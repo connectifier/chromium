@@ -5,9 +5,9 @@
 #ifndef DEVICE_BLUETOOTH_BLUETOOTH_UUID_H_
 #define DEVICE_BLUETOOTH_BLUETOOTH_UUID_H_
 
-#include "device/bluetooth/bluetooth_export.h"
-
 #include <string>
+
+#include "device/bluetooth/bluetooth_export.h"
 
 namespace device {
 
