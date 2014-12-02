@@ -92,7 +92,8 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothUUID {
 };
 
 // This is required by gtest to print a readable output on test failures.
-void PrintTo(const BluetoothUUID& uuid, std::ostream* out);
+void DEVICE_BLUETOOTH_EXPORT
+PrintTo(const BluetoothUUID& uuid, std::ostream* out);
 
 }  // namespace device
 
