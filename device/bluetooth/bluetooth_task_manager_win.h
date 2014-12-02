@@ -14,6 +14,7 @@
 #include "base/observer_list.h"
 #include "base/win/scoped_handle.h"
 #include "device/bluetooth/bluetooth_adapter.h"
+#include "device/bluetooth/bluetooth_export.h"
 
 namespace base {
 
@@ -32,7 +33,7 @@ namespace device {
 // It delegates the blocking Windows API calls to |bluetooth_task_runner_|'s
 // message loop, and receives responses via methods like OnAdapterStateChanged
 // posted to UI thread.
-class BluetoothTaskManagerWin
+class DEVICE_BLUETOOTH_EXPORT BluetoothTaskManagerWin
     : public base::RefCountedThreadSafe<BluetoothTaskManagerWin> {
  public:
   struct AdapterState {
