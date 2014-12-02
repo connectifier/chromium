@@ -2973,7 +2973,6 @@
             '../components/components.gyp:web_modal',
             '../components/components.gyp:web_resource',
             '../content/app/resources/content_resources.gyp:content_resources',
-            '../device/bluetooth/bluetooth.gyp:device_bluetooth',
             '../media/cast/cast.gyp:cast_net',
             '../media/media.gyp:media',
             '../mojo/edk/mojo_edk.gyp:mojo_system_impl',
