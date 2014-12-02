@@ -5,6 +5,8 @@
 #ifndef DEVICE_BLUETOOTH_BLUETOOTH_UUID_H_
 #define DEVICE_BLUETOOTH_BLUETOOTH_UUID_H_
 
+#include "device/bluetooth/bluetooth_export.h"
+
 #include <string>
 
 namespace device {
@@ -14,7 +16,7 @@ namespace device {
 // used in Bluetooth based communication, such as a peripheral's services,
 // characteristics, and characteristic descriptors. An instance are
 // constructed using a string representing 16, 32, or 128 bit UUID formats.
-class BluetoothUUID {
+class DEVICE_BLUETOOTH_EXPORT BluetoothUUID {
  public:
   // Possible representation formats used during construction.
   enum Format {
