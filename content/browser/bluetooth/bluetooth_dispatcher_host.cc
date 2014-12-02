@@ -36,8 +36,8 @@ BluetoothDispatcherHost::BluetoothDispatcherHost()
   //
   //
   if (BluetoothAdapterFactory::IsBluetoothAdapterAvailable())
-    BluetoothAdapterFactory::GetAdapter(base::Bind(
-        &BluetoothDispatcherHost::set_adapter, this));
+    BluetoothAdapterFactory::GetAdapter(
+        base::Bind(&BluetoothDispatcherHost::set_adapter, this));
 }
 
 BluetoothDispatcherHost::~BluetoothDispatcherHost() {
