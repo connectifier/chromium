@@ -26,7 +26,6 @@ source_set("browser") {
     "//content/public/common:common_sources",
     "//crypto",
     "//device/battery",
-    "//device/bluetooth",
     "//google_apis",
     "//net",
     "//skia",
