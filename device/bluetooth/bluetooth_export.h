@@ -5,16 +5,15 @@
 #ifndef DEVICE_BLUETOOTH_DEVICE_BLUETOOTH_EXPORT_H_
 #define DEVICE_BLUETOOTH_DEVICE_BLUETOOTH_EXPORT_H_
 
-#if defined(COMPONENT_BUILD)
-#if defined(WIN32)
+#if defined(COMPONENT_BUILD) && defined(WIN32)
 
 #if defined(DEVICE_BLUETOOTH_IMPLEMENTATION)
 #define DEVICE_BLUETOOTH_EXPORT __declspec(dllexport)
 #else
 #define DEVICE_BLUETOOTH_EXPORT __declspec(dllimport)
-#endif  // defined(DEVICE_BLUETOOTH_IMPLEMENTATION)
+#endif
 
-#else  // defined(WIN32)
+#elif defined(COMPONENT_BUILD) && !defined(WIN32)
 
 #if defined(DEVICE_BLUETOOTH_IMPLEMENTATION)
 #define DEVICE_BLUETOOTH_EXPORT __attribute__((visibility("default")))
@@ -22,12 +21,8 @@
 #define DEVICE_BLUETOOTH_EXPORT
 #endif
 
-#endif  // defined(WIN32)
-
-#else  // defined(COMPONENT_BUILD)
-
+#else
 #define DEVICE_BLUETOOTH_EXPORT
-
-#endif  // defined(COMPONENT_BUILD)
+#endif
 
 #endif  // DEVICE_BLUETOOTH_DEVICE_BLUETOOTH_EXPORT_H_
