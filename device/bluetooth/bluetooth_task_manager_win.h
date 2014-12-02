@@ -74,7 +74,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothTaskManagerWin
     base::FilePath path;
   };
 
-  class Observer {
+  class DEVICE_BLUETOOTH_EXPORT Observer {
    public:
      virtual ~Observer() {}
 
