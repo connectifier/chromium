@@ -50,7 +50,8 @@ void BluetoothDispatcherHost::set_adapter(
   if (adapter_.get())
     adapter_->RemoveObserver(this);
   adapter_ = adapter;
-  adapter_->AddObserver(this);
+  if (adapter_.get())
+    adapter_->AddObserver(this);
 }
 
 bool BluetoothDispatcherHost::OnMessageReceived(const IPC::Message& message) {
