@@ -36,7 +36,7 @@ namespace device {
 class DEVICE_BLUETOOTH_EXPORT BluetoothTaskManagerWin
     : public base::RefCountedThreadSafe<BluetoothTaskManagerWin> {
  public:
-  struct AdapterState {
+  struct DEVICE_BLUETOOTH_EXPORT AdapterState {
     AdapterState();
     ~AdapterState();
     std::string name;
@@ -44,7 +44,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothTaskManagerWin
     bool powered;
   };
 
-  struct ServiceRecordState {
+  struct DEVICE_BLUETOOTH_EXPORT ServiceRecordState {
     ServiceRecordState();
     ~ServiceRecordState();
     // Properties common to Bluetooth Classic and LE devices.
@@ -55,7 +55,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothTaskManagerWin
     BluetoothUUID gatt_uuid;
   };
 
-  struct DeviceState {
+  struct DEVICE_BLUETOOTH_EXPORT DeviceState {
     DeviceState();
     ~DeviceState();
 
@@ -74,7 +74,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothTaskManagerWin
     base::FilePath path;
   };
 
-  class Observer {
+  class DEVICE_BLUETOOTH_EXPORT Observer {
    public:
      virtual ~Observer() {}
 

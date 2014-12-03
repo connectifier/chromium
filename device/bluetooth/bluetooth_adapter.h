@@ -160,7 +160,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapter
   };
 
   // Used to configure a listening servie.
-  struct ServiceOptions {
+  struct DEVICE_BLUETOOTH_EXPORT ServiceOptions {
     ServiceOptions();
     ~ServiceOptions();
 
