@@ -878,6 +878,7 @@ void RenderProcessHostImpl::CreateMessageFilters() {
 #endif
   AddFilter(new GeofencingDispatcherHost(
       storage_partition_impl_->GetGeofencingManager()));
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
   if (browser_command_line.HasSwitch(
           switches::kEnableExperimentalWebPlatformFeatures))
     AddFilter(new BluetoothDispatcherHost());
