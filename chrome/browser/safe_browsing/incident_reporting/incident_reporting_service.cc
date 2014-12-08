@@ -56,8 +56,12 @@ enum IncidentType {
 // The action taken for an incident; used for user metrics (see
 // LogIncidentDataType).
 enum IncidentDisposition {
+  RECEIVED,
   DROPPED,
   ACCEPTED,
+  PRUNED,
+  DISCARDED,
+  NUM_DISPOSITIONS
 };
 
 // The state persisted for a specific instance of an incident to enable pruning
@@ -114,14 +118,24 @@ IncidentType GetIncidentType(
 void LogIncidentDataType(
     IncidentDisposition disposition,
     const ClientIncidentReport_IncidentData& incident_data) {
+  static const char* const kHistogramNames[] = {
+      "SBIRS.ReceivedIncident",
+      "SBIRS.DroppedIncident",
+      "SBIRS.Incident",
+      "SBIRS.PrunedIncident",
+      "SBIRS.DiscardedIncident",
+  };
+  static_assert(arraysize(kHistogramNames) == NUM_DISPOSITIONS,
+                "Keep kHistogramNames in sync with enum IncidentDisposition.");
+  DCHECK_GE(disposition, 0);
+  DCHECK_LT(disposition, NUM_DISPOSITIONS);
   IncidentType type = GetIncidentType(incident_data);
-  if (disposition == ACCEPTED) {
-    UMA_HISTOGRAM_ENUMERATION("SBIRS.Incident", type, NUM_INCIDENT_TYPES);
-  } else {
-    DCHECK_EQ(disposition, DROPPED);
-    UMA_HISTOGRAM_ENUMERATION("SBIRS.DroppedIncident", type,
-                              NUM_INCIDENT_TYPES);
-  }
+  base::LinearHistogram::FactoryGet(
+      kHistogramNames[disposition],
+      1,  // minimum
+      NUM_INCIDENT_TYPES,  // maximum
+      NUM_INCIDENT_TYPES + 1,  // bucket_count
+      base::HistogramBase::kUmaTargetedHistogramFlag)->Add(type);
 }
 
 // Computes the persistent state for an incident.
@@ -202,6 +216,7 @@ struct IncidentReportingService::ProfileContext {
   ~ProfileContext();
 
   // The incidents collected for this profile pending creation and/or upload.
+  // Will contain null values for pruned incidents.
   ScopedVector<ClientIncidentReport_IncidentData> incidents;
 
   // False until PROFILE_ADDED notification is received.
@@ -236,6 +251,10 @@ IncidentReportingService::ProfileContext::ProfileContext() : added() {
 }
 
 IncidentReportingService::ProfileContext::~ProfileContext() {
+  for (ClientIncidentReport_IncidentData* incident : incidents) {
+    if (incident)
+      LogIncidentDataType(DISCARDED, *incident);
+  }
 }
 
 IncidentReportingService::UploadContext::UploadContext(
@@ -433,8 +452,8 @@ void IncidentReportingService::OnProfileAdded(Profile* profile) {
   // Drop all incidents associated with this profile that were received prior to
   // its addition if the profile is not participating in safe browsing.
   if (!context->incidents.empty() && !safe_browsing_enabled) {
-    for (size_t i = 0; i < context->incidents.size(); ++i)
-      LogIncidentDataType(DROPPED, *context->incidents[i]);
+    for (ClientIncidentReport_IncidentData* incident : context->incidents)
+      LogIncidentDataType(DROPPED, *incident);
     context->incidents.clear();
   }
 
@@ -534,6 +553,8 @@ void IncidentReportingService::AddIncident(
   // If this is a process-wide incident, the context must not indicate that the
   // profile (which is NULL) has been added to the profile manager.
   DCHECK(profile || !context->added);
+
+  LogIncidentDataType(RECEIVED, *incident_data);
 
   // Drop the incident immediately if the profile has already been added to the
   // manager and is not participating in safe browsing. Preference evaluation is
@@ -812,9 +833,8 @@ void IncidentReportingService::UploadIfCollectionComplete() {
     if (context->incidents.empty())
       continue;
     if (!prefs->GetBoolean(prefs::kSafeBrowsingEnabled)) {
-      for (size_t i = 0; i < context->incidents.size(); ++i) {
-        LogIncidentDataType(DROPPED, *context->incidents[i]);
-      }
+      for (ClientIncidentReport_IncidentData* incident : context->incidents)
+        LogIncidentDataType(DROPPED, *incident);
       context->incidents.clear();
       continue;
     }
@@ -822,43 +842,21 @@ void IncidentReportingService::UploadIfCollectionComplete() {
     const base::DictionaryValue* incidents_sent =
         prefs->GetDictionary(prefs::kSafeBrowsingIncidentsSent);
     // Prep persistent data and prune any incidents already sent.
-    for (size_t i = 0; i < context->incidents.size(); ++i) {
-      ClientIncidentReport_IncidentData* incident = context->incidents[i];
+    for (ClientIncidentReport_IncidentData* incident : context->incidents) {
       const PersistentIncidentState state = ComputeIncidentState(*incident);
       if (IncidentHasBeenReported(incidents_sent, state)) {
+        LogIncidentDataType(PRUNED, *incident);
         ++prune_count;
-        delete context->incidents[i];
-        context->incidents[i] = NULL;
+        delete incident;
       } else {
+        LogIncidentDataType(ACCEPTED, *incident);
+        // Ownership of the incident is passed to the report.
+        report->mutable_incident()->AddAllocated(incident);
         states.push_back(state);
       }
     }
-    if (prefs->GetBoolean(prefs::kSafeBrowsingIncidentReportSent)) {
-      // Prune all incidents as if they had been reported, migrating to the new
-      // technique. TODO(grt): remove this branch after it has shipped.
-      for (size_t i = 0; i < context->incidents.size(); ++i) {
-        if (context->incidents[i])
-          ++prune_count;
-      }
-      context->incidents.clear();
-      prefs->ClearPref(prefs::kSafeBrowsingIncidentReportSent);
-      DictionaryPrefUpdate pref_update(prefs,
-                                       prefs::kSafeBrowsingIncidentsSent);
-      MarkIncidentsAsReported(states, pref_update.Get());
-    } else {
-      for (size_t i = 0; i < context->incidents.size(); ++i) {
-        ClientIncidentReport_IncidentData* incident = context->incidents[i];
-        if (incident) {
-          LogIncidentDataType(ACCEPTED, *incident);
-          // Ownership of the incident is passed to the report.
-          report->mutable_incident()->AddAllocated(incident);
-        }
-      }
-      context->incidents.weak_clear();
-      std::vector<PersistentIncidentState>& profile_states =
-          profiles_to_state[scan->first];
-      profile_states.swap(states);
-    }
+    context->incidents.weak_clear();
+    profiles_to_state[scan->first].swap(states);
   }
 
   const int count = report->incident_size();

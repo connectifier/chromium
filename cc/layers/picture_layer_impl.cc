@@ -106,6 +106,14 @@ scoped_ptr<TilingSetEvictionQueue> PictureLayerImpl::CreateEvictionQueue(
       new TilingSetEvictionQueue(tilings_.get(), tree_priority));
 }
 
+scoped_ptr<TilingSetRasterQueue> PictureLayerImpl::CreateRasterQueue(
+    bool prioritize_low_res) {
+  if (!tilings_)
+    return make_scoped_ptr(new TilingSetRasterQueue());
+  return make_scoped_ptr(
+      new TilingSetRasterQueue(tilings_.get(), prioritize_low_res));
+}
+
 const char* PictureLayerImpl::LayerTypeAsString() const {
   return "cc::PictureLayerImpl";
 }
@@ -1048,8 +1056,12 @@ void PictureLayerImpl::RecalculateRasterScales() {
     if (maximum_scale) {
       gfx::Size bounds_at_maximum_scale = gfx::ToCeiledSize(
           gfx::ScaleSize(raster_source_->GetSize(), maximum_scale));
-      if (bounds_at_maximum_scale.GetArea() <=
-          layer_tree_impl()->device_viewport_size().GetArea())
+      int64 maximum_area = static_cast<int64>(bounds_at_maximum_scale.width()) *
+                           static_cast<int64>(bounds_at_maximum_scale.height());
+      gfx::Size viewport = layer_tree_impl()->device_viewport_size();
+      int64 viewport_area = static_cast<int64>(viewport.width()) *
+                            static_cast<int64>(viewport.height());
+      if (maximum_area <= viewport_area)
         can_raster_at_maximum_scale = true;
     }
     // Use the computed scales for the raster scale directly, do not try to use
@@ -1362,125 +1374,6 @@ bool PictureLayerImpl::AllTilesRequiredForDrawAreReadyToDraw() const {
 
   return AllTilesRequiredAreReadyToDraw(
       &PictureLayerTiling::IsTileRequiredForDrawIfVisible);
-}
-
-PictureLayerImpl::LayerRasterTileIterator::LayerRasterTileIterator()
-    : layer_(nullptr), current_stage_(arraysize(stages_)) {
-}
-
-PictureLayerImpl::LayerRasterTileIterator::LayerRasterTileIterator(
-    PictureLayerImpl* layer,
-    bool prioritize_low_res)
-    : layer_(layer), current_stage_(0) {
-  DCHECK(layer_);
-
-  // Early out if the layer has no tilings.
-  if (!layer_->tilings_ || !layer_->tilings_->num_tilings()) {
-    current_stage_ = arraysize(stages_);
-    return;
-  }
-
-  // Tiles without valid priority are treated as having lowest priority and
-  // never considered for raster.
-  if (!layer_->HasValidTilePriorities()) {
-    current_stage_ = arraysize(stages_);
-    return;
-  }
-
-  // Find high and low res tilings and initialize the iterators.
-  for (size_t i = 0; i < layer_->tilings_->num_tilings(); ++i) {
-    PictureLayerTiling* tiling = layer_->tilings_->tiling_at(i);
-    if (tiling->resolution() == HIGH_RESOLUTION) {
-      iterators_[HIGH_RES] =
-          PictureLayerTiling::TilingRasterTileIterator(tiling);
-    }
-
-    if (prioritize_low_res && tiling->resolution() == LOW_RESOLUTION) {
-      iterators_[LOW_RES] =
-          PictureLayerTiling::TilingRasterTileIterator(tiling);
-    }
-  }
-
-  if (prioritize_low_res) {
-    stages_[0].iterator_type = LOW_RES;
-    stages_[0].tile_type = TilePriority::NOW;
-
-    stages_[1].iterator_type = HIGH_RES;
-    stages_[1].tile_type = TilePriority::NOW;
-  } else {
-    stages_[0].iterator_type = HIGH_RES;
-    stages_[0].tile_type = TilePriority::NOW;
-
-    stages_[1].iterator_type = LOW_RES;
-    stages_[1].tile_type = TilePriority::NOW;
-  }
-
-  stages_[2].iterator_type = HIGH_RES;
-  stages_[2].tile_type = TilePriority::SOON;
-
-  stages_[3].iterator_type = HIGH_RES;
-  stages_[3].tile_type = TilePriority::EVENTUALLY;
-
-  IteratorType index = stages_[current_stage_].iterator_type;
-  TilePriority::PriorityBin tile_type = stages_[current_stage_].tile_type;
-  if (!iterators_[index] || iterators_[index].get_type() != tile_type)
-    AdvanceToNextStage();
-}
-
-PictureLayerImpl::LayerRasterTileIterator::~LayerRasterTileIterator() {}
-
-PictureLayerImpl::LayerRasterTileIterator::operator bool() const {
-  return current_stage_ < arraysize(stages_);
-}
-
-PictureLayerImpl::LayerRasterTileIterator&
-PictureLayerImpl::LayerRasterTileIterator::
-operator++() {
-  IteratorType index = stages_[current_stage_].iterator_type;
-  TilePriority::PriorityBin tile_type = stages_[current_stage_].tile_type;
-
-  // First advance the iterator.
-  DCHECK(iterators_[index]);
-  DCHECK(iterators_[index].get_type() == tile_type);
-  ++iterators_[index];
-
-  if (!iterators_[index] || iterators_[index].get_type() != tile_type)
-    AdvanceToNextStage();
-
-  return *this;
-}
-
-Tile* PictureLayerImpl::LayerRasterTileIterator::operator*() {
-  DCHECK(*this);
-
-  IteratorType index = stages_[current_stage_].iterator_type;
-  DCHECK(iterators_[index]);
-  DCHECK(iterators_[index].get_type() == stages_[current_stage_].tile_type);
-
-  return *iterators_[index];
-}
-
-const Tile* PictureLayerImpl::LayerRasterTileIterator::operator*() const {
-  DCHECK(*this);
-
-  IteratorType index = stages_[current_stage_].iterator_type;
-  DCHECK(iterators_[index]);
-  DCHECK(iterators_[index].get_type() == stages_[current_stage_].tile_type);
-
-  return *iterators_[index];
-}
-
-void PictureLayerImpl::LayerRasterTileIterator::AdvanceToNextStage() {
-  DCHECK_LT(current_stage_, arraysize(stages_));
-  ++current_stage_;
-  while (current_stage_ < arraysize(stages_)) {
-    IteratorType index = stages_[current_stage_].iterator_type;
-    TilePriority::PriorityBin tile_type = stages_[current_stage_].tile_type;
-
-    if (iterators_[index] && iterators_[index].get_type() == tile_type)
-      break;
-    ++current_stage_;
-  }
 }
 
 }  // namespace cc

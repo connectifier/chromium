@@ -49,6 +49,7 @@ group("root") {
     "//device/battery",
     "//device/bluetooth",
     "//device/nfc",
+    "//device/vibration",
     "//extensions/browser",
     "//extensions/common",
     "//extensions/common/api",
@@ -137,7 +138,8 @@ group("root") {
     "//ui/web_dialogs",
     "//url",
     "//v8:v8",
-  ] + root_extra_deps
+  ]
+  deps += root_extra_deps
 
   if (!is_win) {
     deps += [ "//breakpad:symupload" ]
@@ -160,16 +162,12 @@ group("root") {
   }
 
   if (is_win) {
-    deps += [
-      "//ui/metro_viewer",
-    ]
+    deps += [ "//ui/metro_viewer" ]
   }
 
   if (is_win || is_mac || is_chromeos) {
     # RLZ works on these platforms.
-    deps += [
-      "//rlz:rlz_lib",
-    ]
+    deps += [ "//rlz:rlz_lib" ]
   }
 
   if (cpu_arch == "x86" || cpu_arch == "x64") {
@@ -192,13 +190,11 @@ group("root") {
       "//third_party/android_tools:android_support_v13_java",
       "//third_party/android_tools:android_support_v7_appcompat_java",
       "//third_party/android_tools:android_support_v7_mediarouter_java",
-      "//third_party/eyesfree:eyesfree_java",
+      "//third_party/mockito:mockito_java",
     ]
 
     if (has_chrome_android_internal) {
-      deps += [
-        "//clank",
-      ]
+      deps += [ "//clank" ]
     }
 
     # TODO(GYP): Move the targets in the rest of this block that still
@@ -268,7 +264,7 @@ group("root") {
     ]
   }
 
-  # 
+  #
   # TODO(GYP): Make everything below this work in the GN build.
   #
 

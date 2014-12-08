@@ -4,7 +4,6 @@
 
 import("//mojo/public/mojo_application.gni")
 
-# GYP version: mojo/mojo_services.gypi:mojo_network_service
 mojo_native_application("network") {
   output_name = "network_service"
 
@@ -17,10 +16,11 @@ mojo_native_application("network") {
     "//mojo/services/public/interfaces/network",
   ]
 
-  sources = [ "network_service.cc" ]
+  sources = [
+    "network_service.cc",
+  ]
 }
 
-# GYP version: mojo/mojo_services.gypi:mojo_network_service_lib
 source_set("lib") {
   deps = [
     "//base",

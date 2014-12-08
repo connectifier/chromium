@@ -61,18 +61,18 @@ class PipelineIntegrationTestBase {
 
   bool WaitUntilOnEnded();
   PipelineStatus WaitUntilEndedOrError();
-  bool Start(const base::FilePath& file_path, PipelineStatus expected_status);
-  // Enable playback with audio and video hashing enabled, or clockless
-  // playback (audio only). Frame dropping and audio underflow will be disabled
-  // if hashing enabled to ensure consistent hashes.
+
+  // Starts the pipeline (optionally with a CdmContext), returning the final
+  // status code after it has started. |filename| points at a test file located
+  // under media/test/data/.
+  PipelineStatus Start(const std::string& filename);
+  PipelineStatus Start(const std::string& filename, CdmContext* cdm_context);
+
+  // Starts the pipeline in a particular mode for advanced testing and
+  // benchmarking purposes (e.g., underflow is disabled to ensure consistent
+  // hashes).
   enum kTestType { kHashed, kClockless };
-  bool Start(const base::FilePath& file_path,
-             PipelineStatus expected_status,
-             kTestType test_type);
-  // Initialize the pipeline and ignore any status updates.  Useful for testing
-  // invalid audio/video clips which don't have deterministic results.
-  bool Start(const base::FilePath& file_path);
-  bool Start(const base::FilePath& file_path, CdmContext* cdm_context);
+  PipelineStatus Start(const std::string& filename, kTestType test_type);
 
   void Play();
   void Pause();
@@ -107,21 +107,19 @@ class PipelineIntegrationTestBase {
   scoped_refptr<ClocklessAudioSink> clockless_audio_sink_;
   bool ended_;
   PipelineStatus pipeline_status_;
-  Demuxer::NeedKeyCB need_key_cb_;
+  Demuxer::EncryptedMediaInitDataCB encrypted_media_init_data_cb_;
   VideoFrame::Format last_video_frame_format_;
   DummyTickClock dummy_clock_;
   AudioHardwareConfig hardware_config_;
   PipelineMetadata metadata_;
 
-  void SaveStatus(PipelineStatus status);
-  void OnStatusCallbackChecked(PipelineStatus expected_status,
-                               PipelineStatus status);
+  void OnSeeked(base::TimeDelta seek_time, PipelineStatus status);
   void OnStatusCallback(PipelineStatus status);
-  PipelineStatusCB QuitOnStatusCB(PipelineStatus expected_status);
-  void DemuxerNeedKeyCB(const std::string& type,
-                        const std::vector<uint8>& init_data);
-  void set_need_key_cb(const Demuxer::NeedKeyCB& need_key_cb) {
-    need_key_cb_ = need_key_cb;
+  void DemuxerEncryptedMediaInitDataCB(const std::string& type,
+                                       const std::vector<uint8>& init_data);
+  void set_encrypted_media_init_data_cb(
+      const Demuxer::EncryptedMediaInitDataCB& encrypted_media_init_data_cb) {
+    encrypted_media_init_data_cb_ = encrypted_media_init_data_cb;
   }
 
   void OnEnded();
@@ -129,7 +127,7 @@ class PipelineIntegrationTestBase {
   void QuitAfterCurrentTimeTask(const base::TimeDelta& quit_time);
 
   // Creates Demuxer and sets |demuxer_|.
-  void CreateDemuxer(const base::FilePath& file_path);
+  void CreateDemuxer(const std::string& filename);
 
   // Creates and returns a Renderer.
   scoped_ptr<Renderer> CreateRenderer();

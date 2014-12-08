@@ -11,6 +11,7 @@
 #include "base/metrics/histogram.h"
 #include "base/metrics/user_metrics.h"
 #include "chromecast/base/metrics/cast_histograms.h"
+#include "chromecast/base/metrics/grouped_histogram.h"
 
 namespace chromecast {
 namespace metrics {
@@ -67,16 +68,16 @@ void CastMetricsHelper::TagAppStart(const std::string& arg_app_name) {
   app_name_ = arg_app_name;
   app_start_time_ = base::TimeTicks::Now();
   new_startup_time_ = true;
+
+  TagAppStartForGroupedHistograms(app_name_);
 }
 
 void CastMetricsHelper::LogMediaPlay() {
-  MAKE_SURE_THREAD(LogMediaPlay);
-  base::RecordComputedAction(GetMetricsNameWithAppName("MediaPlay", ""));
+  LogAction(GetMetricsNameWithAppName("MediaPlay", ""));
 }
 
 void CastMetricsHelper::LogMediaPause() {
-  MAKE_SURE_THREAD(LogMediaPause);
-  base::RecordComputedAction(GetMetricsNameWithAppName("MediaPause", ""));
+  LogAction(GetMetricsNameWithAppName("MediaPause", ""));
 }
 
 void CastMetricsHelper::LogTimeToDisplayVideo() {
@@ -190,6 +191,16 @@ std::string CastMetricsHelper::GetMetricsNameWithAppName(
 void CastMetricsHelper::SetMetricsSink(MetricsSink* delegate) {
   MAKE_SURE_THREAD(SetMetricsSink, delegate);
   metrics_sink_ = delegate;
+}
+
+void CastMetricsHelper::LogAction(const std::string& action) {
+  MAKE_SURE_THREAD(LogAction, action);
+
+  if (metrics_sink_) {
+    metrics_sink_->OnAction(action);
+  } else {
+    base::RecordComputedAction(action);
+  }
 }
 
 void CastMetricsHelper::LogEnumerationHistogramEvent(

@@ -34,6 +34,7 @@
 #include "content/child/weburlresponse_extradata_impl.h"
 #include "content/common/clipboard_messages.h"
 #include "content/common/frame_messages.h"
+#include "content/common/frame_replication_state.h"
 #include "content/common/input_messages.h"
 #include "content/common/service_worker/service_worker_types.h"
 #include "content/common/swapped_out_messages.h"
@@ -136,7 +137,6 @@
 #include "content/renderer/pepper/pepper_plugin_instance_impl.h"
 #include "content/renderer/pepper/pepper_webplugin_impl.h"
 #include "content/renderer/pepper/plugin_module.h"
-#include "content/renderer/pepper/plugin_power_saver_helper.h"
 #endif
 
 #if defined(ENABLE_WEBRTC)
@@ -604,7 +604,7 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
 #endif
 
 #if defined(ENABLE_PLUGINS)
-  plugin_power_saver_helper_ = new PluginPowerSaverHelper(this);
+  plugin_power_saver_helper_ = new PluginPowerSaverHelperImpl(this);
 #endif
 
   manifest_manager_ = new ManifestManager(this);
@@ -834,11 +834,6 @@ void RenderFrameImpl::OnImeConfirmComposition(
     render_view_->focused_pepper_plugin()->HandleTextInput(last_text);
   }
   pepper_composition_text_.clear();
-}
-
-PluginPowerSaverHelper* RenderFrameImpl::plugin_power_saver_helper() {
-  DCHECK(plugin_power_saver_helper_);
-  return plugin_power_saver_helper_;
 }
 #endif  // defined(ENABLE_PLUGINS)
 
@@ -1109,7 +1104,9 @@ void RenderFrameImpl::OnBeforeUnload() {
                                          before_unload_end_time));
 }
 
-void RenderFrameImpl::OnSwapOut(int proxy_routing_id) {
+void RenderFrameImpl::OnSwapOut(
+    int proxy_routing_id,
+    const FrameReplicationState& replicated_frame_state) {
   TRACE_EVENT1("navigation", "RenderFrameImpl::OnSwapOut", "id", routing_id_);
   RenderFrameProxy* proxy = NULL;
   bool is_site_per_process =
@@ -1193,6 +1190,17 @@ void RenderFrameImpl::OnSwapOut(int proxy_routing_id) {
       set_render_frame_proxy(proxy);
     }
   }
+
+  // In --site-per-process, initialize the WebRemoteFrame with the replication
+  // state passed by the process that is now rendering the frame.
+  // TODO(alexmos): We cannot yet do this for swapped-out main frames, because
+  // in that case we leave the LocalFrame as the main frame visible to Blink
+  // and don't call swap() above. Because swap() is what creates a RemoteFrame
+  // in proxy->web_frame(), the RemoteFrame will not exist for main frames.
+  // When we do an unconditional swap for all frames, we can remove
+  // !is_main_frame below.
+  if (is_site_per_process && proxy && !is_main_frame)
+    proxy->SetReplicatedState(replicated_frame_state);
 
   // Safe to exit if no one else is using the process.
   if (is_main_frame)
@@ -1632,6 +1640,13 @@ ServiceRegistry* RenderFrameImpl::GetServiceRegistry() {
   return &service_registry_;
 }
 
+#if defined(ENABLE_PLUGINS)
+PluginPowerSaverHelperImpl* RenderFrameImpl::GetPluginPowerSaverHelper() {
+  DCHECK(plugin_power_saver_helper_);
+  return plugin_power_saver_helper_;
+}
+#endif
+
 bool RenderFrameImpl::IsFTPDirectoryListing() {
   WebURLResponseExtraDataImpl* extra_data =
       GetExtraDataFromResponse(frame_->dataSource()->response());
@@ -1640,6 +1655,10 @@ bool RenderFrameImpl::IsFTPDirectoryListing() {
 
 void RenderFrameImpl::AttachGuest(int element_instance_id) {
   render_view_->GetBrowserPluginManager()->Attach(element_instance_id);
+}
+
+void RenderFrameImpl::DetachGuest(int element_instance_id) {
+  render_view_->GetBrowserPluginManager()->Detach(element_instance_id);
 }
 
 void RenderFrameImpl::SetSelectedText(const base::string16& selection_text,
@@ -2134,7 +2153,7 @@ void RenderFrameImpl::didCreateDataSource(blink::WebLocalFrame* frame,
   if (!ServiceWorkerNetworkProvider::FromDocumentState(
           DocumentState::FromDataSource(datasource))) {
     scoped_ptr<ServiceWorkerNetworkProvider>
-        network_provider(new ServiceWorkerNetworkProvider());
+        network_provider(new ServiceWorkerNetworkProvider(routing_id_));
     ServiceWorkerNetworkProvider::AttachToDocumentState(
         DocumentState::FromDataSource(datasource),
         network_provider.Pass());
@@ -2920,10 +2939,10 @@ void RenderFrameImpl::willSendRequest(
   extra_data->set_custom_user_agent(custom_user_agent);
   extra_data->set_requested_with(requested_with);
   extra_data->set_render_frame_id(routing_id_);
-  extra_data->set_is_main_frame(frame == top_frame);
+  extra_data->set_is_main_frame(!parent);
   extra_data->set_frame_origin(
       GURL(frame->document().securityOrigin().toString()));
-  extra_data->set_parent_is_main_frame(frame->parent() == top_frame);
+  extra_data->set_parent_is_main_frame(parent && !parent->parent());
   extra_data->set_parent_render_frame_id(parent_routing_id);
   extra_data->set_allow_download(navigation_state->allow_download());
   extra_data->set_transition_type(transition_type);
@@ -3479,6 +3498,16 @@ void RenderFrameImpl::SendDidCommitProvisionalLoad(blink::WebFrame* frame) {
   // Set the URL to be displayed in the browser UI to the user.
   params.url = GetLoadingUrl();
   DCHECK(!is_swapped_out_ || params.url == GURL(kSwappedOutURL));
+
+  // Set the origin of the frame.  This will be replicated to the corresponding
+  // RenderFrameProxies in other processes.
+  // TODO(alexmos): Origins for URLs with non-standard schemes are excluded due
+  // to https://crbug.com/439608 and will be replicated as unique origins.
+  if (!is_swapped_out_) {
+    WebString serialized_origin(frame->document().securityOrigin().toString());
+    if (GURL(serialized_origin).IsStandard())
+      params.origin = url::Origin(serialized_origin.utf8());
+  }
 
   if (frame->document().baseURL() != params.url)
     params.base_url = frame->document().baseURL();

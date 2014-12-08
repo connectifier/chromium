@@ -7,6 +7,7 @@
 #include "base/auto_reset.h"
 #include "chrome/browser/extensions/extension_action_manager.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/sessions/session_tab_helper.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/extensions/extension_action_view_controller.h"
@@ -78,10 +79,12 @@ ToolbarActionsBar::ToolbarActionsBar(ToolbarActionsBarDelegate* delegate,
       in_overflow_mode_(in_overflow_mode),
       platform_settings_(in_overflow_mode),
       model_observer_(this),
+      tab_strip_observer_(this),
       suppress_layout_(false),
       suppress_animation_(true) {
   if (model_)  // |model_| can be null in unittests.
     model_observer_.Add(model_);
+  tab_strip_observer_.Add(browser_->tab_strip_model());
 }
 
 ToolbarActionsBar::~ToolbarActionsBar() {
@@ -171,10 +174,7 @@ size_t ToolbarActionsBar::GetIconCount() const {
   if (!model_)
     return 0u;
 
-  // Find the absolute value for the model's visible count.
-  size_t model_visible_size = model_->GetVisibleIconCountForTab(
-      browser_->tab_strip_model()->GetActiveWebContents());
-
+  size_t visible_icons = model_->visible_icon_count();
 #if DCHECK_IS_ON
   // Good time for some sanity checks: We should never try to display more
   // icons than we have, and we should always have a view per item in the model.
@@ -190,14 +190,23 @@ size_t ToolbarActionsBar::GetIconCount() const {
       if (crx_file::id_util::IdIsValid(action->GetId()))
         ++num_extension_actions;
     }
-    DCHECK_LE(model_visible_size, num_extension_actions);
+    DCHECK_LE(visible_icons, num_extension_actions);
     DCHECK_EQ(model_->toolbar_items().size(), num_extension_actions);
   }
 #endif
 
+  int tab_id = SessionTabHelper::IdForTab(
+      browser_->tab_strip_model()->GetActiveWebContents());
+  for (ToolbarActionViewController* action : toolbar_actions_) {
+    auto actions_tabs = popped_out_in_tabs_.find(action);
+    if (actions_tabs != popped_out_in_tabs_.end() &&
+        actions_tabs->second.count(tab_id))
+      ++visible_icons;
+  }
+
   // The overflow displays any icons not shown by the main bar.
   return in_overflow_mode_ ?
-      model_->toolbar_items().size() - model_visible_size : model_visible_size;
+      model_->toolbar_items().size() - visible_icons : visible_icons;
 }
 
 void ToolbarActionsBar::CreateActions() {
@@ -214,8 +223,7 @@ void ToolbarActionsBar::CreateActions() {
     // Extension actions come first.
     extensions::ExtensionActionManager* action_manager =
         extensions::ExtensionActionManager::Get(browser_->profile());
-    const extensions::ExtensionList& toolbar_items = model_->GetItemOrderForTab(
-        GetCurrentWebContents());
+    const extensions::ExtensionList& toolbar_items = model_->toolbar_items();
     for (const scoped_refptr<const extensions::Extension>& extension :
              toolbar_items) {
       toolbar_actions_.push_back(new ExtensionActionViewController(
@@ -238,13 +246,11 @@ void ToolbarActionsBar::CreateActions() {
       component_actions.weak_clear();
     }
 
+    if (!toolbar_actions_.empty())
+      ReorderActions();
+
     for (size_t i = 0; i < toolbar_actions_.size(); ++i)
       delegate_->AddViewForAction(toolbar_actions_[i], i);
-  }
-
-  if (!toolbar_actions_.empty()) {
-    delegate_->Redraw(false);
-    ResizeDelegate(gfx::Tween::EASE_OUT, false);
   }
 
   // Once the actions are created, we should animate the changes.
@@ -282,22 +288,87 @@ void ToolbarActionsBar::SetOverflowRowWidth(int width) {
 }
 
 void ToolbarActionsBar::OnResizeComplete(int width) {
+  DCHECK(!in_overflow_mode_);  // The user can't resize the overflow container.
+  size_t resized_count = WidthToIconCount(width);
+  size_t tab_icon_count = GetIconCount();
+  int tab_id = SessionTabHelper::IdForTab(GetCurrentWebContents());
+  int delta = tab_icon_count - model_->visible_icon_count();
+  bool reorder_necessary = false;
+  if (resized_count < tab_icon_count) {
+    for (int i = resized_count; i < delta; ++i) {
+      // If an extension that was popped out to act is overflowed, then it
+      // should no longer be popped out, and it also doesn't count for adjusting
+      // the visible count (since it wasn't really out to begin with).
+      if (popped_out_in_tabs_[toolbar_actions_[i]].count(tab_id)) {
+        reorder_necessary = true;
+        popped_out_in_tabs_[toolbar_actions_[i]].erase(tab_id);
+        ++resized_count;
+      }
+    }
+  } else {
+    // If the user increases the toolbar size while actions that popped out are
+    // visible, we need to re-arrange the icons in other windows to be
+    // consistent with what the user sees.
+    // That is, if the normal order is A, B, [C, D] (with C and D hidden), C
+    // pops out to act, and then the user increases the size of the toolbar,
+    // the user sees uncovering D (since C is already out). This is what should
+    // happen in all windows.
+    for (size_t i = tab_icon_count; i < resized_count; ++i) {
+      if (toolbar_actions_[i]->GetId() !=
+              model_->toolbar_items()[i - delta]->id())
+        model_->MoveExtensionIcon(toolbar_actions_[i]->GetId(), i - delta);
+    }
+  }
+  resized_count -= delta;
   // Save off the desired number of visible icons.  We do this now instead of at
   // the end of the animation so that even if the browser is shut down while
   // animating, the right value will be restored on next run.
-  model_->SetVisibleIconCount(WidthToIconCount(width));
+  model_->SetVisibleIconCount(resized_count);
+  if (reorder_necessary)
+    ReorderActions();
 }
 
 void ToolbarActionsBar::OnDragDrop(int dragged_index,
                                    int dropped_index,
                                    DragType drag_type) {
-  model_->MoveExtensionIcon(toolbar_actions_[dragged_index]->GetId(),
-                            dropped_index);
-
-  if (drag_type != DRAG_TO_SAME) {
-    int delta = drag_type == DRAG_TO_OVERFLOW ? -1 : 1;
-    model_->SetVisibleIconCount(model_->visible_icon_count() + delta);
+  ToolbarActionViewController* action = toolbar_actions_[dragged_index];
+  int tab_id = SessionTabHelper::IdForTab(GetCurrentWebContents());
+  int delta = 0;
+  switch (drag_type) {
+    case DRAG_TO_OVERFLOW:
+      // If the user moves an action back into overflow, then we don't adjust
+      // the base visible count, but do stop popping that action out.
+      if (popped_out_in_tabs_[action].count(tab_id))
+        popped_out_in_tabs_[action].erase(tab_id);
+      else
+        delta = -1;
+      break;
+    case DRAG_TO_MAIN:
+      delta = 1;
+      break;
+    case DRAG_TO_SAME:
+      // If the user moves an action that had popped out to be on the toolbar,
+      // then we treat it as "pinning" the action, and adjust the base visible
+      // count to accommodate.
+      if (popped_out_in_tabs_[action].count(tab_id)) {
+        delta = 1;
+        popped_out_in_tabs_[action].erase(tab_id);
+      }
+      break;
   }
+
+  // If there are any actions that are in front of the dropped index only
+  // because they were popped out, decrement the dropped index.
+  for (int i = 0; i < dropped_index; ++i) {
+    if (i != dragged_index &&
+        model_->GetIndexForId(toolbar_actions_[i]->GetId()) >= dropped_index)
+      --dropped_index;
+  }
+
+  model_->MoveExtensionIcon(action->GetId(), dropped_index);
+
+  if (delta)
+    model_->SetVisibleIconCount(model_->visible_icon_count() + delta);
 }
 
 void ToolbarActionsBar::ToolbarExtensionAdded(
@@ -343,6 +414,7 @@ void ToolbarActionsBar::ToolbarExtensionRemoved(
     return;
 
   delegate_->RemoveViewForAction(*iter);
+  popped_out_in_tabs_.erase(*iter);
   toolbar_actions_.erase(iter);
 
   // If the extension is being upgraded we don't want the bar to shrink
@@ -368,19 +440,10 @@ void ToolbarActionsBar::ToolbarExtensionMoved(
     const extensions::Extension* extension,
     int index) {
   DCHECK(index >= 0 && index < static_cast<int>(toolbar_actions_.size()));
-  ToolbarActions::iterator iter = toolbar_actions_.begin();
-  while (iter != toolbar_actions_.end() && (*iter)->GetId() != extension->id())
-    ++iter;
-
-  DCHECK(iter != toolbar_actions_.end());
-  if (iter - toolbar_actions_.begin() == index)
-    return;  // Already in place.
-
-  ToolbarActionViewController* moved_action = *iter;
-  toolbar_actions_.weak_erase(iter);
-  toolbar_actions_.insert(toolbar_actions_.begin() + index, moved_action);
-
-  delegate_->Redraw(true);
+  // Unfortunately, |index| doesn't really mean a lot to us, because this
+  // window's toolbar could be different (if actions are popped out). Just
+  // do a full reorder.
+  ReorderActions();
 }
 
 void ToolbarActionsBar::ToolbarExtensionUpdated(
@@ -388,8 +451,27 @@ void ToolbarActionsBar::ToolbarExtensionUpdated(
   ToolbarActionViewController* action = GetActionForId(extension->id());
   // There might not be a view in cases where we are highlighting or if we
   // haven't fully initialized the actions.
-  if (action)
+  if (action) {
+    content::WebContents* web_contents = GetCurrentWebContents();
     action->UpdateState();
+    bool wants_to_run = action->WantsToRun(web_contents);
+
+    // The action may need to be popped in or out of overflow.
+    int index = std::find(toolbar_actions_.begin(),
+                          toolbar_actions_.end(),
+                          action) - toolbar_actions_.begin();
+    bool reorder_necessary = false;
+    int tab_id = SessionTabHelper::IdForTab(web_contents);
+    if (wants_to_run && static_cast<size_t>(index) >= GetIconCount()) {
+      popped_out_in_tabs_[action].insert(tab_id);
+      reorder_necessary = true;
+    } else if (!wants_to_run && popped_out_in_tabs_[action].count(tab_id)) {
+      popped_out_in_tabs_[action].erase(tab_id);
+      reorder_necessary = true;
+    }
+    if (reorder_necessary)
+      ReorderActions();
+  }
 }
 
 bool ToolbarActionsBar::ShowExtensionActionPopup(
@@ -445,51 +527,81 @@ void ToolbarActionsBar::OnToolbarModelInitialized() {
   CreateActions();
 }
 
-void ToolbarActionsBar::OnToolbarReorderNecessary(
-    content::WebContents* web_contents) {
-  if (GetCurrentWebContents() == web_contents)
-    ReorderActions();
-}
-
 Browser* ToolbarActionsBar::GetBrowser() {
   return browser_;
 }
 
+void ToolbarActionsBar::TabInsertedAt(content::WebContents* web_contents,
+                                      int index,
+                                      bool foreground) {
+  if (foreground)
+    ReorderActions();
+}
+
+void ToolbarActionsBar::TabDetachedAt(content::WebContents* web_contents,
+                                      int index) {
+  int tab_id = SessionTabHelper::IdForTab(web_contents);
+  for (auto& tabs : popped_out_in_tabs_)
+    tabs.second.erase(tab_id);
+  tabs_checked_for_pop_out_.erase(tab_id);
+}
+
+void ToolbarActionsBar::TabStripModelDeleted() {
+  tab_strip_observer_.RemoveAll();
+}
+
 void ToolbarActionsBar::ReorderActions() {
-  extensions::ExtensionList new_order =
-      model_->GetItemOrderForTab(GetCurrentWebContents());
-  if (new_order.empty())
-    return;  // Nothing to do.
+  if (toolbar_actions_.empty())
+    return;
 
-#if DCHECK_IS_ON
-  // Make sure the lists are in sync. There should be a view for each action in
-  // the new order.
-  // |toolbar_actions_| may have more views than actions are present in
-  // |new_order| if there are any component toolbar actions.
-  // TODO(devlin): Change this to DCHECK_EQ when all toolbar actions are shown
-  // in the model.
-  DCHECK_LE(new_order.size(), toolbar_actions_.size());
-  for (const scoped_refptr<const extensions::Extension>& extension : new_order)
-    DCHECK(GetActionForId(extension->id()));
-#endif
-
-  // Run through the views and compare them to the desired order. If something
-  // is out of place, find the correct spot for it.
-  for (size_t i = 0; i < new_order.size() - 1; ++i) {
-    if (new_order[i]->id() != toolbar_actions_[i]->GetId()) {
+  // First, reset the order to that of the model. Run through the views and
+  // compare them to the model; if something is out of place, find the correct
+  // spot for it.
+  const extensions::ExtensionList& model_order = model_->toolbar_items();
+  for (int i = 0; i < static_cast<int>(model_order.size() - 1); ++i) {
+    if (model_order[i]->id() != toolbar_actions_[i]->GetId()) {
       // Find where the correct view is (it's guaranteed to be after our current
       // index, since everything up to this point is correct).
       size_t j = i + 1;
-      while (new_order[i]->id() != toolbar_actions_[j]->GetId())
+      while (model_order[i]->id() != toolbar_actions_[j]->GetId())
         ++j;
       std::swap(toolbar_actions_[i], toolbar_actions_[j]);
     }
   }
 
+  // Only adjust the order if the model isn't highlighting a particular subset.
+  if (!model_->is_highlighting()) {
+    // First, make sure that we've checked any actions that want to run.
+    content::WebContents* web_contents = GetCurrentWebContents();
+    int tab_id = SessionTabHelper::IdForTab(web_contents);
+    if (!tabs_checked_for_pop_out_.count(tab_id)) {
+      tabs_checked_for_pop_out_.insert(tab_id);
+      for (ToolbarActionViewController* toolbar_action : toolbar_actions_) {
+        if (toolbar_action->WantsToRun(web_contents))
+          popped_out_in_tabs_[toolbar_action].insert(tab_id);
+      }
+    }
+
+    // Then, shift any actions that want to run to the front.
+    size_t insert_at = 0;
+    // Rotate any actions that want to run to the boundary between visible and
+    // overflowed actions.
+    for (ToolbarActions::iterator iter =
+             toolbar_actions_.begin() + model_->visible_icon_count();
+         iter != toolbar_actions_.end(); ++iter) {
+      if (popped_out_in_tabs_[(*iter)].count(tab_id)) {
+        std::rotate(toolbar_actions_.begin() + insert_at, iter, iter + 1);
+        ++insert_at;
+      }
+    }
+  }
+
   // Our visible browser actions may have changed - re-Layout() and check the
-  // size.
-  ResizeDelegate(gfx::Tween::EASE_OUT, false);
-  delegate_->Redraw(true);
+  // size (if we aren't suppressing the layout).
+  if (!suppress_layout_) {
+    ResizeDelegate(gfx::Tween::EASE_OUT, false);
+    delegate_->Redraw(true);
+  }
 }
 
 ToolbarActionViewController* ToolbarActionsBar::GetActionForId(

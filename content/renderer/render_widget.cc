@@ -164,6 +164,73 @@ bool IsThreadedCompositingEnabled() {
 // be spent in input hanlders before input starts getting throttled.
 const int kInputHandlingTimeThrottlingThresholdMicroseconds = 4166;
 
+int64 GetEventLatencyMicros(const WebInputEvent& event, base::TimeTicks now) {
+  return (now - base::TimeDelta::FromSecondsD(event.timeStampSeconds))
+      .ToInternalValue();
+}
+
+void LogInputEventLatencyUma(const WebInputEvent& event, base::TimeTicks now) {
+  UMA_HISTOGRAM_CUSTOM_COUNTS(
+      "Event.AggregatedLatency.Renderer2",
+      GetEventLatencyMicros(event, now),
+      1,
+      10000000,
+      100);
+
+#define CASE_TYPE(t) \
+    case WebInputEvent::t: \
+      UMA_HISTOGRAM_CUSTOM_COUNTS( \
+          "Event.Latency.Renderer2." #t, \
+          GetEventLatencyMicros(event, now), \
+          1, \
+          10000000, \
+          100); \
+      break;
+
+  switch(event.type) {
+    CASE_TYPE(Undefined);
+    CASE_TYPE(MouseDown);
+    CASE_TYPE(MouseUp);
+    CASE_TYPE(MouseMove);
+    CASE_TYPE(MouseEnter);
+    CASE_TYPE(MouseLeave);
+    CASE_TYPE(ContextMenu);
+    CASE_TYPE(MouseWheel);
+    CASE_TYPE(RawKeyDown);
+    CASE_TYPE(KeyDown);
+    CASE_TYPE(KeyUp);
+    CASE_TYPE(Char);
+    CASE_TYPE(GestureScrollBegin);
+    CASE_TYPE(GestureScrollEnd);
+    CASE_TYPE(GestureScrollUpdate);
+    CASE_TYPE(GestureFlingStart);
+    CASE_TYPE(GestureFlingCancel);
+    CASE_TYPE(GestureShowPress);
+    CASE_TYPE(GestureTap);
+    CASE_TYPE(GestureTapUnconfirmed);
+    CASE_TYPE(GestureTapDown);
+    CASE_TYPE(GestureTapCancel);
+    CASE_TYPE(GestureDoubleTap);
+    CASE_TYPE(GestureTwoFingerTap);
+    CASE_TYPE(GestureLongPress);
+    CASE_TYPE(GestureLongTap);
+    CASE_TYPE(GesturePinchBegin);
+    CASE_TYPE(GesturePinchEnd);
+    CASE_TYPE(GesturePinchUpdate);
+    CASE_TYPE(TouchStart);
+    CASE_TYPE(TouchMove);
+    CASE_TYPE(TouchEnd);
+    CASE_TYPE(TouchCancel);
+    default:
+      // Must include default to let blink::WebInputEvent add new event types
+      // before they're added here.
+      DLOG(WARNING) << "Unhandled WebInputEvent type: " << event.type;
+      break;
+  }
+
+#undef CASE_TYPE
+}
+
 }  // namespace
 
 namespace content {
@@ -198,7 +265,8 @@ class RenderWidget::ScreenMetricsEmulator {
 
  private:
   void Reapply();
-  void Apply(float top_controls_layout_height,
+  void Apply(bool top_controls_shrink_blink_size,
+             float top_controls_height,
              gfx::Rect resizer_rect,
              bool is_fullscreen);
 
@@ -235,8 +303,10 @@ RenderWidget::ScreenMetricsEmulator::ScreenMetricsEmulator(
   original_screen_info_ = widget_->screen_info_;
   original_view_screen_rect_ = widget_->view_screen_rect_;
   original_window_screen_rect_ = widget_->window_screen_rect_;
-  Apply(widget_->top_controls_layout_height_, widget_->resizer_rect_,
-      widget_->is_fullscreen_);
+  Apply(widget_->top_controls_shrink_blink_size_,
+        widget_->top_controls_height_,
+        widget_->resizer_rect_,
+        widget_->is_fullscreen_);
 }
 
 RenderWidget::ScreenMetricsEmulator::~ScreenMetricsEmulator() {
@@ -248,7 +318,8 @@ RenderWidget::ScreenMetricsEmulator::~ScreenMetricsEmulator() {
   widget_->window_screen_rect_ = original_window_screen_rect_;
   widget_->Resize(original_size_,
                   original_physical_backing_size_,
-                  widget_->top_controls_layout_height_,
+                  widget_->top_controls_shrink_blink_size_,
+                  widget_->top_controls_height_,
                   original_visible_viewport_size_,
                   widget_->resizer_rect_,
                   widget_->is_fullscreen_,
@@ -262,12 +333,15 @@ void RenderWidget::ScreenMetricsEmulator::ChangeEmulationParams(
 }
 
 void RenderWidget::ScreenMetricsEmulator::Reapply() {
-  Apply(widget_->top_controls_layout_height_, widget_->resizer_rect_,
-      widget_->is_fullscreen_);
+  Apply(widget_->top_controls_shrink_blink_size_,
+        widget_->top_controls_height_,
+        widget_->resizer_rect_,
+        widget_->is_fullscreen_);
 }
 
 void RenderWidget::ScreenMetricsEmulator::Apply(
-    float top_controls_layout_height,
+    bool top_controls_shrink_blink_size,
+    float top_controls_height,
     gfx::Rect resizer_rect,
     bool is_fullscreen) {
   applied_widget_rect_.set_size(gfx::Size(params_.viewSize));
@@ -325,9 +399,14 @@ void RenderWidget::ScreenMetricsEmulator::Apply(
 
   gfx::Size physical_backing_size = gfx::ToCeiledSize(gfx::ScaleSize(
       original_size_, original_screen_info_.deviceScaleFactor));
-  widget_->Resize(applied_widget_rect_.size(), physical_backing_size,
-      top_controls_layout_height, applied_widget_rect_.size(), resizer_rect,
-      is_fullscreen, NO_RESIZE_ACK);
+  widget_->Resize(applied_widget_rect_.size(),
+                  physical_backing_size,
+                  top_controls_shrink_blink_size,
+                  top_controls_height,
+                  applied_widget_rect_.size(),
+                  resizer_rect,
+                  is_fullscreen,
+                  NO_RESIZE_ACK);
 }
 
 void RenderWidget::ScreenMetricsEmulator::OnResizeMessage(
@@ -338,8 +417,10 @@ void RenderWidget::ScreenMetricsEmulator::OnResizeMessage(
   original_physical_backing_size_ = params.physical_backing_size;
   original_screen_info_ = params.screen_info;
   original_visible_viewport_size_ = params.visible_viewport_size;
-  Apply(params.top_controls_layout_height, params.resizer_rect,
-      params.is_fullscreen);
+  Apply(params.top_controls_shrink_blink_size,
+        params.top_controls_height,
+        params.resizer_rect,
+        params.is_fullscreen);
 
   if (need_ack) {
     widget_->set_next_paint_is_resize_ack();
@@ -385,7 +466,8 @@ RenderWidget::RenderWidget(blink::WebPopupType popup_type,
       webwidget_(NULL),
       opener_id_(MSG_ROUTING_NONE),
       init_complete_(false),
-      top_controls_layout_height_(0.f),
+      top_controls_shrink_blink_size_(false),
+      top_controls_height_(0.f),
       next_paint_flags_(0),
       auto_resize_mode_(false),
       need_update_rect_for_auto_resize_(false),
@@ -651,7 +733,8 @@ bool RenderWidget::Send(IPC::Message* message) {
 
 void RenderWidget::Resize(const gfx::Size& new_size,
                           const gfx::Size& physical_backing_size,
-                          float top_controls_layout_height,
+                          bool top_controls_shrink_blink_size,
+                          float top_controls_height,
                           const gfx::Size& visible_viewport_size,
                           const gfx::Rect& resizer_rect,
                           bool is_fullscreen,
@@ -669,11 +752,13 @@ void RenderWidget::Resize(const gfx::Size& new_size,
 
   if (compositor_) {
     compositor_->setViewportSize(new_size, physical_backing_size);
-    compositor_->SetTopControlsLayoutHeight(top_controls_layout_height);
+    compositor_->SetTopControlsShrinkBlinkSize(top_controls_shrink_blink_size);
+    compositor_->SetTopControlsHeight(top_controls_height);
   }
 
   physical_backing_size_ = physical_backing_size;
-  top_controls_layout_height_ = top_controls_layout_height;
+  top_controls_shrink_blink_size_ = top_controls_shrink_blink_size;
+  top_controls_height_ = top_controls_height;
   visible_viewport_size_ = visible_viewport_size;
   resizer_rect_ = resizer_rect;
 
@@ -683,7 +768,8 @@ void RenderWidget::Resize(const gfx::Size& new_size,
     WillToggleFullscreen();
   is_fullscreen_ = is_fullscreen;
 
-  webwidget_->setTopControlsLayoutHeight(top_controls_layout_height);
+  webwidget_->setTopControlsLayoutHeight(top_controls_shrink_blink_size_
+      ? top_controls_height : 0.f);
 
   if (size_ != new_size) {
     size_ = new_size;
@@ -723,7 +809,8 @@ void RenderWidget::ResizeSynchronously(
     const gfx::Size& visible_viewport_size) {
   Resize(new_position.size(),
          new_position.size(),
-         top_controls_layout_height_,
+         top_controls_shrink_blink_size_,
+         top_controls_height_,
          visible_viewport_size,
          gfx::Rect(),
          is_fullscreen_,
@@ -779,10 +866,14 @@ void RenderWidget::OnResize(const ViewMsg_Resize_Params& params) {
 
   screen_info_ = params.screen_info;
   SetDeviceScaleFactor(screen_info_.deviceScaleFactor);
-  Resize(params.new_size, params.physical_backing_size,
-         params.top_controls_layout_height,
-         params.visible_viewport_size, params.resizer_rect,
-         params.is_fullscreen, SEND_RESIZE_ACK);
+  Resize(params.new_size,
+         params.physical_backing_size,
+         params.top_controls_shrink_blink_size,
+         params.top_controls_height,
+         params.visible_viewport_size,
+         params.resizer_rect,
+         params.is_fullscreen,
+         SEND_RESIZE_ACK);
 
   if (orientation_changed)
     OnOrientationChange();
@@ -974,10 +1065,8 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
   if (base::TimeTicks::IsHighResNowFastAndReliable())
     start_time = base::TimeTicks::HighResNow();
 
-  const char* const event_name =
-      WebInputEventTraits::GetName(input_event->type);
   TRACE_EVENT1("renderer", "RenderWidget::OnHandleInputEvent",
-               "event", event_name);
+               "event", WebInputEventTraits::GetName(input_event->type));
   TRACE_EVENT_SYNTHETIC_DELAY_BEGIN("blink.HandleInputEvent");
   TRACE_EVENT_FLOW_STEP0(
       "input",
@@ -985,34 +1074,17 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
       TRACE_ID_DONT_MANGLE(latency_info.trace_id),
       "HanldeInputEventMain");
 
+  // If we don't have a high res timer, these metrics won't be accurate enough
+  // to be worth collecting. Note that this does introduce some sampling bias.
+  if (!start_time.is_null())
+    LogInputEventLatencyUma(*input_event, start_time);
+
   scoped_ptr<cc::SwapPromiseMonitor> latency_info_swap_promise_monitor;
   ui::LatencyInfo swap_latency_info(latency_info);
   if (compositor_) {
     latency_info_swap_promise_monitor =
         compositor_->CreateLatencyInfoSwapPromiseMonitor(&swap_latency_info)
             .Pass();
-  }
-
-  if (base::TimeTicks::IsHighResNowFastAndReliable()) {
-    // If we don't have a high res timer, these metrics won't be accurate enough
-    // to be worth collecting. Note that this does introduce some sampling bias.
-
-    base::TimeDelta now = base::TimeDelta::FromInternalValue(
-        base::TimeTicks::HighResNow().ToInternalValue());
-
-    int64 delta =
-        static_cast<int64>((now.InSecondsF() - input_event->timeStampSeconds) *
-                           base::Time::kMicrosecondsPerSecond);
-
-    UMA_HISTOGRAM_CUSTOM_COUNTS(
-        "Event.AggregatedLatency.Renderer2", delta, 1, 10000000, 100);
-    base::HistogramBase* counter_for_type = base::Histogram::FactoryGet(
-        base::StringPrintf("Event.Latency.Renderer2.%s", event_name),
-        1,
-        10000000,
-        100,
-        base::HistogramBase::kUmaTargetedHistogramFlag);
-    counter_for_type->Add(delta);
   }
 
   bool prevent_default = false;
@@ -1086,16 +1158,14 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
     }
   }
 
-  bool event_type_can_be_rate_limited =
-      input_event->type == WebInputEvent::MouseMove ||
-      input_event->type == WebInputEvent::MouseWheel;
-
   bool frame_pending = compositor_ && compositor_->BeginMainFrameRequested();
 
   // If we don't have a fast and accurate HighResNow, we assume the input
   // handlers are heavy and rate limit them.
-  bool rate_limiting_wanted = true;
-  if (base::TimeTicks::IsHighResNowFastAndReliable()) {
+  bool rate_limiting_wanted =
+      input_event->type == WebInputEvent::MouseMove ||
+      input_event->type == WebInputEvent::MouseWheel;
+  if (rate_limiting_wanted && !start_time.is_null()) {
       base::TimeTicks end_time = base::TimeTicks::HighResNow();
       total_input_handling_time_this_frame_ += (end_time - start_time);
       rate_limiting_wanted =
@@ -1116,8 +1186,7 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
     ack.latency = swap_latency_info;
     scoped_ptr<IPC::Message> response(
         new InputHostMsg_HandleInputEvent_ACK(routing_id_, ack));
-    if (rate_limiting_wanted && event_type_can_be_rate_limited &&
-        frame_pending && !is_hidden_) {
+    if (rate_limiting_wanted && frame_pending && !is_hidden_) {
       // We want to rate limit the input events in this case, so we'll wait for
       // painting to finish before ACKing this message.
       TRACE_EVENT_INSTANT0("renderer",
@@ -1545,9 +1614,7 @@ void RenderWidget::OnImeSetComposition(
     // sure we are in a consistent state.
     Send(new InputHostMsg_ImeCancelComposition(routing_id()));
   }
-#if defined(OS_MACOSX) || defined(USE_AURA) || defined(OS_ANDROID)
   UpdateCompositionInfo(true);
-#endif
 }
 
 void RenderWidget::OnImeConfirmComposition(const base::string16& text,
@@ -1564,9 +1631,7 @@ void RenderWidget::OnImeConfirmComposition(const base::string16& text,
   else
     webwidget_->confirmComposition(WebWidget::DoNotKeepSelection);
   handling_input_event_ = false;
-#if defined(OS_MACOSX) || defined(USE_AURA) || defined(OS_ANDROID)
   UpdateCompositionInfo(true);
-#endif
 }
 
 void RenderWidget::OnRepaint(gfx::Size size_to_paint) {
@@ -1896,9 +1961,7 @@ void RenderWidget::UpdateSelectionBounds() {
     }
   }
 
-#if defined(OS_MACOSX) || defined(USE_AURA) || defined(OS_ANDROID)
   UpdateCompositionInfo(false);
-#endif
 }
 
 // Check blink::WebTextInputType and ui::TextInputType is kept in sync.
@@ -1951,7 +2014,6 @@ ui::TextInputType RenderWidget::GetTextInputType() {
   return ui::TEXT_INPUT_TYPE_NONE;
 }
 
-#if defined(OS_MACOSX) || defined(USE_AURA) || defined(OS_ANDROID)
 void RenderWidget::UpdateCompositionInfo(bool should_update_range) {
 #if defined(OS_ANDROID)
   // Sending composition info makes sense only in Lollipop (API level 21)
@@ -2009,7 +2071,6 @@ bool RenderWidget::ShouldUpdateCompositionInfo(
   }
   return false;
 }
-#endif
 
 #if defined(OS_ANDROID)
 void RenderWidget::DidChangeBodyBackgroundColor(SkColor bg_color) {
@@ -2022,6 +2083,19 @@ void RenderWidget::DidChangeBodyBackgroundColor(SkColor bg_color) {
     body_background_color_ = bg_color;
     Send(new ViewHostMsg_DidChangeBodyBackgroundColor(routing_id(), bg_color));
   }
+}
+
+bool RenderWidget::DoesRecordFullLayer() const {
+  SynchronousCompositorFactory* synchronous_compositor_factory =
+      SynchronousCompositorFactory::GetInstance();
+
+  // We assume that the absence of synchronous_compositor_factory
+  // means we are in Chrome. In chrome, we want to clip, i.e.
+  // *not* to record the full layer.
+  if (!synchronous_compositor_factory)
+    return false;
+
+  return synchronous_compositor_factory->RecordFullLayer();
 }
 #endif
 
@@ -2051,9 +2125,7 @@ void RenderWidget::resetInputMethod() {
       Send(new InputHostMsg_ImeCancelComposition(routing_id()));
   }
 
-#if defined(OS_MACOSX) || defined(USE_AURA) || defined(OS_ANDROID)
   UpdateCompositionInfo(true);
-#endif
 }
 
 void RenderWidget::didHandleGestureEvent(

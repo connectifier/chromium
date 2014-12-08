@@ -311,9 +311,6 @@ const char kEnableDistanceFieldText[]       = "enable-distance-field-text";
 const char kEnableLayerSquashing[] =
     "enable-layer-squashing";
 
-// Enable experimental container node culling.
-const char kEnableContainerCulling[]        = "enable-container-culling";
-
 // Enable the experimental Credential Manager JavaScript API.
 const char kEnableCredentialManagerAPI[]    = "enable-credential-manager-api";
 
@@ -849,14 +846,17 @@ const char kUseFakeUIForMediaStream[]     = "use-fake-ui-for-media-stream";
 // Enable native GPU memory buffer support when available.
 const char kEnableNativeGpuMemoryBuffers[] = "enable-native-gpu-memory-buffers";
 
-// Use TEXTURE_EXTERNAL_OES target with CHROMIUM_image extension.
-const char kUseImageExternal[] = "use-image-external";
+// Overrides the default texture target used with CHROMIUM_image extension.
+const char kUseImageTextureTarget[] = "use-image-texture-target";
 
 // Set when Chromium should use a mobile user agent.
 const char kUseMobileUserAgent[] = "use-mobile-user-agent";
 
 // Use the new surfaces system to handle compositor delegation.
 const char kUseSurfaces[] = "use-surfaces";
+
+// Disable the use of the new surfaces system to handle compositor delegation.
+const char kDisableSurfaces[] = "disable-surfaces";
 
 // On POSIX only: the contents of this flag are prepended to the utility
 // process command line. Useful values might be "valgrind" or "xterm -e gdb

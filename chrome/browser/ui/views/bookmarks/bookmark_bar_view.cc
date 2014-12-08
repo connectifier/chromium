@@ -100,6 +100,15 @@ using views::LabelButtonBorder;
 using views::MenuButton;
 using views::View;
 
+// How inset the bookmarks bar is when displayed on the new tab page.
+static const int kNewTabHorizontalPadding = 2;
+
+// Maximum size of buttons on the bookmark bar.
+static const int kMaxButtonWidth = 150;
+
+// Number of pixels the attached bookmark bar overlaps with the toolbar.
+static const int kToolbarAttachedBookmarkBarOverlap = 3;
+
 // Margins around the content.
 static const int kDetachedTopMargin = 1;  // When attached, we use 0 and let the
                                           // toolbar above serve as the margin.
@@ -107,17 +116,8 @@ static const int kBottomMargin = 2;
 static const int kLeftMargin = 1;
 static const int kRightMargin = 1;
 
-// static
-const char BookmarkBarView::kViewClassName[] = "BookmarkBarView";
-
 // Padding between buttons.
 static const int kButtonPadding = 0;
-
-// Icon to display when one isn't found for the page.
-static gfx::ImageSkia* kDefaultFavicon = NULL;
-
-// Icon used for folders.
-static gfx::ImageSkia* kFolderIcon = NULL;
 
 // Color of the drop indicator.
 static const SkColor kDropIndicatorColor = SK_ColorBLACK;
@@ -163,6 +163,10 @@ namespace {
 // To enable/disable BookmarkBar animations during testing. In production
 // animations are enabled by default.
 bool animations_enabled = true;
+
+gfx::ImageSkia* GetImageSkiaNamed(int id) {
+  return ui::ResourceBundle::GetSharedInstance().GetImageSkiaNamed(id);
+}
 
 // BookmarkButtonBase -----------------------------------------------
 
@@ -441,25 +445,7 @@ class BookmarkBarView::ButtonSeparatorView : public views::View {
 // BookmarkBarView ------------------------------------------------------------
 
 // static
-const int BookmarkBarView::kMaxButtonWidth = 150;
-const int BookmarkBarView::kNewtabHorizontalPadding = 2;
-const int BookmarkBarView::kToolbarAttachedBookmarkBarOverlap = 3;
-
-const gfx::ImageSkia& GetDefaultFavicon() {
-  if (!kDefaultFavicon) {
-    ui::ResourceBundle* rb = &ui::ResourceBundle::GetSharedInstance();
-    kDefaultFavicon = rb->GetImageSkiaNamed(IDR_DEFAULT_FAVICON);
-  }
-  return *kDefaultFavicon;
-}
-
-const gfx::ImageSkia& GetFolderIcon() {
-  if (!kFolderIcon) {
-    ui::ResourceBundle* rb = &ui::ResourceBundle::GetSharedInstance();
-    kFolderIcon = rb->GetImageSkiaNamed(IDR_BOOKMARK_BAR_FOLDER);
-  }
-  return *kFolderIcon;
-}
+const char BookmarkBarView::kViewClassName[] = "BookmarkBarView";
 
 BookmarkBarView::BookmarkBarView(Browser* browser, BrowserView* browser_view)
     : page_navigator_(NULL),
@@ -747,7 +733,7 @@ gfx::Size BookmarkBarView::GetMinimumSize() const {
   int height = chrome::kBookmarkBarHeight;
   if (IsDetached()) {
     double current_state = 1 - size_animation_->GetCurrentValue();
-    width += 2 * static_cast<int>(kNewtabHorizontalPadding * current_state);
+    width += 2 * static_cast<int>(kNewTabHorizontalPadding * current_state);
     height += static_cast<int>(
         (chrome::kNTPBookmarkBarHeight - chrome::kBookmarkBarHeight) *
             current_state);
@@ -791,9 +777,9 @@ void BookmarkBarView::Layout() {
 
   if (IsDetached()) {
     double current_state = 1 - size_animation_->GetCurrentValue();
-    x += static_cast<int>(kNewtabHorizontalPadding * current_state);
+    x += static_cast<int>(kNewTabHorizontalPadding * current_state);
     y += (View::height() - chrome::kBookmarkBarHeight) / 2;
-    width -= static_cast<int>(kNewtabHorizontalPadding * current_state);
+    width -= static_cast<int>(kNewTabHorizontalPadding * current_state);
     separator_margin -= static_cast<int>(kSeparatorMargin * current_state);
   } else {
     // For the attached appearance, pin the content to the bottom of the bar
@@ -1273,22 +1259,23 @@ void BookmarkBarView::WriteDragDataForView(View* sender,
 
   for (int i = 0; i < GetBookmarkButtonCount(); ++i) {
     if (sender == GetBookmarkButton(i)) {
-      views::LabelButton* button = GetBookmarkButton(i);
       const BookmarkNode* node = model_->bookmark_bar_node()->GetChild(i);
+      const gfx::ImageSkia* icon = nullptr;
+      if (node->is_url()) {
+        const gfx::Image& image = model_->GetFavicon(node);
+        icon = image.IsEmpty() ? GetImageSkiaNamed(IDR_DEFAULT_FAVICON)
+                               : image.ToImageSkia();
+      } else {
+        icon = GetImageSkiaNamed(IDR_BOOKMARK_BAR_FOLDER);
+      }
 
-      const gfx::Image& image_from_model = model_->GetFavicon(node);
-      const gfx::ImageSkia& icon = image_from_model.IsEmpty() ?
-          (node->is_folder() ? GetFolderIcon() : GetDefaultFavicon()) :
-          *image_from_model.ToImageSkia();
-
-      button_drag_utils::SetDragImage(
-          node->url(),
-          node->GetTitle(),
-          icon,
-          &press_pt,
-          data,
-          button->GetWidget());
-      WriteBookmarkDragData(model_->bookmark_bar_node()->GetChild(i), data);
+      button_drag_utils::SetDragImage(node->url(),
+                                      node->GetTitle(),
+                                      *icon,
+                                      &press_pt,
+                                      data,
+                                      GetBookmarkButton(i)->GetWidget());
+      WriteBookmarkDragData(node, data);
       return;
     }
   }
@@ -1542,7 +1529,8 @@ MenuButton* BookmarkBarView::CreateOtherBookmarkedButton() {
   MenuButton* button =
       new BookmarkFolderButton(this, base::string16(), this, false);
   button->set_id(VIEW_ID_OTHER_BOOKMARKS);
-  button->SetImage(views::Button::STATE_NORMAL, GetFolderIcon());
+  button->SetImage(views::Button::STATE_NORMAL,
+                   *GetImageSkiaNamed(IDR_BOOKMARK_BAR_FOLDER));
   button->set_context_menu_controller(this);
   button->set_tag(kOtherFolderButtonTag);
   return button;
@@ -1553,20 +1541,17 @@ MenuButton* BookmarkBarView::CreateManagedBookmarksButton() {
   MenuButton* button =
       new BookmarkFolderButton(this, base::string16(), this, false);
   button->set_id(VIEW_ID_MANAGED_BOOKMARKS);
-  ui::ResourceBundle* rb = &ui::ResourceBundle::GetSharedInstance();
-  gfx::ImageSkia* image =
-      rb->GetImageSkiaNamed(IDR_BOOKMARK_BAR_FOLDER_MANAGED);
-  button->SetImage(views::Button::STATE_NORMAL, *image);
+  button->SetImage(views::Button::STATE_NORMAL,
+                   *GetImageSkiaNamed(IDR_BOOKMARK_BAR_FOLDER_MANAGED));
   button->set_context_menu_controller(this);
   button->set_tag(kManagedFolderButtonTag);
   return button;
 }
 
 MenuButton* BookmarkBarView::CreateOverflowButton() {
-  ui::ResourceBundle* rb = &ui::ResourceBundle::GetSharedInstance();
   MenuButton* button = new OverFlowButton(this);
   button->SetImage(views::Button::STATE_NORMAL,
-                   *rb->GetImageSkiaNamed(IDR_BOOKMARK_BAR_CHEVRONS));
+                   *GetImageSkiaNamed(IDR_BOOKMARK_BAR_CHEVRONS));
 
   // The overflow button's image contains an arrow and therefore it is a
   // direction sensitive image and we need to flip it if the UI layout is
@@ -1594,7 +1579,8 @@ views::View* BookmarkBarView::CreateBookmarkButton(const BookmarkNode* node) {
   }
   views::MenuButton* button =
       new BookmarkFolderButton(this, node->GetTitle(), this, false);
-  button->SetImage(views::Button::STATE_NORMAL, GetFolderIcon());
+  button->SetImage(views::Button::STATE_NORMAL,
+                   *GetImageSkiaNamed(IDR_BOOKMARK_BAR_FOLDER));
   ConfigureButton(node, button);
   return button;
 }
@@ -1605,9 +1591,8 @@ views::LabelButton* BookmarkBarView::CreateAppsPageShortcutButton() {
   button->SetTooltipText(l10n_util::GetStringUTF16(
       IDS_BOOKMARK_BAR_APPS_SHORTCUT_TOOLTIP));
   button->set_id(VIEW_ID_BOOKMARK_BAR_ELEMENT);
-  ui::ResourceBundle* rb = &ui::ResourceBundle::GetSharedInstance();
   button->SetImage(views::Button::STATE_NORMAL,
-                   *rb->GetImageSkiaNamed(IDR_BOOKMARK_BAR_APPS_SHORTCUT));
+                   *GetImageSkiaNamed(IDR_BOOKMARK_BAR_APPS_SHORTCUT));
   button->set_context_menu_controller(this);
   button->set_tag(kAppsShortcutButtonTag);
   return button;
@@ -1630,10 +1615,12 @@ void BookmarkBarView::ConfigureButton(const BookmarkNode* node,
   button->set_drag_controller(this);
   if (node->is_url()) {
     const gfx::Image& favicon = model_->GetFavicon(node);
-    if (!favicon.IsEmpty())
+    if (!favicon.IsEmpty()) {
       button->SetImage(views::Button::STATE_NORMAL, *favicon.ToImageSkia());
-    else
-      button->SetImage(views::Button::STATE_NORMAL, GetDefaultFavicon());
+    } else {
+      button->SetImage(views::Button::STATE_NORMAL,
+                       *GetImageSkiaNamed(IDR_DEFAULT_FAVICON));
+    }
   }
   button->SetMaxSize(gfx::Size(kMaxButtonWidth, 0));
 }

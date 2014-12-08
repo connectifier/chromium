@@ -90,6 +90,7 @@ void SingleThreadProxy::SetLayerTreeHostClientReady() {
   if (layer_tree_host_->settings().single_thread_proxy_scheduler &&
       !scheduler_on_impl_thread_) {
     SchedulerSettings scheduler_settings(layer_tree_host_->settings());
+    scheduler_settings.main_thread_should_always_be_low_latency = true;
     scheduler_on_impl_thread_ =
         Scheduler::Create(this,
                           scheduler_settings,
@@ -430,9 +431,8 @@ void SingleThreadProxy::DidActivateSyncTree() {
     // equivalent of blocking commit until activation and also running
     // all tasks posted during commit/activation before CommitComplete.
     MainThreadTaskRunner()->PostTask(
-        FROM_HERE,
-        base::Bind(&SingleThreadProxy::CommitComplete,
-                   weak_factory_.GetWeakPtr()));
+        FROM_HERE, base::Bind(&SingleThreadProxy::CommitComplete,
+                              weak_factory_.GetWeakPtr()));
   }
 
   timing_history_.DidActivateSyncTree();
@@ -493,8 +493,8 @@ void SingleThreadProxy::CompositeImmediately(base::TimeTicks frame_begin_time) {
 
   {
     BeginFrameArgs begin_frame_args(BeginFrameArgs::Create(
-        frame_begin_time, base::TimeTicks(), BeginFrameArgs::DefaultInterval(),
-        BeginFrameArgs::SYNCHRONOUS));
+        BEGINFRAME_FROM_HERE, frame_begin_time, base::TimeTicks(),
+        BeginFrameArgs::DefaultInterval(), BeginFrameArgs::SYNCHRONOUS));
     DoBeginMainFrame(begin_frame_args);
     DoCommit();
 

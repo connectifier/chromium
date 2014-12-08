@@ -166,17 +166,17 @@ Status Status::ErrorUnexpectedKeyType() {
 }
 
 Status Status::ErrorIncorrectSizeAesCbcIv() {
-  return Status(blink::WebCryptoErrorTypeData,
+  return Status(blink::WebCryptoErrorTypeOperation,
                 "The \"iv\" has an unexpected length -- must be 16 bytes");
 }
 
 Status Status::ErrorIncorrectSizeAesCtrCounter() {
-  return Status(blink::WebCryptoErrorTypeData,
+  return Status(blink::WebCryptoErrorTypeOperation,
                 "The \"counter\" has an unexpected length -- must be 16 bytes");
 }
 
 Status Status::ErrorInvalidAesCtrCounterLength() {
-  return Status(blink::WebCryptoErrorTypeData,
+  return Status(blink::WebCryptoErrorTypeOperation,
                 "The \"length\" property must be >= 1 and <= 128");
 }
 
@@ -210,7 +210,7 @@ Status Status::ErrorUnexpected() {
 
 Status Status::ErrorInvalidAesGcmTagLength() {
   return Status(
-      blink::WebCryptoErrorTypeData,
+      blink::WebCryptoErrorTypeOperation,
       "The tag length is invalid: Must be 32, 64, 96, 104, 112, 120, or 128 "
       "bits");
 }
@@ -252,7 +252,7 @@ Status Status::ErrorGenerateHmacKeyLengthPartialByte() {
   //   * The error type is no longer spec compliant
   //   * The message text is poor
   //   * In fact the spec no longer requires key lengths to be multiples of 8
-  //     bits so this message is bogus (http://crbug.com/431085)
+  //     bits so this message is bogus (http://crbug.com/438469)
   return Status(blink::WebCryptoErrorTypeData,
                 "Invalid key length: it is either zero or not a multiple of 8 "
                 "bits");
@@ -260,12 +260,17 @@ Status Status::ErrorGenerateHmacKeyLengthPartialByte() {
 
 Status Status::ErrorGenerateHmacKeyLengthZero() {
   return Status(blink::WebCryptoErrorTypeOperation,
-                "HMAC key length must be not be zero");
+                "HMAC key length must not be zero");
 }
 
 Status Status::ErrorCreateKeyBadUsages() {
   return Status(blink::WebCryptoErrorTypeSyntax,
                 "Cannot create a key using the specified key usages.");
+}
+
+Status Status::ErrorCreateKeyEmptyUsages() {
+  return Status(blink::WebCryptoErrorTypeSyntax,
+                "Usages cannot be empty when creating a key.");
 }
 
 Status Status::ErrorImportedEcKeyIncorrectCurve() {
@@ -315,7 +320,7 @@ Status Status::ErrorEcdhCurveMismatch() {
 }
 
 Status Status::ErrorEcdhLengthTooBig(unsigned int max_length_bits) {
-  return Status(blink::WebCryptoErrorTypeInvalidAccess,
+  return Status(blink::WebCryptoErrorTypeOperation,
                 base::StringPrintf(
                     "Length specified for ECDH key derivation is too large. "
                     "Maximum allowed is %u bits",

@@ -8,7 +8,7 @@
 #include <bitset>
 #include <string>
 
-#include "base/callback.h"
+#include "base/callback_forward.h"
 #include "base/compiler_specific.h"
 #include "base/macros.h"
 #include "base/memory/ref_counted.h"
@@ -27,6 +27,7 @@ class SequencedTaskRunner;
 
 namespace chromeos {
 class DeviceSettingsService;
+class OwnerSettingsServiceChromeOS;
 }
 
 namespace policy {
@@ -46,8 +47,6 @@ class DeviceCloudPolicyInitializer : public CloudPolicyStore::Observer {
 
   // |background_task_runner| is used to execute long-running background tasks
   // that may involve file I/O.
-  // |on_connected_callback| is invoked after the device cloud policy manager
-  // is connected.
   DeviceCloudPolicyInitializer(
       PrefService* local_state,
       DeviceManagementService* enterprise_service,
@@ -57,8 +56,7 @@ class DeviceCloudPolicyInitializer : public CloudPolicyStore::Observer {
       ServerBackedStateKeysBroker* state_keys_broker,
       DeviceCloudPolicyStoreChromeOS* device_store,
       DeviceCloudPolicyManagerChromeOS* manager,
-      chromeos::DeviceSettingsService* device_settings_service,
-      const base::Closure& on_connected_callback);
+      chromeos::DeviceSettingsService* device_settings_service);
 
   virtual ~DeviceCloudPolicyInitializer();
 
@@ -75,8 +73,8 @@ class DeviceCloudPolicyInitializer : public CloudPolicyStore::Observer {
   virtual void StartEnrollment(
       ManagementMode management_mode,
       DeviceManagementService* device_management_service,
+      chromeos::OwnerSettingsServiceChromeOS* owner_settings_service,
       const std::string& auth_token,
-      bool is_auto_enrollment,
       const AllowedDeviceModes& allowed_modes,
       const EnrollmentCallback& enrollment_callback);
 
@@ -120,7 +118,6 @@ class DeviceCloudPolicyInitializer : public CloudPolicyStore::Observer {
   DeviceCloudPolicyStoreChromeOS* device_store_;
   DeviceCloudPolicyManagerChromeOS* manager_;
   chromeos::DeviceSettingsService* device_settings_service_;
-  base::Closure on_connected_callback_;
   bool is_initialized_;
 
   // Non-NULL if there is an enrollment operation pending.

@@ -532,6 +532,11 @@ PasswordStoreChangeList LoginDatabase::UpdateLogin(const PasswordForm& form) {
 }
 
 bool LoginDatabase::RemoveLogin(const PasswordForm& form) {
+  if (form.IsPublicSuffixMatch()) {
+    // Do not try to remove |form|. It is a modified copy of a password stored
+    // for a different origin, and it is not contained in the database.
+    return false;
+  }
   // Remove a login by UNIQUE-constrained fields.
   sql::Statement s(db_.GetCachedStatement(SQL_FROM_HERE,
       "DELETE FROM logins WHERE "
@@ -648,9 +653,10 @@ bool LoginDatabase::GetLogins(const PasswordForm& form,
   std::string registered_domain = GetRegistryControlledDomain(signon_realm);
   PSLDomainMatchMetric psl_domain_match_metric = PSL_DOMAIN_MATCH_NONE;
   const bool should_PSL_matching_apply =
+      form.scheme == PasswordForm::SCHEME_HTML &&
       ShouldPSLDomainMatchingApply(registered_domain);
   // PSL matching only applies to HTML forms.
-  if (form.scheme == PasswordForm::SCHEME_HTML && should_PSL_matching_apply) {
+  if (should_PSL_matching_apply) {
     // We are extending the original SQL query with one that includes more
     // possible matches based on public suffix domain matching. Using a regexp
     // here is just an optimization to not have to parse all the stored entries

@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,14 +6,21 @@
 // containers, such as web_view, app_view, etc.
 
 var DocumentNatives = requireNative('document_natives');
+var GuestView = require('guestView').GuestView;
 var IdGenerator = requireNative('id_generator');
 
-function GuestViewContainer(element) {
+function GuestViewContainer(element, viewType) {
   privates(element).internal = this;
   this.element = element;
   this.elementAttached = false;
+  this.guest = new GuestView(viewType);
+  this.viewInstanceId = IdGenerator.GetNextId();
 
-  this.browserPluginElement = this.createBrowserPluginElement();
+  privates(this).browserPluginElement = this.createBrowserPluginElement();
+  this.setupFocusPropagation();
+
+  var shadowRoot = this.element.createShadowRoot();
+  shadowRoot.appendChild(privates(this).browserPluginElement);
 }
 
 // Forward public API methods from |proto| to their internal implementations.
@@ -31,7 +38,7 @@ GuestViewContainer.forwardApiMethods = function(proto, apiMethods) {
 
 // Registers the browserplugin and guestview as custom elements once the
 // document has loaded.
-GuestViewContainer.listenForReadyStateChange =
+GuestViewContainer.registerElement =
     function(guestViewContainerType) {
   var useCapture = true;
   window.addEventListener('readystatechange', function listener(event) {
@@ -54,7 +61,48 @@ GuestViewContainer.prototype.createBrowserPluginElement = function() {
   return browserPluginElement;
 };
 
+GuestViewContainer.prototype.setupFocusPropagation = function() {
+  if (!this.element.hasAttribute('tabIndex')) {
+    // GuestViewContainer needs a tabIndex in order to be focusable.
+    // TODO(fsamuel): It would be nice to avoid exposing a tabIndex attribute
+    // to allow GuestViewContainer to be focusable.
+    // See http://crbug.com/231664.
+    this.element.setAttribute('tabIndex', -1);
+  }
+  this.element.addEventListener('focus', function(e) {
+    // Focus the BrowserPlugin when the GuestViewContainer takes focus.
+    privates(this).browserPluginElement.focus();
+  }.bind(this));
+  this.element.addEventListener('blur', function(e) {
+    // Blur the BrowserPlugin when the GuestViewContainer loses focus.
+    privates(this).browserPluginElement.blur();
+  }.bind(this));
+};
+
+GuestViewContainer.prototype.attachWindow = function() {
+  if (!this.internalInstanceId) {
+    return true;
+  }
+
+  this.guest.attach(this.internalInstanceId, this.buildAttachParams());
+  return true;
+};
+
+GuestViewContainer.prototype.handleBrowserPluginAttributeMutation =
+    function(name, oldValue, newValue) {
+  if (name == 'internalinstanceid' && !oldValue && !!newValue) {
+    privates(this).browserPluginElement.removeAttribute('internalinstanceid');
+    this.internalInstanceId = parseInt(newValue);
+
+    if (!this.guest.getId()) {
+      return;
+    }
+    this.guest.attach(this.internalInstanceId, this.buildAttachParams());
+  }
+};
+
 // Implemented by the specific view type.
+GuestViewContainer.prototype.buildAttachParams = function() { return {}; };
 GuestViewContainer.prototype.handleAttributeMutation = function() {};
 GuestViewContainer.prototype.onElementAttached = function() {};
 GuestViewContainer.prototype.onElementDetached = function() {};

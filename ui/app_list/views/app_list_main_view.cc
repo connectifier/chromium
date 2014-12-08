@@ -10,6 +10,7 @@
 #include "base/callback.h"
 #include "base/files/file_path.h"
 #include "base/message_loop/message_loop.h"
+#include "base/profiler/scoped_tracker.h"
 #include "base/strings/string_util.h"
 #include "ui/app_list/app_list_constants.h"
 #include "ui/app_list/app_list_folder_item.h"
@@ -142,7 +143,6 @@ void AppListMainView::AddContentsViews() {
   AddChildView(contents_view_);
 
   search_box_view_->set_contents_view(contents_view_);
-  UpdateSearchBoxVisibility();
 
   contents_view_->SetPaintToLayer(true);
   contents_view_->SetFillsBoundsOpaquely(false);
@@ -195,20 +195,6 @@ void AppListMainView::ModelChanged() {
   contents_view_ = NULL;
   AddContentsViews();
   Layout();
-}
-
-void AppListMainView::UpdateSearchBoxVisibility() {
-  bool visible = !contents_view_->IsStateActive(AppListModel::STATE_START);
-  search_box_view_->SetVisible(visible);
-  if (visible && GetWidget() && GetWidget()->IsVisible())
-    search_box_view_->search_box()->RequestFocus();
-}
-
-void AppListMainView::OnStartPageSearchTextfieldChanged(
-    const base::string16& new_contents) {
-  search_box_view_->SetVisible(true);
-  search_box_view_->search_box()->SetText(new_contents);
-  search_box_view_->search_box()->RequestFocus();
 }
 
 views::Widget* AppListMainView::GetCustomPageClickzone() const {
@@ -292,6 +278,10 @@ void AppListMainView::NotifySearchBoxVisibilityChanged() {
 }
 
 void AppListMainView::InitWidgets() {
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/431326 is fixed.
+  tracked_objects::ScopedTracker tracking_profile(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION("431326 AppListMainView::InitWidgets"));
+
   // The widget that receives click events to transition to the custom page.
   views::Widget::InitParams custom_page_clickzone_params(
       views::Widget::InitParams::TYPE_CONTROL);
@@ -343,7 +333,6 @@ void AppListMainView::QueryChanged(SearchBoxView* sender) {
   base::TrimWhitespace(model_->search_box()->text(), base::TRIM_ALL, &query);
   bool should_show_search = !query.empty();
   contents_view_->ShowSearchResults(should_show_search);
-  UpdateSearchBoxVisibility();
 
   delegate_->StartSearch();
 }

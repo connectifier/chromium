@@ -27,7 +27,10 @@ action("regexes") {
     "$target_gen_dir/autofill_regex_constants.cc",
   ]
 
-  args = [ "-o", rebase_path(target_gen_dir, root_build_dir) ]
+  args = [
+    "-o",
+    rebase_path(target_gen_dir, root_build_dir),
+  ]
   args += rebase_path(inputs, root_build_dir)
 }
 

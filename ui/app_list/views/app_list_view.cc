@@ -156,11 +156,11 @@ class HideViewAnimationObserver : public ui::ImplicitAnimationObserver {
 
 AppListView::AppListView(AppListViewDelegate* delegate)
     : delegate_(delegate),
-      app_list_main_view_(NULL),
-      search_box_view_(NULL),
-      speech_view_(NULL),
-      experimental_banner_view_(NULL),
-      overlay_view_(NULL),
+      app_list_main_view_(nullptr),
+      speech_view_(nullptr),
+      search_box_widget_(nullptr),
+      search_box_view_(nullptr),
+      overlay_view_(nullptr),
       animation_observer_(new HideViewAnimationObserver()) {
   CHECK(delegate);
 
@@ -219,6 +219,8 @@ void AppListView::InitAsFramelessWindow(gfx::NativeView parent,
   // View::AddChildView() which is called at Widget::SetContentsView() to build
   // the views hierarchy in the widget.
   set_background(new AppListBackground(0, app_list_main_view_));
+
+  InitChildWidgets();
 }
 
 void AppListView::SetBubbleArrow(views::BubbleBorder::Arrow arrow) {
@@ -355,11 +357,12 @@ void AppListView::InitContents(gfx::NativeView parent, int initial_apps_page) {
   app_list_main_view_->SetFillsBoundsOpaquely(false);
   app_list_main_view_->layer()->SetMasksToBounds(true);
 
+  // This will be added to the |search_box_widget_| after the app list widget is
+  // initialized.
   search_box_view_ = new SearchBoxView(app_list_main_view_, delegate_);
   search_box_view_->SetPaintToLayer(true);
   search_box_view_->SetFillsBoundsOpaquely(false);
   search_box_view_->layer()->SetMasksToBounds(true);
-  AddChildView(search_box_view_);
 
   app_list_main_view_->Init(parent, initial_apps_page, search_box_view_);
 
@@ -373,19 +376,29 @@ void AppListView::InitContents(gfx::NativeView parent, int initial_apps_page) {
     AddChildView(speech_view_);
   }
 
-  if (app_list::switches::IsExperimentalAppListEnabled()) {
-    // Draw a banner in the corner of the experimental app list.
-    experimental_banner_view_ = new views::ImageView;
-    const gfx::ImageSkia& experimental_icon =
-        *ui::ResourceBundle::GetSharedInstance().GetImageSkiaNamed(
-            IDR_APP_LIST_EXPERIMENTAL_ICON);
-    experimental_banner_view_->SetImage(experimental_icon);
-    experimental_banner_view_->SetPaintToLayer(true);
-    experimental_banner_view_->SetFillsBoundsOpaquely(false);
-    AddChildView(experimental_banner_view_);
-  }
-
   OnProfilesChanged();
+}
+
+void AppListView::InitChildWidgets() {
+  DCHECK(search_box_view_);
+
+  app_list_main_view_->InitWidgets();
+
+  // Create the search box widget.
+  views::Widget::InitParams search_box_widget_params(
+      views::Widget::InitParams::TYPE_CONTROL);
+  search_box_widget_params.parent = GetWidget()->GetNativeView();
+  search_box_widget_params.opacity =
+      views::Widget::InitParams::TRANSLUCENT_WINDOW;
+
+  // Create a widget for the SearchBoxView to live in. This allows the
+  // SearchBoxView to be on top of the custom launcher page's WebContents
+  // (otherwise the search box events will be captured by the WebContents).
+  search_box_widget_ = new views::Widget;
+  search_box_widget_->Init(search_box_widget_params);
+  search_box_widget_->SetContentsView(search_box_view_);
+
+  Layout();
 }
 
 void AppListView::InitAsBubbleInternal(gfx::NativeView parent,
@@ -425,7 +438,7 @@ void AppListView::InitAsBubbleInternal(gfx::NativeView parent,
   SetBubbleArrow(arrow);
 
   // We can now create the internal widgets.
-  app_list_main_view_->InitWidgets();
+  InitChildWidgets();
 
 #if defined(USE_AURA)
   // TODO(vadimt): Remove ScopedTracker below once crbug.com/431326 is fixed.
@@ -502,12 +515,7 @@ void AppListView::OnBeforeBubbleWidgetInit(
 }
 
 views::View* AppListView::GetInitiallyFocusedView() {
-  return app_list::switches::IsExperimentalAppListEnabled()
-             ? app_list_main_view_->contents_view()
-                   ->start_page_view()
-                   ->dummy_search_box_view()
-                   ->search_box()
-             : app_list_main_view_->search_box_view()->search_box();
+  return app_list_main_view_->search_box_view()->search_box();
 }
 
 gfx::ImageSkia AppListView::GetWindowIcon() {
@@ -577,9 +585,12 @@ void AppListView::Layout() {
   // GetDefaultSearchBoxBounds() returns the bounds in |contents_view|'s
   // coordinate, therefore convert it to this coordinate.
   ContentsView* contents_view = app_list_main_view_->contents_view();
-  gfx::RectF search_box_bounds = contents_view->GetDefaultSearchBoxBounds();
-  ConvertRectToTarget(contents_view, this, &search_box_bounds);
-  search_box_view_->SetBoundsRect(gfx::ToNearestRect(search_box_bounds));
+  gfx::Rect search_box_bounds = contents_view->GetSearchBoxBoundsForState(
+      contents_view->GetActiveState());
+  if (search_box_widget_) {
+    search_box_widget_->SetBounds(
+        contents_view->ConvertRectToWidget(search_box_bounds));
+  }
 
   if (speech_view_) {
     gfx::Rect speech_bounds = centered_bounds;
@@ -590,18 +601,6 @@ void AppListView::Layout() {
     speech_bounds.Inset(-speech_view_->GetInsets());
     speech_view_->SetBoundsRect(speech_bounds);
   }
-
-  if (experimental_banner_view_) {
-    // Position the experimental banner in the lower right corner.
-    gfx::Rect image_bounds = experimental_banner_view_->GetImageBounds();
-    image_bounds.set_origin(
-        gfx::Point(contents_bounds.width() - image_bounds.width(),
-                   contents_bounds.height() - image_bounds.height()));
-    experimental_banner_view_->SetBoundsRect(image_bounds);
-  }
-
-  if (overlay_view_)
-    overlay_view_->SetBoundsRect(contents_bounds);
 }
 
 void AppListView::SchedulePaintInRect(const gfx::Rect& rect) {

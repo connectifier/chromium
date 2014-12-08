@@ -107,23 +107,6 @@ CommandUtil.canExecuteAlways = function(event) {
 };
 
 /**
- * Returns a single selected/passed entry or null.
- * @param {!Event} event Command event.
- * @param {!FileManager} fileManager FileManager to use.
- * @return {FileEntry} The entry or null.
- */
-CommandUtil.getSingleEntry = function(event, fileManager) {
-  if (event.target.entry) {
-    return event.target.entry;
-  }
-  var selection = fileManager.getSelection();
-  if (selection.totalCount == 1) {
-    return selection.entries[0];
-  }
-  return null;
-};
-
-/**
  * Obtains target entries that can be pinned from the selection.
  * If directories are included in the selection, it just returns an empty
  * array to avoid confusing because pinning directory is not supported
@@ -236,7 +219,7 @@ CommandUtil.getOnlyOneSelectedDirectory = function(selection) {
     return null;
   if (!selection.entries[0].isDirectory)
     return null;
-  return selection.entries[0];
+  return /** @type {!DirectoryEntry} */(selection.entries[0]);
 };
 
 /**
@@ -285,6 +268,16 @@ CommandHandler.prototype.updateAvailability = function() {
   for (var id in this.commands_) {
     this.commands_[id].canExecuteChange();
   }
+};
+
+/**
+ * @param {string} id Command id
+ * @return {boolean} True if the specified command was "very recently"
+ *     known to be enabled.
+ */
+CommandHandler.prototype.isCommandEnabled = function(id) {
+  var command = this.commands_[id];
+  return !!command && !command.disabled;
 };
 
 /**
@@ -1033,6 +1026,66 @@ CommandHandler.COMMANDS_['share'] = /** @type {Command} */ ({
         !isDriveOffline &&
         selection && selection.totalCount == 1;
     event.command.setHidden(!fileManager.isOnDrive());
+  }
+});
+
+/**
+ * Initiates cloud import.
+ * @type {Command}
+ */
+CommandHandler.COMMANDS_['cloud-import'] = /** @type {Command} */ ({
+  /**
+   * @param {!Event} event Command event.
+   * @param {!FileManager} fileManager FileManager to use.
+   */
+  execute: function(event, fileManager) {
+    // TODO(smckay): Initiate import.
+    metrics.recordEnum('CloudImport.UserAction', 'IMPORT_INITIATED');
+  },
+  /**
+   * @param {!Event} event Command event.
+   * @param {!FileManager} fileManager FileManager to use.
+   */
+  canExecute: function(event, fileManager) {
+
+    /**
+     * @return {boolean} True if CloudImport is enabled and
+     *     applicable to the current location and/or selection.
+     */
+    var isCloudImportEnabled = function() {
+      if (!importer.lastKnownImportEnabled) {
+        return false;
+      }
+
+      // If there is no Google Drive mount, Drive may be disabled
+      // or the machine may be running in guest mode.
+      var drive = fileManager.volumeManager.getCurrentProfileVolumeInfo(
+          VolumeManagerCommon.VolumeType.DRIVE);
+      if (!drive) {
+        return false;
+      }
+
+      var entries = fileManager.getSelection().entries;
+
+      // Enabled if user has a selection and it consists entirely of files
+      // that:
+      // 1) are of a recognized media type
+      // 2) reside on a removable media device
+      // 3) in the DCIM dir
+      if (entries.length) {
+        return entries.every(
+            importer.isEligibleEntry.bind(null, fileManager.volumeManager));
+      }
+
+      // Enabled if the current dir is the DCIM dir on a removable media device.
+      return importer.isMediaDirectory(
+          fileManager.getCurrentDirectoryEntry(),
+          fileManager.volumeManager);
+    };
+
+    event.command.label = str('CLOUD_IMPORT_BUTTON_LABEL');
+    event.canExecute = isCloudImportEnabled();
+    event.command.setHidden(!event.canExecute);
   }
 });
 

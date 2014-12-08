@@ -42,14 +42,11 @@ class CONTENT_EXPORT RenderProcessHost : public IPC::Sender,
 
   // Details for RENDERER_PROCESS_CLOSED notifications.
   struct RendererClosedDetails {
-    RendererClosedDetails(base::ProcessHandle handle,
-                          base::TerminationStatus status,
+    RendererClosedDetails(base::TerminationStatus status,
                           int exit_code) {
-      this->handle = handle;
       this->status = status;
       this->exit_code = exit_code;
     }
-    base::ProcessHandle handle;
     base::TerminationStatus status;
     int exit_code;
   };
@@ -102,10 +99,16 @@ class CONTENT_EXPORT RenderProcessHost : public IPC::Sender,
   // http://crbug.com/158595
   virtual StoragePartition* GetStoragePartition() const = 0;
 
-  // Try to shutdown the associated renderer process as fast as possible.
+  // Try to shut down the associated renderer process without running unload
+  // handlers, etc, giving it the specified exit code. If |wait| is true, wait
+  // for the process to be actually terminated before returning.
+  // Returns true if it was able to shut down.
+  virtual bool Shutdown(int exit_code, bool wait) = 0;
+
+  // Try to shut down the associated renderer process as fast as possible.
   // If this renderer has any RenderViews with unload handlers, then this
-  // function does nothing.  The current implementation uses TerminateProcess.
-  // Returns True if it was able to do fast shutdown.
+  // function does nothing.
+  // Returns true if it was able to do fast shutdown.
   virtual bool FastShutdownIfPossible() = 0;
 
   // Returns true if fast shutdown was started for the renderer.

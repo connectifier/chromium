@@ -49,6 +49,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/extensions/app_launch_params.h"
 #include "chrome/browser/ui/extensions/application_launch.h"
 #include "chrome/browser/ui/webui/extensions/extension_basic_info.h"
 #include "chrome/browser/ui/webui/extensions/extension_icon_source.h"
@@ -256,6 +257,11 @@ base::DictionaryValue* ExtensionSettingsHandler::CreateExtensionDetailValue(
   bool corrupt_install =
       (disable_reasons & Extension::DISABLE_CORRUPTED) != 0;
   extension_data->SetBoolean("corruptInstall", corrupt_install);
+
+  bool update_required_by_policy =
+      (disable_reasons & Extension::DISABLE_UPDATE_REQUIRED_BY_POLICY) != 0;
+  extension_data->SetBoolean("updateRequiredByPolicy",
+                             update_required_by_policy);
 
   bool managed_install =
       !management_policy_->UserMayModifySettings(extension, NULL);
@@ -625,6 +631,9 @@ void ExtensionSettingsHandler::GetLocalizedValues(
       l10n_util::GetStringUTF16(IDS_EXTENSIONS_SHOW_DETAILS));
   source->AddString("extensionSettingsHideDetails",
       l10n_util::GetStringUTF16(IDS_EXTENSIONS_HIDE_DETAILS));
+  source->AddString("extensionSettingsUpdateRequiredBePolicy",
+                    l10n_util::GetStringUTF16(
+                        IDS_EXTENSIONS_DISABLED_UPDATE_REQUIRED_BY_POLICY));
 
   // TODO(estade): comb through the above strings to find ones no longer used in
   // uber extensions.
@@ -1029,7 +1038,8 @@ void ExtensionSettingsHandler::HandleLaunchMessage(
       extension_service_->GetExtensionById(extension_id, false);
   OpenApplication(AppLaunchParams(extension_service_->profile(), extension,
                                   extensions::LAUNCH_CONTAINER_WINDOW,
-                                  NEW_WINDOW));
+                                  NEW_WINDOW,
+                                  extensions::SOURCE_EXTENSIONS_PAGE));
 }
 
 void ExtensionSettingsHandler::HandleReloadMessage(

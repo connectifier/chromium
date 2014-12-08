@@ -6,7 +6,6 @@
 #define CHROME_BROWSER_SUPERVISED_USER_SUPERVISED_USER_SERVICE_H_
 
 #include <map>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -24,7 +23,6 @@
 #include "chrome/browser/sync/sync_type_preference_provider.h"
 #include "chrome/browser/ui/browser_list_observer.h"
 #include "components/keyed_service/core/keyed_service.h"
-#include "content/public/browser/web_contents.h"
 
 #if defined(ENABLE_EXTENSIONS)
 #include "extensions/browser/extension_registry_observer.h"
@@ -44,6 +42,10 @@ class SupervisedUserURLFilter;
 
 namespace base {
 class FilePath;
+}
+
+namespace content {
+class WebContents;
 }
 
 namespace extensions {
@@ -81,6 +83,8 @@ class SupervisedUserService : public KeyedService,
     // Returns true to indicate that the delegate handled the (de)activation, or
     // false to indicate that the SupervisedUserService itself should handle it.
     virtual bool SetActive(bool active) = 0;
+    // Returns whether the current profile is linked to a child account.
+    virtual bool IsChildAccount() const;
     // Returns the path to a blacklist file to load, or an empty path to
     // indicate "none".
     virtual base::FilePath GetBlacklistPath() const;
@@ -125,6 +129,9 @@ class SupervisedUserService : public KeyedService,
   // a prefix followed by a URIEncoded version of the URL. Each entry contains
   // a dictionary which currently has the timestamp of the request in it.
   void AddAccessRequest(const GURL& url, const SuccessCallback& callback);
+
+  // Returns whether the profile is linked to a child account.
+  bool IsChildAccount() const;
 
   // Returns the email address of the custodian.
   std::string GetCustodianEmailAddress() const;

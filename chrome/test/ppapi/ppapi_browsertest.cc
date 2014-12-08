@@ -22,6 +22,7 @@
 #include "content/public/common/url_constants.h"
 #include "content/public/test/javascript_test_observer.h"
 #include "content/public/test/test_renderer_host.h"
+#include "extensions/common/constants.h"
 #include "extensions/test/extension_test_message_listener.h"
 #include "ppapi/shared_impl/test_harness_utils.h"
 
@@ -320,7 +321,7 @@ IN_PROC_BROWSER_TEST_F(PPAPINaClPNaClNonSfiTest,
   RUN_TCPSOCKET_SUBTESTS;
 }
 IN_PROC_BROWSER_TEST_F(PPAPINaClPNaClTransitionalNonSfiTest,
-                       MAYBE_PNACL_NONSFI(TCPSocket)) {
+                       MAYBE_PNACL_TRANSITIONAL_NONSFI(TCPSocket)) {
   RUN_TCPSOCKET_SUBTESTS;
 }
 
@@ -1389,7 +1390,13 @@ IN_PROC_BROWSER_TEST_F(OutOfProcessPPAPITest, MAYBE_FlashMessageLoop) {
 TEST_PPAPI_NACL_SUBTESTS(MAYBE_Compositor0, RUN_COMPOSITOR_SUBTESTS_0)
 TEST_PPAPI_NACL_SUBTESTS(MAYBE_Compositor1, RUN_COMPOSITOR_SUBTESTS_1)
 
-TEST_PPAPI_NACL(MediaStreamAudioTrack)
+#if defined(OS_WIN)
+// Flaky on Windows (crbug.com/438729)
+#define MAYBE_MediaStreamAudioTrack DISABLED_MediaStreamAudioTrack
+#else
+#define MAYBE_MediaStreamAudioTrack MediaStreamAudioTrack
+#endif
+TEST_PPAPI_NACL(MAYBE_MediaStreamAudioTrack)
 
 TEST_PPAPI_NACL(MediaStreamVideoTrack)
 
@@ -1480,10 +1487,9 @@ class PackagedAppTest : public ExtensionBrowserTest {
     const extensions::Extension* extension = LoadExtension(app_dir);
     ASSERT_TRUE(extension);
 
-    AppLaunchParams params(browser()->profile(),
-                           extension,
-                           extensions::LAUNCH_CONTAINER_NONE,
-                           NEW_WINDOW);
+    AppLaunchParams params(browser()->profile(), extension,
+                           extensions::LAUNCH_CONTAINER_NONE, NEW_WINDOW,
+                           extensions::SOURCE_UNTRACKED);
     params.command_line = *CommandLine::ForCurrentProcess();
     OpenApplication(params);
   }

@@ -81,11 +81,6 @@ class OutputSurfaceWithoutParent : public cc::OutputSurface {
   }
 
   virtual void SwapBuffers(cc::CompositorFrame* frame) override {
-    for (size_t i = 0; i < frame->metadata.latency_info.size(); i++) {
-      frame->metadata.latency_info[i].AddLatencyNumber(
-          ui::INPUT_EVENT_BROWSER_SWAP_BUFFER_COMPONENT, 0, 0);
-    }
-
     GetCommandBufferProxy()->SetLatencyInfo(frame->metadata.latency_info);
     DCHECK(frame->gl_frame_data->sub_buffer_rect ==
            gfx::Rect(frame->gl_frame_data->size));
@@ -170,8 +165,9 @@ bool CompositorImpl::IsInitialized() {
 CompositorImpl::CompositorImpl(CompositorClient* client,
                                gfx::NativeWindow root_window)
     : root_layer_(cc::Layer::Create()),
+      resource_manager_(&ui_resource_provider_),
       surface_id_allocator_(
-        new cc::SurfaceIdAllocator(++g_surface_id_namespace)),
+          new cc::SurfaceIdAllocator(++g_surface_id_namespace)),
       has_transparent_background_(false),
       device_scale_factor_(1),
       window_(NULL),
@@ -327,6 +323,10 @@ UIResourceProvider& CompositorImpl::GetUIResourceProvider() {
   return ui_resource_provider_;
 }
 
+ui::ResourceManager& CompositorImpl::GetResourceManager() {
+  return resource_manager_;
+}
+
 ui::SystemUIResourceManager& CompositorImpl::GetSystemUIResourceManager() {
   return ui_resource_provider_.GetSystemUIResourceManager();
 }
@@ -389,6 +389,44 @@ void CompositorImpl::SetSurface(jobject surface) {
   }
 }
 
+void CompositorImpl::CreateLayerTreeHost() {
+  DCHECK(!host_);
+  DCHECK(!WillCompositeThisFrame());
+  needs_composite_ = false;
+  defer_composite_for_gpu_channel_ = false;
+  pending_swapbuffers_ = 0;
+  cc::LayerTreeSettings settings;
+  settings.renderer_settings.refresh_rate = 60.0;
+  settings.renderer_settings.allow_antialiasing = false;
+  settings.renderer_settings.highp_threshold_min = 2048;
+  settings.impl_side_painting = false;
+  settings.calculate_top_controls_position = false;
+
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  settings.initial_debug_state.SetRecordRenderingStats(
+      command_line->HasSwitch(cc::switches::kEnableGpuBenchmarking));
+  settings.initial_debug_state.show_fps_counter =
+      command_line->HasSwitch(cc::switches::kUIShowFPSCounter);
+  // TODO(enne): Update this this compositor to use the scheduler.
+  settings.single_thread_proxy_scheduler = false;
+
+  host_ = cc::LayerTreeHost::CreateSingleThreaded(
+      this,
+      this,
+      HostSharedBitmapManager::current(),
+      BrowserGpuMemoryBufferManager::current(),
+      settings,
+      base::MessageLoopProxy::current(),
+      nullptr);
+  host_->SetRootLayer(root_layer_);
+
+  host_->SetVisible(true);
+  host_->SetLayerTreeHostClientReady();
+  host_->SetViewportSize(size_);
+  host_->set_has_transparent_background(has_transparent_background_);
+  host_->SetDeviceScaleFactor(device_scale_factor_);
+}
+
 void CompositorImpl::SetVisible(bool visible) {
   if (!visible) {
     DCHECK(host_);
@@ -416,41 +454,7 @@ void CompositorImpl::SetVisible(bool visible) {
       current_composite_task_.reset();
     }
   } else if (!host_) {
-    DCHECK(!WillComposite());
-    needs_composite_ = false;
-    defer_composite_for_gpu_channel_ = false;
-    pending_swapbuffers_ = 0;
-    cc::LayerTreeSettings settings;
-    settings.renderer_settings.refresh_rate = 60.0;
-    settings.renderer_settings.allow_antialiasing = false;
-    settings.renderer_settings.highp_threshold_min = 2048;
-    settings.impl_side_painting = false;
-    settings.calculate_top_controls_position = false;
-    settings.top_controls_height = 0.f;
-
-    base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-    settings.initial_debug_state.SetRecordRenderingStats(
-        command_line->HasSwitch(cc::switches::kEnableGpuBenchmarking));
-    settings.initial_debug_state.show_fps_counter =
-        command_line->HasSwitch(cc::switches::kUIShowFPSCounter);
-    // TODO(enne): Update this this compositor to use the scheduler.
-    settings.single_thread_proxy_scheduler = false;
-
-    host_ = cc::LayerTreeHost::CreateSingleThreaded(
-        this,
-        this,
-        HostSharedBitmapManager::current(),
-        BrowserGpuMemoryBufferManager::current(),
-        settings,
-        base::MessageLoopProxy::current(),
-        nullptr);
-    host_->SetRootLayer(root_layer_);
-
-    host_->SetVisible(true);
-    host_->SetLayerTreeHostClientReady();
-    host_->SetViewportSize(size_);
-    host_->set_has_transparent_background(has_transparent_background_);
-    host_->SetDeviceScaleFactor(device_scale_factor_);
+    CreateLayerTreeHost();
     ui_resource_provider_.SetLayerTreeHost(host_.get());
   }
 }

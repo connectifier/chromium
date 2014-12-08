@@ -719,6 +719,13 @@ const Experiment kExperiments[] = {
   },
 #endif  // defined(OS_ANDROID)
   {
+    "disable-javascript-harmony-shipping",
+    IDS_FLAGS_DISABLE_JAVASCRIPT_HARMONY_SHIPPING_NAME,
+    IDS_FLAGS_DISABLE_JAVASCRIPT_HARMONY_SHIPPING_DESCRIPTION,
+    kOsAll,
+    SINGLE_VALUE_TYPE(switches::kDisableJavaScriptHarmonyShipping)
+  },
+  {
     "enable-javascript-harmony",
     IDS_FLAGS_ENABLE_JAVASCRIPT_HARMONY_NAME,
     IDS_FLAGS_ENABLE_JAVASCRIPT_HARMONY_DESCRIPTION,
@@ -958,11 +965,11 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(ash::switches::kAshEnableTouchViewTesting),
   },
   {
-    "enable-touch-feedback",
-    IDS_FLAGS_ENABLE_TOUCH_FEEDBACK_NAME,
-    IDS_FLAGS_ENABLE_TOUCH_FEEDBACK_DESCRIPTION,
+    "disable-touch-feedback",
+    IDS_FLAGS_DISABLE_TOUCH_FEEDBACK_NAME,
+    IDS_FLAGS_DISABLE_TOUCH_FEEDBACK_DESCRIPTION,
     kOsCrOS,
-    SINGLE_VALUE_TYPE(switches::kEnableTouchFeedback),
+    SINGLE_VALUE_TYPE(switches::kDisableTouchFeedback),
   },
   { "ash-disable-text-filtering-in-overview-mode",
     IDS_FLAGS_ASH_DISABLE_TEXT_FILTERING_IN_OVERVIEW_MODE_NAME,
@@ -1284,6 +1291,13 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(chromeos::switches::kEnableNewKoreanIme)
   },
   {
+    "enable-new-qp-input-view",
+    IDS_FLAGS_ENABLE_NEW_QP_INPUT_VIEW_NAME,
+    IDS_FLAGS_ENABLE_NEW_QP_INPUT_VIEW_DESCRIPTION,
+    kOsCrOS,
+    SINGLE_VALUE_TYPE(chromeos::switches::kEnableNewQPInputView)
+  },
+  {
     "enable-physical-keyboard-autocorrect",
     IDS_FLAGS_ENABLE_PHYSICAL_KEYBOARD_AUTOCORRECT_NAME,
     IDS_FLAGS_ENABLE_PHYSICAL_KEYBOARD_AUTOCORRECT_DESCRIPTION,
@@ -1525,7 +1539,7 @@ const Experiment kExperiments[] = {
     "enable-streamlined-hosted-apps",
     IDS_FLAGS_ENABLE_STREAMLINED_HOSTED_APPS_NAME,
     IDS_FLAGS_ENABLE_STREAMLINED_HOSTED_APPS_DESCRIPTION,
-    kOsWin | kOsCrOS | kOsLinux,
+    kOsWin | kOsCrOS | kOsLinux | kOsMac,
     SINGLE_VALUE_TYPE(switches::kEnableStreamlinedHostedApps)
   },
   {
@@ -1673,7 +1687,7 @@ const Experiment kExperiments[] = {
     "enable-single-click-autofill",
     IDS_FLAGS_ENABLE_SINGLE_CLICK_AUTOFILL_NAME,
     IDS_FLAGS_ENABLE_SINGLE_CLICK_AUTOFILL_DESCRIPTION,
-    kOsCrOS | kOsMac | kOsWin | kOsLinux,
+    kOsCrOS | kOsMac | kOsWin | kOsLinux | kOsAndroid,
     ENABLE_DISABLE_VALUE_TYPE(
         autofill::switches::kEnableSingleClickAutofill,
         autofill::switches::kDisableSingleClickAutofill)
@@ -1892,11 +1906,11 @@ const Experiment kExperiments[] = {
   },
 #endif
   {
-    "enable-experimental-hotwording",
-    IDS_FLAGS_ENABLE_EXPERIMENTAL_HOTWORDING_NAME,
-    IDS_FLAGS_ENABLE_EXPERIMENTAL_HOTWORDING_DESCRIPTION,
+    "disable-experimental-hotwording",
+    IDS_FLAGS_DISABLE_EXPERIMENTAL_HOTWORDING_NAME,
+    IDS_FLAGS_DISABLE_EXPERIMENTAL_HOTWORDING_DESCRIPTION,
     kOsDesktop,
-    SINGLE_VALUE_TYPE(switches::kEnableExperimentalHotwording)
+    SINGLE_VALUE_TYPE(switches::kDisableExperimentalHotwording)
   },
   {
     "enable-hotword-hardware",
@@ -2004,13 +2018,6 @@ const Experiment kExperiments[] = {
 #endif
 #if defined(OS_CHROMEOS)
   {
-    "enable-remote-assistance",
-    IDS_FLAGS_ENABLE_REMOTE_ASSISTANCE_NAME,
-    IDS_FLAGS_ENABLE_REMOTE_ASSISTANCE_DESCRIPTION,
-    kOsCrOS,
-    SINGLE_VALUE_TYPE(extensions::switches::kEnableRemoteAssistance)
-  },
-  {
     "disable-new-zip-unpacker",
     IDS_FLAGS_DISABLE_NEW_ZIP_UNPACKER_NAME,
     IDS_FLAGS_DISABLE_NEW_ZIP_UNPACKER_DESCRIPTION,
@@ -2041,6 +2048,22 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(chromeos::switches::kEnableCaptivePortalBypassProxy)
   },
 #endif  // defined(OS_CHROMEOS)
+#if defined(OS_ANDROID)
+  {
+    "enable-seccomp-filter-sandbox",
+    IDS_FLAGS_ENABLE_SECCOMP_FILTER_SANDBOX_ANDROID_NAME,
+    IDS_FLAGS_ENABLE_SECCOMP_FILTER_SANDBOX_ANDROID_DESCRIPTION,
+    kOsAndroid,
+    SINGLE_VALUE_TYPE(switches::kEnableSeccompFilterSandbox)
+  },
+#endif
+  {
+    "enable-touch-hover",
+    IDS_FLAGS_ENABLE_TOUCH_HOVER_NAME,
+    IDS_FLAGS_ENABLE_TOUCH_HOVER_DESCRIPTION,
+    kOsAndroid,
+    SINGLE_VALUE_TYPE("enable-touch-hover")
+  },
 
   // NOTE: Adding new command-line switches requires adding corresponding
   // entries to enum "LoginCustomFlags" in histograms.xml. See note in

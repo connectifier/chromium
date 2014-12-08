@@ -9,9 +9,11 @@ import sys
 from telemetry import benchmark
 from telemetry import user_story
 from telemetry.core import exceptions
+from telemetry.page import page_set
 from telemetry.page import page_test
 from telemetry.page import test_expectations
 from telemetry.results import results_options
+from unittest_data import test_simple_one_page_set
 from telemetry.unittest_util import options_for_unittests
 from telemetry.unittest_util import system_stub
 from telemetry.user_story import shared_user_story_state
@@ -75,6 +77,9 @@ class BarUserStoryState(TestSharedUserStoryState):
 
 class DummyTest(page_test.PageTest):
   def RunPage(self, *_):
+    pass
+
+  def ValidateAndMeasurePage(self, page, tab, results):
     pass
 
 
@@ -216,11 +221,15 @@ class UserStoryRunnerTest(unittest.TestCase):
       def __init__(self, *args):
         super(Test, self).__init__(*args)
         self.run_count = 0
+
       def RunPage(self, *_):
         old_run_count = self.run_count
         self.run_count += 1
         if old_run_count == 0:
           raise ExpectedException()
+
+      def ValidateAndMeasurePage(self, page, tab, results):
+        pass
 
     us.AddUserStory(user_story.UserStory(TestSharedUserStoryState))
     us.AddUserStory(user_story.UserStory(TestSharedUserStoryState))
@@ -239,11 +248,15 @@ class UserStoryRunnerTest(unittest.TestCase):
       def __init__(self, *args):
         super(Test, self).__init__(*args)
         self.run_count = 0
+
       def RunPage(self, *_):
         old_run_count = self.run_count
         self.run_count += 1
         if old_run_count == 0:
           raise exceptions.BrowserGoneException()
+
+      def ValidateAndMeasurePage(self, page, tab, results):
+        pass
 
     us.AddUserStory(user_story.UserStory(TestSharedUserStoryState))
     us.AddUserStory(user_story.UserStory(TestSharedUserStoryState))
@@ -265,6 +278,9 @@ class UserStoryRunnerTest(unittest.TestCase):
 
       def RunPage(self, page, _, results):
         results.AddValue(string.StringValue(page, 'test', 't', page.name))
+
+      def ValidateAndMeasurePage(self, page, tab, results):
+        pass
 
     results = results_options.CreateResults(
         EmptyMetadataForTest(), self.options)
@@ -320,6 +336,9 @@ class UserStoryRunnerTest(unittest.TestCase):
         results.AddValue(scalar.ScalarValue(
             page, 'metric', 'unit', self.i))
 
+      def ValidateAndMeasurePage(self, page, tab, results):
+        pass
+
     self.options.page_repeat = 1
     self.options.pageset_repeat = 2
     self.options.output_formats = ['buildbot']
@@ -340,3 +359,37 @@ class UserStoryRunnerTest(unittest.TestCase):
       self.assertIn('*RESULT metric: metric= [1,2,3,4] unit', contents)
     finally:
       sys.stdout = real_stdout
+
+  def testCheckArchives(self):
+    ps = page_set.PageSet()
+    ps.AddPageWithDefaultRunNavigate('http://www.testurl.com')
+    # Page set missing archive_data_file.
+    self.assertFalse(user_story_runner._CheckArchives(
+        ps.archive_data_file, ps.wpr_archive_info, ps.pages))
+
+    ps = page_set.PageSet(archive_data_file='missing_archive_data_file.json')
+    ps.AddPageWithDefaultRunNavigate('http://www.testurl.com')
+    # Page set missing json file specified in archive_data_file.
+    self.assertFalse(user_story_runner._CheckArchives(
+       ps.archive_data_file, ps.wpr_archive_info, ps.pages))
+
+    ps = page_set.PageSet(archive_data_file='../../unittest_data/test.json',
+                          bucket=page_set.PUBLIC_BUCKET)
+    ps.AddPageWithDefaultRunNavigate('http://www.testurl.com')
+    # Page set with valid archive_data_file.
+    self.assertTrue(user_story_runner._CheckArchives(
+        ps.archive_data_file, ps.wpr_archive_info, ps.pages))
+    ps.AddPageWithDefaultRunNavigate('http://www.google.com')
+    # Page set with an archive_data_file which exists but is missing a page.
+    self.assertFalse(user_story_runner._CheckArchives(
+        ps.archive_data_file, ps.wpr_archive_info, ps.pages))
+
+    ps = page_set.PageSet(
+        archive_data_file='../../unittest_data/test_missing_wpr_file.json',
+        bucket=page_set.PUBLIC_BUCKET)
+    ps.AddPageWithDefaultRunNavigate('http://www.testurl.com')
+    ps.AddPageWithDefaultRunNavigate('http://www.google.com')
+    # Page set with an archive_data_file which exists and contains all pages
+    # but fails to find a wpr file.
+    self.assertFalse(user_story_runner._CheckArchives(
+        ps.archive_data_file, ps.wpr_archive_info, ps.pages))

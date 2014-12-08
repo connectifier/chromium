@@ -261,6 +261,8 @@ class TiledLayerTest : public testing::Test {
 };
 
 TEST_F(TiledLayerTest, PushDirtyTiles) {
+  layer_tree_host_->SetViewportSize(gfx::Size(1000, 1000));
+
   scoped_refptr<FakeTiledLayer> layer =
       make_scoped_refptr(new FakeTiledLayer(resource_manager_.get()));
   scoped_ptr<FakeTiledLayerImpl> layer_impl =
@@ -290,6 +292,8 @@ TEST_F(TiledLayerTest, PushDirtyTiles) {
 }
 
 TEST_F(TiledLayerTest, Scale) {
+  layer_tree_host_->SetViewportSize(gfx::Size(1000, 1000));
+
   layer_tree_host_->SetDeviceScaleFactor(1.5);
 
   scoped_refptr<FakeTiledLayer> layer =
@@ -352,6 +356,8 @@ TEST_F(TiledLayerTest, PushOccludedDirtyTiles) {
 }
 
 TEST_F(TiledLayerTest, PushDeletedTiles) {
+  layer_tree_host_->SetViewportSize(gfx::Size(1000, 1000));
+
   scoped_refptr<FakeTiledLayer> layer =
       make_scoped_refptr(new FakeTiledLayer(resource_manager_.get()));
   scoped_ptr<FakeTiledLayerImpl> layer_impl =
@@ -1201,6 +1207,8 @@ TEST_F(TiledLayerPartialUpdateTest, PartialUpdates) {
 }
 
 TEST_F(TiledLayerTest, TilesPaintedWithoutOcclusion) {
+  layer_tree_host_->SetViewportSize(gfx::Size(1000, 1000));
+
   scoped_refptr<FakeTiledLayer> layer =
       make_scoped_refptr(new FakeTiledLayer(resource_manager_.get()));
   RenderSurfaceLayerList render_surface_layer_list;
@@ -1703,7 +1711,7 @@ TEST_F(TiledLayerTest, NonIntegerContentsScaleIsNotDistortedDuringPaint) {
   layer->Update(queue_.get(), nullptr);
   layer->tracking_layer_painter()->ResetPaintedRect();
 
-  EXPECT_RECT_EQ(gfx::Rect(), layer->tracking_layer_painter()->PaintedRect());
+  EXPECT_EQ(gfx::Rect(), layer->tracking_layer_painter()->PaintedRect());
   UpdateTextures();
 
   // Invalidate the entire layer in content space. When painting, the rect given
@@ -1714,8 +1722,8 @@ TEST_F(TiledLayerTest, NonIntegerContentsScaleIsNotDistortedDuringPaint) {
   // Rounding leads to an extra pixel.
   gfx::Rect expanded_layer_rect(layer_rect);
   expanded_layer_rect.set_height(32);
-  EXPECT_RECT_EQ(expanded_layer_rect,
-                 layer->tracking_layer_painter()->PaintedRect());
+  EXPECT_EQ(expanded_layer_rect,
+            layer->tracking_layer_painter()->PaintedRect());
 }
 
 TEST_F(TiledLayerTest,
@@ -1742,7 +1750,7 @@ TEST_F(TiledLayerTest,
   layer->Update(queue_.get(), nullptr);
   layer->tracking_layer_painter()->ResetPaintedRect();
 
-  EXPECT_RECT_EQ(gfx::Rect(), layer->tracking_layer_painter()->PaintedRect());
+  EXPECT_EQ(gfx::Rect(), layer->tracking_layer_painter()->PaintedRect());
   UpdateTextures();
 
   // Invalidate the entire layer in layer space. When painting, the rect given
@@ -1753,8 +1761,8 @@ TEST_F(TiledLayerTest,
   // Rounding leads to an extra pixel.
   gfx::Rect expanded_layer_rect(layer_rect);
   expanded_layer_rect.set_height(32);
-  EXPECT_RECT_EQ(expanded_layer_rect,
-                 layer->tracking_layer_painter()->PaintedRect());
+  EXPECT_EQ(expanded_layer_rect,
+            layer->tracking_layer_painter()->PaintedRect());
 }
 
 }  // namespace

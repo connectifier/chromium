@@ -442,6 +442,12 @@
             },
           },
         ],
+        [ 'OS == "ios" or OS == "mac"', {
+            'sources': [
+              '<@(net_base_mac_ios_sources)',
+            ],
+          },
+        ],
         ['OS=="android" and _toolset=="target" and android_webview_build == 0', {
           'dependencies': [
              'net_java',
@@ -548,6 +554,11 @@
           ],
           'sources': [
             '<@(net_linux_test_sources)',
+          ],
+        }],
+        ['OS == "mac" or OS == "ios"', {
+          'sources': [
+            '<@(net_base_test_mac_ios_sources)',
           ],
         }],
         ['chromeos==1', {
@@ -1570,6 +1581,7 @@
             '../base/base.gyp:base',
             'cert_verify_status_android_java',
             'certificate_mime_types_java',
+            'network_change_notifier_types_java',
             'net_errors_java',
             'private_key_types_java',
             'remote_android_keystore_aidl',
@@ -1636,6 +1648,14 @@
           'type': 'none',
           'variables': {
             'source_file': 'android/cert_verify_result_android.h',
+          },
+          'includes': [ '../build/android/java_cpp_enum.gypi' ],
+        },
+        {
+          'target_name': 'network_change_notifier_types_java',
+          'type': 'none',
+          'variables': {
+            'source_file': 'base/network_change_notifier.h',
           },
           'includes': [ '../build/android/java_cpp_enum.gypi' ],
         },

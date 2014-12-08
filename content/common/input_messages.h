@@ -24,11 +24,11 @@
 #include "ipc/ipc_message_macros.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
 #include "ui/events/ipc/latency_info_param_traits.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/vector2d_f.h"
 #include "ui/gfx/ipc/gfx_param_traits.h"
-#include "ui/gfx/point.h"
 #include "ui/gfx/range/range.h"
-#include "ui/gfx/rect.h"
-#include "ui/gfx/vector2d_f.h"
 
 #undef IPC_MESSAGE_EXPORT
 #define IPC_MESSAGE_EXPORT CONTENT_EXPORT
@@ -254,15 +254,11 @@ IPC_MESSAGE_ROUTED0(InputHostMsg_SelectRange_ACK)
 // Required for cancelling an ongoing input method composition.
 IPC_MESSAGE_ROUTED0(InputHostMsg_ImeCancelComposition)
 
-#if defined(OS_MACOSX) || defined(USE_AURA) || defined(OS_ANDROID)
-// On Mac and Aura IME can request composition character bounds
-// synchronously (see crbug.com/120597). This IPC message sends the character
-// bounds after every composition change to always have correct bound info.
-// This IPC message is also used on Android 5.0 and above.
+// This IPC message sends the character bounds after every composition change
+// to always have correct bound info.
 IPC_MESSAGE_ROUTED2(InputHostMsg_ImeCompositionRangeChanged,
                     gfx::Range /* composition range */,
                     std::vector<gfx::Rect> /* character bounds */)
-#endif
 
 // Adding a new message? Stick to the sort order above: first platform
 // independent InputMsg, then ifdefs for platform specific InputMsg, then

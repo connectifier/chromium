@@ -37,7 +37,7 @@ class MockHotwordService : public HotwordService {
     return HotwordService::UninstallHotwordExtension(extension_service);
   }
 
-  void InstallHotwordExtensionFromWebstore() override {
+  void InstallHotwordExtensionFromWebstore(int num_tries) override {
     scoped_ptr<base::DictionaryValue> manifest =
         extensions::DictionaryBuilder()
         .Set("name", "Hotword Test Extension")
@@ -95,9 +95,9 @@ class HotwordServiceTest :
 
   void SetUp() override {
     extension_id_ = GetParam();
-    if (extension_id_ == extension_misc::kHotwordSharedModuleId) {
+    if (extension_id_ == extension_misc::kHotwordExtensionId) {
       base::CommandLine::ForCurrentProcess()->AppendSwitch(
-          switches::kEnableExperimentalHotwording);
+          switches::kDisableExperimentalHotwording);
     }
 
     extensions::ExtensionServiceTestBase::SetUp();
@@ -251,7 +251,7 @@ TEST_P(HotwordServiceTest, PreviousLanguageSetOnInstall) {
 
   SetApplicationLocale(profile(), "test_locale");
 
-  hotword_service->InstallHotwordExtensionFromWebstore();
+  hotword_service->InstallHotwordExtensionFromWebstore(1);
   base::MessageLoop::current()->RunUntilIdle();
 
   EXPECT_EQ("test_locale",
@@ -282,8 +282,8 @@ TEST_P(HotwordServiceTest, UninstallReinstallTriggeredCorrectly) {
   // The previous locale should not be set. No reason to uninstall.
   EXPECT_FALSE(hotword_service->MaybeReinstallHotwordExtension());
 
-   // Do an initial installation.
-  hotword_service->InstallHotwordExtensionFromWebstore();
+  // Do an initial installation.
+  hotword_service->InstallHotwordExtensionFromWebstore(1);
   base::MessageLoop::current()->RunUntilIdle();
   EXPECT_EQ("en",
             profile()->GetPrefs()->GetString(prefs::kHotwordPreviousLanguage));
@@ -298,7 +298,7 @@ TEST_P(HotwordServiceTest, UninstallReinstallTriggeredCorrectly) {
     EXPECT_TRUE(registry()->disabled_extensions().Contains(extension_id_));
   }
 
-   // The previous locale should be set but should match the current
+  // The previous locale should be set but should match the current
   // locale. No reason to uninstall.
   EXPECT_FALSE(hotword_service->MaybeReinstallHotwordExtension());
 
@@ -306,7 +306,7 @@ TEST_P(HotwordServiceTest, UninstallReinstallTriggeredCorrectly) {
   SetApplicationLocale(profile(), "fr_fr");
   EXPECT_TRUE(HotwordServiceFactory::IsHotwordAllowed(profile()));
 
-   // Different but valid locale so expect uninstall.
+  // Different but valid locale so expect uninstall.
   EXPECT_TRUE(hotword_service->MaybeReinstallHotwordExtension());
   EXPECT_EQ(1, hotword_service->uninstall_count());
   EXPECT_EQ("fr_fr",
@@ -372,7 +372,7 @@ TEST_P(HotwordServiceTest, DisableAlwaysOnOnLanguageChange) {
   EXPECT_TRUE(hotword_service->IsAlwaysOnEnabled());
 
   // Do an initial installation.
-  hotword_service->InstallHotwordExtensionFromWebstore();
+  hotword_service->InstallHotwordExtensionFromWebstore(1);
   base::MessageLoop::current()->RunUntilIdle();
 
   // The previous locale should be set but should match the current

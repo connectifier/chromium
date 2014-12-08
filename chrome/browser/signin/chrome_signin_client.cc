@@ -7,11 +7,14 @@
 #include "base/command_line.h"
 #include "base/guid.h"
 #include "base/prefs/pref_service.h"
+#include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/content_settings/cookie_settings.h"
 #include "chrome/browser/net/chrome_cookie_notification_details.h"
 #include "chrome/browser/profiles/profile_info_cache.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/profiles/profile_metrics.h"
+#include "chrome/browser/profiles/profile_window.h"
 #include "chrome/browser/signin/local_auth.h"
 #include "chrome/browser/signin/signin_cookie_changed_subscription.h"
 #include "chrome/browser/webdata/web_data_service_factory.h"
@@ -25,7 +28,7 @@
 #include "net/url_request/url_request_context_getter.h"
 #include "url/gurl.h"
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
 #include "chrome/browser/supervised_user/supervised_user_constants.h"
 #endif
 
@@ -207,12 +210,24 @@ ChromeSigninClient::AddCookieChangedCallback(
   return subscription.Pass();
 }
 
-void ChromeSigninClient::GoogleSigninSucceeded(const std::string& account_id,
-                                               const std::string& username,
-                                               const std::string& password) {
+void ChromeSigninClient::OnSignedIn(const std::string& account_id,
+                                    const std::string& username,
+                                    const std::string& password) {
+  ProfileManager* profile_manager = g_browser_process->profile_manager();
+  ProfileInfoCache& cache = profile_manager->GetProfileInfoCache();
+  size_t index = cache.GetIndexOfProfileWithPath(profile_->GetPath());
+  if (index != std::string::npos) {
+    cache.SetUserNameOfProfileAtIndex(index, base::UTF8ToUTF16(username));
+    ProfileMetrics::UpdateReportedProfilesStatistics(profile_manager);
+  }
+}
+
+void ChromeSigninClient::PostSignedIn(const std::string& account_id,
+                                      const std::string& username,
+                                      const std::string& password) {
 #if !defined(OS_ANDROID) && !defined(OS_IOS) && !defined(OS_CHROMEOS)
-  // Don't store password hash except for users of new profile management.
-  if (switches::IsNewProfileManagement() && !password.empty())
+  // Don't store password hash except when lock is available for the user.
+  if (!password.empty() && profiles::IsLockAvailable(profile_))
     chrome::SetLocalAuthCredentials(profile_, password);
 #endif
 }

@@ -45,13 +45,16 @@ class CONTENT_EXPORT ServiceWorkerProviderHost
     : public NON_EXPORTED_BASE(ServiceWorkerRegistration::Listener),
       public base::SupportsWeakPtr<ServiceWorkerProviderHost> {
  public:
-  ServiceWorkerProviderHost(int process_id,
+  typedef base::Callback<void(bool)> FocusCallback;
+
+  ServiceWorkerProviderHost(int render_process_id,
+                            int render_frame_id,
                             int provider_id,
                             base::WeakPtr<ServiceWorkerContextCore> context,
                             ServiceWorkerDispatcherHost* dispatcher_host);
   virtual ~ServiceWorkerProviderHost();
 
-  int process_id() const { return process_id_; }
+  int process_id() const { return render_process_id_; }
   int provider_id() const { return provider_id_; }
 
   bool IsHostToRunningServiceWorker() {
@@ -127,6 +130,12 @@ class CONTENT_EXPORT ServiceWorkerProviderHost
   void PostMessage(const base::string16& message,
                    const std::vector<int>& sent_message_port_ids);
 
+  // Activates the WebContents associated with
+  // { render_process_id_, render_frame_id_ }.
+  // Runs the |callback| with the result in parameter describing whether the
+  // focusing action was successful.
+  void Focus(const FocusCallback& callback);
+
   // Adds reference of this host's process to the |pattern|, the reference will
   // be removed in destructor.
   void AddScopedProcessReferenceToPattern(const GURL& pattern);
@@ -155,7 +164,8 @@ class CONTENT_EXPORT ServiceWorkerProviderHost
   void IncreaseProcessReference(const GURL& pattern);
   void DecreaseProcessReference(const GURL& pattern);
 
-  const int process_id_;
+  const int render_process_id_;
+  const int render_frame_id_;
   const int provider_id_;
   GURL document_url_;
   GURL topmost_frame_url_;

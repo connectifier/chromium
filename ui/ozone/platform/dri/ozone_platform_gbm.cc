@@ -89,6 +89,9 @@ class OzonePlatformGbm : public OzonePlatform {
   CursorFactoryOzone* GetCursorFactoryOzone() override {
     return cursor_factory_ozone_.get();
   }
+  InputController* GetInputController() override {
+    return event_factory_ozone_->input_controller();
+  }
   GpuPlatformSupport* GetGpuPlatformSupport() override {
     return gpu_platform_support_.get();
   }
@@ -140,13 +143,12 @@ class OzonePlatformGbm : public OzonePlatform {
     surface_factory_ozone_->InitializeGpu(
         dri_.get(), buffer_generator_->device(), screen_manager_.get(),
         window_delegate_manager_.get());
-    gpu_platform_support_.reset(new DriGpuPlatformSupport(
-        dri_.get(), window_delegate_manager_.get(), screen_manager_.get(),
-        scoped_ptr<NativeDisplayDelegateDri>(new NativeDisplayDelegateDri(
-            dri_.get(), screen_manager_.get(), NULL))));
-    if (surface_factory_ozone_->InitializeHardware() !=
-        DriSurfaceFactory::INITIALIZED)
-      LOG(FATAL) << "failed to initialize display hardware";
+    scoped_ptr<NativeDisplayDelegateDri> ndd(
+        new NativeDisplayDelegateDri(dri_.get(), screen_manager_.get()));
+    ndd->Initialize();
+    gpu_platform_support_.reset(
+        new DriGpuPlatformSupport(dri_.get(), window_delegate_manager_.get(),
+                                  screen_manager_.get(), ndd.Pass()));
   }
 
  private:

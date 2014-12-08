@@ -29,8 +29,8 @@
 #include "third_party/WebKit/public/platform/WebGraphicsContext3D.h"
 #include "ui/base/android/window_android_observer.h"
 #include "ui/events/gesture_detection/filtered_gesture_provider.h"
-#include "ui/gfx/size.h"
-#include "ui/gfx/vector2d_f.h"
+#include "ui/gfx/geometry/size.h"
+#include "ui/gfx/geometry/vector2d_f.h"
 
 struct ViewHostMsg_TextInputState_Params;
 
@@ -118,7 +118,8 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
   virtual bool IsShowing() override;
   virtual gfx::Rect GetViewBounds() const override;
   virtual gfx::Size GetPhysicalBackingSize() const override;
-  virtual float GetTopControlsLayoutHeight() const override;
+  virtual bool DoTopControlsShrinkBlinkSize() const override;
+  virtual float GetTopControlsHeight() const override;
   virtual void UpdateCursor(const WebCursor& cursor) override;
   virtual void SetIsLoading(bool is_loading) override;
   virtual void TextInputTypeChanged(ui::TextInputType type,
@@ -388,7 +389,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
   // Size to use if we have no backing ContentViewCore
   gfx::Size default_size_;
 
-  const bool using_synchronous_compositor_;
+  const bool using_browser_compositor_;
 
   scoped_ptr<DelegatedFrameEvictor> frame_evictor_;
 

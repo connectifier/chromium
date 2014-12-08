@@ -39,6 +39,7 @@
 #include "content/child/child_discardable_shared_memory_manager.h"
 #include "content/child/child_gpu_memory_buffer_manager.h"
 #include "content/child/child_histogram_message_filter.h"
+#include "content/child/child_shared_bitmap_manager.h"
 #include "content/child/content_child_helpers.h"
 #include "content/child/db_message_filter.h"
 #include "content/child/indexed_db/indexed_db_dispatcher.h"
@@ -72,6 +73,7 @@
 #include "content/public/renderer/render_process_observer.h"
 #include "content/public/renderer/render_view_visitor.h"
 #include "content/renderer/devtools/devtools_agent_filter.h"
+#include "content/renderer/devtools/v8_sampling_profiler.h"
 #include "content/renderer/dom_storage/dom_storage_dispatcher.h"
 #include "content/renderer/dom_storage/webstoragearea_impl.h"
 #include "content/renderer/dom_storage/webstoragenamespace_impl.h"
@@ -80,6 +82,7 @@
 #include "content/renderer/gpu/compositor_output_surface.h"
 #include "content/renderer/input/input_event_filter.h"
 #include "content/renderer/input/input_handler_manager.h"
+#include "content/renderer/input/main_thread_input_event_filter.h"
 #include "content/renderer/media/aec_dump_message_filter.h"
 #include "content/renderer/media/audio_input_message_filter.h"
 #include "content/renderer/media/audio_message_filter.h"
@@ -101,6 +104,8 @@
 #include "content/renderer/service_worker/embedded_worker_dispatcher.h"
 #include "content/renderer/shared_worker/embedded_shared_worker_stub.h"
 #include "gin/public/debug.h"
+#include "gpu/GLES2/gl2extchromium.h"
+#include "gpu/command_buffer/common/gles2_cmd_utils.h"
 #include "ipc/ipc_channel_handle.h"
 #include "ipc/ipc_platform_file.h"
 #include "ipc/mojo/ipc_channel_mojo.h"
@@ -520,7 +525,19 @@ void RenderThreadImpl::Init() {
   is_one_copy_enabled_ = !command_line.HasSwitch(switches::kDisableOneCopy);
 #endif
 
-  use_image_external_ = command_line.HasSwitch(switches::kUseImageExternal);
+  use_image_texture_target_ = GL_TEXTURE_2D;
+  if (command_line.HasSwitch(switches::kUseImageTextureTarget)) {
+    std::string target_string =
+        command_line.GetSwitchValueASCII(switches::kUseImageTextureTarget);
+    const unsigned targets[] = {
+      GL_TEXTURE_RECTANGLE_ARB,
+      GL_TEXTURE_EXTERNAL_OES
+    };
+    for (auto target : targets) {
+      if (target_string == gpu::gles2::GLES2Util::GetStringEnum(target))
+        use_image_texture_target_ = target;
+    }
+  }
 
   if (command_line.HasSwitch(switches::kDisableLCDText)) {
     is_lcd_text_enabled_ = false;
@@ -670,6 +687,8 @@ void RenderThreadImpl::Shutdown() {
   audio_message_filter_ = NULL;
 
   compositor_thread_.reset();
+
+  main_input_callback_.Cancel();
   input_handler_manager_.reset();
   if (input_event_filter_.get()) {
     RemoveFilter(input_event_filter_.get());
@@ -896,6 +915,10 @@ const CommandLine& command_line = *CommandLine::ForCurrentProcess();
   main_thread_compositor_task_runner_ =
       renderer_scheduler()->CompositorTaskRunner();
 
+  main_input_callback_.Reset(
+      base::Bind(base::IgnoreResult(&RenderThreadImpl::OnMessageReceived),
+                 base::Unretained(this)));
+
   bool enable = !command_line.HasSwitch(switches::kDisableThreadedCompositing);
   if (enable) {
 #if defined(OS_ANDROID)
@@ -926,17 +949,27 @@ const CommandLine& command_line = *CommandLine::ForCurrentProcess();
     }
 #endif
     if (!input_handler_manager_client) {
-      input_event_filter_ =
-          new InputEventFilter(this,
+      scoped_refptr<InputEventFilter> compositor_input_event_filter(
+          new InputEventFilter(main_input_callback_.callback(),
                                main_thread_compositor_task_runner_,
-                               compositor_message_loop_proxy_);
-      AddFilter(input_event_filter_.get());
-      input_handler_manager_client = input_event_filter_.get();
+                               compositor_message_loop_proxy_));
+      input_handler_manager_client = compositor_input_event_filter.get();
+      input_event_filter_ = compositor_input_event_filter;
     }
     input_handler_manager_.reset(new InputHandlerManager(
         compositor_message_loop_proxy_, input_handler_manager_client,
         renderer_scheduler()));
   }
+
+  if (!input_event_filter_.get()) {
+    // Always provide an input event filter implementation to ensure consistent
+    // input event scheduling and prioritization.
+    // TODO(jdduke): Merge InputEventFilter, InputHandlerManager and
+    // MainThreadInputEventFilter, crbug.com/436057.
+    input_event_filter_ = new MainThreadInputEventFilter(
+        main_input_callback_.callback(), main_thread_compositor_task_runner_);
+  }
+  AddFilter(input_event_filter_.get());
 
   scoped_refptr<base::MessageLoopProxy> compositor_impl_side_loop;
   if (enable)
@@ -965,6 +998,8 @@ const CommandLine& command_line = *CommandLine::ForCurrentProcess();
 
   devtools_agent_message_filter_ = new DevToolsAgentFilter();
   AddFilter(devtools_agent_message_filter_.get());
+
+  v8_sampling_profiler_.reset(new V8SamplingProfiler());
 
   if (GetContentClient()->renderer()->RunIdleHandlerWhenWidgetsHidden())
     ScheduleIdleHandler(kLongIdleHandlerDelayMs);
@@ -1010,27 +1045,11 @@ void RenderThreadImpl::RecordComputedAction(const std::string& action) {
 
 scoped_ptr<base::SharedMemory>
     RenderThreadImpl::HostAllocateSharedMemoryBuffer(size_t size) {
-  if (size > static_cast<size_t>(std::numeric_limits<int>::max()))
-    return scoped_ptr<base::SharedMemory>();
+  return ChildThread::AllocateSharedMemory(size, thread_safe_sender());
+}
 
-  base::SharedMemoryHandle handle;
-  bool success;
-  IPC::Message* message =
-      new ChildProcessHostMsg_SyncAllocateSharedMemory(size, &handle);
-
-  // Allow calling this from the compositor thread.
-  if (base::MessageLoop::current() == message_loop())
-    success = ChildThread::Send(message);
-  else
-    success = sync_message_filter()->Send(message);
-
-  if (!success)
-    return scoped_ptr<base::SharedMemory>();
-
-  if (!base::SharedMemory::IsHandleValid(handle))
-    return scoped_ptr<base::SharedMemory>();
-
-  return scoped_ptr<base::SharedMemory>(new base::SharedMemory(handle, false));
+cc::SharedBitmapManager* RenderThreadImpl::GetSharedBitmapManager() {
+  return shared_bitmap_manager();
 }
 
 void RenderThreadImpl::RegisterExtension(v8::Extension* extension) {
@@ -1351,11 +1370,13 @@ void RenderThreadImpl::OnCreateNewFrame(int routing_id,
   RenderFrameImpl::CreateFrame(routing_id, parent_routing_id, proxy_routing_id);
 }
 
-void RenderThreadImpl::OnCreateNewFrameProxy(int routing_id,
-                                             int parent_routing_id,
-                                             int render_view_routing_id) {
-  RenderFrameProxy::CreateFrameProxy(
-      routing_id, parent_routing_id, render_view_routing_id);
+void RenderThreadImpl::OnCreateNewFrameProxy(
+    int routing_id,
+    int parent_routing_id,
+    int render_view_routing_id,
+    const FrameReplicationState& replicated_state) {
+  RenderFrameProxy::CreateFrameProxy(routing_id, parent_routing_id,
+                                     render_view_routing_id, replicated_state);
 }
 
 void RenderThreadImpl::OnSetZoomLevelForCurrentURL(const std::string& scheme,

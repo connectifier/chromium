@@ -590,13 +590,7 @@ remoting.ClientSession.prototype.removePlugin = function() {
       function() {
         remoting.fullscreen.removeListener(listener);
       });
-  if (remoting.windowFrame) {
-    remoting.windowFrame.setClientSession(null);
-  } else {
-    remoting.toolbar.setClientSession(null);
-  }
-  remoting.optionsMenu.setClientSession(null);
-  document.body.classList.remove('connected');
+  this.updateClientSessionUi_(null);
 
   // Remove mediasource-rendering class from the container - this will also
   // hide the <video> element.
@@ -606,6 +600,29 @@ remoting.ClientSession.prototype.removePlugin = function() {
                                       this.updateMouseCursorPosition_,
                                       true);
 };
+
+/**
+ * @param {remoting.ClientSession} clientSession The active session, or null if
+ *     there is no connection.
+ */
+remoting.ClientSession.prototype.updateClientSessionUi_ = function(
+    clientSession) {
+  if (remoting.windowFrame) {
+    remoting.windowFrame.setClientSession(clientSession);
+  }
+  if (remoting.toolbar) {
+    remoting.toolbar.setClientSession(clientSession);
+  }
+  if (remoting.optionsMenu) {
+    remoting.optionsMenu.setClientSession(clientSession);
+  }
+
+  if (clientSession == null) {
+    document.body.classList.remove('connected');
+  } else {
+    document.body.classList.add('connected');
+  }
+}
 
 /**
  * Disconnect the current session with a particular |error|.  The session will
@@ -626,6 +643,7 @@ remoting.ClientSession.prototype.disconnect = function(error) {
   this.logToServer.logClientSessionStateChange(state, error);
   this.error_ = error;
   this.setState_(state);
+  remoting.app.onDisconnected();
 };
 
 /**
@@ -955,14 +973,7 @@ remoting.ClientSession.prototype.onConnectionStatusUpdate_ =
     }
     // Activate full-screen related UX.
     remoting.fullscreen.addListener(this.callOnFullScreenChanged_);
-    if (remoting.windowFrame) {
-      remoting.windowFrame.setClientSession(this);
-    } else {
-      remoting.toolbar.setClientSession(this);
-    }
-    remoting.optionsMenu.setClientSession(this);
-    document.body.classList.add('connected');
-
+    this.updateClientSessionUi_(this);
     this.container_.addEventListener('mousemove',
                                      this.updateMouseCursorPosition_,
                                      true);
@@ -1284,6 +1295,10 @@ remoting.ClientSession.prototype.updateDimensions = function() {
               parentNode.style.left + ',' +
               parentNode.style.top + '-' +
               pluginWidth + 'x' + pluginHeight + '.');
+
+  // When we receive the first plugin dimensions from the host, we know that
+  // remote host has started.
+  remoting.app.onVideoStreamingStarted();
 };
 
 /**

@@ -40,12 +40,25 @@ class ManagePasswordsBubbleModel : public content::WebContentsObserver {
   // Called by the view code when the bubble is hidden.
   void OnBubbleHidden();
 
+  // Called by the view code when the "Never for this site." button in clicked
+  // by the user and user gets confirmation bubble.
+  void OnConfirmationForNeverForThisSite();
+  // Call by the view code when user agreed to |url| collection.
+  void OnCollectURLClicked(const std::string& url);
+
+  // Called by the view code when user didn't allow to collect URL.
+  void OnDoNotCollectURLClicked();
+
   // Called by the view code when the "Nope" button in clicked by the user.
   void OnNopeClicked();
 
   // Called by the view code when the "Never for this site." button in clicked
   // by the user.
   void OnNeverForThisSiteClicked();
+
+  // Called by the view code when the "Undo" button is clicked in
+  // "Never for this site." confirmation bubble by the user.
+  void OnUndoNeverForThisSite();
 
   // Called by the view code when the site is unblacklisted.
   void OnUnblacklistClicked();
@@ -70,6 +83,8 @@ class ManagePasswordsBubbleModel : public content::WebContentsObserver {
   // Called by the view code to notify about chosen credential.
   void OnChooseCredentials(const autofill::PasswordForm& password_form);
 
+  GURL origin() const { return origin_; }
+
   password_manager::ui::State state() const { return state_; }
 
   const base::string16& title() const { return title_; }
@@ -83,6 +98,7 @@ class ManagePasswordsBubbleModel : public content::WebContentsObserver {
     return pending_credentials_;
   }
   const base::string16& manage_link() const { return manage_link_; }
+  bool never_save_passwords() const { return never_save_passwords_; }
   const base::string16& save_confirmation_text() const {
     return save_confirmation_text_;
   }
@@ -111,6 +127,8 @@ class ManagePasswordsBubbleModel : public content::WebContentsObserver {
   static int PasswordFieldWidth();
 
  private:
+  // URL of the page from where this bubble was triggered.
+  GURL origin_;
   password_manager::ui::State state_;
   base::string16 title_;
   autofill::PasswordForm pending_password_;
@@ -119,7 +137,9 @@ class ManagePasswordsBubbleModel : public content::WebContentsObserver {
   base::string16 manage_link_;
   base::string16 save_confirmation_text_;
   gfx::Range save_confirmation_link_range_;
-
+  // If true upon destruction, the user has confirmed that she never wants to
+  // save passwords for a particular site.
+  bool never_save_passwords_;
   password_manager::metrics_util::UIDisplayDisposition display_disposition_;
   password_manager::metrics_util::UIDismissalReason dismissal_reason_;
 

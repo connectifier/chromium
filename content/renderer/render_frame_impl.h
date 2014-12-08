@@ -31,6 +31,10 @@
 #include "third_party/WebKit/public/web/WebTransitionElementData.h"
 #include "ui/gfx/range/range.h"
 
+#if defined(ENABLE_PLUGINS)
+#include "content/renderer/pepper/plugin_power_saver_helper_impl.h"
+#endif
+
 #if defined(OS_ANDROID)
 #include "content/renderer/media/android/renderer_media_player_manager.h"
 #endif
@@ -72,7 +76,6 @@ class MidiDispatcher;
 class NotificationPermissionDispatcher;
 class PageState;
 class PepperPluginInstanceImpl;
-class PluginPowerSaverHelper;
 class PushMessagingDispatcher;
 class RendererAccessibility;
 class RendererCdmManager;
@@ -87,6 +90,7 @@ class UserMediaClientImpl;
 struct CommitNavigationParams;
 struct CommonNavigationParams;
 struct CustomContextMenuContext;
+struct FrameReplicationState;
 struct RequestNavigationParams;
 struct ResourceResponseHead;
 
@@ -243,8 +247,6 @@ class CONTENT_EXPORT RenderFrameImpl
   void OnImeConfirmComposition(const base::string16& text,
                                const gfx::Range& replacement_range,
                                bool keep_selection);
-
-  PluginPowerSaverHelper* plugin_power_saver_helper();
 #endif  // defined(ENABLE_PLUGINS)
 
   // May return NULL in some cases, especially if userMediaClient() returns
@@ -280,8 +282,12 @@ class CONTENT_EXPORT RenderFrameImpl
   void ExecuteJavaScript(const base::string16& javascript) override;
   bool IsHidden() override;
   ServiceRegistry* GetServiceRegistry() override;
+#if defined(ENABLE_PLUGINS)
+  PluginPowerSaverHelperImpl* GetPluginPowerSaverHelper() override;
+#endif
   bool IsFTPDirectoryListing() override;
   void AttachGuest(int element_instance_id) override;
+  void DetachGuest(int element_instance_id) override;
   void SetSelectedText(const base::string16& selection_text,
                        size_t offset,
                        const gfx::Range& range) override;
@@ -508,6 +514,7 @@ class CONTENT_EXPORT RenderFrameImpl
                            OnExtendSelectionAndDelete);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, ReloadWhileSwappedOut);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, SendSwapOutACK);
+  FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, OriginReplicationForSwapOut);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest,
                            SetEditableSelectionAndComposition);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest,
@@ -531,7 +538,8 @@ class CONTENT_EXPORT RenderFrameImpl
   // The documentation for these functions should be in
   // content/common/*_messages.h for the message that the function is handling.
   void OnBeforeUnload();
-  void OnSwapOut(int proxy_routing_id);
+  void OnSwapOut(int proxy_routing_id,
+                 const FrameReplicationState& replicated_frame_state);
   void OnStop();
   void OnShowContextMenu(const gfx::Point& location);
   void OnContextMenuClosed(const CustomContextMenuContext& custom_context);
@@ -649,7 +657,7 @@ class CONTENT_EXPORT RenderFrameImpl
   virtual scoped_ptr<MediaStreamRendererFactory> CreateRendererFactory();
 
   // Checks that the RenderView is ready to display the navigation to |url|. If
-  // the return value is false, the navigation should be abandonned.
+  // the return value is false, the navigation should be abandoned.
   bool PrepareRenderViewForNavigation(
       const GURL& url,
       FrameMsg_Navigate_Type::Value navigate_type,
@@ -704,7 +712,7 @@ class CONTENT_EXPORT RenderFrameImpl
   // progress.
   base::string16 pepper_composition_text_;
 
-  PluginPowerSaverHelper* plugin_power_saver_helper_;
+  PluginPowerSaverHelperImpl* plugin_power_saver_helper_;
 #endif
 
   RendererWebCookieJarImpl cookie_jar_;

@@ -69,6 +69,7 @@
 #include "chrome/browser/services/gcm/gcm_profile_service_factory.h"
 #include "chrome/browser/services/gcm/push_messaging_service_impl.h"
 #include "chrome/browser/sessions/session_service_factory.h"
+#include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/signin/signin_ui_util.h"
 #include "chrome/browser/ssl/chrome_ssl_host_state_delegate.h"
 #include "chrome/browser/ssl/chrome_ssl_host_state_delegate_factory.h"
@@ -93,6 +94,7 @@
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/metrics/metrics_service.h"
 #include "components/pref_registry/pref_registry_syncable.h"
+#include "components/signin/core/browser/signin_manager.h"
 #include "components/startup_metric_utils/startup_metric_utils.h"
 #include "components/url_fixer/url_fixer.h"
 #include "components/user_prefs/user_prefs.h"
@@ -148,7 +150,8 @@
 #include "extensions/browser/guest_view/guest_view_manager.h"
 #endif
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
+#include "chrome/browser/supervised_user/supervised_user_constants.h"
 #include "chrome/browser/supervised_user/supervised_user_settings_service.h"
 #include "chrome/browser/supervised_user/supervised_user_settings_service_factory.h"
 #endif
@@ -327,6 +330,14 @@ void ProfileImpl::RegisterProfilePrefs(
       false,
       user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
   registry->RegisterBooleanPref(
+      prefs::kForceGoogleSafeSearch,
+      false,
+      user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
+  registry->RegisterBooleanPref(
+      prefs::kForceYouTubeSafetyMode,
+      false,
+      user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
+  registry->RegisterBooleanPref(
       prefs::kRecordHistory,
       false,
       user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
@@ -468,7 +479,7 @@ ProfileImpl::ProfileImpl(
       RegisterProfilePrefsForServices(this, pref_registry_.get());
 
   SupervisedUserSettingsService* supervised_user_settings = NULL;
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
   supervised_user_settings =
       SupervisedUserSettingsServiceFactory::GetForProfile(this);
   supervised_user_settings->Init(
@@ -520,10 +531,6 @@ void ProfileImpl::DoFinalInit() {
   PrefService* prefs = GetPrefs();
   pref_change_registrar_.Init(prefs);
   pref_change_registrar_.Add(
-      prefs::kGoogleServicesUsername,
-      base::Bind(&ProfileImpl::UpdateProfileUserNameCache,
-                 base::Unretained(this)));
-  pref_change_registrar_.Add(
       prefs::kSupervisedUserId,
       base::Bind(&ProfileImpl::UpdateProfileSupervisedUserIdCache,
                  base::Unretained(this)));
@@ -567,10 +574,7 @@ void ProfileImpl::DoFinalInit() {
                                           BrowserThread::GetBlockingPool());
   CreateProfileDirectory(sequenced_task_runner.get(), base_cache_path_);
 
-  // Now that the profile is hooked up to receive pref change notifications to
-  // kGoogleServicesUsername, initialize components that depend on it to reflect
-  // the current value.
-  UpdateProfileUserNameCache();
+  // Initialize components that depend on the current value.
   UpdateProfileSupervisedUserIdCache();
   UpdateProfileIsEphemeralCache();
   GAIAInfoUpdateServiceFactory::GetForProfile(this);
@@ -833,7 +837,12 @@ ProfileImpl::~ProfileImpl() {
 }
 
 std::string ProfileImpl::GetProfileName() {
-  return GetPrefs()->GetString(prefs::kGoogleServicesUsername);
+  SigninManagerBase* signin_manager =
+      SigninManagerFactory::GetForProfile(this);
+  if (signin_manager)
+    return signin_manager->GetAuthenticatedUsername();
+
+  return std::string();
 }
 
 Profile::ProfileType ProfileImpl::GetProfileType() const {
@@ -891,6 +900,19 @@ Profile* ProfileImpl::GetOriginalProfile() {
 
 bool ProfileImpl::IsSupervised() {
   return !GetPrefs()->GetString(prefs::kSupervisedUserId).empty();
+}
+
+bool ProfileImpl::IsChild() {
+#if defined(ENABLE_SUPERVISED_USERS)
+  return GetPrefs()->GetString(prefs::kSupervisedUserId) ==
+      supervised_users::kChildAccountSUID;
+#else
+  return false;
+#endif
+}
+
+bool ProfileImpl::IsLegacySupervised() {
+  return IsSupervised() && !IsChild();
 }
 
 ExtensionSpecialStoragePolicy*
@@ -1307,18 +1329,6 @@ GURL ProfileImpl::GetHomePage() {
   if (!home_page.is_valid())
     return GURL(chrome::kChromeUINewTabURL);
   return home_page;
-}
-
-void ProfileImpl::UpdateProfileUserNameCache() {
-  ProfileManager* profile_manager = g_browser_process->profile_manager();
-  ProfileInfoCache& cache = profile_manager->GetProfileInfoCache();
-  size_t index = cache.GetIndexOfProfileWithPath(GetPath());
-  if (index != std::string::npos) {
-    std::string user_name =
-        GetPrefs()->GetString(prefs::kGoogleServicesUsername);
-    cache.SetUserNameOfProfileAtIndex(index, base::UTF8ToUTF16(user_name));
-    ProfileMetrics::UpdateReportedProfilesStatistics(profile_manager);
-  }
 }
 
 void ProfileImpl::UpdateProfileSupervisedUserIdCache() {

@@ -463,7 +463,7 @@ TEST_F(LayerTreeImplTest, HitTestingForSingleLayerWithScaledContents) {
   // its layout size is 50x50, positioned at 25x25.
   LayerImpl* test_layer =
       host_impl().active_tree()->root_layer()->children()[0];
-  EXPECT_RECT_EQ(gfx::Rect(0, 0, 100, 100), test_layer->visible_content_rect());
+  EXPECT_EQ(gfx::Rect(0, 0, 100, 100), test_layer->visible_content_rect());
   ASSERT_EQ(1u, RenderSurfaceLayerList().size());
   ASSERT_EQ(1u, root_layer()->render_surface()->layer_list().size());
 
@@ -1697,7 +1697,7 @@ TEST_F(LayerTreeImplTest,
   // its layout size is 50x50, positioned at 25x25.
   LayerImpl* test_layer =
       host_impl().active_tree()->root_layer()->children()[0];
-  EXPECT_RECT_EQ(gfx::Rect(0, 0, 100, 100), test_layer->visible_content_rect());
+  EXPECT_EQ(gfx::Rect(0, 0, 100, 100), test_layer->visible_content_rect());
   ASSERT_EQ(1u, RenderSurfaceLayerList().size());
   ASSERT_EQ(1u, root_layer()->render_surface()->layer_list().size());
 
@@ -1795,8 +1795,9 @@ TEST_F(LayerTreeImplTest,
   host_impl().SetViewportSize(scaled_bounds_for_root);
 
   host_impl().SetDeviceScaleFactor(device_scale_factor);
-  host_impl().active_tree()->SetPageScaleFactorAndLimits(
+  host_impl().active_tree()->PushPageScaleFromMainThread(
       page_scale_factor, page_scale_factor, page_scale_factor);
+  host_impl().SetPageScaleOnActiveTree(page_scale_factor);
   host_impl().active_tree()->SetRootLayer(root.Pass());
   host_impl().active_tree()->SetViewportLayersFromIds(Layer::INVALID_ID, 1, 1,
                                                       Layer::INVALID_ID);
@@ -1811,8 +1812,8 @@ TEST_F(LayerTreeImplTest,
   ASSERT_EQ(1u, root_layer()->render_surface()->layer_list().size());
 
   // Check whether the child layer fits into the root after scaled.
-  EXPECT_RECT_EQ(gfx::Rect(test_layer->content_bounds()),
-                 test_layer->visible_content_rect());
+  EXPECT_EQ(gfx::Rect(test_layer->content_bounds()),
+            test_layer->visible_content_rect());
 
   // Hit checking for a point outside the layer should return a null pointer
   // (the root layer does not draw content, so it will not be tested either).
@@ -2299,8 +2300,9 @@ TEST_F(LayerTreeImplTest, SelectionBoundsForScaledLayers) {
   host_impl().SetViewportSize(scaled_bounds_for_root);
 
   host_impl().SetDeviceScaleFactor(device_scale_factor);
-  host_impl().active_tree()->SetPageScaleFactorAndLimits(
+  host_impl().active_tree()->PushPageScaleFromMainThread(
       page_scale_factor, page_scale_factor, page_scale_factor);
+  host_impl().SetPageScaleOnActiveTree(page_scale_factor);
   host_impl().active_tree()->SetRootLayer(root.Pass());
   host_impl().active_tree()->SetViewportLayersFromIds(Layer::INVALID_ID, 1, 1,
                                                       Layer::INVALID_ID);

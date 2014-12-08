@@ -7,7 +7,7 @@
 /** @suppress {duplicate} */
 var remoting = remoting || {};
 
-function onLoad() {
+remoting.initElementEventHandlers = function() {
   var goHome = function() {
     remoting.setMode(remoting.AppMode.HOME);
   };
@@ -36,7 +36,7 @@ function onLoad() {
   };
   var reconnect = function() {
     remoting.setMode(remoting.AppMode.CLIENT_CONNECTING);
-    remoting.connector.reconnect();
+    remoting.app.getSessionConnector().reconnect();
   };
   var doAuthRedirect = function() {
     if (!base.isAppsV2()) {
@@ -115,8 +115,9 @@ function onLoad() {
   registerEventListeners(me2me_actions);
   registerEventListeners(host_actions);
   registerEventListeners(auth_actions);
-  remoting.init();
+}
 
+remoting.initGlobalEventHandlers = function() {
   window.addEventListener('resize', remoting.onResize, false);
   // When a window goes full-screen, a resize event is triggered, but the
   // Fullscreen.isActive call is not guaranteed to return true until the
@@ -157,5 +158,3 @@ function registerEventListener(id, eventname, fn) {
         ': element not found.');
   }
 }
-
-window.addEventListener('load', onLoad, false);

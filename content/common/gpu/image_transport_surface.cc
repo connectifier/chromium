@@ -13,7 +13,6 @@
 #include "content/common/gpu/gpu_command_buffer_stub.h"
 #include "content/common/gpu/gpu_messages.h"
 #include "content/common/gpu/null_transport_surface.h"
-#include "gpu/command_buffer/service/gpu_scheduler.h"
 #include "gpu/command_buffer/service/sync_point_manager.h"
 #include "ui/gfx/vsync_provider.h"
 #include "ui/gl/gl_implementation.h"
@@ -125,21 +124,6 @@ void ImageTransportHelper::SwapBuffersCompleted(
   stub_->SwapBuffersCompleted(latency_info);
 }
 
-void ImageTransportHelper::SetScheduled(bool is_scheduled) {
-  gpu::GpuScheduler* scheduler = Scheduler();
-  if (!scheduler)
-    return;
-
-  scheduler->SetScheduled(is_scheduled);
-}
-
-void ImageTransportHelper::DeferToFence(base::Closure task) {
-  gpu::GpuScheduler* scheduler = Scheduler();
-  DCHECK(scheduler);
-
-  scheduler->DeferToFence(task);
-}
-
 void ImageTransportHelper::SetPreemptByFlag(
     scoped_refptr<gpu::PreemptionFlag> preemption_flag) {
   stub_->channel()->SetPreemptByFlag(preemption_flag);
@@ -165,12 +149,6 @@ void ImageTransportHelper::SetSwapInterval(gfx::GLContext* context) {
     context->SetSwapInterval(0);
   else
     context->SetSwapInterval(1);
-}
-
-gpu::GpuScheduler* ImageTransportHelper::Scheduler() {
-  if (!stub_.get())
-    return NULL;
-  return stub_->scheduler();
 }
 
 gpu::gles2::GLES2Decoder* ImageTransportHelper::Decoder() {
@@ -235,10 +213,6 @@ bool PassThroughImageTransportSurface::SwapBuffers() {
   // GetVsyncValues before SwapBuffers to work around Mali driver bug:
   // crbug.com/223558.
   SendVSyncUpdateIfAvailable();
-  for (size_t i = 0; i < latency_info_.size(); ++i) {
-    latency_info_[i].AddLatencyNumber(
-        ui::INPUT_EVENT_GPU_SWAP_BUFFER_COMPONENT, 0, 0);
-  }
   bool result = gfx::GLSurfaceAdapter::SwapBuffers();
   for (size_t i = 0; i < latency_info_.size(); i++) {
     latency_info_[i].AddLatencyNumber(

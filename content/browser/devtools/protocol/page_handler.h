@@ -94,6 +94,7 @@ class PageHandler {
                                const SkBitmap& bitmap,
                                ReadbackResponse response);
   void ScreencastFrameEncoded(const cc::CompositorFrameMetadata& metadata,
+                              const base::Time& timestamp,
                               const std::string& data);
 
   void ScreenshotCaptured(
@@ -117,10 +118,12 @@ class PageHandler {
   int screencast_max_width_;
   int screencast_max_height_;
   int capture_retry_count_;
-  bool has_last_compositor_frame_metadata_;
+  bool has_compositor_frame_metadata_;
+  cc::CompositorFrameMetadata next_compositor_frame_metadata_;
   cc::CompositorFrameMetadata last_compositor_frame_metadata_;
   int screencast_frame_sent_;
   int screencast_frame_acked_;
+  bool processing_screencast_frame_;
 
   scoped_ptr<ColorPicker> color_picker_;
 

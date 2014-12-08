@@ -62,6 +62,7 @@ class WebAXObjectProxy : public gin::Wrappable<WebAXObjectProxy> {
   std::string Description();
   std::string HelpText();
   std::string StringValue();
+  std::string Language();
   int X();
   int Y();
   int Width();
@@ -95,6 +96,7 @@ class WebAXObjectProxy : public gin::Wrappable<WebAXObjectProxy> {
   int32_t RowCount();
   int32_t ColumnCount();
   bool IsClickable();
+  bool IsButtonStateMixed();
 
   // Bound methods.
   std::string AllAttributes();

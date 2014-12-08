@@ -77,9 +77,12 @@
     "contexts": ["blessed_extension"],
     "dependencies": ["permission:appview"]
   },
+  // Note that exposing this doesn't necessarily expose AppView,
+  // appViewEmbedderInternal is required for that.
+  // See http://crbug.com/437891.
   "appViewGuestInternal": {
     "internal": true,
-    "channel": "dev",
+    "channel": "stable",
     "contexts": ["blessed_extension"]
   },
   "bluetooth": {
@@ -102,8 +105,8 @@
     "dependencies": ["permission:declarativeWebRequest"],
     "contexts": ["blessed_extension"]
   },
-  "copresenceSocket": {
-    "channel" : "dev",
+  "copresenceEndpoints": {
+    "channel" : "canary",
     "dependencies": ["permission:copresence"],
     "contexts": ["blessed_extension"]
   },

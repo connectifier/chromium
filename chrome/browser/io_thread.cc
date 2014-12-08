@@ -53,9 +53,11 @@
 #include "content/public/browser/cookie_store_factory.h"
 #include "net/base/host_mapping_rules.h"
 #include "net/base/net_util.h"
+#include "net/cert/cert_policy_enforcer.h"
 #include "net/cert/cert_verifier.h"
 #include "net/cert/cert_verify_proc.h"
 #include "net/cert/ct_known_logs.h"
+#include "net/cert/ct_known_logs_static.h"
 #include "net/cert/ct_log_verifier.h"
 #include "net/cert/ct_verifier.h"
 #include "net/cert/multi_log_ct_verifier.h"
@@ -122,8 +124,6 @@ const char kTCPFastOpenHttpsEnabledGroupName[] = "HttpsEnabled";
 const char kQuicFieldTrialName[] = "QUIC";
 const char kQuicFieldTrialEnabledGroupName[] = "Enabled";
 const char kQuicFieldTrialHttpsEnabledGroupName[] = "HttpsEnabled";
-const char kQuicFieldTrialPacketLengthSuffix[] = "BytePackets";
-const char kQuicFieldTrialPacingSuffix[] = "WithPacing";
 
 // The SPDY trial composes two different trial plus control groups:
 //  * A "holdback" group with SPDY disabled, and corresponding control
@@ -479,6 +479,8 @@ IOThread::IOThread(
       &system_enable_referrers_,
       NULL,
       NULL,
+      NULL,
+      NULL,
       local_state);
   ssl_config_service_manager_.reset(
       SSLConfigServiceManager::CreateDefaultManager(local_state));
@@ -639,6 +641,15 @@ void IOThread::InitAsync() {
       ct_verifier->AddLog(external_log_verifier.Pass());
     }
   }
+
+  net::CertPolicyEnforcer* policy_enforcer = NULL;
+  // TODO(eranm): Control with Finch, crbug.com/437766
+  if (command_line.HasSwitch(switches::kRequireCTForEV)) {
+    policy_enforcer = new net::CertPolicyEnforcer(kNumKnownCTLogs, true);
+  } else {
+    policy_enforcer = new net::CertPolicyEnforcer(kNumKnownCTLogs, false);
+  }
+  globals_->cert_policy_enforcer.reset(policy_enforcer);
 
   globals_->ssl_config_service = GetSSLConfigService();
 
@@ -986,6 +997,7 @@ void IOThread::InitializeNetworkSessionParamsFromGlobals(
     net::HttpNetworkSession::Params* params) {
   params->host_resolver = globals.host_resolver.get();
   params->cert_verifier = globals.cert_verifier.get();
+  params->cert_policy_enforcer = globals.cert_policy_enforcer.get();
   params->channel_id_service = globals.system_channel_id_service.get();
   params->transport_security_state = globals.transport_security_state.get();
   params->ssl_config_service = globals.ssl_config_service.get();
@@ -1272,12 +1284,9 @@ bool IOThread::ShouldEnableQuicPacing(
   if (command_line.HasSwitch(switches::kDisableQuicPacing))
     return false;
 
-  if (LowerCaseEqualsASCII(
+  return LowerCaseEqualsASCII(
       GetVariationParam(quic_trial_params, "enable_pacing"),
-      "true"))
-    return true;
-
-  return quic_trial_group.ends_with(kQuicFieldTrialPacingSuffix);
+      "true");
 }
 
 net::QuicTagVector IOThread::GetQuicConnectionOptions(
@@ -1376,25 +1385,7 @@ size_t IOThread::GetQuicMaxPacketLength(
                          &value)) {
     return value;
   }
-
-  // Format of the packet length group names is:
-  //   (Https)?Enabled<length>BytePackets.
-  base::StringPiece length_str(quic_trial_group);
-  if (length_str.starts_with(kQuicFieldTrialEnabledGroupName)) {
-    length_str.remove_prefix(strlen(kQuicFieldTrialEnabledGroupName));
-  } else if (length_str.starts_with(kQuicFieldTrialHttpsEnabledGroupName)) {
-    length_str.remove_prefix(strlen(kQuicFieldTrialHttpsEnabledGroupName));
-  } else {
-    return 0;
-  }
-  if (!length_str.ends_with(kQuicFieldTrialPacketLengthSuffix)) {
-    return 0;
-  }
-  length_str.remove_suffix(strlen(kQuicFieldTrialPacketLengthSuffix));
-  if (!base::StringToUint(length_str, &value)) {
-    return 0;
-  }
-  return value;
+  return 0;
 }
 
 // static

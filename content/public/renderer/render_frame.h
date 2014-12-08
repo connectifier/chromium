@@ -33,6 +33,7 @@ class Isolate;
 
 namespace content {
 class ContextMenuClient;
+class PluginPowerSaverHelper;
 class RenderView;
 class ServiceRegistry;
 struct ContextMenuParams;
@@ -108,12 +109,21 @@ class CONTENT_EXPORT RenderFrame : public IPC::Listener,
   // Returns the ServiceRegistry for this frame.
   virtual ServiceRegistry* GetServiceRegistry() = 0;
 
+#if defined(ENABLE_PLUGINS)
+  // Returns the PluginPowerSaverHelper for this frame.
+  virtual PluginPowerSaverHelper* GetPluginPowerSaverHelper() = 0;
+#endif
+
   // Returns true if this frame is a FTP directory listing.
   virtual bool IsFTPDirectoryListing() = 0;
 
   // Attaches the browser plugin identified by |element_instance_id| to guest
   // content created by the embedder.
   virtual void AttachGuest(int element_instance_id) = 0;
+
+  // Detaches the browser plugin identified by |element_instance_id| from guest
+  // content created by the embedder.
+  virtual void DetachGuest(int element_instance_id) = 0;
 
   // Notifies the browser of text selection changes made.
   virtual void SetSelectedText(const base::string16& selection_text,

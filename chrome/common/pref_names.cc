@@ -332,10 +332,6 @@ const char kSafeBrowsingExtendedReportingEnabled[] =
 const char kSafeBrowsingProceedAnywayDisabled[] =
     "safebrowsing.proceed_anyway_disabled";
 
-// Boolean that is true when SafeBrowsing has sent an incident report.
-const char kSafeBrowsingIncidentReportSent[] =
-    "safebrowsing.incident_report_sent";
-
 // A dictionary mapping incident types to a dict of incident key:digest pairs.
 const char kSafeBrowsingIncidentsSent[] = "safebrowsing.incidents_sent";
 
@@ -539,14 +535,25 @@ const char kLanguageHotkeyPreviousEngine[] =
 // (ex. "en-US,fr,ko").
 const char kLanguagePreferredLanguages[] =
     "settings.language.preferred_languages";
+const char kLanguagePreferredLanguagesSyncable[] =
+    "settings.language.preferred_languages_syncable";
 
 // A string pref (comma-separated list) set to the preloaded (active) input
 // method IDs (ex. "pinyin,mozc").
 const char kLanguagePreloadEngines[] = "settings.language.preload_engines";
+const char kLanguagePreloadEnginesSyncable[] =
+    "settings.language.preload_engines_syncable";
 
-// A List pref (comma-separated list) set to the extension IMEs to be enabled.
+// A string pref (comma-separated list) set to the extension IMEs to be enabled.
 const char kLanguageEnabledExtensionImes[] =
     "settings.language.enabled_extension_imes";
+const char kLanguageEnabledExtensionImesSyncable[] =
+    "settings.language.enabled_extension_imes_syncable";
+
+// A boolean pref to indicate whether we still need to add the globally synced
+// input methods. False after the initial post-OOBE sync.
+const char kLanguageShouldMergeInputMethods[] =
+    "settings.language.merge_input_methods";
 
 // Integer prefs which determine how we remap modifier keys (e.g. swap Alt and
 // Control.) Possible values for these prefs are 0-4. See ModifierKey enum in
@@ -880,8 +887,17 @@ const char kSavingBrowserHistoryDisabled[] = "history.saving_disabled";
 // permitted.
 const char kAllowDeletingBrowserHistory[] = "history.deleting_enabled";
 
-// Boolean controlling whether SafeSearch is mandatory for Google Web Searches.
+// Boolean controlling whether SafeSearch is mandatory for Google Web Searches
+// and also whether Safety Mode is mandatory on YouTube.
+// DEPRECATED: This is replaced by kForceGoogleSafeSearch and
+// kForceYouTubeSafetyMode, and still exists for legacy reasons only.
 const char kForceSafeSearch[] = "settings.force_safesearch";
+
+// Boolean controlling whether SafeSearch is mandatory for Google Web Searches.
+const char kForceGoogleSafeSearch[] = "settings.force_google_safesearch";
+
+// Boolean controlling whether Safety Mode is mandatory on YouTube.
+const char kForceYouTubeSafetyMode[] = "settings.force_youtube_safety_mode";
 
 // Boolean controlling whether History is recorded and synced for
 // supervised users.
@@ -1403,10 +1419,6 @@ const char kTaskManagerWindowPlacement[] = "task_manager.window_placement";
 // restore on startup.
 const char kAppWindowPlacement[] = "browser.app_window_placement";
 
-// An integer specifying the total number of bytes to be used by the
-// renderer's in-memory cache of objects.
-const char kMemoryCacheSize[] = "renderer.memory_cache.size";
-
 // String which specifies where to download files to by default.
 const char kDownloadDefaultDirectory[] = "download.default_directory";
 
@@ -1778,6 +1790,11 @@ const char kHotwordSearchEnabled[] = "hotword.search_enabled_2";
 // trigger from any screen.
 const char kHotwordAlwaysOnSearchEnabled[] = "hotword.always_on_search_enabled";
 
+// A boolean pref that indicates whether the hotword always-on notification
+// has been seen already.
+const char kHotwordAlwaysOnNotificationSeen[] =
+    "hotword.always_on_notification_seen";
+
 // A boolean pref that controls whether the sound of "Ok, Google" plus a few
 // seconds of audio data before is sent back to improve voice search.
 const char kHotwordAudioLoggingEnabled[] = "hotword.audio_logging_enabled";
@@ -1924,11 +1941,10 @@ const char kCustomizationDefaultWallpaperURL[] =
 // This is saved to file and cleared after chrome process starts.
 const char kLogoutStartedLast[] = "chromeos.logout-started";
 
-// An integer pref of the current consumer management enrollment stage. The
-// meaning of the value is defined in the enum EnrollmentStage in:
-//   chrome/browser/chromeos/policy/consumer_management_service.h
-const char kConsumerManagementEnrollmentStage[] =
-    "consumer_management.enrollment_stage";
+// An integer pref of the current consumer management stage. The meaning of the
+// value is defined in:
+//   chrome/browser/chromeos/policy/consumer_management_stage.h
+const char kConsumerManagementStage[] = "consumer_management.stage";
 #endif  // defined(OS_CHROMEOS)
 
 // Whether there is a Flash version installed that supports clearing LSO data.
@@ -2280,5 +2296,9 @@ const char kPasswordBubbleNopesCount[] = "password_bubble.nopes";
 
 // Last user's interaction with the password bubble.
 const char kPasswordBubbleLastInteractions[] = "password_bubble.interactions";
+
+// Boolean that indicates whether elevation is needed to recover Chrome upgrade.
+const char kRecoveryComponentNeedsElevation[] =
+    "recovery_component.needs_elevation";
 
 }  // namespace prefs

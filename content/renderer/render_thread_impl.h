@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "base/cancelable_callback.h"
 #include "base/memory/memory_pressure_listener.h"
 #include "base/metrics/user_metrics_action.h"
 #include "base/observer_list.h"
@@ -18,6 +19,7 @@
 #include "build/build_config.h"
 #include "content/child/child_thread.h"
 #include "content/common/content_export.h"
+#include "content/common/frame_replication_state.h"
 #include "content/common/gpu/client/gpu_channel_host.h"
 #include "content/common/gpu/gpu_result_codes.h"
 #include "content/public/renderer/render_thread.h"
@@ -86,7 +88,6 @@ class DomStorageDispatcher;
 class EmbeddedWorkerDispatcher;
 class GpuChannelHost;
 class IndexedDBDispatcher;
-class InputEventFilter;
 class InputHandlerManager;
 class MediaStreamCenter;
 class MemoryObserver;
@@ -99,6 +100,7 @@ class RenderProcessObserver;
 class RendererBlinkPlatformImpl;
 class RendererDemuxerAndroid;
 class RendererScheduler;
+class V8SamplingProfiler;
 class VideoCaptureImplManager;
 class WebGraphicsContext3DCommandBufferImpl;
 class WebRTCIdentityService;
@@ -155,6 +157,7 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
   void RecordComputedAction(const std::string& action) override;
   scoped_ptr<base::SharedMemory> HostAllocateSharedMemoryBuffer(
       size_t buffer_size) override;
+  cc::SharedBitmapManager* GetSharedBitmapManager() override;
   void RegisterExtension(v8::Extension* extension) override;
   void ScheduleIdleHandler(int64 initial_delay_ms) override;
   void IdleHandler() override;
@@ -246,7 +249,9 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
 
   bool is_one_copy_enabled() const { return is_one_copy_enabled_; }
 
-  bool use_image_external() const { return use_image_external_; }
+  unsigned use_image_texture_target() const {
+    return use_image_texture_target_;
+  }
 
   AppCacheDispatcher* appcache_dispatcher() const {
     return appcache_dispatcher_.get();
@@ -429,7 +434,8 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
                         int proxy_routing_id);
   void OnCreateNewFrameProxy(int routing_id,
                              int parent_routing_id,
-                             int render_view_routing_id);
+                             int render_view_routing_id,
+                             const FrameReplicationState& replicated_state);
   void OnSetZoomLevelForCurrentURL(const std::string& scheme,
                                    const std::string& host,
                                    double zoom_level);
@@ -479,6 +485,7 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
   scoped_refptr<RendererDemuxerAndroid> renderer_demuxer_;
 #endif
   scoped_refptr<DevToolsAgentFilter> devtools_agent_message_filter_;
+  scoped_ptr<V8SamplingProfiler> v8_sampling_profiler_;
 
 #if defined(ENABLE_WEBRTC)
   scoped_ptr<PeerConnectionDependencyFactory> peer_connection_factory_;
@@ -547,8 +554,8 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
   // regardless of whether |compositor_thread_| is overriden.
   scoped_refptr<base::MessageLoopProxy> compositor_message_loop_proxy_;
 
-  // May be null if unused by the |input_handler_manager_|.
-  scoped_refptr<InputEventFilter> input_event_filter_;
+  base::CancelableCallback<void(const IPC::Message&)> main_input_callback_;
+  scoped_refptr<IPC::MessageFilter> input_event_filter_;
   scoped_ptr<InputHandlerManager> input_handler_manager_;
   scoped_refptr<CompositorForwardingMessageFilter> compositor_message_filter_;
 
@@ -583,7 +590,7 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
   bool is_distance_field_text_enabled_;
   bool is_zero_copy_enabled_;
   bool is_one_copy_enabled_;
-  bool use_image_external_;
+  unsigned use_image_texture_target_;
 
   std::map<int, mojo::MessagePipeHandle> pending_render_frame_connects_;
 

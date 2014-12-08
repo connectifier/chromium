@@ -18,6 +18,23 @@ function MockVolumeManager() {
 }
 
 /**
+ * @private {?VolumeManager}
+ */
+MockVolumeManager.instance_ = null;
+
+/**
+ * Replaces the VolumeManager singleton with a MockVolumeManager.
+ * @param {!MockVolumeManager=} opt_singleton
+ */
+MockVolumeManager.installMockSingleton = function(opt_singleton) {
+  MockVolumeManager.instance_ = opt_singleton || new MockVolumeManager();
+
+  VolumeManager.getInstance = function() {
+    return Promise.resolve(MockVolumeManager.instance_);
+  };
+};
+
+/**
  * Returns the corresponding VolumeInfo.
  *
  * @param {MockFileEntry} entry MockFileEntry pointing anywhere on a volume.
@@ -55,6 +72,15 @@ MockVolumeManager.prototype.getLocationInfo = function(entry) {
 };
 
 /**
+ * @param {VolumeManagerCommon.VolumeType} volumeType Volume type.
+ * @return {VolumeInfo} Volume info.
+ */
+MockVolumeManager.prototype.getCurrentProfileVolumeInfo = function(volumeType) {
+  return VolumeManager.prototype.getCurrentProfileVolumeInfo.call(
+      this, volumeType);
+};
+
+/**
  * Utility function to create a mock VolumeInfo.
  * @param {VolumeType} type Volume type.
  * @param {string} volumeId Volume id.
@@ -74,7 +100,9 @@ MockVolumeManager.createMockVolumeInfo = function(type, volumeId, label) {
       '',     // devicePath
       false,  // isReadonly
       {isCurrentProfile: true, displayName: ''},  // profile
-      label);    // label
+      label,  // label
+      '',     // extensionId
+      false); // hasMedia
 
   return volumeInfo;
 };

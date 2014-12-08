@@ -54,7 +54,6 @@ public enum SyncDecryptionPassphraseType implements Parcelable {
         mNativeValue = nativeValue;
     }
 
-
     public Set<SyncDecryptionPassphraseType> getVisibleTypes() {
         Set<SyncDecryptionPassphraseType> visibleTypes = new HashSet<>();
         switch (this) {
@@ -103,14 +102,6 @@ public enum SyncDecryptionPassphraseType implements Parcelable {
                 break;
         }
         return allowedTypes;
-    }
-
-    /**
-     * TODO(maxbogue): Remove when no longer used in Clank; see http://crbug.com/424187.
-     */
-    @Deprecated
-    public Set<SyncDecryptionPassphraseType> getAllowedTypes() {
-        return getAllowedTypes(true);
     }
 
     public int internalValue() {

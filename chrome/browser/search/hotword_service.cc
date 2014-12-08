@@ -8,6 +8,7 @@
 
 #include "base/command_line.h"
 #include "base/i18n/case_conversion.h"
+#include "base/message_loop/message_loop.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/histogram.h"
 #include "base/path_service.h"
@@ -19,25 +20,34 @@
 #include "chrome/browser/extensions/pending_extension_manager.h"
 #include "chrome/browser/extensions/updater/extension_updater.h"
 #include "chrome/browser/extensions/webstore_startup_installer.h"
+#include "chrome/browser/notifications/notification.h"
+#include "chrome/browser/notifications/notification_ui_manager.h"
 #include "chrome/browser/plugins/plugin_prefs.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/search/hotword_audio_history_handler.h"
 #include "chrome/browser/search/hotword_service_factory.h"
+#include "chrome/browser/ui/extensions/app_launch_params.h"
 #include "chrome/browser/ui/extensions/application_launch.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/extensions/extension_constants.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/user_manager/user.h"
+#include "components/user_manager/user_manager.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/plugin_service.h"
 #include "content/public/common/webplugininfo.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/uninstall_reason.h"
+#include "extensions/common/constants.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/one_shot_event.h"
+#include "grit/theme_resources.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/resource/resource_bundle.h"
 
 using extensions::BrowserContextKeyedAPIFactory;
 using extensions::HotwordPrivateEventService;
@@ -51,6 +61,14 @@ static const char* kSupportedLocales[] = {
   "fr",
   "ru"
 };
+
+// Maximum number of retries for installing the hotword shared module from the
+// web store.
+static const int kMaxInstallRetries = 2;
+
+// Delay between retries for installing the hotword shared module from the web
+// store.
+static const int kInstallRetryDelaySeconds = 5;
 
 // Enum describing the state of the hotword preference.
 // This is used for UMA stats -- do not reorder or delete items; only add to
@@ -185,7 +203,54 @@ const char kHotwordFieldTrialExperimentalGroupName[] = "Experimental";
 const char kHotwordUnusablePrefName[] = "hotword.search_enabled";
 // String passed to indicate the training state has changed.
 const char kHotwordTrainingEnabled[] = "hotword_training_enabled";
+// Id of the hotword notification.
+const char kHotwordNotificationId[] = "hotword";
+// Notifier id for the hotword notification.
+const char kHotwordNotifierId[] = "hotword.notification";
 }  // namespace hotword_internal
+
+// Delegate for the hotword notification.
+class HotwordNotificationDelegate : public NotificationDelegate {
+ public:
+  explicit HotwordNotificationDelegate(Profile* profile)
+      : profile_(profile) {
+  }
+
+  // Overridden from NotificationDelegate:
+  void ButtonClick(int button_index) override {
+    DCHECK_EQ(0, button_index);
+
+    // Launch the hotword audio verification app in the right mode.
+    HotwordService::LaunchMode launch_mode =
+        HotwordService::HOTWORD_AND_AUDIO_HISTORY;
+    if (profile_->GetPrefs()->GetBoolean(
+            prefs::kHotwordAudioHistoryEnabled)) {
+      // TODO(rlp): Make sure the Chrome Audio History pref is synced
+      // to the account-level Audio History setting from footprints.
+      launch_mode = HotwordService::HOTWORD_ONLY;
+    }
+
+    HotwordService* hotword_service =
+        HotwordServiceFactory::GetForProfile(profile_);
+
+    if (!hotword_service)
+      return;
+
+    hotword_service->LaunchHotwordAudioVerificationApp(launch_mode);
+  }
+
+  // Overridden from NotificationDelegate:
+  std::string id() const override {
+    return hotword_internal::kHotwordNotificationId;
+  }
+
+ private:
+  ~HotwordNotificationDelegate() override {}
+
+  Profile* profile_;
+
+  DISALLOW_COPY_AND_ASSIGN(HotwordNotificationDelegate);
+};
 
 // static
 bool HotwordService::DoesHotwordSupportLanguage(Profile* profile) {
@@ -210,8 +275,29 @@ bool HotwordService::IsExperimentalHotwordingEnabled() {
   }
 
   CommandLine* command_line = CommandLine::ForCurrentProcess();
-  return command_line->HasSwitch(switches::kEnableExperimentalHotwording);
+  return !command_line->HasSwitch(switches::kDisableExperimentalHotwording);
 }
+
+#if defined(OS_CHROMEOS)
+class HotwordService::HotwordUserSessionStateObserver
+    : public user_manager::UserManager::UserSessionStateObserver {
+ public:
+  explicit HotwordUserSessionStateObserver(HotwordService* service)
+      : service_(service) {}
+
+  // Overridden from UserSessionStateObserver:
+  void ActiveUserChanged(const user_manager::User* active_user) override {
+    service_->ActiveUserChanged();
+  }
+
+ private:
+  HotwordService* service_;  // Not owned
+};
+#else
+// Dummy class to please the linker.
+class HotwordService::HotwordUserSessionStateObserver {
+};
+#endif
 
 HotwordService::HotwordService(Profile* profile)
     : profile_(profile),
@@ -258,9 +344,77 @@ HotwordService::HotwordService(Profile* profile)
   }
 
   audio_history_handler_.reset(new HotwordAudioHistoryHandler(profile_));
+
+  if (HotwordServiceFactory::IsHotwordHardwareAvailable() &&
+      IsHotwordAllowed() &&
+      IsExperimentalHotwordingEnabled()) {
+    // Show the hotword notification in 5 seconds if the experimental flag is
+    // on, or in 30 minutes if not. We need to wait at least a few seconds
+    // for the hotword extension to be installed.
+    CommandLine* command_line = CommandLine::ForCurrentProcess();
+    if (command_line->HasSwitch(switches::kEnableExperimentalHotwordHardware)) {
+      base::MessageLoop::current()->PostDelayedTask(
+          FROM_HERE,
+          base::Bind(&HotwordService::ShowHotwordNotification,
+                     weak_factory_.GetWeakPtr()),
+          base::TimeDelta::FromSeconds(5));
+    } else if (!profile_->GetPrefs()->GetBoolean(
+                   prefs::kHotwordAlwaysOnNotificationSeen)) {
+      base::MessageLoop::current()->PostDelayedTask(
+          FROM_HERE,
+          base::Bind(&HotwordService::ShowHotwordNotification,
+                     weak_factory_.GetWeakPtr()),
+          base::TimeDelta::FromMinutes(30));
+    }
+  }
+
+#if defined(OS_CHROMEOS)
+  if (user_manager::UserManager::IsInitialized()) {
+    session_observer_.reset(new HotwordUserSessionStateObserver(this));
+    user_manager::UserManager::Get()->AddSessionStateObserver(
+        session_observer_.get());
+  }
+#endif
 }
 
 HotwordService::~HotwordService() {
+#if defined(OS_CHROMEOS)
+  if (user_manager::UserManager::IsInitialized() && session_observer_) {
+    user_manager::UserManager::Get()->RemoveSessionStateObserver(
+        session_observer_.get());
+  }
+#endif
+}
+
+void HotwordService::ShowHotwordNotification() {
+  // Check for enabled here in case always-on was enabled during the delay.
+  if (!IsServiceAvailable() || IsAlwaysOnEnabled())
+    return;
+
+  message_center::RichNotificationData data;
+  const base::string16 label = l10n_util::GetStringUTF16(
+        IDS_HOTWORD_NOTIFICATION_BUTTON);
+  data.buttons.push_back(message_center::ButtonInfo(label));
+
+  Notification notification(
+      message_center::NOTIFICATION_TYPE_SIMPLE,
+      GURL(),
+      l10n_util::GetStringUTF16(IDS_HOTWORD_NOTIFICATION_TITLE),
+      l10n_util::GetStringUTF16(IDS_HOTWORD_NOTIFICATION_DESCRIPTION),
+      ui::ResourceBundle::GetSharedInstance().GetImageNamed(
+          IDR_HOTWORD_NOTIFICATION_ICON),
+      blink::WebTextDirectionDefault,
+      message_center::NotifierId(
+          message_center::NotifierId::SYSTEM_COMPONENT,
+          hotword_internal::kHotwordNotifierId),
+      base::string16(),
+      base::string16(),
+      data,
+      new HotwordNotificationDelegate(profile_));
+
+  g_browser_process->notification_ui_manager()->Add(notification, profile_);
+  profile_->GetPrefs()->SetBoolean(
+      prefs::kHotwordAlwaysOnNotificationSeen, true);
 }
 
 void HotwordService::OnExtensionUninstalled(
@@ -280,7 +434,7 @@ void HotwordService::OnExtensionUninstalled(
   if (!reinstall_pending_)
     return;
 
-  InstallHotwordExtensionFromWebstore();
+  InstallHotwordExtensionFromWebstore(kMaxInstallRetries);
   SetPreviousLanguagePref();
 }
 
@@ -291,12 +445,31 @@ std::string HotwordService::ReinstalledExtensionId() {
   return extension_misc::kHotwordExtensionId;
 }
 
-void HotwordService::InstallHotwordExtensionFromWebstore() {
+void HotwordService::InstalledFromWebstoreCallback(
+    int num_tries,
+    bool success,
+    const std::string& error,
+    extensions::webstore_install::Result result) {
+  if (result != extensions::webstore_install::SUCCESS && num_tries) {
+    // Try again on failure.
+    content::BrowserThread::PostDelayedTask(
+        content::BrowserThread::UI,
+        FROM_HERE,
+        base::Bind(&HotwordService::InstallHotwordExtensionFromWebstore,
+                   weak_factory_.GetWeakPtr(),
+                   num_tries),
+        base::TimeDelta::FromSeconds(kInstallRetryDelaySeconds));
+  }
+}
+
+void HotwordService::InstallHotwordExtensionFromWebstore(int num_tries) {
   installer_ = new extensions::WebstoreStartupInstaller(
       ReinstalledExtensionId(),
       profile_,
       false,
-      extensions::WebstoreStandaloneInstaller::Callback());
+      base::Bind(&HotwordService::InstalledFromWebstoreCallback,
+                 weak_factory_.GetWeakPtr(),
+                 num_tries - 1));
   installer_->BeginInstall();
 }
 
@@ -503,8 +676,9 @@ void HotwordService::LaunchHotwordAudioVerificationApp(
   if (!extension)
     return;
 
-  OpenApplication(AppLaunchParams(
-      profile_, extension, extensions::LAUNCH_CONTAINER_WINDOW, NEW_WINDOW));
+  OpenApplication(
+      AppLaunchParams(profile_, extension, extensions::LAUNCH_CONTAINER_WINDOW,
+                      NEW_WINDOW, extensions::SOURCE_CHROME_INTERNAL));
 }
 
 HotwordService::LaunchMode
@@ -569,6 +743,19 @@ void HotwordService::SetAudioHistoryHandler(
   audio_history_handler_.reset(handler);
 }
 
+void HotwordService::DisableHotwordPreferences() {
+  if (IsSometimesOnEnabled()) {
+    if (profile_->GetPrefs()->HasPrefPath(prefs::kHotwordSearchEnabled))
+      profile_->GetPrefs()->SetBoolean(prefs::kHotwordSearchEnabled, false);
+  } else if (IsAlwaysOnEnabled()) {
+    if (profile_->GetPrefs()->HasPrefPath(
+            prefs::kHotwordAlwaysOnSearchEnabled)) {
+      profile_->GetPrefs()->SetBoolean(prefs::kHotwordAlwaysOnSearchEnabled,
+                                       false);
+    }
+  }
+}
+
 void HotwordService::OnHotwordSearchEnabledChanged(
     const std::string& pref_name) {
   DCHECK_EQ(pref_name, std::string(prefs::kHotwordSearchEnabled));
@@ -626,4 +813,33 @@ bool HotwordService::ShouldReinstallHotwordExtension() {
   // If it's a new locale, then the old extension should be uninstalled.
   return locale != previous_locale &&
       HotwordService::DoesHotwordSupportLanguage(profile_);
+}
+
+void HotwordService::ActiveUserChanged() {
+  // Do nothing for old hotwording.
+  if (!IsExperimentalHotwordingEnabled())
+    return;
+
+  // Don't bother notifying the extension if hotwording is completely off.
+  if (!IsSometimesOnEnabled() && !IsAlwaysOnEnabled())
+    return;
+
+  HotwordPrivateEventService* event_service =
+      BrowserContextKeyedAPIFactory<HotwordPrivateEventService>::Get(profile_);
+  // "enabled" isn't being changed, but piggy-back off the notification anyway.
+  if (event_service)
+    event_service->OnEnabledChanged(prefs::kHotwordSearchEnabled);
+}
+
+bool HotwordService::UserIsActive() {
+#if defined(OS_CHROMEOS)
+  // Only support multiple profiles and profile switching in ChromeOS.
+  if (user_manager::UserManager::IsInitialized()) {
+    user_manager::User* user =
+        user_manager::UserManager::Get()->GetActiveUser();
+    if (user && user->is_profile_created())
+      return profile_ == ProfileManager::GetActiveUserProfile();
+  }
+#endif
+  return true;
 }

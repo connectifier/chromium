@@ -8,10 +8,8 @@
 #include "base/files/file_path.h"
 #include "base/memory/ref_counted.h"
 #include "base/prefs/pref_service.h"
-#include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/prefs/incognito_mode_prefs.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_info_cache.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -31,8 +29,6 @@
 #include "chrome/browser/supervised_user/supervised_user_settings_service_factory.h"
 #include "chrome/browser/supervised_user/supervised_user_shared_settings_service_factory.h"
 #include "chrome/browser/supervised_user/supervised_user_site_list.h"
-#include "chrome/browser/supervised_user/supervised_user_sync_service.h"
-#include "chrome/browser/supervised_user/supervised_user_sync_service_factory.h"
 #include "chrome/browser/sync/profile_sync_service.h"
 #include "chrome/browser/sync/profile_sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
@@ -59,7 +55,6 @@
 #include "chrome/common/extensions/api/supervised_user_private/supervised_user_handler.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
-#include "extensions/common/extension_set.h"
 #endif
 
 #if defined(ENABLE_THEMES)
@@ -70,6 +65,10 @@
 using base::DictionaryValue;
 using base::UserMetricsAction;
 using content::BrowserThread;
+
+bool SupervisedUserService::Delegate::IsChildAccount() const {
+  return false;
+}
 
 base::FilePath SupervisedUserService::Delegate::GetBlacklistPath() const {
   return base::FilePath();
@@ -627,9 +626,7 @@ void SupervisedUserService::OnPermissionRequestIssued(
 }
 
 void SupervisedUserService::OnSupervisedUserIdChanged() {
-  std::string supervised_user_id =
-      profile_->GetPrefs()->GetString(prefs::kSupervisedUserId);
-  SetActive(!supervised_user_id.empty());
+  SetActive(ProfileIsSupervised());
 }
 
 void SupervisedUserService::OnDefaultFilteringBehaviorChanged() {
@@ -695,6 +692,10 @@ void SupervisedUserService::AddAccessRequest(const GURL& url,
                                              const SuccessCallback& callback) {
   AddAccessRequestInternal(SupervisedUserURLFilter::Normalize(url), callback,
                            0);
+}
+
+bool SupervisedUserService::IsChildAccount() const {
+  return delegate_ && delegate_->IsChildAccount();
 }
 
 void SupervisedUserService::InitSync(const std::string& refresh_token) {

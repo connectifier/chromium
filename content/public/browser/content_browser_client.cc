@@ -176,14 +176,6 @@ QuotaPermissionContext* ContentBrowserClient::CreateQuotaPermissionContext() {
   return NULL;
 }
 
-void ContentBrowserClient::SelectClientCertificate(
-    int render_process_id,
-    int render_frame_id,
-    net::SSLCertRequestInfo* cert_request_info,
-    const base::Callback<void(net::X509Certificate*)>& callback) {
-  callback.Run(NULL);
-}
-
 net::URLRequestContext* ContentBrowserClient::OverrideRequestContextForURL(
     const GURL& url, ResourceContext* context) {
   return NULL;
@@ -303,10 +295,6 @@ LocationProvider* ContentBrowserClient::OverrideSystemLocationProvider() {
   return NULL;
 }
 
-VibrationProvider* ContentBrowserClient::OverrideVibrationProvider() {
-  return NULL;
-}
-
 DevToolsManagerDelegate* ContentBrowserClient::GetDevToolsManagerDelegate() {
   return NULL;
 }
@@ -328,6 +316,13 @@ net::CookieStore* ContentBrowserClient::OverrideCookieStoreForRenderProcess(
   return NULL;
 }
 
+bool ContentBrowserClient::CheckMediaAccessPermission(
+    BrowserContext* browser_context,
+    const GURL& security_origin,
+    MediaStreamType type) {
+  return false;
+}
+
 #if defined(OS_WIN)
 const wchar_t* ContentBrowserClient::GetResourceDllName() {
   return NULL;
@@ -341,12 +336,5 @@ ContentBrowserClient::OverrideCreateExternalVideoSurfaceContainer(
   return NULL;
 }
 #endif
-
-bool ContentBrowserClient::CheckMediaAccessPermission(
-    BrowserContext* browser_context,
-    const GURL& security_origin,
-    MediaStreamType type) {
-  return false;
-}
 
 }  // namespace content

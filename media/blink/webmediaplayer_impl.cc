@@ -60,6 +60,7 @@
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebURL.h"
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
+#include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
 #include "third_party/WebKit/public/web/WebView.h"
 
@@ -325,7 +326,7 @@ bool WebMediaPlayerImpl::supportsSave() const {
 }
 
 void WebMediaPlayerImpl::seek(double seconds) {
-  DVLOG(1) << __FUNCTION__ << "(" << seconds << ")";
+  DVLOG(1) << __FUNCTION__ << "(" << seconds << "s)";
   DCHECK(main_task_runner_->BelongsToCurrentThread());
 
   ended_ = false;
@@ -699,6 +700,28 @@ void WebMediaPlayerImpl::setContentDecryptionModule(
          BIND_TO_RENDER_LOOP1(&WebMediaPlayerImpl::OnCdmAttached, result));
 }
 
+void WebMediaPlayerImpl::OnEncryptedMediaInitData(
+    const std::string& init_data_type,
+    const std::vector<uint8>& init_data) {
+  DCHECK(!init_data_type.empty());
+
+  // Do not fire "encrypted" event if encrypted media is not enabled.
+  // TODO(xhwang): Handle this in |client_|.
+  if (!blink::WebRuntimeFeatures::isPrefixedEncryptedMediaEnabled() &&
+      !blink::WebRuntimeFeatures::isEncryptedMediaEnabled()) {
+    return;
+  }
+
+  // TODO(xhwang): Update this UMA name.
+  UMA_HISTOGRAM_COUNTS("Media.EME.NeedKey", 1);
+
+  encrypted_media_support_.SetInitDataType(init_data_type);
+
+  const uint8* init_data_ptr = init_data.empty() ? nullptr : &init_data[0];
+  client_->encrypted(WebString::fromUTF8(init_data_type), init_data_ptr,
+                     base::saturated_cast<unsigned int>(init_data.size()));
+}
+
 void WebMediaPlayerImpl::SetCdm(CdmContext* cdm_context,
                                 const CdmAttachedCB& cdm_attached_cb) {
   pipeline_.SetCdm(cdm_context, cdm_attached_cb);
@@ -909,18 +932,16 @@ void WebMediaPlayerImpl::StartPipeline() {
                         (load_type_ == LoadTypeMediaSource));
 
   LogCB mse_log_cb;
-  Demuxer::NeedKeyCB need_key_cb =
-      encrypted_media_support_.CreateNeedKeyCB();
+  Demuxer::EncryptedMediaInitDataCB encrypted_media_init_data_cb =
+      BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnEncryptedMediaInitData);
 
   // Figure out which demuxer to use.
   if (load_type_ != LoadTypeMediaSource) {
     DCHECK(!chunk_demuxer_);
     DCHECK(data_source_);
 
-    demuxer_.reset(new FFmpegDemuxer(
-        media_task_runner_, data_source_.get(),
-        need_key_cb,
-        media_log_));
+    demuxer_.reset(new FFmpegDemuxer(media_task_runner_, data_source_.get(),
+                                     encrypted_media_init_data_cb, media_log_));
   } else {
     DCHECK(!chunk_demuxer_);
     DCHECK(!data_source_);
@@ -929,10 +950,7 @@ void WebMediaPlayerImpl::StartPipeline() {
 
     chunk_demuxer_ = new ChunkDemuxer(
         BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnDemuxerOpened),
-        need_key_cb,
-        mse_log_cb,
-        media_log_,
-        true);
+        encrypted_media_init_data_cb, mse_log_cb, media_log_, true);
     demuxer_.reset(chunk_demuxer_);
   }
 

@@ -103,8 +103,9 @@ void ReportNotSupported(
   failure_callback.Run(extensions::networking_private::kErrorNotSupported);
 }
 
-// Fires the appropriate callback when the network connection succeeds or fails.
-void OnNetworkConnected(
+// Fires the appropriate callback when the network connect operation succeeds
+// or fails.
+void OnNetworkConnectOperationCompleted(
     scoped_ptr<std::string> error,
     const NetworkingPrivateDelegate::VoidCallback& success_callback,
     const NetworkingPrivateDelegate::FailureCallback& failure_callback) {
@@ -339,6 +340,56 @@ void NetworkingPrivateLinux::ConnectToNetwork(const std::string& guid,
   return;
 }
 
+void NetworkingPrivateLinux::DisconnectFromNetwork(const std::string& guid,
+                                                   std::string* error) {
+  AssertOnDBusThread();
+  std::string device_path_str;
+  std::string access_point_path_str;
+  std::string ssid;
+  DVLOG(1) << "Disconnecting from network GUID " << guid;
+
+  if (!ParseNetworkGuid(guid, &device_path_str, &access_point_path_str,
+                        &ssid)) {
+    *error = "Invalid Network GUID format";
+    return;
+  }
+
+  scoped_ptr<NetworkMap> network_map(new NetworkMap);
+  GetAllWiFiAccessPoints(false /* configured_only */, false /* visible_only */,
+                         0 /* limit */, network_map.get());
+
+  NetworkMap::const_iterator network_iter =
+      network_map->find(base::UTF8ToUTF16(ssid));
+  if (network_iter == network_map->end()) {
+    // This network doesn't exist so there's nothing to do.
+    return;
+  }
+
+  std::string connection_state;
+  network_iter->second->GetString(kAccessPointInfoConnectionState,
+                                  &connection_state);
+  if (connection_state == ::onc::connection_state::kNotConnected) {
+    // Already disconnected so nothing to do.
+    return;
+  }
+
+  // It's not disconnected so disconnect it.
+  dbus::ObjectProxy* device_proxy =
+      dbus_->GetObjectProxy(networking_private::kNetworkManagerNamespace,
+                            dbus::ObjectPath(device_path_str));
+  dbus::MethodCall method_call(
+      networking_private::kNetworkManagerDeviceNamespace,
+      networking_private::kNetworkManagerDisconnectMethod);
+  scoped_ptr<dbus::Response> response(device_proxy->CallMethodAndBlock(
+      &method_call, dbus::ObjectProxy::TIMEOUT_USE_DEFAULT));
+
+  if (!response) {
+    LOG(WARNING) << "Failed to disconnect network on device "
+                 << device_path_str;
+    *error = "Failed to disconnect network";
+  }
+}
+
 void NetworkingPrivateLinux::StartConnect(
     const std::string& guid,
     const VoidCallback& success_callback,
@@ -352,20 +403,27 @@ void NetworkingPrivateLinux::StartConnect(
   dbus_thread_.task_runner()->PostTaskAndReply(
       FROM_HERE,
       base::Bind(&NetworkingPrivateLinux::ConnectToNetwork,
-                 base::Unretained(this),
-                 guid,
-                 base::Unretained(error.get())),
-      base::Bind(&OnNetworkConnected,
-                 base::Passed(&error),
-                 success_callback,
-                 failure_callback));
+                 base::Unretained(this), guid, base::Unretained(error.get())),
+      base::Bind(&OnNetworkConnectOperationCompleted, base::Passed(&error),
+                 success_callback, failure_callback));
 }
 
 void NetworkingPrivateLinux::StartDisconnect(
     const std::string& guid,
     const VoidCallback& success_callback,
     const FailureCallback& failure_callback) {
-  ReportNotSupported("StartDisconnect", failure_callback);
+  if (!CheckNetworkManagerSupported(failure_callback))
+    return;
+
+  scoped_ptr<std::string> error(new std::string);
+
+  // Runs DisconnectFromNetwork on |dbus_thread|.
+  dbus_thread_.task_runner()->PostTaskAndReply(
+      FROM_HERE,
+      base::Bind(&NetworkingPrivateLinux::DisconnectFromNetwork,
+                 base::Unretained(this), guid, base::Unretained(error.get())),
+      base::Bind(&OnNetworkConnectOperationCompleted, base::Passed(&error),
+                 success_callback, failure_callback));
 }
 
 void NetworkingPrivateLinux::SetWifiTDLSEnabledState(
@@ -580,7 +638,11 @@ bool NetworkingPrivateLinux::GetAccessPointInfo(
                                   strength);
   }
 
-  // Read the security type.
+  // Read the security type. This is from the WpaFlags and RsnFlags property
+  // which are of the same type and can be OR'd together to find all supported
+  // security modes.
+
+  uint32 wpa_security_flags = 0;
   {
     scoped_ptr<dbus::Response> response(GetAccessPointProperty(
         access_point_proxy,
@@ -590,18 +652,35 @@ bool NetworkingPrivateLinux::GetAccessPointInfo(
     }
 
     dbus::MessageReader reader(response.get());
-    uint32 security_flags = 0;
-    if (!reader.PopVariantOfUint32(&security_flags)) {
+
+    if (!reader.PopVariantOfUint32(&wpa_security_flags)) {
       LOG(ERROR) << "Unexpected response for " << access_point_path.value()
                  << ": " << response->ToString();
       return false;
     }
-
-    std::string security;
-    MapSecurityFlagsToString(security_flags, &security);
-    access_point_info->SetString(kAccessPointInfoWifiSecurityDotted, security);
   }
 
+  uint32 rsn_security_flags = 0;
+  {
+    scoped_ptr<dbus::Response> response(GetAccessPointProperty(
+        access_point_proxy,
+        networking_private::kNetworkManagerRsnFlagsProperty));
+    if (!response) {
+      return false;
+    }
+
+    dbus::MessageReader reader(response.get());
+
+    if (!reader.PopVariantOfUint32(&rsn_security_flags)) {
+      LOG(ERROR) << "Unexpected response for " << access_point_path.value()
+                 << ": " << response->ToString();
+      return false;
+    }
+  }
+
+  std::string security;
+  MapSecurityFlagsToString(rsn_security_flags | wpa_security_flags, &security);
+  access_point_info->SetString(kAccessPointInfoWifiSecurityDotted, security);
   access_point_info->SetString(kAccessPointInfoType, kAccessPointInfoTypeWifi);
   access_point_info->SetBoolean(kAccessPointInfoConnectable, true);
   return true;
@@ -717,9 +796,6 @@ void NetworkingPrivateLinux::AddOrUpdateAccessPoint(
 
 void NetworkingPrivateLinux::MapSecurityFlagsToString(uint32 security_flags,
                                                       std::string* security) {
-  // TODO(zentaro): Correct mapping - this may not be correct but the underlying
-  // API appears not to work on Trusty so I can't verify yet.
-  // Everything returns 0.
   // Valid values are None, WEP-PSK, WEP-8021X, WPA-PSK, WPA-EAP
   if (security_flags == NetworkingPrivateLinux::NM_802_11_AP_SEC_NONE) {
     *security = kAccessPointSecurityNone;

@@ -97,7 +97,8 @@ ResourceLoader::ResourceLoader(scoped_ptr<net::URLRequest> request,
 ResourceLoader::~ResourceLoader() {
   if (login_delegate_.get())
     login_delegate_->OnRequestCancelled();
-  ssl_client_auth_handler_.reset();
+  if (ssl_client_auth_handler_.get())
+    ssl_client_auth_handler_->OnRequestCancelled();
 
   // Run ResourceHandler destructor before we tear-down the rest of our state
   // as the ResourceHandler may want to inspect the URLRequest and other state.
@@ -210,6 +211,10 @@ void ResourceLoader::ClearLoginDelegate() {
   login_delegate_ = NULL;
 }
 
+void ResourceLoader::ClearSSLClientAuthHandler() {
+  ssl_client_auth_handler_ = NULL;
+}
+
 void ResourceLoader::OnUploadProgressACK() {
   waiting_for_upload_progress_ack_ = false;
 }
@@ -287,14 +292,12 @@ void ResourceLoader::OnCertificateRequested(
     return;
   }
 
-  DCHECK(!ssl_client_auth_handler_)
+  DCHECK(!ssl_client_auth_handler_.get())
       << "OnCertificateRequested called with ssl_client_auth_handler pending";
-  ssl_client_auth_handler_.reset(new SSLClientAuthHandler(
+  ssl_client_auth_handler_ = new SSLClientAuthHandler(
       GetRequestInfo()->GetContext()->CreateClientCertStore(),
       request_.get(),
-      cert_info,
-      base::Bind(&ResourceLoader::ContinueWithCertificate,
-                 weak_ptr_factory_.GetWeakPtr())));
+      cert_info);
   ssl_client_auth_handler_->SelectCertificate();
 }
 
@@ -567,7 +570,10 @@ void ResourceLoader::CancelRequestInternal(int error, bool from_renderer) {
     login_delegate_->OnRequestCancelled();
     login_delegate_ = NULL;
   }
-  ssl_client_auth_handler_.reset();
+  if (ssl_client_auth_handler_.get()) {
+    ssl_client_auth_handler_->OnRequestCancelled();
+    ssl_client_auth_handler_ = NULL;
+  }
 
   request_->CancelWithError(error);
 
@@ -598,12 +604,27 @@ void ResourceLoader::StoreSignedCertificateTimestamps(
 }
 
 void ResourceLoader::CompleteResponseStarted() {
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/423948 is fixed.
+  tracked_objects::ScopedTracker tracking_profile1(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "423948 ResourceLoader::CompleteResponseStarted1"));
+
   ResourceRequestInfoImpl* info = GetRequestInfo();
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/423948 is fixed.
+  tracked_objects::ScopedTracker tracking_profile2(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "423948 ResourceLoader::CompleteResponseStarted2"));
 
   scoped_refptr<ResourceResponse> response(new ResourceResponse());
   PopulateResourceResponse(info, request_.get(), response.get());
 
   if (request_->ssl_info().cert.get()) {
+    // TODO(vadimt): Remove ScopedTracker below once crbug.com/423948 is fixed.
+    tracked_objects::ScopedTracker tracking_profile3(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "423948 ResourceLoader::CompleteResponseStarted3"));
+
     int cert_id = CertStore::GetInstance()->StoreCert(
         request_->ssl_info().cert.get(), info->GetChildID());
 
@@ -626,6 +647,11 @@ void ResourceLoader::CompleteResponseStarted() {
            !request_->ssl_info().connection_status);
   }
 
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/423948 is fixed.
+  tracked_objects::ScopedTracker tracking_profile5(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "423948 ResourceLoader::CompleteResponseStarted5"));
+
   delegate_->DidReceiveResponse(this);
 
   // TODO(vadimt): Remove ScopedTracker below once crbug.com/423948 is fixed.
@@ -643,6 +669,10 @@ void ResourceLoader::CompleteResponseStarted() {
 }
 
 void ResourceLoader::StartReading(bool is_continuation) {
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/423948 is fixed.
+  tracked_objects::ScopedTracker tracking_profile(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION("423948 ResourceLoader::StartReading"));
+
   int bytes_read = 0;
   ReadMore(&bytes_read);
 
@@ -680,6 +710,10 @@ void ResourceLoader::ResumeReading() {
 }
 
 void ResourceLoader::ReadMore(int* bytes_read) {
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/423948 is fixed.
+  tracked_objects::ScopedTracker tracking_profile1(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION("423948 ResourceLoader::ReadMore1"));
+
   DCHECK(!is_deferred());
 
   // Make sure we track the buffer in at least one place.  This ensures it gets
@@ -689,8 +723,8 @@ void ResourceLoader::ReadMore(int* bytes_read) {
   int buf_size;
   {
     // TODO(vadimt): Remove ScopedTracker below once crbug.com/423948 is fixed.
-    tracked_objects::ScopedTracker tracking_profile(
-        FROM_HERE_WITH_EXPLICIT_FUNCTION("423948 ResourceLoader::ReadMore"));
+    tracked_objects::ScopedTracker tracking_profile2(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION("423948 ResourceLoader::ReadMore2"));
 
     if (!handler_->OnWillRead(&buf, &buf_size, -1)) {
       Cancel();
@@ -803,11 +837,6 @@ void ResourceLoader::RecordHistograms() {
 
     UMA_HISTOGRAM_ENUMERATION("Net.Prefetch.Pattern", status, STATUS_MAX);
   }
-}
-
-void ResourceLoader::ContinueWithCertificate(net::X509Certificate* cert) {
-  ssl_client_auth_handler_.reset();
-  request_->ContinueWithCertificate(cert);
 }
 
 }  // namespace content

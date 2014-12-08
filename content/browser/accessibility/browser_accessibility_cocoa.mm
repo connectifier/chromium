@@ -446,20 +446,12 @@ NSDictionary* attributeToMethodNameMap = nil;
 }
 
 - (NSString*)orientation {
-  // We present a spin button as a vertical slider, with a role description
-  // of "spin button".
-  if ([self internalRole] == ui::AX_ROLE_SPIN_BUTTON)
-    return NSAccessibilityVerticalOrientationValue;
-
-  if ([self internalRole] == ui::AX_ROLE_LIST ||
-      [self internalRole] == ui::AX_ROLE_LIST_BOX) {
-    return NSAccessibilityVerticalOrientationValue;
-  }
-
   if (GetState(browserAccessibility_, ui::AX_STATE_VERTICAL))
     return NSAccessibilityVerticalOrientationValue;
-  else
+  else if (GetState(browserAccessibility_, ui::AX_STATE_HORIZONTAL))
     return NSAccessibilityHorizontalOrientationValue;
+
+  return @"";
 }
 
 - (NSNumber*)numberOfCharacters {
@@ -1223,7 +1215,6 @@ NSDictionary* attributeToMethodNameMap = nil;
       NSAccessibilityWindowAttribute,
       @"AXAccessKey",
       @"AXInvalid",
-      @"AXRequired",
       @"AXVisited",
       nil];
 
@@ -1277,7 +1268,6 @@ NSDictionary* attributeToMethodNameMap = nil;
     [ret addObjectsFromArray:[NSArray arrayWithObjects:
         NSAccessibilityMaxValueAttribute,
         NSAccessibilityMinValueAttribute,
-        NSAccessibilityOrientationAttribute,
         NSAccessibilityValueDescriptionAttribute,
         nil]];
   } else if ([subrole isEqualToString:NSAccessibilityOutlineRowSubrole]) {
@@ -1308,7 +1298,6 @@ NSDictionary* attributeToMethodNameMap = nil;
     }
   } else if ([role isEqualToString:NSAccessibilityListRole]) {
     [ret addObjectsFromArray:[NSArray arrayWithObjects:
-        NSAccessibilityOrientationAttribute,
         NSAccessibilitySelectedChildrenAttribute,
         NSAccessibilityVisibleChildrenAttribute,
         nil]];
@@ -1353,6 +1342,17 @@ NSDictionary* attributeToMethodNameMap = nil;
     [ret addObjectsFromArray:[NSArray arrayWithObjects:
         NSAccessibilityExpandedAttribute,
         nil]];
+  }
+
+  if (GetState(browserAccessibility_, ui::AX_STATE_VERTICAL)
+      || GetState(browserAccessibility_, ui::AX_STATE_HORIZONTAL)) {
+    [ret addObjectsFromArray:[NSArray arrayWithObjects:
+        NSAccessibilityOrientationAttribute, nil]];
+  }
+
+  if (GetState(browserAccessibility_, ui::AX_STATE_REQUIRED)) {
+    [ret addObjectsFromArray:[NSArray arrayWithObjects:
+        @"AXRequired", nil]];
   }
 
   // Title UI Element.

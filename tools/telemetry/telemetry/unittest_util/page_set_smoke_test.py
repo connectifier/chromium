@@ -35,7 +35,7 @@ class PageSetSmokeTest(unittest.TestCase):
     for page in page_set.pages:
       if not page.url.startswith('http'):
         continue
-      self.assertTrue(wpr_archive_info.WprFilePathForPage(page),
+      self.assertTrue(wpr_archive_info.WprFilePathForUserStory(page),
                       msg='No archive found for %s in %s' % (
                           page.url, page_set.archive_data_file))
 
@@ -104,10 +104,6 @@ class PageSetSmokeTest(unittest.TestCase):
         isinstance(page_set.make_javascript_deterministic, bool),
         msg='page_set\'s make_javascript_deterministic must have type bool')
 
-    self.assertTrue(
-        isinstance(page_set.startup_url, str),
-        msg='page_set\'s startup_url must have type string')
-
   def CheckAttributesOfPageBasicAttributes(self, page):
     self.assertTrue(not hasattr(page, 'disabled'))
     self.assertTrue(
@@ -123,6 +119,10 @@ class PageSetSmokeTest(unittest.TestCase):
     self.assertTrue(
        isinstance(page.labels, set),
        msg='page %s \'s labels field must have type set' % page.display_name)
+    self.assertTrue(
+        isinstance(page.startup_url, str),
+        msg=('page %s \'s startup_url field must have type string'
+            % page.display_name))
     for l in page.labels:
       self.assertTrue(
          isinstance(l, str),

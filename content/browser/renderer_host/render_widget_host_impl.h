@@ -23,13 +23,13 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "build/build_config.h"
-#include "cc/base/rolling_time_delta_history.h"
 #include "cc/resources/shared_bitmap.h"
 #include "content/browser/renderer_host/event_with_latency_info.h"
 #include "content/browser/renderer_host/input/input_ack_handler.h"
 #include "content/browser/renderer_host/input/input_router_client.h"
 #include "content/browser/renderer_host/input/synthetic_gesture.h"
 #include "content/browser/renderer_host/input/touch_emulator_client.h"
+#include "content/browser/renderer_host/render_widget_host_latency_tracker.h"
 #include "content/common/input/input_event_ack_state.h"
 #include "content/common/input/synthetic_gesture_packet.h"
 #include "content/common/view_message_enums.h"
@@ -467,11 +467,6 @@ class CONTENT_EXPORT RenderWidgetHostImpl
       gfx::Size snapshot_size,
       scoped_refptr<base::RefCountedBytes> png_data);
 
-  // LatencyComponents generated in the renderer must have component IDs
-  // provided to them by the browser process. This function adds the correct
-  // component ID where necessary.
-  void AddLatencyInfoComponentIds(ui::LatencyInfo* latency_info);
-
   InputRouter* input_router() { return input_router_.get(); }
 
   // Get the BrowserAccessibilityManager for the root of the frame tree,
@@ -481,28 +476,12 @@ class CONTENT_EXPORT RenderWidgetHostImpl
   // or create it if it doesn't already exist.
   BrowserAccessibilityManager* GetOrCreateRootBrowserAccessibilityManager();
 
-  base::TimeDelta GetEstimatedBrowserCompositeTime();
-
 #if defined(OS_WIN)
   gfx::NativeViewAccessible GetParentNativeViewAccessible();
 #endif
 
  protected:
   RenderWidgetHostImpl* AsRenderWidgetHostImpl() override;
-
-  // Create a LatencyInfo struct with INPUT_EVENT_LATENCY_RWH_COMPONENT
-  // component if it is not already in |original|. And if |original| is
-  // not NULL, it is also merged into the resulting LatencyInfo.
-  ui::LatencyInfo CreateInputEventLatencyInfoIfNotExist(
-      const ui::LatencyInfo* original,
-      blink::WebInputEvent::Type type,
-      const ui::LatencyInfo::InputCoordinate* logical_coordinates,
-      size_t logical_coordinates_size);
-  // Add UMA histograms for the latency to the renderer and roundtrip latency
-  // for a given event type.
-  void ComputeInputLatencyHistograms(
-      blink::WebInputEvent::Type type,
-      const ui::LatencyInfo& latency_info) const;
 
   // Called when we receive a notification indicating that the renderer
   // process has gone. This will reset our state so that our state will be
@@ -625,11 +604,9 @@ class CONTENT_EXPORT RenderWidgetHostImpl
                               bool can_compose_inline,
                               int flags);
 
-#if defined(OS_MACOSX) || defined(USE_AURA) || defined(OS_ANDROID)
   void OnImeCompositionRangeChanged(
       const gfx::Range& range,
       const std::vector<gfx::Rect>& character_bounds);
-#endif
   void OnImeCancelComposition();
   void OnLockMouse(bool user_gesture,
                    bool last_unlocked_by_target,
@@ -843,14 +820,14 @@ class CONTENT_EXPORT RenderWidgetHostImpl
   std::list<HWND> dummy_windows_for_activation_;
 #endif
 
-  int64 last_input_number_;
+  RenderWidgetHostLatencyTracker latency_tracker_;
+
+  bool subscribe_uniform_enabled_;
 
   int next_browser_snapshot_id_;
   typedef std::map<int,
       base::Callback<void(const unsigned char*, size_t)> > PendingSnapshotMap;
   PendingSnapshotMap pending_browser_snapshots_;
-
-  cc::RollingTimeDeltaHistory browser_composite_latency_history_;
 
   base::WeakPtrFactory<RenderWidgetHostImpl> weak_factory_;
 

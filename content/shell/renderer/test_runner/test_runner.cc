@@ -22,7 +22,6 @@
 #include "gin/handle.h"
 #include "gin/object_template_builder.h"
 #include "gin/wrappable.h"
-#include "third_party/WebKit/public/platform/WebArrayBuffer.h"
 #include "third_party/WebKit/public/platform/WebBatteryStatus.h"
 #include "third_party/WebKit/public/platform/WebCanvas.h"
 #include "third_party/WebKit/public/platform/WebData.h"
@@ -31,6 +30,7 @@
 #include "third_party/WebKit/public/platform/WebLocalCredential.h"
 #include "third_party/WebKit/public/platform/WebPoint.h"
 #include "third_party/WebKit/public/platform/WebURLResponse.h"
+#include "third_party/WebKit/public/web/WebArrayBuffer.h"
 #include "third_party/WebKit/public/web/WebArrayBufferConverter.h"
 #include "third_party/WebKit/public/web/WebBindings.h"
 #include "third_party/WebKit/public/web/WebDataSource.h"
@@ -296,6 +296,8 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
   void SetMockPushClientSuccess(const std::string& endpoint,
                                 const std::string& registration_id);
   void SetMockPushClientError(const std::string& message);
+  void SetPushMessagingPermission(const std::string& origin, bool allowed);
+  void ClearPushMessagingPermissions();
   void SetBluetoothMockDataSet(const std::string& dataset_name);
 
   std::string PlatformName();
@@ -543,6 +545,10 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::SetMockPushClientSuccess)
       .SetMethod("setMockPushClientError",
                  &TestRunnerBindings::SetMockPushClientError)
+      .SetMethod("setPushMessagingPermission",
+                 &TestRunnerBindings::SetPushMessagingPermission)
+      .SetMethod("clearPushMessagingPermissions",
+                 &TestRunnerBindings::ClearPushMessagingPermissions)
       .SetMethod("setBluetoothMockDataSet",
                  &TestRunnerBindings::SetBluetoothMockDataSet)
       .SetMethod("forceNextWebGLContextCreationToFail",
@@ -1414,6 +1420,17 @@ void TestRunnerBindings::SetMockPushClientError(const std::string& message) {
   if (!runner_)
     return;
   runner_->SetMockPushClientError(message);
+}
+
+void TestRunnerBindings::SetPushMessagingPermission(const std::string& origin,
+                                                    bool allowed) {
+  if (runner_)
+    runner_->SetPushMessagingPermission(GURL(origin), allowed);
+}
+
+void TestRunnerBindings::ClearPushMessagingPermissions() {
+  if (runner_)
+    runner_->ClearPushMessagingPermissions();
 }
 
 std::string TestRunnerBindings::PlatformName() {
@@ -2916,6 +2933,14 @@ void TestRunner::SetMockPushClientSuccess(const std::string& endpoint,
 
 void TestRunner::SetMockPushClientError(const std::string& message) {
   proxy_->GetPushClientMock()->SetMockErrorValues(message);
+}
+
+void TestRunner::SetPushMessagingPermission(const GURL& origin, bool allowed) {
+  delegate_->SetPushMessagingPermission(origin, allowed);
+}
+
+void TestRunner::ClearPushMessagingPermissions() {
+  delegate_->ClearPushMessagingPermissions();
 }
 
 void TestRunner::LocationChangeDone() {

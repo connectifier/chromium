@@ -172,7 +172,8 @@ TEST_F(ChromePasswordManagerClientTest, AnswerToPingsAboutLoggingState_Active) {
 
   // Ping the client for logging activity update.
   AutofillHostMsg_PasswordAutofillAgentConstructed msg(0);
-  static_cast<IPC::Listener*>(GetClient())->OnMessageReceived(msg);
+  static_cast<content::WebContentsObserver*>(GetClient())->OnMessageReceived(
+      msg, web_contents()->GetMainFrame());
 
   bool logging_active = false;
   EXPECT_TRUE(WasLoggingActivationMessageSent(&logging_active));
@@ -187,7 +188,8 @@ TEST_F(ChromePasswordManagerClientTest,
 
   // Ping the client for logging activity update.
   AutofillHostMsg_PasswordAutofillAgentConstructed msg(0);
-  static_cast<IPC::Listener*>(GetClient())->OnMessageReceived(msg);
+  static_cast<content::WebContentsObserver*>(GetClient())->OnMessageReceived(
+      msg, web_contents()->GetMainFrame());
 
   bool logging_active = true;
   EXPECT_TRUE(WasLoggingActivationMessageSent(&logging_active));
@@ -219,6 +221,19 @@ TEST_F(ChromePasswordManagerClientTest, LogToAReceiver) {
 
   service_->UnregisterReceiver(&receiver_);
   EXPECT_FALSE(client->IsLoggingActive());
+}
+
+TEST_F(ChromePasswordManagerClientTest,
+       ShouldAskUserToSubmitURLDefaultBehaviour) {
+  ChromePasswordManagerClient* client = GetClient();
+  // TODO(melandory) Since "Ask user to submit URL" functionality is currently
+  // in development, so the user should not be asked to submit a URL.
+  EXPECT_FALSE(client->ShouldAskUserToSubmitURL(GURL("https://hostname.com/")));
+}
+
+TEST_F(ChromePasswordManagerClientTest, ShouldAskUserToSubmitURLEmptyURL) {
+  ChromePasswordManagerClient* client = GetClient();
+  EXPECT_FALSE(client->ShouldAskUserToSubmitURL(GURL::EmptyGURL()));
 }
 
 TEST_F(ChromePasswordManagerClientTest, ShouldFilterAutofillResult_Reauth) {

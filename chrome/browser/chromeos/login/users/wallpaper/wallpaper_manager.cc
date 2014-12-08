@@ -32,7 +32,7 @@
 #include "base/values.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
-#include "chrome/browser/chromeos/customization_document.h"
+#include "chrome/browser/chromeos/customization/customization_document.h"
 #include "chrome/browser/chromeos/login/startup_utils.h"
 #include "chrome/browser/chromeos/login/wizard_controller.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
@@ -212,6 +212,24 @@ int FindPublicSession(const user_manager::UserList& users) {
 }
 
 }  // namespace
+
+WallpaperInfo::WallpaperInfo()
+    : layout(ash::WALLPAPER_LAYOUT_CENTER),
+      type(user_manager::User::WALLPAPER_TYPE_COUNT) {
+}
+
+WallpaperInfo::WallpaperInfo(const std::string& in_location,
+                             ash::WallpaperLayout in_layout,
+                             user_manager::User::WallpaperType in_type,
+                             const base::Time& in_date)
+    : location(in_location),
+      layout(in_layout),
+      type(in_type),
+      date(in_date) {
+}
+
+WallpaperInfo::~WallpaperInfo() {
+}
 
 const char kWallpaperSequenceTokenName[] = "wallpaper-sequence";
 

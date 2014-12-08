@@ -38,6 +38,7 @@
 #include "chrome/browser/profiles/startup_task_runner_service_factory.h"
 #include "chrome/browser/signin/account_reconcilor_factory.h"
 #include "chrome/browser/signin/account_tracker_service_factory.h"
+#include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/sync/profile_sync_service.h"
 #include "chrome/browser/sync/profile_sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
@@ -53,6 +54,7 @@
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/password_manager/core/browser/password_store.h"
+#include "components/signin/core/browser/signin_manager.h"
 #include "components/signin/core/common/profile_management_switches.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_service.h"
@@ -71,7 +73,9 @@
 #include "extensions/common/manifest.h"
 #endif
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
+#include "chrome/browser/supervised_user/child_accounts/child_account_service.h"
+#include "chrome/browser/supervised_user/child_accounts/child_account_service_factory.h"
 #include "chrome/browser/supervised_user/supervised_user_service.h"
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
 #endif
@@ -649,7 +653,8 @@ void ProfileManager::ScheduleProfileForDeletion(
     for (size_t i = 0; i < cache.GetNumberOfProfiles(); ++i) {
       base::FilePath cur_path = cache.GetPathOfProfileAtIndex(i);
       // Make sure that this profile is not pending deletion.
-      if (cur_path != profile_dir && !cache.ProfileIsSupervisedAtIndex(i) &&
+      if (cur_path != profile_dir &&
+          !cache.ProfileIsLegacySupervisedAtIndex(i) &&
           !IsProfileMarkedForDeletion(cur_path)) {
         last_non_supervised_profile_path = cur_path;
         break;
@@ -1013,10 +1018,11 @@ void ProfileManager::DoFinalInitForServices(Profile* profile,
   }
 
 #endif
-#if defined(ENABLE_MANAGED_USERS) && !defined(OS_ANDROID)
+#if defined(ENABLE_SUPERVISED_USERS) && !defined(OS_ANDROID)
   // Initialization needs to happen after extension system initialization (for
   // extension::ManagementPolicy) and InitProfileUserPrefs (for setting the
   // initializing the supervised flag if necessary).
+  ChildAccountServiceFactory::GetForProfile(profile)->Init();
   SupervisedUserServiceFactory::GetForProfile(profile)->Init();
 #endif
   // Start the deferred task runners once the profile is loaded.
@@ -1182,8 +1188,10 @@ void ProfileManager::AddProfileToCache(Profile* profile) {
   if (cache.GetIndexOfProfileWithPath(profile->GetPath()) != std::string::npos)
     return;
 
-  base::string16 username = base::UTF8ToUTF16(profile->GetPrefs()->GetString(
-      prefs::kGoogleServicesUsername));
+  SigninManagerBase* signin_manager =
+      SigninManagerFactory::GetForProfile(profile);
+  base::string16 username = base::UTF8ToUTF16(
+      signin_manager->GetAuthenticatedUsername());
 
   // Profile name and avatar are set by InitProfileUserPrefs and stored in the
   // profile. Use those values to setup the cache entry.

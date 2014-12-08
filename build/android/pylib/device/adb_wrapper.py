@@ -8,7 +8,9 @@ This is a thin wrapper around the adb interface. Any additional complexity
 should be delegated to a higher level (ex. DeviceUtils).
 """
 
+import collections
 import errno
+import logging
 import os
 
 from pylib import cmd_helper
@@ -35,6 +37,10 @@ def _VerifyLocalFileExists(path):
     raise IOError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
 
+DeviceStat = collections.namedtuple('DeviceStat',
+                                    ['st_mode', 'st_size', 'st_time'])
+
+
 class AdbWrapper(object):
   """A wrapper around a local Android Debug Bridge executable."""
 
@@ -44,6 +50,8 @@ class AdbWrapper(object):
     Args:
       device_serial: The device serial number as a string.
     """
+    if not device_serial:
+      raise ValueError('A device serial must be specified')
     self._device_serial = str(device_serial)
 
   # pylint: disable=unused-argument
@@ -153,8 +161,13 @@ class AdbWrapper(object):
       timeout: (optional) Timeout per try in seconds.
       retries: (optional) Number of retries to attempt.
     """
-    self._RunDeviceAdbCmd(['pull', remote, local], timeout, retries)
-    _VerifyLocalFileExists(local)
+    cmd = ['pull', remote, local]
+    self._RunDeviceAdbCmd(cmd, timeout, retries)
+    try:
+      _VerifyLocalFileExists(local)
+    except IOError:
+      raise device_errors.AdbCommandFailedError(
+          cmd, 'File not found on host: %s' % local, device_serial=str(self))
 
   def Shell(self, command, expect_status=0, timeout=_DEFAULT_TIMEOUT,
             retries=_DEFAULT_RETRIES):
@@ -188,8 +201,7 @@ class AdbWrapper(object):
       try:
         status = int(output[output_end+1:])
       except ValueError:
-        output = '\n'.join([output.rstrip(),
-                            'adb shell error: exit status missing!'])
+        logging.warning('exit status of shell command %r missing.', command)
         raise device_errors.AdbCommandFailedError(
             args, output, device_serial=self._device_serial)
       output = output[:output_end]
@@ -197,6 +209,38 @@ class AdbWrapper(object):
         raise device_errors.AdbCommandFailedError(
             args, output, status, self._device_serial)
     return output
+
+  def Ls(self, path, timeout=_DEFAULT_TIMEOUT, retries=_DEFAULT_RETRIES):
+    """List the contents of a directory on the device.
+
+    Args:
+      path: Path on the device filesystem.
+      timeout: (optional) Timeout per try in seconds.
+      retries: (optional) Number of retries to attempt.
+
+    Returns:
+      A list of pairs (filename, stat) for each file found in the directory,
+      where the stat object has the properties: st_mode, st_size, and st_time.
+
+    Raises:
+      AdbCommandFailedError if |path| does not specify a valid and accessible
+          directory in the device.
+    """
+    def ParseLine(line):
+      cols = line.split(None, 3)
+      filename = cols.pop()
+      stat = DeviceStat(*[int(num, base=16) for num in cols])
+      return (filename, stat)
+
+    cmd = ['ls', path]
+    lines = self._RunDeviceAdbCmd(
+        cmd, timeout=timeout, retries=retries).splitlines()
+    if lines:
+      return [ParseLine(line) for line in lines]
+    else:
+      raise device_errors.AdbCommandFailedError(
+          cmd, 'path does not specify an accessible directory in the device',
+          device_serial=self._device_serial)
 
   def Logcat(self, filter_spec=None, timeout=_DEFAULT_TIMEOUT,
              retries=_DEFAULT_RETRIES):

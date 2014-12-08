@@ -27,6 +27,7 @@ import org.chromium.chrome.browser.dom_distiller.DomDistillerFeedbackReporter;
 import org.chromium.chrome.browser.infobar.AutoLoginProcessor;
 import org.chromium.chrome.browser.infobar.InfoBarContainer;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.toolbar.ToolbarModel;
 import org.chromium.content.browser.ContentView;
 import org.chromium.content.browser.ContentViewClient;
@@ -38,6 +39,7 @@ import org.chromium.ui.base.Clipboard;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.gfx.DeviceDisplayInfo;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -148,6 +150,19 @@ public class Tab {
      * The number of pixel of 16DP.
      */
     private int mNumPixel16DP;
+
+    /** Whether or not the TabState has changed. */
+    private boolean mIsTabStateDirty = true;
+
+    /**
+     * Saves how this tab was launched (from a link, external app, etc) so that
+     * we can determine the different circumstances in which it should be
+     * closed. For example, a tab opened from an external app should be closed
+     * when the back stack is empty and the user uses the back hardware key. A
+     * standard tab however should be kept open and the entire activity should
+     * be moved to the background.
+     */
+    private final TabLaunchType mLaunchType;
 
     /**
      * A default {@link ChromeContextMenuItemDelegate} that supports some of the context menu
@@ -332,6 +347,20 @@ public class Tab {
                 observer.onDidChangeThemeColor(color);
             }
         }
+
+        @Override
+        public void didAttachInterstitialPage() {
+            for (TabObserver observer : mObservers) {
+                observer.onDidAttachInterstitialPage(Tab.this);
+            }
+        }
+
+        @Override
+        public void didDetachInterstitialPage() {
+            for (TabObserver observer : mObservers) {
+                observer.onDidDetachInterstitialPage(Tab.this);
+            }
+        }
     }
 
     /**
@@ -353,7 +382,7 @@ public class Tab {
      * @param window    An instance of a {@link WindowAndroid}.
      */
     public Tab(int id, boolean incognito, Context context, WindowAndroid window) {
-        this(id, INVALID_TAB_ID, incognito, context, window);
+        this(id, INVALID_TAB_ID, incognito, context, window, null);
     }
 
     /**
@@ -364,7 +393,8 @@ public class Tab {
      * @param context   An instance of a {@link Context}.
      * @param window    An instance of a {@link WindowAndroid}.
      */
-    public Tab(int id, int parentId, boolean incognito, Context context, WindowAndroid window) {
+    public Tab(int id, int parentId, boolean incognito, Context context, WindowAndroid window,
+            TabLaunchType type) {
         // We need a valid Activity Context to build the ContentView with.
         assert context == null || context instanceof Activity;
 
@@ -375,6 +405,7 @@ public class Tab {
         mContext = context;
         mApplicationContext = context != null ? context.getApplicationContext() : null;
         mWindowAndroid = window;
+        mLaunchType = type;
         if (mContext != null) {
             mNumPixel16DP = (int) (DeviceDisplayInfo.create(mContext).getDIPScale() * 16);
         }
@@ -529,6 +560,32 @@ public class Tab {
      */
     public final InfoBarContainer getInfoBarContainer() {
         return mInfoBarContainer;
+    }
+
+    /** @return An opaque "state" object that can be persisted to storage. */
+    public TabState getState() {
+        if (!isInitialized()) return null;
+        TabState tabState = new TabState();
+        tabState.contentsState = getWebContentsState();
+        tabState.parentId = getParentId();
+        tabState.syncId = getSyncId();
+        return tabState;
+    }
+
+    /** Returns an object representing the state of the Tab's WebContents. */
+    protected TabState.WebContentsState getWebContentsState() {
+        // Native call returns null when buffer allocation needed to serialize the state failed.
+        ByteBuffer buffer = getWebContentsStateAsByteBuffer();
+        if (buffer == null) return null;
+
+        TabState.WebContentsState state = new TabState.WebContentsStateNative(buffer);
+        state.setVersion(TabState.CONTENTS_STATE_CURRENT_VERSION);
+        return state;
+    }
+
+    /** Returns an ByteBuffer representing the state of the Tab's WebContents. */
+    protected ByteBuffer getWebContentsStateAsByteBuffer() {
+        return TabState.getContentsStateAsByteBuffer(this);
     }
 
     /**
@@ -1173,6 +1230,21 @@ public class Tab {
     }
 
     /**
+     * @return Whether the TabState representing this Tab has been updated.
+     */
+    public boolean isTabStateDirty() {
+        return mIsTabStateDirty;
+    }
+
+    /**
+     * Set whether the TabState representing this Tab has been updated.
+     * @param isDirty Whether the Tab's state has changed.
+     */
+    public void setIsTabStateDirty(boolean isDirty) {
+        mIsTabStateDirty = isDirty;
+    }
+
+    /**
      * Validates {@code id} and increments the internal counter to make sure future ids don't
      * collide.
      * @param id The current id.  Maybe {@link #INVALID_TAB_ID}.
@@ -1183,6 +1255,21 @@ public class Tab {
         incrementIdCounterTo(id + 1);
 
         return id;
+    }
+
+    /**
+     * Restores a tab either frozen or from state.
+     * TODO(aurimas): investigate reducing the visibility of this method after TabModel refactoring.
+     */
+    public void createHistoricalTab() {
+        nativeCreateHistoricalTab(mNativeTabAndroid);
+    }
+
+    /**
+     * @return The reason the Tab was launched.
+     */
+    public TabLaunchType getLaunchType() {
+        return mLaunchType;
     }
 
     /**
@@ -1228,4 +1315,5 @@ public class Tab {
             String title);
     private native boolean nativePrint(long nativeTabAndroid);
     private native Bitmap nativeGetDefaultFavicon(long nativeTabAndroid);
+    private native void nativeCreateHistoricalTab(long nativeTabAndroid);
 }

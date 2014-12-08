@@ -20,6 +20,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/sequenced_worker_pool.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
@@ -102,7 +103,7 @@
 #include "extensions/common/constants.h"
 #endif
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
 #include "chrome/browser/supervised_user/supervised_user_service.h"
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
 #include "chrome/browser/supervised_user/supervised_user_url_filter.h"
@@ -127,9 +128,9 @@
 #include "chrome/browser/chromeos/profiles/profile_helper.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
 #include "chrome/browser/net/nss_context.h"
-#include "chromeos/dbus/cryptohome_client.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/settings/cros_settings_names.h"
+#include "chromeos/tpm_token_info_getter.h"
 #include "components/user_manager/user.h"
 #include "components/user_manager/user_manager.h"
 #include "crypto/nss_util.h"
@@ -260,28 +261,28 @@ class DebugDevToolsInterceptor : public net::URLRequestInterceptor {
 //                   v---------------------------------------/
 //     GetTPMInfoForUserOnUIThread
 //                   |
-// CryptohomeClient::Pkcs11GetTpmTokenInfoForUser
+// chromeos::TPMTokenInfoGetter::Start
 //                   |
 //     DidGetTPMInfoForUserOnUIThread
 //                   \---------------------------------------v
 //                                          crypto::InitializeTPMForChromeOSUser
 
-void DidGetTPMInfoForUserOnUIThread(const std::string& username_hash,
-                                    chromeos::DBusMethodCallStatus call_status,
-                                    const std::string& label,
-                                    const std::string& user_pin,
-                                    int slot_id) {
+void DidGetTPMInfoForUserOnUIThread(
+    scoped_ptr<chromeos::TPMTokenInfoGetter> getter,
+    const std::string& username_hash,
+    const chromeos::TPMTokenInfo& info) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
-  if (call_status == chromeos::DBUS_METHOD_CALL_FAILURE) {
-    NOTREACHED() << "dbus error getting TPM info for " << username_hash;
-    return;
+  if (info.tpm_is_enabled && info.token_slot_id != -1) {
+    DVLOG(1) << "Got TPM slot for " << username_hash << ": "
+             << info.token_slot_id;
+    BrowserThread::PostTask(
+        BrowserThread::IO,
+        FROM_HERE,
+        base::Bind(&crypto::InitializeTPMForChromeOSUser,
+                   username_hash, info.token_slot_id));
+  } else {
+    NOTREACHED() << "TPMTokenInfoGetter reported invalid token.";
   }
-  DVLOG(1) << "Got TPM slot for " << username_hash << ": " << slot_id;
-  BrowserThread::PostTask(
-      BrowserThread::IO,
-      FROM_HERE,
-      base::Bind(
-          &crypto::InitializeTPMForChromeOSUser, username_hash, slot_id));
 }
 
 void GetTPMInfoForUserOnUIThread(const std::string& username,
@@ -289,11 +290,22 @@ void GetTPMInfoForUserOnUIThread(const std::string& username,
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   DVLOG(1) << "Getting TPM info from cryptohome for "
            << " " << username << " " << username_hash;
-  chromeos::DBusThreadManager::Get()
-      ->GetCryptohomeClient()
-      ->Pkcs11GetTpmTokenInfoForUser(
-            username,
-            base::Bind(&DidGetTPMInfoForUserOnUIThread, username_hash));
+  scoped_ptr<chromeos::TPMTokenInfoGetter> scoped_token_info_getter =
+      chromeos::TPMTokenInfoGetter::CreateForUserToken(
+          username,
+          chromeos::DBusThreadManager::Get()->GetCryptohomeClient(),
+          base::ThreadTaskRunnerHandle::Get());
+  chromeos::TPMTokenInfoGetter* token_info_getter =
+      scoped_token_info_getter.get();
+
+  // Bind |token_info_getter| to the callback to ensure it does not go away
+  // before TPM token info is fetched.
+  // TODO(tbarzic, pneubeck): Handle this in a nicer way when this logic is
+  //     moved to a separate profile service.
+  token_info_getter->Start(
+      base::Bind(&DidGetTPMInfoForUserOnUIThread,
+                 base::Passed(&scoped_token_info_getter),
+                 username_hash));
 }
 
 void StartTPMSlotInitializationOnIOThread(const std::string& username,
@@ -398,7 +410,7 @@ void ProfileIOData::InitializeOnUIThread(Profile* profile) {
   params->proxy_config_service
       .reset(ProxyServiceFactory::CreateProxyConfigService(
            profile->GetProxyConfigTracker()));
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
   SupervisedUserService* supervised_user_service =
       SupervisedUserServiceFactory::GetForProfile(profile);
   params->supervised_user_url_filter =
@@ -443,6 +455,8 @@ void ProfileIOData::InitializeOnUIThread(Profile* profile) {
       &enable_referrers_,
       &enable_do_not_track_,
       &force_safesearch_,
+      &force_google_safesearch_,
+      &force_youtube_safety_mode_,
       pref_service);
 
   scoped_refptr<base::MessageLoopProxy> io_message_loop_proxy =
@@ -1028,7 +1042,9 @@ void ProfileIOData::Init(
   network_delegate->set_profile_path(profile_params_->path);
   network_delegate->set_cookie_settings(profile_params_->cookie_settings.get());
   network_delegate->set_enable_do_not_track(&enable_do_not_track_);
-  network_delegate->set_force_google_safe_search(&force_safesearch_);
+  network_delegate->set_force_safe_search(&force_safesearch_);
+  network_delegate->set_force_google_safe_search(&force_google_safesearch_);
+  network_delegate->set_force_youtube_safety_mode(&force_youtube_safety_mode_);
   network_delegate->set_prerender_tracker(profile_params_->prerender_tracker);
   network_delegate_.reset(network_delegate);
 
@@ -1069,7 +1085,7 @@ void ProfileIOData::Init(
         profile_params_->resource_prefetch_predictor_observer_.release());
   }
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
   supervised_user_url_filter_ = profile_params_->supervised_user_url_filter;
 #endif
 
@@ -1209,6 +1225,8 @@ void ProfileIOData::ShutdownOnUIThread(
   enable_referrers_.Destroy();
   enable_do_not_track_.Destroy();
   force_safesearch_.Destroy();
+  force_google_safesearch_.Destroy();
+  force_youtube_safety_mode_.Destroy();
 #if !defined(OS_CHROMEOS)
   enable_metrics_.Destroy();
 #endif

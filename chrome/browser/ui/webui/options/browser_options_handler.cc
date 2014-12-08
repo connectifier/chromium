@@ -231,6 +231,7 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
       IDS_OPTIONS_AUTOOPENFILETYPES_RESETTODEFAULT },
     { "changeHomePage", IDS_OPTIONS_CHANGE_HOME_PAGE },
     { "certificatesManageButton", IDS_OPTIONS_CERTIFICATES_MANAGE_BUTTON },
+    { "childLabel", IDS_PROFILES_LIST_CHILD_LABEL },
     { "customizeSync", IDS_OPTIONS_CUSTOMIZE_SYNC_BUTTON_LABEL },
     { "defaultFontSizeLabel", IDS_OPTIONS_DEFAULT_FONT_SIZE_LABEL },
     { "defaultSearchManageEngines", IDS_OPTIONS_DEFAULTSEARCH_MANAGE_ENGINES },
@@ -1205,6 +1206,22 @@ void BrowserOptionsHandler::OnTemplateURLServiceChanged() {
           template_url_service_->is_default_search_managed() ||
           template_url_service_->IsExtensionControlledDefaultSearch()));
 
+  if (default_index != -1 && model_urls[default_index]->HasGoogleBaseURLs(
+          template_url_service_->search_terms_data())) {
+    // If the user has chosen Google as the default search provider, make
+    // hotwording as an option available again.
+    HandleRequestHotwordAvailable(nullptr);
+  } else {
+    // If the user has chosen a default search provide other than Google, turn
+    // off hotwording since other providers don't provide that functionality.
+    web_ui()->CallJavascriptFunction("BrowserOptions.setHotwordSectionVisible",
+                                     base::FundamentalValue(false));
+    HotwordService* hotword_service =
+        HotwordServiceFactory::GetForProfile(Profile::FromWebUI(web_ui()));
+    if (hotword_service)
+      hotword_service->DisableHotwordPreferences();
+  }
+
   SetupExtensionControlledIndicators();
 }
 
@@ -1316,6 +1333,7 @@ scoped_ptr<base::ListValue> BrowserOptionsHandler::GetProfilesInfoList() {
                               profile_path == current_profile_path);
     profile_value->SetBoolean("isSupervised",
                               cache.ProfileIsSupervisedAtIndex(i));
+    profile_value->SetBoolean("isChild", cache.ProfileIsChildAtIndex(i));
 
     bool is_gaia_picture =
         cache.IsUsingGAIAPictureOfProfileAtIndex(i) &&
@@ -1434,6 +1452,7 @@ BrowserOptionsHandler::GetSyncStateDictionary() {
   }
 
   sync_status->SetBoolean("supervisedUser", profile->IsSupervised());
+  sync_status->SetBoolean("childUser", profile->IsChild());
 
   bool signout_prohibited = false;
 #if !defined(OS_CHROMEOS)
@@ -1722,17 +1741,14 @@ void BrowserOptionsHandler::HandleLaunchHotwordAudioVerificationApp(
   if (retrain) {
     DCHECK(profile->GetPrefs()->GetBoolean(
         prefs::kHotwordAlwaysOnSearchEnabled));
-    DCHECK(profile->GetPrefs()->GetBoolean(
-        prefs::kHotwordAudioHistoryEnabled));
 
     launch_mode = HotwordService::RETRAIN;
+    // TODO(rlp): Make sure the Chrome Audio History pref is synced
+    // to the account-level Audio History setting from footprints.
   } else if (profile->GetPrefs()->GetBoolean(
       prefs::kHotwordAudioHistoryEnabled)) {
     DCHECK(!profile->GetPrefs()->GetBoolean(
         prefs::kHotwordAlwaysOnSearchEnabled));
-
-    // TODO(kcarattini): Make sure the Chrome Audio History pref is synced
-    // to the account-level Audio History setting from footprints.
     launch_mode = HotwordService::HOTWORD_ONLY;
   } else {
     DCHECK(!profile->GetPrefs()->GetBoolean(

@@ -17,7 +17,6 @@
 #include "base/values.h"
 #include "content/browser/devtools/devtools_manager.h"
 #include "content/browser/devtools/devtools_protocol.h"
-#include "content/browser/devtools/devtools_protocol_constants.h"
 #include "content/browser/devtools/protocol/devtools_protocol_handler_impl.h"
 #include "content/browser/devtools/protocol/system_info_handler.h"
 #include "content/browser/devtools/protocol/tethering_handler.h"
@@ -101,8 +100,7 @@ class DevToolsHttpHandlerImpl : public DevToolsHttpHandler {
 
  private:
   // DevToolsHttpHandler implementation.
-  GURL GetFrontendURL() override;
-
+  GURL GetFrontendURL(const std::string& path) override;
 
   static void OnTargetListReceivedWeak(
       base::WeakPtr<DevToolsHttpHandlerImpl> handler,
@@ -525,10 +523,11 @@ DevToolsHttpHandlerImpl::~DevToolsHttpHandlerImpl() {
   STLDeleteValues(&connection_to_client_);
 }
 
-GURL DevToolsHttpHandlerImpl::GetFrontendURL() {
+GURL DevToolsHttpHandlerImpl::GetFrontendURL(const std::string& path) {
   if (!server_ip_address_)
     return GURL();
-  return GURL(std::string("http://") + server_ip_address_->ToString() + frontend_url_);
+  return GURL(std::string("http://") + server_ip_address_->ToString() +
+              (path.empty() ? frontend_url_ : path));
 }
 
 static std::string PathWithoutParams(const std::string& path) {

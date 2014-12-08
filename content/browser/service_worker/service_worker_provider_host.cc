@@ -17,16 +17,41 @@
 #include "content/common/resource_request_body.h"
 #include "content/common/service_worker/service_worker_messages.h"
 #include "content/common/service_worker/service_worker_types.h"
+#include "content/public/browser/render_frame_host.h"
+#include "content/public/browser/web_contents.h"
+#include "content/public/browser/web_contents_delegate.h"
 
 namespace content {
 
 static const int kDocumentMainThreadId = 0;
 
+namespace {
+
+void FocusOnUIThread(int render_process_id,
+                     int render_frame_id,
+                     const ServiceWorkerProviderHost::FocusCallback& callback) {
+  WebContents* web_contents = WebContents::FromRenderFrameHost(
+      RenderFrameHost::FromID(render_process_id, render_frame_id));
+
+  bool result = false;
+
+  if (web_contents && web_contents->GetDelegate()) {
+    result = true;
+    web_contents->GetDelegate()->ActivateContents(web_contents);
+  }
+
+  BrowserThread::PostTask(BrowserThread::IO, FROM_HERE,
+                          base::Bind(callback, result));
+}
+
+}  // anonymous namespace
+
 ServiceWorkerProviderHost::ServiceWorkerProviderHost(
-    int process_id, int provider_id,
+    int render_process_id, int render_frame_id, int provider_id,
     base::WeakPtr<ServiceWorkerContextCore> context,
     ServiceWorkerDispatcherHost* dispatcher_host)
-    : process_id_(process_id),
+    : render_process_id_(render_process_id),
+      render_frame_id_(render_frame_id),
       provider_id_(provider_id),
       context_(context),
       dispatcher_host_(dispatcher_host),
@@ -95,7 +120,7 @@ bool ServiceWorkerProviderHost::SetHostedVersionId(int64 version_id) {
 
   ServiceWorkerVersionInfo info = live_version->GetInfo();
   if (info.running_status != ServiceWorkerVersion::STARTING ||
-      info.process_id != process_id_) {
+      info.process_id != render_process_id_) {
     // If we aren't trying to start this version in our process
     // something is amiss.
     return false;
@@ -208,6 +233,15 @@ void ServiceWorkerProviderHost::PostMessage(
           new_routing_ids));
 }
 
+void ServiceWorkerProviderHost::Focus(const FocusCallback& callback) {
+  BrowserThread::PostTask(
+      BrowserThread::UI, FROM_HERE,
+      base::Bind(&FocusOnUIThread,
+                 render_process_id_,
+                 render_frame_id_,
+                 callback));
+}
+
 void ServiceWorkerProviderHost::AddScopedProcessReferenceToPattern(
     const GURL& pattern) {
   associated_patterns_.push_back(pattern);
@@ -234,7 +268,7 @@ void ServiceWorkerProviderHost::IncreaseProcessReference(
     const GURL& pattern) {
   if (context_ && context_->process_manager()) {
     context_->process_manager()->AddProcessReferenceToPattern(
-        pattern, process_id_);
+        pattern, render_process_id_);
   }
 }
 
@@ -242,7 +276,7 @@ void ServiceWorkerProviderHost::DecreaseProcessReference(
     const GURL& pattern) {
   if (context_ && context_->process_manager()) {
     context_->process_manager()->RemoveProcessReferenceFromPattern(
-        pattern, process_id_);
+        pattern, render_process_id_);
   }
 }
 

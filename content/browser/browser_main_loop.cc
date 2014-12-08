@@ -238,33 +238,47 @@ MSVC_DISABLE_OPTIMIZE()
 MSVC_PUSH_DISABLE_WARNING(4748)
 
 NOINLINE void ResetThread_DB(scoped_ptr<BrowserProcessSubThread> thread) {
+  volatile int inhibit_comdat = __LINE__;
+  ALLOW_UNUSED_LOCAL(inhibit_comdat);
   thread.reset();
 }
 
 NOINLINE void ResetThread_FILE(scoped_ptr<BrowserProcessSubThread> thread) {
+  volatile int inhibit_comdat = __LINE__;
+  ALLOW_UNUSED_LOCAL(inhibit_comdat);
   thread.reset();
 }
 
 NOINLINE void ResetThread_FILE_USER_BLOCKING(
     scoped_ptr<BrowserProcessSubThread> thread) {
+  volatile int inhibit_comdat = __LINE__;
+  ALLOW_UNUSED_LOCAL(inhibit_comdat);
   thread.reset();
 }
 
 NOINLINE void ResetThread_PROCESS_LAUNCHER(
     scoped_ptr<BrowserProcessSubThread> thread) {
+  volatile int inhibit_comdat = __LINE__;
+  ALLOW_UNUSED_LOCAL(inhibit_comdat);
   thread.reset();
 }
 
 NOINLINE void ResetThread_CACHE(scoped_ptr<BrowserProcessSubThread> thread) {
+  volatile int inhibit_comdat = __LINE__;
+  ALLOW_UNUSED_LOCAL(inhibit_comdat);
   thread.reset();
 }
 
 NOINLINE void ResetThread_IO(scoped_ptr<BrowserProcessSubThread> thread) {
+  volatile int inhibit_comdat = __LINE__;
+  ALLOW_UNUSED_LOCAL(inhibit_comdat);
   thread.reset();
 }
 
 #if !defined(OS_IOS)
 NOINLINE void ResetThread_IndexedDb(scoped_ptr<base::Thread> thread) {
+  volatile int inhibit_comdat = __LINE__;
+  ALLOW_UNUSED_LOCAL(inhibit_comdat);
   thread.reset();
 }
 #endif
@@ -1018,7 +1032,8 @@ int BrowserMainLoop::BrowserThreadsStarted() {
   }
 #endif
 #elif defined(OS_ANDROID)
-  established_gpu_channel = true;
+  // TODO(crbug.com/439322): This should be set to |true|.
+  established_gpu_channel = false;
   BrowserGpuChannelHostFactory::Initialize(established_gpu_channel);
 #endif
 

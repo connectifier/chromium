@@ -1196,6 +1196,11 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params) {
 #if defined(OS_ANDROID)
   date_time_chooser_.reset(new DateTimeChooserAndroid());
 #endif
+
+  // BrowserPluginGuest::Init needs to be called after this WebContents has
+  // a RenderWidgetHostViewGuest. That is, |view_->CreateView| above.
+  if (browser_plugin_guest_)
+    browser_plugin_guest_->Init();
 }
 
 void WebContentsImpl::OnWebContentsDestroyed(WebContentsImpl* web_contents) {
@@ -1472,12 +1477,12 @@ void WebContentsImpl::CreateNewWindow(
   // this WebContentsImpl instance. If any other process sends the request,
   // it is invalid and the process must be terminated.
   if (GetRenderProcessHost()->GetID() != render_process_id) {
-    base::ProcessHandle process_handle =
-        RenderProcessHost::FromID(render_process_id)->GetHandle();
+    RenderProcessHost* rph = RenderProcessHost::FromID(render_process_id);
+    base::ProcessHandle process_handle = rph->GetHandle();
     if (process_handle != base::kNullProcessHandle) {
       RecordAction(
           base::UserMetricsAction("Terminate_ProcessMismatch_CreateNewWindow"));
-      base::KillProcess(process_handle, RESULT_CODE_KILLED, false);
+      rph->Shutdown(RESULT_CODE_KILLED, false);
     }
     return;
   }
@@ -1606,12 +1611,12 @@ void WebContentsImpl::CreateNewWidget(int render_process_id,
   // this WebContentsImpl instance. If any other process sends the request,
   // it is invalid and the process must be terminated.
   if (process->GetID() != render_process_id) {
-    base::ProcessHandle process_handle =
-        RenderProcessHost::FromID(render_process_id)->GetHandle();
+    RenderProcessHost* rph = RenderProcessHost::FromID(render_process_id);
+    base::ProcessHandle process_handle = rph->GetHandle();
     if (process_handle != base::kNullProcessHandle) {
       RecordAction(
           base::UserMetricsAction("Terminate_ProcessMismatch_CreateNewWidget"));
-      base::KillProcess(process_handle, RESULT_CODE_KILLED, false);
+      rph->Shutdown(RESULT_CODE_KILLED, false);
     }
     return;
   }
@@ -3611,14 +3616,12 @@ void WebContentsImpl::RenderViewDeleted(RenderViewHost* rvh) {
 void WebContentsImpl::UpdateState(RenderViewHost* rvh,
                                   int32 page_id,
                                   const PageState& page_state) {
-  // Ensure that this state update comes from either the active RVH or one of
-  // the swapped out RVHs.  We don't expect to hear from any other RVHs.
+  // Ensure that this state update comes from a RenderViewHost that belongs to
+  // this WebContents.
   // TODO(nasko): This should go through RenderFrameHost.
   // TODO(creis): We can't update state for cross-process subframes until we
   // have FrameNavigationEntries.  Once we do, this should be a DCHECK.
-  if (rvh != GetRenderViewHost() &&
-      !GetRenderManager()->IsRVHOnSwappedOutList(
-          static_cast<RenderViewHostImpl*>(rvh)))
+  if (rvh->GetDelegate()->GetAsWebContents() != this)
     return;
 
   // We must be prepared to handle state updates for any page, these occur

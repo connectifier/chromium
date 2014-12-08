@@ -25,6 +25,7 @@
 //<include src="metrics_base.js">
 //<include src="metrics.js">
 //
+//<include src="../../common/js/lru_cache.js">
 //<include src="../../../image_loader/image_loader_client.js">
 //
 //<include src="../../../../webui/resources/js/load_time_data.js">
@@ -106,6 +107,7 @@
 //<include src="search_controller.js">
 //<include src="share_client.js">
 //<include src="spinner_controller.js">
+//<include src="task_controller.js">
 //<include src="thumbnail_loader.js">
 //<include src="ui/conflict_dialog.js">
 //<include src="ui/default_action_dialog.js">

@@ -138,9 +138,18 @@ cr.define('options', function() {
 
         cr.dispatchSimpleEvent(this, 'edit', true);
 
+        var isMouseClick = this.editClickTarget_;
         var focusElement = this.getEditFocusElement_();
-        if (focusElement)
-          this.focusAndMaybeSelect_(focusElement);
+        if (focusElement) {
+          if (isMouseClick) {
+            // Delay focus to fix http://crbug.com/436789
+            setTimeout(function() {
+              this.focusAndMaybeSelect_(focusElement);
+            }.bind(this), 0);
+          } else {
+            this.focusAndMaybeSelect_(focusElement);
+          }
+        }
       } else {
         if (!this.editCancelled_ && this.hasBeenEdited &&
             this.currentInputIsValid) {
@@ -651,12 +660,12 @@ cr.define('options', function() {
     onSetDataModelComplete: function() {
       DeletableItemList.prototype.onSetDataModelComplete.call(this);
 
-      var firstItem = this.getListItemByIndex(0);
-      if (firstItem) {
-        firstItem.setStaticValuesFocusable(true);
-        firstItem.setCloseButtonFocusable(true);
-        if (firstItem.isPlaceholder)
-          firstItem.setEditableValuesFocusable(true);
+      var item = this.getInitialFocusableItem();
+      if (item) {
+        item.setStaticValuesFocusable(true);
+        item.setCloseButtonFocusable(true);
+        if (item.isPlaceholder)
+          item.setEditableValuesFocusable(true);
       }
     },
 
@@ -667,6 +676,16 @@ cr.define('options', function() {
      */
     shouldFocusPlaceholder: function() {
       return true;
+    },
+
+    /**
+    * Override to change which item is initially focusable.
+    * @return {options.InlineEditableItem} Initially focusable item or null.
+    * @protected
+    */
+    getInitialFocusableItem: function() {
+      return /** @type {options.InlineEditableItem} */(
+          this.getListItemByIndex(0));
     },
   };
 

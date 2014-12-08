@@ -597,6 +597,9 @@ void HWNDMessageHandler::ShowWindowWithState(ui::WindowShowState show_state) {
     case ui::SHOW_STATE_MINIMIZED:
       native_show_state = SW_SHOWMINIMIZED;
       break;
+    case ui::SHOW_STATE_NORMAL:
+      native_show_state = SW_SHOWNORMAL;
+      break;
     default:
       native_show_state = delegate_->GetInitialShowState();
       break;
@@ -632,6 +635,11 @@ void HWNDMessageHandler::ShowMaximizedWithBounds(const gfx::Rect& bounds) {
   placement.showCmd = SW_SHOWMAXIMIZED;
   placement.rcNormalPosition = bounds.ToRECT();
   SetWindowPlacement(hwnd(), &placement);
+
+  // We need to explicitly activate the window, because if we're opened from a
+  // desktop shortcut while an existing window is already running it doesn't
+  // seem to be enough to use SW_SHOWMAXIMIZED to activate the window.
+  Activate();
 }
 
 void HWNDMessageHandler::Hide() {
@@ -2286,8 +2294,15 @@ void HWNDMessageHandler::OnWindowPosChanging(WINDOWPOS* window_pos) {
     }
   }
 
-  if (DidClientAreaSizeChange(window_pos))
+  RECT window_rect;
+  gfx::Size old_size;
+  if (GetWindowRect(hwnd(), &window_rect))
+    old_size = gfx::Rect(window_rect).size();
+  gfx::Size new_size = gfx::Size(window_pos->cx, window_pos->cy);
+  if ((old_size != new_size && !(window_pos->flags & SWP_NOSIZE)) ||
+      window_pos->flags & SWP_FRAMECHANGED) {
     delegate_->HandleWindowSizeChanging();
+  }
 
   if (ScopedFullscreenVisibility::IsHiddenForFullscreen(hwnd())) {
     // Prevent the window from being made visible if we've been asked to do so.

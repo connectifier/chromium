@@ -125,7 +125,7 @@
 #include "extensions/browser/extension_prefs.h"
 #endif
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
 #include "chrome/browser/supervised_user/supervised_user_service.h"
 #include "chrome/browser/supervised_user/supervised_user_shared_settings_service.h"
 #include "chrome/browser/supervised_user/supervised_user_sync_service.h"
@@ -156,7 +156,7 @@
 #include "chrome/browser/chromeos/app_mode/kiosk_app_manager.h"
 #include "chrome/browser/chromeos/attestation/platform_verification_flow.h"
 #include "chrome/browser/chromeos/audio/audio_devices_pref_handler_impl.h"
-#include "chrome/browser/chromeos/customization_document.h"
+#include "chrome/browser/chromeos/customization/customization_document.h"
 #include "chrome/browser/chromeos/display/display_preferences.h"
 #include "chrome/browser/chromeos/extensions/echo_private_api.h"
 #include "chrome/browser/chromeos/file_system_provider/registry.h"
@@ -446,7 +446,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   printing::StickySettings::RegisterProfilePrefs(registry);
 #endif
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
   SupervisedUserService::RegisterProfilePrefs(registry);
   SupervisedUserSharedSettingsService::RegisterProfilePrefs(registry);
   SupervisedUserSyncService::RegisterProfilePrefs(registry);

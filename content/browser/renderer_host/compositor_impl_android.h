@@ -18,6 +18,7 @@
 #include "content/public/browser/android/compositor.h"
 #include "gpu/command_buffer/common/capabilities.h"
 #include "third_party/khronos/GLES2/gl2.h"
+#include "ui/android/resources/resource_manager.h"
 #include "ui/base/android/system_ui_resource_manager.h"
 #include "ui/base/android/window_android_compositor.h"
 
@@ -61,6 +62,7 @@ class CONTENT_EXPORT CompositorImpl
   virtual void SetHasTransparentBackground(bool flag) override;
   virtual void SetNeedsComposite() override;
   virtual UIResourceProvider& GetUIResourceProvider() override;
+  virtual ui::ResourceManager& GetResourceManager() override;
 
   // LayerTreeHostClient implementation.
   virtual void WillBeginMainFrame(int frame_id) override {}
@@ -130,6 +132,7 @@ class CONTENT_EXPORT CompositorImpl
     composite_on_vsync_trigger_ = DO_NOT_COMPOSITE;
     will_composite_immediately_ = false;
   }
+  void CreateLayerTreeHost();
   void OnGpuChannelEstablished();
 
   // root_layer_ is the persistent internal root layer, while subroot_layer_
@@ -139,6 +142,7 @@ class CONTENT_EXPORT CompositorImpl
 
   scoped_ptr<cc::LayerTreeHost> host_;
   content::UIResourceProviderImpl ui_resource_provider_;
+  ui::ResourceManager resource_manager_;
 
   scoped_ptr<OnscreenDisplayClient> display_client_;
   scoped_ptr<cc::SurfaceIdAllocator> surface_id_allocator_;

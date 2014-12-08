@@ -437,6 +437,7 @@
           'dependencies': [
             '../base/base.gyp:base',
             '../device/battery/battery.gyp:device_battery_java',
+            '../device/vibration/vibration.gyp:device_vibration_java',
             '../media/media.gyp:media_java',
             '../mojo/mojo_base.gyp:mojo_system_java',
             '../mojo/public/mojo_public.gyp:mojo_application_bindings',
@@ -461,13 +462,6 @@
             'R_package': 'org.chromium.content',
             'R_package_relpath': 'org/chromium/content',
           },
-          'conditions': [
-            ['android_webview_build == 0', {
-              'dependencies': [
-                '../third_party/eyesfree/eyesfree.gyp:eyesfree_java',
-              ],
-            }],
-          ],
           'includes': [ '../build/java.gypi' ],
         },
         {

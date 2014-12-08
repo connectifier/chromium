@@ -213,8 +213,8 @@
             'enable_hidpi%': 1,
           }],
 
-          # Enable the OpenSSL backend on Mac OS.
-          ['OS=="mac"', {
+          # Enable the OpenSSL backend on Mac OS and Windows.
+          ['OS=="mac" or OS=="win"', {
             'use_openssl%': 1,
           }],
 
@@ -592,8 +592,8 @@
 
       'wix_path%': '<(DEPTH)/third_party/wix',
 
-      # Managed users are enabled by default.
-      'enable_managed_users%': 1,
+      # Supervised users are enabled by default.
+      'enable_supervised_users%': 1,
 
       # Platform natively supports discardable memory.
       'native_discardable_memory%': 0,
@@ -801,7 +801,7 @@
           'notifications%': 0,
           'remoting%': 0,
           'safe_browsing%': 0,
-          'enable_managed_users%': 0,
+          'enable_supervised_users%': 0,
           'enable_task_manager%': 0,
           'use_system_libcxx%': 1,
           'support_pre_M6_history_database%': 0,
@@ -1189,7 +1189,7 @@
     'google_api_key%': '<(google_api_key)',
     'google_default_client_id%': '<(google_default_client_id)',
     'google_default_client_secret%': '<(google_default_client_secret)',
-    'enable_managed_users%': '<(enable_managed_users)',
+    'enable_supervised_users%': '<(enable_supervised_users)',
     'native_discardable_memory%': '<(native_discardable_memory)',
     'native_memory_pressure_signals%': '<(native_memory_pressure_signals)',
     'spdy_proxy_auth_property%': '<(spdy_proxy_auth_property)',
@@ -1777,7 +1777,7 @@
         'use_openssl_certs%': 1,
 
         'proprietary_codecs%': '<(proprietary_codecs)',
-        'safe_browsing%': 1,
+        'safe_browsing%': 2,
         'enable_web_speech%': 0,
         'java_bridge%': 1,
         'build_ffmpegsumo%': 0,
@@ -2239,7 +2239,7 @@
         # Iterator debugging is slow.
         'win_debug_disable_iterator_debugging': '1',
         # Try to disable optimizations that mess up stacks in a release build.
-        # DrM-i#1054 (http://code.google.com/p/drmemory/issues/detail?id=1054)
+        # DrM-i#1054 (https://github.com/DynamoRIO/drmemory/issues/1054)
         # /O2 and /Ob0 (disable inline) cannot be used together because of a
         # compiler bug, so we use /Ob1 instead.
         'win_release_InlineFunctionExpansion': '1',
@@ -2349,7 +2349,6 @@
       }, {
          'use_seccomp_bpf%': 0,
       }],
-
       # Set component build with LTO until all tests pass.
       # This also reduces link time.
       ['use_lto==1', {
@@ -2388,7 +2387,7 @@
     # Whether to allow building of the GPU-related isolates.
     'archive_gpu_tests%': 0,
 
-    # Whether to allow building of chromoting related isolates.
+     # Whether to allow building of chromoting related isolates.
     'archive_chromoting_tests%': 0,
   },
   'target_defaults': {
@@ -2948,8 +2947,8 @@
       ['use_icu_alternatives_on_android==1', {
         'defines': ['USE_ICU_ALTERNATIVES_ON_ANDROID=1'],
       }],
-      ['enable_managed_users==1', {
-        'defines': ['ENABLE_MANAGED_USERS=1'],
+      ['enable_supervised_users==1', {
+        'defines': ['ENABLE_SUPERVISED_USERS=1'],
       }],
       ['spdy_proxy_auth_property != ""', {
         'defines': ['SPDY_PROXY_AUTH_PROPERTY="<(spdy_proxy_auth_property)"'],
@@ -4186,13 +4185,6 @@
                 ],
               }],
             ],
-            'conditions': [
-              ['OS=="mac"', {
-                'cflags': [
-                  '-mllvm -asan-globals=0',  # http://crbug.com/352073
-                ],
-              }],
-            ],
           }],
           ['ubsan==1', {
             'target_conditions': [
@@ -4638,19 +4630,10 @@
                   '--sysroot=<(android_ndk_sysroot)',
                   '-nostdlib',
                 ],
-                'variables': {
-                  'conditions': [
-                    ['target_arch=="arm" and arm_thumb==1', {
-                      'thumb_option%': '-mthumb',
-                    }, {
-                      'thumb_option%': '',
-                    }],
-                  ],
-                },
                 'libraries': [
                   '-l<(android_stlport_library)',
                   # Manually link the libgcc.a that the cross compiler uses.
-                  '<!(<(android_toolchain)/*-gcc <(thumb_option) -print-libgcc-file-name)',
+                  '<!(<(android_toolchain)/*-gcc -print-libgcc-file-name)',
                   '-lc',
                   '-ldl',
                   '-lm',
@@ -4715,12 +4698,8 @@
                 'cflags': [
                   '-isystem<(android_stlport_include)',
                 ],
-                'conditions': [
-                  ['target_arch=="arm" and arm_thumb==1', {
-                    'ldflags': [ '-L<(android_stlport_libs_dir)/thumb' ]
-                  }, {
-                    'ldflags': [ '-L<(android_stlport_libs_dir)' ]
-                  }],
+                'ldflags': [
+                  '-L<(android_stlport_libs_dir)',
                 ],
               }, { # else: android_webview_build!=0
                 'aosp_build_settings': {
@@ -4921,7 +4900,6 @@
             'xcode_settings': {
               'OTHER_CFLAGS': [
                 '-fsanitize=address',
-                '-mllvm -asan-globals=0',  # http://crbug.com/352073
                 '-gline-tables-only',
               ],
             },

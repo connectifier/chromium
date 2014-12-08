@@ -250,7 +250,7 @@ class FileTokenMessageFilter : public IPC::MessageFilter {
 
 void NaClListener::Listen() {
   std::string channel_name =
-      CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
           switches::kProcessChannelID);
   channel_ = IPC::SyncChannel::Create(
       this, io_thread_.message_loop_proxy().get(), &shutdown_event_);
@@ -401,6 +401,7 @@ void NaClListener::OnStart(const nacl::NaClStartParams& params) {
     // https://code.google.com/p/nativeclient/issues/detail?id=3914.
     // Once done, this can be removed.
     args->irt_load_optional = 1;
+    args->pnacl_mode = 0;
   }
 
 #if defined(OS_LINUX) || defined(OS_MACOSX)

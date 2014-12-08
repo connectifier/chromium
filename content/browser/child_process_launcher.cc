@@ -317,9 +317,7 @@ void ChildProcessLauncher::Context::LaunchInternal(
   if (launch_elevated) {
     base::LaunchOptions options;
     options.start_hidden = true;
-    base::ProcessHandle handle = base::kNullProcessHandle;
-    if (base::LaunchElevatedProcess(*cmd_line, options, &handle))
-      process = base::Process(handle);
+    process = base::LaunchElevatedProcess(*cmd_line, options);
   } else {
     process = StartSandboxedProcess(delegate, cmd_line);
   }
@@ -431,7 +429,7 @@ void ChildProcessLauncher::Context::LaunchInternal(
     }
 
     if (launched)
-      broker->AddPlaceholderForPid(handle);
+      broker->AddPlaceholderForPid(handle, child_process_id);
 
     // After updating the broker, release the lock and let the child's
     // messasge be processed on the broker's thread.
@@ -533,7 +531,7 @@ void ChildProcessLauncher::Context::TerminateInternal(
     ZygoteHostImpl::GetInstance()->EnsureProcessTerminated(process.Handle());
   } else
 #endif  // !OS_MACOSX
-  base::EnsureProcessTerminated(process.Handle());
+  base::EnsureProcessTerminated(process.Pass());
 #endif  // OS_POSIX
 #endif  // defined(OS_ANDROID)
 }

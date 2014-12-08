@@ -9,6 +9,7 @@
 #include "base/memory/scoped_vector.h"
 #include "base/scoped_observer.h"
 #include "chrome/browser/extensions/extension_toolbar_model.h"
+#include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "ui/gfx/animation/tween.h"
 #include "ui/gfx/geometry/size.h"
 
@@ -30,7 +31,8 @@ class ToolbarActionViewController;
 // (fka wrench) menu. The main bar can have only a single row of icons with
 // flexible width, whereas the overflow bar has multiple rows of icons with a
 // fixed width (the width of the menu).
-class ToolbarActionsBar : public extensions::ExtensionToolbarModel::Observer {
+class ToolbarActionsBar : public extensions::ExtensionToolbarModel::Observer,
+                          public TabStripModelObserver {
  public:
   // A struct to contain the platform settings.
   struct PlatformSettings {
@@ -123,6 +125,8 @@ class ToolbarActionsBar : public extensions::ExtensionToolbarModel::Observer {
     return platform_settings_;
   }
 
+  ToolbarActionsBarDelegate* delegate_for_test() { return delegate_; }
+
  private:
   using ToolbarActions = ScopedVector<ToolbarActionViewController>;
 
@@ -138,8 +142,15 @@ class ToolbarActionsBar : public extensions::ExtensionToolbarModel::Observer {
   void ToolbarVisibleCountChanged() override;
   void ToolbarHighlightModeChanged(bool is_highlighting) override;
   void OnToolbarModelInitialized() override;
-  void OnToolbarReorderNecessary(content::WebContents* web_contents) override;
   Browser* GetBrowser() override;
+
+  // TabStripModelObserver:
+  void TabInsertedAt(content::WebContents* web_contents,
+                     int index,
+                     bool foreground) override;
+  void TabDetachedAt(content::WebContents* web_contents,
+                     int index) override;
+  void TabStripModelDeleted() override;
 
   // Resizes the delegate (if necessary) to the preferred size using the given
   // |tween_type| and optionally suppressing the chevron.
@@ -172,8 +183,19 @@ class ToolbarActionsBar : public extensions::ExtensionToolbarModel::Observer {
   // The toolbar actions.
   ToolbarActions toolbar_actions_;
 
+  // The set of tabs for the given action (the key) is currently "popped out".
+  // "Popped out" actions are those that were in the overflow menu normally, but
+  // want to run and are moved to the main bar so the user can see them.
+  std::map<ToolbarActionViewController*, std::set<int>> popped_out_in_tabs_;
+
+  // The set of tab ids that have been checked for whether actions need to be
+  // popped out or not.
+  std::set<int> tabs_checked_for_pop_out_;
+
   ScopedObserver<extensions::ExtensionToolbarModel,
                  extensions::ExtensionToolbarModel::Observer> model_observer_;
+
+  ScopedObserver<TabStripModel, TabStripModelObserver> tab_strip_observer_;
 
   // True if we should suppress layout, such as when we are creating or
   // adjusting a lot of actions at once.

@@ -133,7 +133,7 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "url/gurl.h"
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
 #include "chrome/browser/supervised_user/supervised_user_service.h"
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
 #endif
@@ -3769,6 +3769,15 @@ TEST_F(ExtensionServiceTest, WillNotLoadExtensionsWhenBlocked) {
   ASSERT_TRUE(IsBlocked(good0));
 }
 
+// Tests that IsEnabledExtension won't crash on an uninstalled extension.
+TEST_F(ExtensionServiceTest, IsEnabledExtensionBlockedAndNotInstalled) {
+  InitializeEmptyExtensionService();
+
+  service()->BlockAllExtensions();
+
+  service()->IsExtensionEnabled(theme_crx);
+}
+
 // Will not install extension blacklisted by policy.
 TEST_F(ExtensionServiceTest, BlacklistedByPolicyWillNotInstall) {
   InitializeEmptyExtensionServiceWithTestingPrefs();
@@ -6531,7 +6540,7 @@ TEST_F(ExtensionServiceTest, ProcessSyncDataNotInstalled) {
   // TODO(akalin): Figure out a way to test |info.ShouldAllowInstall()|.
 }
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
 TEST_F(ExtensionServiceTest, SupervisedUser_InstallOnlyAllowedByCustodian) {
   ExtensionServiceInitParams params = CreateDefaultInitParams();
   params.profile_is_supervised = true;
@@ -6686,7 +6695,7 @@ TEST_F(ExtensionServiceTest,
   EXPECT_FALSE(
       registry()->GenerateInstalledExtensionsSet()->Contains(extension_ids[1]));
 }
-#endif  // defined(ENABLE_MANAGED_USERS)
+#endif  // defined(ENABLE_SUPERVISED_USERS)
 
 TEST_F(ExtensionServiceTest, InstallPriorityExternalUpdateUrl) {
   InitializeEmptyExtensionService();

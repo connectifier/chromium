@@ -441,8 +441,12 @@ int HttpCache::Transaction::Start(const HttpRequestInfo* request,
 
   // Setting this here allows us to check for the existence of a callback_ to
   // determine if we are still inside Start.
-  if (rv == ERR_IO_PENDING)
-    callback_ = callback;
+  if (rv == ERR_IO_PENDING) {
+    callback_ = tracked_objects::ScopedTracker::TrackCallback(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "422516 HttpCache::Transaction::Start"),
+        callback);
+  }
 
   return rv;
 }
@@ -459,8 +463,12 @@ int HttpCache::Transaction::RestartIgnoringLastError(
 
   int rv = RestartNetworkRequest();
 
-  if (rv == ERR_IO_PENDING)
-    callback_ = callback;
+  if (rv == ERR_IO_PENDING) {
+    callback_ = tracked_objects::ScopedTracker::TrackCallback(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "422516 HttpCache::Transaction::RestartIgnoringLastError"),
+        callback);
+  }
 
   return rv;
 }
@@ -478,8 +486,12 @@ int HttpCache::Transaction::RestartWithCertificate(
 
   int rv = RestartNetworkRequestWithCertificate(client_cert);
 
-  if (rv == ERR_IO_PENDING)
-    callback_ = callback;
+  if (rv == ERR_IO_PENDING) {
+    callback_ = tracked_objects::ScopedTracker::TrackCallback(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "422516 HttpCache::Transaction::RestartWithCertificate"),
+        callback);
+  }
 
   return rv;
 }
@@ -501,8 +513,12 @@ int HttpCache::Transaction::RestartWithAuth(
 
   int rv = RestartNetworkRequestWithAuth(credentials);
 
-  if (rv == ERR_IO_PENDING)
-    callback_ = callback;
+  if (rv == ERR_IO_PENDING) {
+    callback_ = tracked_objects::ScopedTracker::TrackCallback(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "422516 HttpCache::Transaction::RestartWithAuth"),
+        callback);
+  }
 
   return rv;
 }
@@ -560,7 +576,9 @@ int HttpCache::Transaction::Read(IOBuffer* buf, int buf_len,
 
   if (rv == ERR_IO_PENDING) {
     DCHECK(callback_.is_null());
-    callback_ = callback;
+    callback_ = tracked_objects::ScopedTracker::TrackCallback(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION("422516 HttpCache::Transaction::Read"),
+        callback);
   }
   return rv;
 }
@@ -699,6 +717,11 @@ int HttpCache::Transaction::ResumeNetworkStart() {
 //-----------------------------------------------------------------------------
 
 void HttpCache::Transaction::DoCallback(int rv) {
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/422516 is fixed.
+  tracked_objects::ScopedTracker tracking_profile(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "422516 HttpCache::Transaction::DoCallback"));
+
   DCHECK(rv != ERR_IO_PENDING);
   DCHECK(!callback_.is_null());
 
@@ -2883,15 +2906,16 @@ void HttpCache::Transaction::RecordHistograms() {
   }
 
   TimeDelta before_send_time = send_request_since_ - first_cache_access_since_;
-  int before_send_percent =
-      total_time.ToInternalValue() == 0 ? 0
-                                        : before_send_time * 100 / total_time;
-  DCHECK_LE(0, before_send_percent);
-  DCHECK_GE(100, before_send_percent);
+  int64 before_send_percent = (total_time.ToInternalValue() == 0) ?
+      0 : before_send_time * 100 / total_time;
+  DCHECK_GE(before_send_percent, 0);
+  DCHECK_LE(before_send_percent, 100);
+  base::HistogramBase::Sample before_send_sample =
+      static_cast<base::HistogramBase::Sample>(before_send_percent);
 
   UMA_HISTOGRAM_TIMES("HttpCache.AccessToDone.SentRequest", total_time);
   UMA_HISTOGRAM_TIMES("HttpCache.BeforeSend", before_send_time);
-  UMA_HISTOGRAM_PERCENTAGE("HttpCache.PercentBeforeSend", before_send_percent);
+  UMA_HISTOGRAM_PERCENTAGE("HttpCache.PercentBeforeSend", before_send_sample);
 
   // TODO(gavinp): Remove or minimize these histograms, particularly the ones
   // below this comment after we have received initial data.
@@ -2900,25 +2924,25 @@ void HttpCache::Transaction::RecordHistograms() {
       UMA_HISTOGRAM_TIMES("HttpCache.BeforeSend.CantConditionalize",
                           before_send_time);
       UMA_HISTOGRAM_PERCENTAGE("HttpCache.PercentBeforeSend.CantConditionalize",
-                               before_send_percent);
+                               before_send_sample);
       break;
     }
     case PATTERN_ENTRY_NOT_CACHED: {
       UMA_HISTOGRAM_TIMES("HttpCache.BeforeSend.NotCached", before_send_time);
       UMA_HISTOGRAM_PERCENTAGE("HttpCache.PercentBeforeSend.NotCached",
-                               before_send_percent);
+                               before_send_sample);
       break;
     }
     case PATTERN_ENTRY_VALIDATED: {
       UMA_HISTOGRAM_TIMES("HttpCache.BeforeSend.Validated", before_send_time);
       UMA_HISTOGRAM_PERCENTAGE("HttpCache.PercentBeforeSend.Validated",
-                               before_send_percent);
+                               before_send_sample);
       break;
     }
     case PATTERN_ENTRY_UPDATED: {
       UMA_HISTOGRAM_TIMES("HttpCache.BeforeSend.Updated", before_send_time);
       UMA_HISTOGRAM_PERCENTAGE("HttpCache.PercentBeforeSend.Updated",
-                               before_send_percent);
+                               before_send_sample);
       break;
     }
     default:

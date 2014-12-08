@@ -6,12 +6,13 @@
 #include "content/common/frame_messages.h"
 #include "content/common/view_message_enums.h"
 #include "content/public/test/render_view_test.h"
-#include "content/renderer/pepper/plugin_power_saver_helper.h"
+#include "content/renderer/pepper/plugin_power_saver_helper_impl.h"
 #include "content/renderer/render_frame_impl.h"
 #include "content/renderer/render_view_impl.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
+#include "third_party/WebKit/public/web/WebPluginParams.h"
 #include "url/gurl.h"
 
 namespace content {
@@ -24,8 +25,8 @@ class PluginPowerSaverHelperTest : public RenderViewTest {
     return static_cast<RenderFrameImpl*>(view_->GetMainRenderFrame());
   }
 
-  PluginPowerSaverHelper* power_saver_helper() {
-    return frame()->plugin_power_saver_helper();
+  PluginPowerSaverHelperImpl* power_saver_helper() {
+    return frame()->GetPluginPowerSaverHelper();
   }
 
   void SetUp() override {
@@ -39,41 +40,92 @@ class PluginPowerSaverHelperTest : public RenderViewTest {
   DISALLOW_COPY_AND_ASSIGN(PluginPowerSaverHelperTest);
 };
 
-TEST_F(PluginPowerSaverHelperTest, AllowSameOrigin) {
-  bool cross_origin = false;
-  EXPECT_FALSE(power_saver_helper()->ShouldThrottleContent(
-      GURL(), 100, 100, &cross_origin));
-  EXPECT_FALSE(cross_origin);
+TEST_F(PluginPowerSaverHelperTest, PosterImage) {
+  size_t size = 3;
+  blink::WebVector<blink::WebString> names(size);
+  blink::WebVector<blink::WebString> values(size);
 
-  EXPECT_FALSE(power_saver_helper()->ShouldThrottleContent(
-      GURL(), 1000, 1000, &cross_origin));
-  EXPECT_FALSE(cross_origin);
+  blink::WebPluginParams params;
+  params.url = GURL("http://b.com/foo.swf");
+
+  params.attributeNames.swap(names);
+  params.attributeValues.swap(values);
+
+  params.attributeNames[0] = "poster";
+  params.attributeNames[1] = "height";
+  params.attributeNames[2] = "width";
+  params.attributeValues[0] = "poster.jpg";
+  params.attributeValues[1] = "100";
+  params.attributeValues[2] = "100";
+
+  EXPECT_EQ(GURL("http://a.com/poster.jpg"),
+            power_saver_helper()->GetPluginInstancePosterImage(
+                params, GURL("http://a.com/page.html")));
+
+  // Ignore empty poster paramaters.
+  params.attributeValues[0] = "";
+  EXPECT_EQ(GURL(), power_saver_helper()->GetPluginInstancePosterImage(
+                        params, GURL("http://a.com/page.html")));
+
+  // Ignore poster parameter when plugin is big (shouldn't be throttled).
+  params.attributeValues[0] = "poster.jpg";
+  params.attributeValues[1] = "500";
+  params.attributeValues[2] = "500";
+  EXPECT_EQ(GURL(), power_saver_helper()->GetPluginInstancePosterImage(
+                        params, GURL("http://a.com/page.html")));
+}
+
+TEST_F(PluginPowerSaverHelperTest, AllowSameOrigin) {
+  EXPECT_FALSE(
+      power_saver_helper()->ShouldThrottleContent(GURL(), 100, 100, nullptr));
+
+  EXPECT_FALSE(
+      power_saver_helper()->ShouldThrottleContent(GURL(), 1000, 1000, nullptr));
 }
 
 TEST_F(PluginPowerSaverHelperTest, DisallowCrossOriginUnlessLarge) {
-  bool cross_origin = false;
+  bool is_main_attraction = false;
   EXPECT_TRUE(power_saver_helper()->ShouldThrottleContent(
-      GURL("http://other.com"), 100, 100, &cross_origin));
-  EXPECT_TRUE(cross_origin);
+      GURL("http://other.com"), 100, 100, &is_main_attraction));
+  EXPECT_FALSE(is_main_attraction);
 
   EXPECT_FALSE(power_saver_helper()->ShouldThrottleContent(
-      GURL("http://other.com"), 1000, 1000, &cross_origin));
-  EXPECT_TRUE(cross_origin);
+      GURL("http://other.com"), 1000, 1000, &is_main_attraction));
+  EXPECT_TRUE(is_main_attraction);
+}
+
+TEST_F(PluginPowerSaverHelperTest, AlwaysAllowTinyContent) {
+  bool is_main_attraction = false;
+  EXPECT_FALSE(power_saver_helper()->ShouldThrottleContent(
+      GURL(), 1, 1, &is_main_attraction));
+  EXPECT_FALSE(is_main_attraction);
+
+  EXPECT_FALSE(power_saver_helper()->ShouldThrottleContent(
+      GURL("http://other.com"), 1, 1, &is_main_attraction));
+  EXPECT_FALSE(is_main_attraction);
+
+  EXPECT_FALSE(power_saver_helper()->ShouldThrottleContent(
+      GURL("http://other.com"), 5, 5, &is_main_attraction));
+  EXPECT_FALSE(is_main_attraction);
+
+  EXPECT_TRUE(power_saver_helper()->ShouldThrottleContent(
+      GURL("http://other.com"), 10, 10, &is_main_attraction));
+  EXPECT_FALSE(is_main_attraction);
 }
 
 TEST_F(PluginPowerSaverHelperTest, TemporaryOriginWhitelist) {
-  bool cross_origin = false;
+  bool is_main_attraction = false;
   EXPECT_TRUE(power_saver_helper()->ShouldThrottleContent(
-      GURL("http://other.com"), 100, 100, &cross_origin));
-  EXPECT_TRUE(cross_origin);
+      GURL("http://other.com"), 100, 100, &is_main_attraction));
+  EXPECT_FALSE(is_main_attraction);
 
   // Clear out other messages so we find just the plugin power saver IPCs.
   sink_->ClearMessages();
 
   power_saver_helper()->WhitelistContentOrigin(GURL("http://other.com"));
   EXPECT_FALSE(power_saver_helper()->ShouldThrottleContent(
-      GURL("http://other.com"), 100, 100, &cross_origin));
-  EXPECT_TRUE(cross_origin);
+      GURL("http://other.com"), 100, 100, &is_main_attraction));
+  EXPECT_FALSE(is_main_attraction);
 
   // Test that we've sent an IPC to the browser.
   ASSERT_EQ(1u, sink_->message_count());
@@ -101,16 +153,13 @@ TEST_F(PluginPowerSaverHelperTest, UnthrottleOnExPostFactoWhitelist) {
 TEST_F(PluginPowerSaverHelperTest, ClearWhitelistOnNavigate) {
   power_saver_helper()->WhitelistContentOrigin(GURL("http://other.com"));
 
-  bool cross_origin = false;
   EXPECT_FALSE(power_saver_helper()->ShouldThrottleContent(
-      GURL("http://other.com"), 100, 100, &cross_origin));
-  EXPECT_TRUE(cross_origin);
+      GURL("http://other.com"), 100, 100, nullptr));
 
   LoadHTML("<html></html>");
 
   EXPECT_TRUE(power_saver_helper()->ShouldThrottleContent(
-      GURL("http://other.com"), 100, 100, &cross_origin));
-  EXPECT_TRUE(cross_origin);
+      GURL("http://other.com"), 100, 100, nullptr));
 }
 
 }  // namespace content

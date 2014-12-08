@@ -118,8 +118,10 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
        IDS_EXTENSION_PROMPT_WARNING_COPRESENCE,
        PermissionMessage::kCopresence},
       {APIPermission::kCopresencePrivate, "copresencePrivate"},
-      {APIPermission::kDocumentScan, "documentScan",
-       APIPermissionInfo::kFlagNone, IDS_EXTENSION_PROMPT_WARNING_DOCUMENT_SCAN,
+      {APIPermission::kDocumentScan,
+       "documentScan",
+       APIPermissionInfo::kFlagNone,
+       IDS_EXTENSION_PROMPT_WARNING_DOCUMENT_SCAN,
        PermissionMessage::kDocumentScan},
       {APIPermission::kEnterprisePlatformKeys, "enterprise.platformKeys"},
       {APIPermission::kFileBrowserHandler,
@@ -339,6 +341,7 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
       {APIPermission::kFirstRunPrivate,
        "firstRunPrivate",
        APIPermissionInfo::kFlagCannotBeOptional},
+      {APIPermission::kInlineInstallPrivate, "inlineInstallPrivate"},
 
       // Full url access permissions.
       {APIPermission::kDebugger,
@@ -414,6 +417,11 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
       {APIPermission::kAudio, "audio"},
       {APIPermission::kCastStreaming, "cast.streaming"},
       {APIPermission::kBrowser, "browser"},
+      {APIPermission::kInterceptAllKeys,
+       "app.window.interceptAllKeys",
+       APIPermissionInfo::kFlagNone,
+       IDS_EXTENSION_PROMPT_WARNING_INTERCEPT_ALL_KEYS,
+       PermissionMessage::kInterceptAllKeys},
 
       // Settings override permissions.
       {APIPermission::kHomepage,

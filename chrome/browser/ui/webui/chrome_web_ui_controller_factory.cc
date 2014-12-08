@@ -99,6 +99,7 @@
 #if defined(OS_ANDROID) || defined(OS_IOS)
 #include "chrome/browser/ui/webui/net_export_ui.h"
 #else
+#include "chrome/browser/devtools/device/webrtc/webrtc_device_provider.h"
 #include "chrome/browser/ui/webui/devtools_ui.h"
 #include "chrome/browser/ui/webui/inspect_ui.h"
 #endif
@@ -156,7 +157,6 @@
 
 #if defined(ENABLE_EXTENSIONS)
 #include "chrome/browser/extensions/extension_web_ui.h"
-#include "chrome/browser/ui/webui/extensions/extension_info_ui.h"
 #include "chrome/browser/ui/webui/extensions/extensions_ui.h"
 #include "chrome/browser/ui/webui/voicesearch_ui.h"
 #include "chrome/common/extensions/extension_constants.h"
@@ -452,6 +452,9 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
     return &NewWebUI<InlineLoginUI>;
   if (url.SchemeIs(content::kChromeDevToolsScheme))
     return &NewWebUI<DevToolsUI>;
+  if (url.host() == chrome::kChromeUIWebRTCDeviceProviderHost)
+    return &NewWebUI<WebRTCDeviceProvider::WebUI>;
+
   // chrome://inspect isn't supported on Android nor iOS. Page debugging is
   // handled by a remote devtools on the host machine, and other elements, i.e.
   // extensions aren't supported.

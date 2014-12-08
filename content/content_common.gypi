@@ -239,6 +239,8 @@
       'common/frame_param.cc',
       'common/frame_param.h',
       'common/frame_param_macros.h',
+      'common/frame_replication_state.cc',
+      'common/frame_replication_state.h',
       'common/gamepad_hardware_buffer.h',
       'common/gamepad_messages.h',
       'common/gamepad_param_traits.cc',
@@ -324,8 +326,6 @@
       'common/gpu/null_transport_surface.h',
       'common/gpu/stream_texture_android.cc',
       'common/gpu/stream_texture_android.h',
-      'common/gpu/surface_handle_types_mac.cc',
-      'common/gpu/surface_handle_types_mac.h',
       'common/handle_enumerator_win.cc',
       'common/handle_enumerator_win.h',
       'common/host_discardable_shared_memory_manager.cc',
@@ -567,6 +567,7 @@
         '../media/media.gyp:shared_memory_support',
         '../mojo/edk/mojo_edk.gyp:mojo_system_impl',
         '../mojo/mojo_base.gyp:mojo_environment_chromium',
+        '../mojo/public/mojo_public.gyp:mojo_application_bindings',
         '../mojo/public/mojo_public.gyp:mojo_cpp_bindings',
         '../storage/storage_browser.gyp:storage',
         '../storage/storage_common.gyp:storage_common',
@@ -575,6 +576,7 @@
         '../webkit/common/gpu/webkit_gpu.gyp:webkit_gpu',
       ],
       'export_dependent_settings' : [
+        '../mojo/public/mojo_public.gyp:mojo_application_bindings',
         '../mojo/public/mojo_public.gyp:mojo_cpp_bindings',
       ],
       'actions': [
@@ -606,6 +608,7 @@
       'dependencies': [
         '../media/media.gyp:media',
         'app/resources/content_resources.gyp:content_resources',
+        '../ui/accelerated_widget_mac/accelerated_widget_mac.gyp:accelerated_widget_mac'
       ],
       'sources': [
         'common/gpu/client/gpu_memory_buffer_impl_io_surface.cc',
@@ -753,8 +756,8 @@
         '../media/media.gyp:media',
       ],
       'sources': [
-        'common/gpu/media/generic_v4l2_video_device.cc',
-        'common/gpu/media/generic_v4l2_video_device.h',
+        'common/gpu/media/exynos_v4l2_video_device.cc',
+        'common/gpu/media/exynos_v4l2_video_device.h',
         'common/gpu/media/tegra_v4l2_video_device.cc',
         'common/gpu/media/tegra_v4l2_video_device.h',
         'common/gpu/media/v4l2_image_processor.cc',

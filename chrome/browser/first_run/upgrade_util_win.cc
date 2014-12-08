@@ -247,8 +247,7 @@ bool SwapNewChromeExeIfPresent() {
     return false;
 
   // Open up the registry key containing current version and rename information.
-  bool user_install =
-      InstallUtil::IsPerUserInstall(cur_chrome_exe.value().c_str());
+  bool user_install = InstallUtil::IsPerUserInstall(cur_chrome_exe);
   HKEY reg_root = user_install ? HKEY_CURRENT_USER : HKEY_LOCAL_MACHINE;
   BrowserDistribution *dist = BrowserDistribution::GetDistribution();
   base::win::RegKey key;
@@ -258,13 +257,13 @@ bool SwapNewChromeExeIfPresent() {
     std::wstring rename_cmd;
     if (key.ReadValue(google_update::kRegRenameCmdField,
                       &rename_cmd) == ERROR_SUCCESS) {
-      base::win::ScopedHandle handle;
       base::LaunchOptions options;
       options.wait = true;
       options.start_hidden = true;
-      if (base::LaunchProcess(rename_cmd, options, &handle)) {
+      base::Process process = base::LaunchProcess(rename_cmd, options);
+      if (process.IsValid()) {
         DWORD exit_code;
-        ::GetExitCodeProcess(handle.Get(), &exit_code);
+        ::GetExitCodeProcess(process.Handle(), &exit_code);
         if (exit_code == installer::RENAME_SUCCESSFUL)
           return true;
       }

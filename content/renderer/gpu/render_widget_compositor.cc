@@ -184,6 +184,7 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
   settings.report_overscroll_only_for_scrollable_axes = true;
   settings.accelerated_animation_enabled =
       !cmd->HasSwitch(cc::switches::kDisableThreadedAnimation);
+  settings.use_display_lists = cmd->HasSwitch(switches::kEnableSlimmingPaint);
 
   settings.default_tile_size = CalculateDefaultTileSize();
   if (cmd->HasSwitch(switches::kDefaultTileWidth)) {
@@ -235,27 +236,12 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
         render_thread->is_distance_field_text_enabled();
     settings.use_zero_copy = render_thread->is_zero_copy_enabled();
     settings.use_one_copy = render_thread->is_one_copy_enabled();
-    settings.use_image_external = render_thread->use_image_external();
+    settings.use_image_texture_target =
+        render_thread->use_image_texture_target();
   }
 
   settings.calculate_top_controls_position =
       cmd->HasSwitch(cc::switches::kEnableTopControlsPositionCalculation);
-  if (cmd->HasSwitch(cc::switches::kTopControlsHeight)) {
-    std::string controls_height_str =
-        cmd->GetSwitchValueASCII(cc::switches::kTopControlsHeight);
-    double controls_height;
-    if (base::StringToDouble(controls_height_str, &controls_height) &&
-        controls_height > 0)
-      settings.top_controls_height = controls_height;
-  }
-
-  if (settings.calculate_top_controls_position &&
-      settings.top_controls_height <= 0) {
-    DCHECK(false)
-        << "Top controls repositioning enabled without valid height set.";
-    settings.calculate_top_controls_position = false;
-  }
-
   if (cmd->HasSwitch(cc::switches::kTopControlsShowThreshold)) {
       std::string top_threshold_str =
           cmd->GetSwitchValueASCII(cc::switches::kTopControlsShowThreshold);
@@ -345,11 +331,13 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
   SynchronousCompositorFactory* synchronous_compositor_factory =
       SynchronousCompositorFactory::GetInstance();
 
+  // We can't use GPU rasterization on low-end devices, because the Ganesh
+  // cache would consume too much memory.
+  if (base::SysInfo::IsLowEndDevice())
+    settings.gpu_rasterization_enabled = false;
   settings.using_synchronous_renderer_compositor =
       synchronous_compositor_factory;
-  settings.record_full_layer =
-      synchronous_compositor_factory &&
-      synchronous_compositor_factory->RecordFullLayer();
+  settings.record_full_layer = widget->DoesRecordFullLayer();
   settings.report_overscroll_only_for_scrollable_axes =
       !synchronous_compositor_factory;
   settings.max_partial_texture_updates = 0;
@@ -370,12 +358,12 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
       synchronous_compositor_factory;
   // Memory policy on Android WebView does not depend on whether device is
   // low end, so always use default policy.
-  bool is_low_end_device =
+  bool use_low_memory_policy =
       base::SysInfo::IsLowEndDevice() && !synchronous_compositor_factory;
   // RGBA_4444 textures are only enabled for low end devices
   // and are disabled for Android WebView as it doesn't support the format.
-  settings.renderer_settings.use_rgba_4444_textures = is_low_end_device;
-  if (is_low_end_device) {
+  settings.renderer_settings.use_rgba_4444_textures = use_low_memory_policy;
+  if (use_low_memory_policy) {
     // On low-end we want to be very carefull about killing other
     // apps. So initially we use 50% more memory to avoid flickering
     // or raster-on-demand.
@@ -462,8 +450,12 @@ void RenderWidgetCompositor::UpdateTopControlsState(
                                            animate);
 }
 
-void RenderWidgetCompositor::SetTopControlsLayoutHeight(float height) {
-  layer_tree_host_->SetTopControlsLayoutHeight(height);
+void RenderWidgetCompositor::SetTopControlsShrinkBlinkSize(bool shrink) {
+  layer_tree_host_->SetTopControlsShrinkBlinkSize(shrink);
+}
+
+void RenderWidgetCompositor::SetTopControlsHeight(float height) {
+  layer_tree_host_->SetTopControlsHeight(height);
 }
 
 void RenderWidgetCompositor::SetNeedsRedrawRect(gfx::Rect damage_rect) {

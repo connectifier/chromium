@@ -34,6 +34,7 @@
     # Auth (Google account) JavaScript files.
     'remoting_webapp_js_auth_google_files': [
       'webapp/base/js/auth_dialog.js',
+      'webapp/base/js/auth_init.js',
       'webapp/crd/js/identity.js',
       'webapp/crd/js/oauth2.js',
       'webapp/crd/js/oauth2_api.js',
@@ -57,6 +58,7 @@
     ],
     # Remoting core JavaScript files.
     'remoting_webapp_js_core_files': [
+      'webapp/base/js/application.js',
       'webapp/base/js/base.js',
       'webapp/base/js/platform.js',
       'webapp/crd/js/error.js',
@@ -154,9 +156,6 @@
       # background.js is where the onLoad handler is defined, which
       # makes it the entry point of the background page.
       'webapp/crd/js/background.js',
-      # event_handlers.js is where the onLoad handler is defined, which
-      # makes it the entry point of the webapp.
-      'webapp/crd/js/event_handlers.js',
     ],
     # The unit test cases for the webapp
     'remoting_webapp_unittest_js_files': [
@@ -178,8 +177,8 @@
     'remoting_webapp_unittest_template_main':
       'webapp/crd/html/template_unittest.html',
 
-    # The JavaScript files required by main.html.
-    'remoting_webapp_main_html_js_files': [
+    # The shared JavaScript files required by main.html.
+    'remoting_webapp_shared_main_html_js_files': [
       # Include the core files first as it is required by the other files.
       # Otherwise, Jscompile will complain.
       '<@(remoting_webapp_js_core_files)',
@@ -197,6 +196,12 @@
       # Uncomment this line to include browser test files in the web app
       # to expedite debugging or local development.
       # '<@(remoting_webapp_js_browser_test_files)'
+    ],
+
+    # The CRD-specific JavaScript files required by main.html.
+    'remoting_webapp_crd_main_html_js_files': [
+      'webapp/crd/js/crd_main.js',
+      'webapp/crd/js/desktop_remoting.js',
     ],
 
     # The JavaScript files that are used in the background page.
@@ -229,10 +234,10 @@
       'webapp/crd/js/plugin_settings.js',
     ],
 
-    # All the JavaScript files required by the webapp.
-    'remoting_webapp_all_js_files': [
+    # All the JavaScript files that are shared by webapps.
+    'remoting_webapp_shared_js_files': [
       # JS files for main.html.
-      '<@(remoting_webapp_main_html_js_files)',
+      '<@(remoting_webapp_shared_main_html_js_files)',
       '<@(remoting_webapp_background_js_files)',
       # JS files for message_window.html
       'webapp/base/js/message_window.js',
@@ -242,6 +247,12 @@
       '<@(remoting_webapp_js_wcs_sandbox_files)',
       # JS files referenced in mainfest.json.
       '<@(remoting_webapp_js_auth_v1_files)',
+    ],
+
+    # All the JavaScript files required by CRD.
+    'remoting_webapp_crd_js_files': [
+      '<@(remoting_webapp_shared_js_files)',
+      '<@(remoting_webapp_crd_main_html_js_files)',
     ],
 
     'remoting_webapp_resource_files': [
@@ -279,9 +290,9 @@
       'webapp/crd/resources/scale-to-fit.webp',
     ],
 
-    'remoting_webapp_files': [
+    'remoting_webapp_crd_files': [
       '<@(remoting_webapp_info_files)',
-      '<@(remoting_webapp_all_js_files)',
+      '<@(remoting_webapp_crd_js_files)',
       '<@(remoting_webapp_resource_files)',
     ],
 

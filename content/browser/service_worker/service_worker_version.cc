@@ -45,16 +45,15 @@ void RunCallbacks(ServiceWorkerVersion* version,
   CallbackArray callbacks;
   callbacks.swap(*callbacks_ptr);
   scoped_refptr<ServiceWorkerVersion> protect(version);
-  for (typename CallbackArray::const_iterator i = callbacks.begin();
-       i != callbacks.end(); ++i)
-    (*i).Run(arg);
+  for (const auto& callback : callbacks)
+    callback.Run(arg);
 }
 
-template <typename IDMAP, typename Method, typename Params>
-void RunIDMapCallbacks(IDMAP* callbacks, Method method, const Params& params) {
+template <typename IDMAP, typename... Params>
+void RunIDMapCallbacks(IDMAP* callbacks, const Params&... params) {
   typename IDMAP::iterator iter(callbacks);
   while (!iter.IsAtEnd()) {
-    DispatchToMethod(iter.GetCurrentValue(), method, params);
+    iter.GetCurrentValue()->Run(params...);
     iter.Advance();
   }
   callbacks->Clear();
@@ -145,10 +144,8 @@ void ServiceWorkerVersion::SetStatus(Status status) {
 
   std::vector<base::Closure> callbacks;
   callbacks.swap(status_change_callbacks_);
-  for (std::vector<base::Closure>::const_iterator i = callbacks.begin();
-       i != callbacks.end(); ++i) {
-    (*i).Run();
-  }
+  for (const auto& callback : callbacks)
+    callback.Run();
 
   FOR_EACH_OBSERVER(Listener, listeners_, OnVersionStateChanged(this));
 }
@@ -177,13 +174,15 @@ void ServiceWorkerVersion::StartWorker(const StatusCallback& callback) {
 void ServiceWorkerVersion::StartWorker(
     bool pause_after_download,
     const StatusCallback& callback) {
+  if (is_doomed()) {
+    RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_START_WORKER_FAILED));
+    return;
+  }
   switch (running_status()) {
     case RUNNING:
       RunSoon(base::Bind(callback, SERVICE_WORKER_OK));
       return;
     case STOPPING:
-      RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_START_WORKER_FAILED));
-      return;
     case STOPPED:
     case STARTING:
       start_callbacks_.push_back(callback);
@@ -543,40 +542,40 @@ void ServiceWorkerVersion::OnStarted() {
   FOR_EACH_OBSERVER(Listener, listeners_, OnWorkerStarted(this));
 }
 
-void ServiceWorkerVersion::OnStopped() {
+void ServiceWorkerVersion::OnStopped(
+    EmbeddedWorkerInstance::Status old_status) {
   DCHECK_EQ(STOPPED, running_status());
   scoped_refptr<ServiceWorkerVersion> protect(this);
+
+  bool should_restart = !is_doomed() && !start_callbacks_.empty() &&
+                        (old_status != EmbeddedWorkerInstance::STARTING);
 
   // Fire all stop callbacks.
   RunCallbacks(this, &stop_callbacks_, SERVICE_WORKER_OK);
 
-  // Let all start callbacks fail.
-  RunCallbacks(
-      this, &start_callbacks_, SERVICE_WORKER_ERROR_START_WORKER_FAILED);
+  if (!should_restart) {
+    // Let all start callbacks fail.
+    RunCallbacks(this, &start_callbacks_,
+                 SERVICE_WORKER_ERROR_START_WORKER_FAILED);
+  }
 
   // Let all message callbacks fail (this will also fire and clear all
   // callbacks for events).
   // TODO(kinuko): Consider if we want to add queue+resend mechanism here.
   RunIDMapCallbacks(&activate_callbacks_,
-                    &StatusCallback::Run,
-                    MakeTuple(SERVICE_WORKER_ERROR_ACTIVATE_WORKER_FAILED));
+                    SERVICE_WORKER_ERROR_ACTIVATE_WORKER_FAILED);
   RunIDMapCallbacks(&install_callbacks_,
-                    &StatusCallback::Run,
-                    MakeTuple(SERVICE_WORKER_ERROR_INSTALL_WORKER_FAILED));
+                    SERVICE_WORKER_ERROR_INSTALL_WORKER_FAILED);
   RunIDMapCallbacks(&fetch_callbacks_,
-                    &FetchCallback::Run,
-                    MakeTuple(SERVICE_WORKER_ERROR_FAILED,
-                              SERVICE_WORKER_FETCH_EVENT_RESULT_FALLBACK,
-                              ServiceWorkerResponse()));
+                    SERVICE_WORKER_ERROR_FAILED,
+                    SERVICE_WORKER_FETCH_EVENT_RESULT_FALLBACK,
+                    ServiceWorkerResponse());
   RunIDMapCallbacks(&sync_callbacks_,
-                    &StatusCallback::Run,
-                    MakeTuple(SERVICE_WORKER_ERROR_FAILED));
+                    SERVICE_WORKER_ERROR_FAILED);
   RunIDMapCallbacks(&push_callbacks_,
-                    &StatusCallback::Run,
-                    MakeTuple(SERVICE_WORKER_ERROR_FAILED));
+                    SERVICE_WORKER_ERROR_FAILED);
   RunIDMapCallbacks(&geofencing_callbacks_,
-                    &StatusCallback::Run,
-                    MakeTuple(SERVICE_WORKER_ERROR_FAILED));
+                    SERVICE_WORKER_ERROR_FAILED);
 
   FOR_EACH_OBSERVER(Listener, listeners_, OnWorkerStopped(this));
 
@@ -584,6 +583,15 @@ void ServiceWorkerVersion::OnStopped() {
   // the listener prevents any pending completion callbacks from causing
   // messages to be sent to the stopped worker.
   cache_listener_.reset();
+
+  // Restart worker if we have any start callbacks and the worker isn't doomed.
+  if (should_restart) {
+    cache_listener_.reset(new ServiceWorkerCacheListener(this, context_));
+    embedded_worker_->Start(
+        version_id_, scope_, script_url_, false /* pause_after_download */,
+        base::Bind(&ServiceWorkerVersion::OnStartMessageSent,
+                   weak_factory_.GetWeakPtr()));
+  }
 }
 
 void ServiceWorkerVersion::OnReportException(
@@ -634,6 +642,8 @@ bool ServiceWorkerVersion::OnMessageReceived(const IPC::Message& message) {
                         OnGeofencingEventFinished)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_PostMessageToDocument,
                         OnPostMessageToDocument)
+    IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_FocusClient,
+                        OnFocusClient)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   return handled;
@@ -835,6 +845,34 @@ void ServiceWorkerVersion::OnPostMessageToDocument(
     return;
   }
   provider_host->PostMessage(message, sent_message_port_ids);
+}
+
+void ServiceWorkerVersion::OnFocusClient(int request_id, int client_id) {
+  TRACE_EVENT2("ServiceWorker",
+               "ServiceWorkerVersion::OnFocusDocument",
+               "Request id", request_id,
+               "Client id", client_id);
+  ServiceWorkerProviderHost* provider_host =
+      controllee_by_id_.Lookup(client_id);
+  if (!provider_host) {
+    // The client may already have been closed, just ignore.
+    return;
+  }
+
+  provider_host->Focus(
+      base::Bind(&ServiceWorkerVersion::OnFocusClientFinished,
+                 weak_factory_.GetWeakPtr(),
+                 request_id));
+}
+
+void ServiceWorkerVersion::OnFocusClientFinished(int request_id, bool result) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+
+  if (running_status() != RUNNING)
+    return;
+
+  embedded_worker_->SendMessage(ServiceWorkerMsg_FocusClientResponse(
+      request_id, result));
 }
 
 void ServiceWorkerVersion::ScheduleStopWorker() {

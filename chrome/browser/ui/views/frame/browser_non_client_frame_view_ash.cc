@@ -43,7 +43,7 @@
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_delegate.h"
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
 #include "chrome/browser/ui/views/profiles/supervised_user_avatar_label.h"
 #endif
 
@@ -260,7 +260,7 @@ int BrowserNonClientFrameViewAsh::NonClientHitTest(const gfx::Point& point) {
     return HTCLIENT;
   }
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
   // ...or within the avatar label, if it's a supervised user.
   if (hit_test == HTCAPTION && supervised_user_avatar_label() &&
       ConvertedHitTest(this, supervised_user_avatar_label(), point)) {
@@ -509,10 +509,8 @@ bool BrowserNonClientFrameViewAsh::UsePackagedAppHeaderStyle() const {
 }
 
 bool BrowserNonClientFrameViewAsh::UseWebAppHeaderStyle() const {
-  // Use of the experimental WebApp header style is guarded with the
-  // streamlined hosted app style.
-  return browser_view()->browser()->is_app() &&
-         extensions::util::IsStreamlinedHostedAppsEnabled();
+  return browser_view()->browser()->SupportsWindowFeature(
+      Browser::FEATURE_WEBAPPFRAME);
 }
 
 void BrowserNonClientFrameViewAsh::LayoutAvatar() {

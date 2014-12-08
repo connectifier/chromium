@@ -18,7 +18,9 @@
 #include "media/blink/webmediaplayer_impl.h"
 #include "media/blink/webmediaplayer_params.h"
 #include "media/filters/gpu_video_accelerator_factories.h"
+#include "media/mojo/interfaces/media_renderer.mojom.h"
 #include "media/mojo/services/mojo_renderer_impl.h"
+#include "mojo/public/cpp/application/connect.h"
 #include "mojo/public/interfaces/application/shell.mojom.h"
 
 namespace mojo {
@@ -57,10 +59,15 @@ blink::WebMediaPlayer* WebMediaPlayerFactory::CreateMediaPlayer(
 
   if (enable_mojo_media_renderer_) {
     ServiceProviderPtr media_renderer_service_provider;
-    shell->ConnectToApplication("mojo:mojo_media_renderer_app",
+    shell->ConnectToApplication("mojo:media",
                                 GetProxy(&media_renderer_service_provider));
-    renderer.reset(new media::MojoRendererImpl(
-        GetMediaThreadTaskRunner(), media_renderer_service_provider.get()));
+
+    MediaRendererPtr mojo_media_renderer;
+    ConnectToService(media_renderer_service_provider.get(),
+                     &mojo_media_renderer);
+
+    renderer.reset(new media::MojoRendererImpl(GetMediaThreadTaskRunner(),
+                                               mojo_media_renderer.Pass()));
   }
 
   media::WebMediaPlayerParams params(

@@ -13,7 +13,7 @@
       'dependencies': [
         'app_shell_version_header',
         '<(DEPTH)/base/base.gyp:base',
-        '<(DEPTH)/base/base.gyp:base_prefs_test_support',
+        '<(DEPTH)/base/base.gyp:base_prefs',
         '<(DEPTH)/components/components.gyp:omaha_client',
         '<(DEPTH)/components/components.gyp:pref_registry',
         '<(DEPTH)/components/components.gyp:user_prefs',
@@ -95,8 +95,12 @@
         'browser/shell_oauth2_token_service.h',
         'browser/shell_omaha_query_params_delegate.cc',
         'browser/shell_omaha_query_params_delegate.h',
+        'browser/shell_prefs.cc',
+        'browser/shell_prefs.h',
         'browser/shell_runtime_api_delegate.cc',
         'browser/shell_runtime_api_delegate.h',
+        'browser/shell_screen.cc',
+        'browser/shell_screen.h',
         'browser/shell_special_storage_policy.cc',
         'browser/shell_special_storage_policy.h',
         'browser/shell_speech_recognition_manager_delegate.cc',
@@ -139,6 +143,7 @@
           'sources': [
             'browser/api/shell_gcd/shell_gcd_api.cc',
             'browser/api/shell_gcd/shell_gcd_api.h',
+            'browser/api/vpn_provider/vpn_service_factory.cc',
           ],
         }],
         ['disable_nacl==0 and OS=="linux"', {
@@ -199,6 +204,7 @@
         'app_shell_lib',
         # TODO(yoz): find the right deps
         '<(DEPTH)/base/base.gyp:test_support_base',
+        '<(DEPTH)/components/components.gyp:storage_monitor_test_support',
         '<(DEPTH)/content/content.gyp:content_app_both',
         '<(DEPTH)/content/content_shell_and_tests.gyp:content_browser_test_support',
         '<(DEPTH)/content/content_shell_and_tests.gyp:test_support_content',
@@ -221,6 +227,10 @@
         '../browser/api/system_cpu/system_cpu_apitest.cc',
         '../browser/api/system_memory/system_memory_apitest.cc',
         '../browser/api/system_network/system_network_apitest.cc',
+        '../browser/api/system_storage/storage_api_test_util.cc',
+        '../browser/api/system_storage/storage_api_test_util.h',
+        '../browser/api/system_storage/system_storage_apitest.cc',
+        '../browser/api/system_storage/system_storage_eject_apitest.cc',
         '../browser/api/usb/usb_apitest.cc',
         '../browser/guest_view/app_view/app_view_apitest.cc',
         '../browser/guest_view/web_view/web_view_apitest.h',
@@ -264,6 +274,8 @@
         'browser/shell_audio_controller_chromeos_unittest.cc',
         'browser/shell_native_app_window_aura_unittest.cc',
         'browser/shell_oauth2_token_service_unittest.cc',
+        'browser/shell_prefs_unittest.cc',
+        'browser/shell_screen_unittest.cc',
         'common/shell_content_client_unittest.cc'
       ],
       'conditions': [

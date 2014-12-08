@@ -6,9 +6,9 @@ import("//build/config/android/config.gni")
 import("//build/config/android/rules.gni")
 
 content_jni_gypi_values = exec_script("//build/gypi_to_gn.py",
-    [ rebase_path("../../content_jni.gypi") ],
-    "scope",
-    [ "../../content_jni.gypi" ])
+                                      [ rebase_path("../../content_jni.gypi") ],
+                                      "scope",
+                                      [ "../../content_jni.gypi" ])
 
 android_aidl("common_aidl") {
   interface_file = "java/src/org/chromium/content/common/common.aidl"
@@ -40,7 +40,7 @@ android_library("content_java") {
     "//ui/android:ui_java",
     "//third_party/jsr-305:jsr_305_javalib",
 
-#"//content:content_common",
+    #"//content:content_common",
   ]
 
   srcjar_deps = [
@@ -49,11 +49,6 @@ android_library("content_java") {
   ]
 
   DEPRECATED_java_in_dir = "java/src"
-  if (!is_android_webview_build) {
-    deps += [
-      "//third_party/eyesfree:eyesfree_java",
-    ]
-  }
 }
 
 java_strings_grd("content_strings_grd") {
@@ -173,6 +168,4 @@ android_library("content_javatests") {
 
   DEPRECATED_java_in_dir = "javatests/src"
 }
-
-
 # TODO(GYP): content_icudata

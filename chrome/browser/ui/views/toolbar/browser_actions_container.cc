@@ -564,7 +564,10 @@ int BrowserActionsContainer::OnPerformDrop(
     drag_type = in_overflow_mode() ? ToolbarActionsBar::DRAG_TO_OVERFLOW :
         ToolbarActionsBar::DRAG_TO_MAIN;
 
-  toolbar_actions_bar_->OnDragDrop(data.index(), i, drag_type);
+  // Let the main container handle the drag/drop.
+  ToolbarActionsBar* toolbar_actions_bar = in_overflow_mode() ?
+      main_container_->toolbar_actions_bar_.get() : toolbar_actions_bar_.get();
+  toolbar_actions_bar->OnDragDrop(data.index(), i, drag_type);
 
   OnDragExited();  // Perform clean up after dragging.
   return ui::DragDropTypes::DRAG_MOVE;
@@ -727,7 +730,8 @@ void BrowserActionsContainer::ViewHierarchyChanged(
     return;
 
   if (details.is_add && details.child == this) {
-    if (!in_overflow_mode()) {  // We only need one keybinding registry.
+    if (!in_overflow_mode() &&  // We only need one keybinding registry.
+        parent()->GetFocusManager()) {  // focus manager can be null in tests.
       extension_keybinding_registry_.reset(new ExtensionKeybindingRegistryViews(
           browser_->profile(),
           parent()->GetFocusManager(),

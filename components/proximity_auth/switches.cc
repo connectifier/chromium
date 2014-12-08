@@ -7,11 +7,18 @@
 namespace proximity_auth {
 namespace switches {
 
+// Overrides the default URL for Google APIs (https://www.googleapis.com) used
+// by CryptAuth.
+const char kCryptAuthHTTPHost[] = "cryptauth-http-host";
+
 // Disable Easy sign-in.
 const char kDisableEasySignin[] = "disable-easy-signin";
 
 // Disable Easy unlock.
 const char kDisableEasyUnlock[] = "disable-easy-unlock";
+
+// TODO(xiyuan): Remove obsolete enable flags since feature is on by default.
+//    Also consolidate the two flags into one after http://crbug.com/439638.
 
 // Enable Easy sign-in.
 const char kEnableEasySignin[] = "enable-easy-signin";

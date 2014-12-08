@@ -19,13 +19,12 @@
 #include "base/prefs/pref_service.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread_restrictions.h"
-#include "base/values.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browser_process_platform_part.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/chromeos/accessibility/accessibility_manager.h"
 #include "chrome/browser/chromeos/app_mode/kiosk_app_manager.h"
-#include "chrome/browser/chromeos/customization_document.h"
+#include "chrome/browser/chromeos/customization/customization_document.h"
 #include "chrome/browser/chromeos/geolocation/simple_geolocation_provider.h"
 #include "chrome/browser/chromeos/login/enrollment/auto_enrollment_check_screen.h"
 #include "chrome/browser/chromeos/login/enrollment/enrollment_mode.h"
@@ -212,6 +211,7 @@ WizardController::WizardController(chromeos::LoginDisplayHost* host,
       usage_statistics_reporting_(true),
       skip_update_enroll_after_eula_(false),
       enrollment_recovery_(ShouldRecoverEnrollment()),
+      retry_auto_enrollment_check_(false),
       login_screen_started_(false),
       user_image_screen_return_to_previous_hack_(false),
       timezone_resolved_(false),
@@ -234,12 +234,9 @@ WizardController::~WizardController() {
   }
 }
 
-void WizardController::Init(
-    const std::string& first_screen_name,
-    scoped_ptr<base::DictionaryValue> screen_parameters) {
+void WizardController::Init(const std::string& first_screen_name) {
   VLOG(1) << "Starting OOBE wizard with screen: " << first_screen_name;
   first_screen_name_ = first_screen_name;
-  screen_parameters_ = screen_parameters.Pass();
 
   bool oobe_complete = StartupUtils::IsOobeCompleted();
   if (!oobe_complete || first_screen_name == kOutOfBoxScreenName)
@@ -391,14 +388,6 @@ void WizardController::ShowLoginScreen(const LoginScreenContext& context) {
   login_screen_started_ = true;
 }
 
-void WizardController::ResumeLoginScreen() {
-  VLOG(1) << "Resuming login screen.";
-  SetStatusAreaVisible(true);
-  host_->ResumeSignInScreen();
-  smooth_show_timer_.Stop();
-  oobe_display_ = NULL;
-}
-
 void WizardController::ShowUpdateScreen() {
   VLOG(1) << "Showing update screen.";
   SetStatusAreaVisible(true);
@@ -435,27 +424,18 @@ void WizardController::ShowEnrollmentScreen() {
 
   SetStatusAreaVisible(true);
 
-  bool is_auto_enrollment = false;
-  std::string user;
-  if (screen_parameters_.get()) {
-    screen_parameters_->GetBoolean("is_auto_enrollment", &is_auto_enrollment);
-    screen_parameters_->GetString("user", &user);
-  }
-
   EnrollmentMode mode = ENROLLMENT_MODE_MANUAL;
-  EnrollmentScreen* screen = EnrollmentScreen::Get(this);
-  std::string enrollment_domain = GetForcedEnrollmentDomain();
-  if (is_auto_enrollment) {
-    mode = ENROLLMENT_MODE_AUTO;
-  } else if (enrollment_recovery_) {
+  std::string enrollment_domain;
+  if (enrollment_recovery_) {
     mode = ENROLLMENT_MODE_RECOVERY;
     enrollment_domain = GetEnrollmentRecoveryDomain();
   } else if (ShouldAutoStartEnrollment() && !CanExitEnrollment()) {
     mode = ENROLLMENT_MODE_FORCED;
+    enrollment_domain = GetForcedEnrollmentDomain();
   }
 
-  screen->SetParameters(mode, enrollment_domain, user,
-                        shark_controller_.get(),
+  EnrollmentScreen* screen = EnrollmentScreen::Get(this);
+  screen->SetParameters(mode, enrollment_domain, shark_controller_.get(),
                         remora_controller_.get());
   SetCurrentScreen(screen);
 }
@@ -744,11 +724,6 @@ void WizardController::OnWrongHWIDWarningSkipped() {
     ShowLoginScreen(LoginScreenContext());
 }
 
-void WizardController::OnAutoEnrollmentDone() {
-  VLOG(1) << "Automagic enrollment done, resuming previous signin";
-  ResumeLoginScreen();
-}
-
 void WizardController::OnTermsOfServiceDeclined() {
   // If the user declines the Terms of Service, end the session and return to
   // the login screen.
@@ -1030,9 +1005,6 @@ void WizardController::OnExit(BaseScreen& /* screen */,
       break;
     case KIOSK_ENABLE_COMPLETED:
       OnKioskEnableCompleted();
-      break;
-    case ENTERPRISE_AUTO_MAGIC_ENROLLMENT_COMPLETED:
-      OnAutoEnrollmentDone();
       break;
     case TERMS_OF_SERVICE_DECLINED:
       OnTermsOfServiceDeclined();

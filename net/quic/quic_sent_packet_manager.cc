@@ -134,8 +134,8 @@ void QuicSentPacketManager::SetFromConfig(const QuicConfig& config) {
         clock_, &rtt_stats_, kReno, stats_, initial_congestion_window_));
   }
   if (HasClientSentConnectionOption(config, kPACE) ||
-      (FLAGS_quic_allow_bbr &&
-       HasClientSentConnectionOption(config, kTBBR))) {
+      FLAGS_quic_enable_pacing ||
+      (FLAGS_quic_allow_bbr && HasClientSentConnectionOption(config, kTBBR))) {
     EnablePacing();
   }
   if (HasClientSentConnectionOption(config, k1CON)) {
@@ -285,7 +285,7 @@ void QuicSentPacketManager::HandleAckForSentPackets(
       // threshold is to tolerate re-ordering.  This handles both StretchAcks
       // and Forward Acks.
       // The nack count only increases when the largest observed increases.
-      size_t min_nacks = ack_frame.largest_observed - sequence_number;
+      QuicPacketCount min_nacks = ack_frame.largest_observed - sequence_number;
       // Truncated acks can nack the largest observed, so use a min of 1.
       if (min_nacks == 0) {
         min_nacks = 1;

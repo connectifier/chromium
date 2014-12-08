@@ -141,7 +141,6 @@ extern const char kWebKitPasswordEchoEnabled[];
 extern const char kSafeBrowsingEnabled[];
 extern const char kSafeBrowsingExtendedReportingEnabled[];
 extern const char kSafeBrowsingProceedAnywayDisabled[];
-extern const char kSafeBrowsingIncidentReportSent[];
 extern const char kSafeBrowsingIncidentsSent[];
 extern const char kIncognitoModeAvailability[];
 extern const char kSearchSuggestEnabled[];
@@ -194,8 +193,12 @@ extern const char kLanguagePreviousInputMethod[];
 extern const char kLanguageHotkeyNextEngineInMenu[];
 extern const char kLanguageHotkeyPreviousEngine[];
 extern const char kLanguagePreferredLanguages[];
+extern const char kLanguagePreferredLanguagesSyncable[];
 extern const char kLanguagePreloadEngines[];
+extern const char kLanguagePreloadEnginesSyncable[];
 extern const char kLanguageEnabledExtensionImes[];
+extern const char kLanguageEnabledExtensionImesSyncable[];
+extern const char kLanguageShouldMergeInputMethods[];
 extern const char kLanguageRemapCapsLockKeyTo[];
 extern const char kLanguageRemapSearchKeyTo[];
 extern const char kLanguageRemapControlKeyTo[];
@@ -288,6 +291,8 @@ extern const char kEnableAutoSpellCorrect[];
 extern const char kSavingBrowserHistoryDisabled[];
 extern const char kAllowDeletingBrowserHistory[];
 extern const char kForceSafeSearch[];
+extern const char kForceGoogleSafeSearch[];
+extern const char kForceYouTubeSafetyMode[];
 extern const char kRecordHistory[];
 extern const char kDeleteTimePeriod[];
 extern const char kLastClearBrowsingDataTime[];
@@ -479,7 +484,6 @@ extern const char kBrowserWindowPlacement[];
 extern const char kBrowserWindowPlacementPopup[];
 extern const char kTaskManagerWindowPlacement[];
 extern const char kAppWindowPlacement[];
-extern const char kMemoryCacheSize[];
 
 extern const char kDownloadDefaultDirectory[];
 extern const char kDownloadExtensionsToOpen[];
@@ -628,6 +632,7 @@ extern const char kVideoCaptureAllowedUrls[];
 
 extern const char kHotwordSearchEnabled[];
 extern const char kHotwordAlwaysOnSearchEnabled[];
+extern const char kHotwordAlwaysOnNotificationSeen[];
 extern const char kHotwordAudioLoggingEnabled[];
 extern const char kHotwordAudioHistoryEnabled[];
 extern const char kHotwordPreviousLanguage[];
@@ -668,7 +673,7 @@ extern const char kUsedPolicyCertificates[];
 extern const char kServerBackedDeviceState[];
 extern const char kCustomizationDefaultWallpaperURL[];
 extern const char kLogoutStartedLast[];
-extern const char kConsumerManagementEnrollmentStage[];
+extern const char kConsumerManagementStage[];
 #endif  // defined(OS_CHROMEOS)
 
 extern const char kClearPluginLSODataEnabled[];
@@ -807,6 +812,8 @@ extern const char kEasyUnlockHardlockState[];
 extern const char kPasswordBubbleTimeStamp[];
 extern const char kPasswordBubbleNopesCount[];
 extern const char kPasswordBubbleLastInteractions[];
+
+extern const char kRecoveryComponentNeedsElevation[];
 
 }  // namespace prefs
 

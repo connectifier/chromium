@@ -6,6 +6,7 @@ cr.exportPath('options');
 
 /**
  * @typedef {{actionLinkText: (string|undefined),
+ *            childUser: (boolean|undefined),
  *            hasError: (boolean|undefined),
  *            hasUnrecoverableError: (boolean|undefined),
  *            managed: (boolean|undefined),
@@ -15,6 +16,7 @@ cr.exportPath('options');
  *            signinAllowed: (boolean|undefined),
  *            signoutAllowed: (boolean|undefined),
  *            statusText: (string|undefined),
+ *            supervisedUser: (boolean|undefined),
  *            syncSystemEnabled: (boolean|undefined)}}
  * @see chrome/browser/ui/webui/options/browser_options_handler.cc
  */
@@ -984,7 +986,7 @@ cr.define('options', function() {
       $('sync-section').hidden = false;
       this.maybeShowUserSection_();
 
-      if (cr.isChromeOS && syncData.supervisedUser) {
+      if (cr.isChromeOS && syncData.supervisedUser && !syncData.childUser) {
         var subSection = $('sync-section').firstChild;
         while (subSection) {
           if (subSection.nodeType == Node.ELEMENT_NODE)
@@ -1193,6 +1195,18 @@ cr.define('options', function() {
           'hotword-no-dsp-search',
           'hotword-no-dsp-search-setting-indicator',
           opt_error);
+    },
+
+    /**
+     * Controls the visibility of all the hotword sections.
+     * @param {boolean} visible Whether to show hotword sections.
+     * @private
+     */
+    setHotwordSectionVisible_: function(visible) {
+      $('hotword-search').hidden = !visible;
+      $('hotword-always-on-search').hidden = !visible;
+      $('hotword-no-dsp-search').hidden = !visible;
+      $('audio-history').hidden = !visible;
     },
 
     /**
@@ -2113,6 +2127,7 @@ cr.define('options', function() {
     'setNativeThemeButtonEnabled',
     'setNetworkPredictionValue',
     'setHighContrastCheckboxState',
+    'setHotwordSectionVisible',
     'setMetricsReportingCheckboxState',
     'setMetricsReportingSettingVisibility',
     'setProfilesInfo',

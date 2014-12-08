@@ -20,6 +20,7 @@ class TaskRunner;
 }
 
 namespace metrics {
+struct ClientInfo;
 class MetricsService;
 class MetricsStateManager;
 }  // namespace metrics
@@ -36,7 +37,7 @@ class CastMetricsServiceClient : public ::metrics::MetricsServiceClient {
  public:
   virtual ~CastMetricsServiceClient();
 
-  static CastMetricsServiceClient* Create(
+  static scoped_ptr<CastMetricsServiceClient> Create(
       base::TaskRunner* io_task_runner,
       PrefService* pref_service,
       net::URLRequestContextGetter* request_context);
@@ -69,6 +70,11 @@ class CastMetricsServiceClient : public ::metrics::MetricsServiceClient {
 
   // Returns whether or not metrics reporting is enabled.
   bool IsReportingEnabled();
+
+  scoped_ptr< ::metrics::ClientInfo> LoadClientInfo();
+  void StoreClientInfo(const ::metrics::ClientInfo& client_info);
+
+  PrefService* pref_service_;
 
 #if defined(OS_LINUX)
   scoped_ptr<ExternalMetrics> external_metrics_;

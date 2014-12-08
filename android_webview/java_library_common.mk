@@ -44,9 +44,12 @@ LOCAL_SRC_FILES += \
 # Java files generated from .template rules. This list should match list of java dependencies in
 # android_webview/libwebviewchromium.gyp
 LOCAL_GENERATED_SOURCES := \
+$(call intermediates-dir-for,GYP,shared)/enums/android_resource_type_java/org/chromium/ui/resources/AndroidResourceType.java \
 $(call intermediates-dir-for,GYP,shared)/enums/bitmap_format_java/org/chromium/ui/gfx/BitmapFormat.java \
 $(call intermediates-dir-for,GYP,shared)/enums/cert_verify_status_android_java/org/chromium/net/CertVerifyStatusAndroid.java \
 $(call intermediates-dir-for,GYP,shared)/enums/certificate_mime_types_java/org/chromium/net/CertificateMimeType.java \
+$(call intermediates-dir-for,GYP,shared)/enums/network_change_notifier_types_java/org/chromium/net/ConnectionSubtype.java \
+$(call intermediates-dir-for,GYP,shared)/enums/network_change_notifier_types_java/org/chromium/net/ConnectionType.java \
 $(call intermediates-dir-for,GYP,shared)/enums/content_gamepad_mapping/org/chromium/content/browser/input/CanonicalAxisIndex.java \
 $(call intermediates-dir-for,GYP,shared)/enums/content_gamepad_mapping/org/chromium/content/browser/input/CanonicalButtonIndex.java \
 $(call intermediates-dir-for,GYP,shared)/enums/gesture_event_type_java/org/chromium/content/browser/GestureEventType.java \
@@ -65,6 +68,8 @@ $(call intermediates-dir-for,GYP,shared)/enums/media_android_imageformat/org/chr
 $(call intermediates-dir-for,GYP,shared)/enums/page_transition_types_java/org/chromium/ui/base/PageTransition.java \
 $(call intermediates-dir-for,GYP,shared)/enums/system_ui_resource_type_java/org/chromium/ui/base/SystemUIResourceType.java \
 $(call intermediates-dir-for,GYP,shared)/enums/text_input_type_java/org/chromium/ui/base/ime/TextInputType.java \
+$(call intermediates-dir-for,GYP,shared)/enums/touch_device_types_java/org/chromium/ui/base/HoverType.java \
+$(call intermediates-dir-for,GYP,shared)/enums/touch_device_types_java/org/chromium/ui/base/PointerType.java \
 $(call intermediates-dir-for,GYP,shared)/templates/net_errors_java/org/chromium/net/NetError.java \
 
 # content dependencies on java components that are provided by the system on

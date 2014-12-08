@@ -54,7 +54,6 @@ class CC_EXPORT LayerTreeSettings {
   bool layers_always_allowed_lcd_text;
   float minimum_contents_scale;
   float low_res_contents_scale_factor;
-  float top_controls_height;
   float top_controls_show_threshold;
   float top_controls_hide_threshold;
   double background_animation_rate;
@@ -73,7 +72,7 @@ class CC_EXPORT LayerTreeSettings {
   bool strict_layer_property_change_checking;
   bool use_one_copy;
   bool use_zero_copy;
-  bool use_image_external;
+  unsigned use_image_texture_target;
   bool ignore_root_layer_flings;
   size_t scheduled_raster_task_limit;
   bool use_occlusion_for_tile_prioritization;

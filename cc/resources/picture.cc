@@ -25,6 +25,7 @@
 #include "third_party/skia/include/core/SkPictureRecorder.h"
 #include "third_party/skia/include/core/SkStream.h"
 #include "third_party/skia/include/utils/SkNullCanvas.h"
+#include "third_party/skia/include/utils/SkPictureUtils.h"
 #include "ui/gfx/codec/jpeg_codec.h"
 #include "ui/gfx/codec/png_codec.h"
 #include "ui/gfx/geometry/rect_conversions.h"
@@ -174,22 +175,23 @@ Picture::~Picture() {
     TRACE_DISABLED_BY_DEFAULT("cc.debug"), "cc::Picture", this);
 }
 
-bool Picture::IsSuitableForGpuRasterization() const {
+bool Picture::IsSuitableForGpuRasterization(const char** reason) const {
   DCHECK(picture_);
 
-  // TODO(alokp): SkPicture::suitableForGpuRasterization needs a GrContext.
-  // Ideally this GrContext should be the same as that for rasterizing this
-  // picture. But we are on the main thread while the rasterization context
-  // may be on the compositor or raster thread.
-  // SkPicture::suitableForGpuRasterization is not implemented yet.
-  // Pass a NULL context for now and discuss with skia folks if the context
-  // is really needed.
-  return picture_->suitableForGpuRasterization(NULL);
+  // TODO(hendrikw): SkPicture::suitableForGpuRasterization takes a GrContext.
+  // Currently the GrContext isn't used, and should probably be removed from
+  // skia.
+  return picture_->suitableForGpuRasterization(nullptr, reason);
 }
 
 int Picture::ApproximateOpCount() const {
   DCHECK(picture_);
   return picture_->approximateOpCount();
+}
+
+size_t Picture::ApproximateMemoryUsage() const {
+  DCHECK(picture_);
+  return SkPictureUtils::ApproximateBytesUsed(picture_.get());
 }
 
 bool Picture::HasText() const {

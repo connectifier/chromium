@@ -109,6 +109,10 @@ class PasswordFormManager : public PasswordStoreConsumer {
   // Takes ownership of the elements in |result|.
   void OnRequestDone(const std::vector<autofill::PasswordForm*>& result);
 
+  // If reasonable, non-blacklisted, candidates were found by the password
+  // store, this will trigger the autofill through PasswordManager.
+  void MaybeTriggerAutofill();
+
   void OnGetPasswordStoreResults(
       const std::vector<autofill::PasswordForm*>& results) override;
 
@@ -324,6 +328,7 @@ class PasswordFormManager : public PasswordStoreConsumer {
   PasswordManagerClient* client_;
 
   // The driver which implements platform-specific PasswordManager operations.
+  // TODO(vabr): remove this due to lifetime issues. http://crbug.com/439387
   PasswordManagerDriver* driver_;
 
   // These three fields record the "ActionsTaken" by the browser and

@@ -444,7 +444,7 @@ class LayerTreeHostTestSetNeedsRedrawRect : public LayerTreeHostTest {
 
     if (!num_draws_) {
       // If this is the first frame, expect full frame damage.
-      EXPECT_RECT_EQ(root_damage_rect, gfx::Rect(bounds_));
+      EXPECT_EQ(root_damage_rect, gfx::Rect(bounds_));
     } else {
       // Check that invalid_rect_ is indeed repainted.
       EXPECT_TRUE(root_damage_rect.Contains(invalid_rect_));
@@ -626,17 +626,17 @@ class LayerTreeHostTestSetNextCommitForcesRedraw : public LayerTreeHostTest {
 
     switch (num_draws_) {
       case 0:
-        EXPECT_RECT_EQ(gfx::Rect(bounds_), root_damage_rect);
+        EXPECT_EQ(gfx::Rect(bounds_), root_damage_rect);
         break;
       case 1:
       case 2:
-        EXPECT_RECT_EQ(gfx::Rect(0, 0, 0, 0), root_damage_rect);
+        EXPECT_EQ(gfx::Rect(0, 0, 0, 0), root_damage_rect);
         break;
       case 3:
-        EXPECT_RECT_EQ(invalid_rect_, root_damage_rect);
+        EXPECT_EQ(invalid_rect_, root_damage_rect);
         break;
       case 4:
-        EXPECT_RECT_EQ(gfx::Rect(bounds_), root_damage_rect);
+        EXPECT_EQ(gfx::Rect(bounds_), root_damage_rect);
         break;
       default:
         NOTREACHED();
@@ -738,12 +738,12 @@ class LayerTreeHostTestUndrawnLayersDamageLater : public LayerTreeHostTest {
     // box.
     switch (host_impl->active_tree()->source_frame_number()) {
       case 0:
-        EXPECT_RECT_EQ(gfx::Rect(root_layer_->bounds()), root_damage_rect);
+        EXPECT_EQ(gfx::Rect(root_layer_->bounds()), root_damage_rect);
         break;
       case 1:
       case 2:
       case 3:
-        EXPECT_RECT_EQ(gfx::Rect(child_layer_->bounds()), root_damage_rect);
+        EXPECT_EQ(gfx::Rect(child_layer_->bounds()), root_damage_rect);
         break;
       default:
         NOTREACHED();
@@ -1041,14 +1041,14 @@ class LayerTreeHostTestStartPageScaleAnimation : public LayerTreeHostTest {
     // until the second draw.
     switch (impl->active_tree()->source_frame_number()) {
       case 0:
-        EXPECT_EQ(1.f, impl->active_tree()->page_scale_factor());
+        EXPECT_EQ(1.f, impl->active_tree()->current_page_scale_factor());
         // We'll start an animation when we get back to the main thread.
         break;
       case 1:
-        EXPECT_EQ(1.f, impl->active_tree()->page_scale_factor());
+        EXPECT_EQ(1.f, impl->active_tree()->current_page_scale_factor());
         break;
       case 2:
-        EXPECT_EQ(1.25f, impl->active_tree()->page_scale_factor());
+        EXPECT_EQ(1.25f, impl->active_tree()->current_page_scale_factor());
         EndTest();
         break;
       default:
@@ -1271,8 +1271,7 @@ class LayerTreeHostTestDeviceScaleFactorScalesViewportAndLayers
     ASSERT_EQ(2u, root->render_surface()->layer_list().size());
 
     // The root render surface is the size of the viewport.
-    EXPECT_RECT_EQ(gfx::Rect(0, 0, 60, 60),
-                   root->render_surface()->content_rect());
+    EXPECT_EQ(gfx::Rect(0, 0, 60, 60), root->render_surface()->content_rect());
 
     // The max tiling scale of the child should be scaled.
     EXPECT_FLOAT_EQ(1.5f, child->MaximumTilingContentsScale());
@@ -2645,10 +2644,10 @@ class LayerTreeHostTestChangeLayerPropertiesInPaintContents
     num_commits_++;
     if (num_commits_ == 1) {
       LayerImpl* root_layer = host_impl->active_tree()->root_layer();
-      EXPECT_SIZE_EQ(gfx::Size(1, 1), root_layer->bounds());
+      EXPECT_EQ(gfx::Size(1, 1), root_layer->bounds());
     } else {
       LayerImpl* root_layer = host_impl->active_tree()->root_layer();
-      EXPECT_SIZE_EQ(gfx::Size(2, 2), root_layer->bounds());
+      EXPECT_EQ(gfx::Size(2, 2), root_layer->bounds());
       EndTest();
     }
   }
@@ -2771,7 +2770,7 @@ class LayerTreeHostTestIOSurfaceDrawing : public LayerTreeHostTest {
     CHECK_EQ(DrawQuad::IO_SURFACE_CONTENT, quad->material);
     const IOSurfaceDrawQuad* io_surface_draw_quad =
         IOSurfaceDrawQuad::MaterialCast(quad);
-    EXPECT_SIZE_EQ(io_surface_size_, io_surface_draw_quad->io_surface_size);
+    EXPECT_EQ(io_surface_size_, io_surface_draw_quad->io_surface_size);
     EXPECT_NE(0u, io_surface_draw_quad->io_surface_resource_id);
     EXPECT_EQ(static_cast<GLenum>(GL_TEXTURE_RECTANGLE_ARB),
               resource_provider->TargetForTesting(
@@ -4743,6 +4742,62 @@ class LayerTreeHostTestBreakSwapPromise : public LayerTreeHostTest {
 
 MULTI_THREAD_TEST_F(LayerTreeHostTestBreakSwapPromise);
 
+class LayerTreeHostTestKeepSwapPromise : public LayerTreeTest {
+ public:
+  LayerTreeHostTestKeepSwapPromise() {}
+
+  void BeginTest() override {
+    layer_ = SolidColorLayer::Create();
+    layer_->SetIsDrawable(true);
+    layer_->SetBounds(gfx::Size(10, 10));
+    layer_tree_host()->SetRootLayer(layer_);
+    gfx::Size bounds(100, 100);
+    layer_tree_host()->SetViewportSize(bounds);
+    PostSetNeedsCommitToMainThread();
+  }
+
+  void DidCommit() override {
+    MainThreadTaskRunner()->PostTask(
+        FROM_HERE, base::Bind(&LayerTreeHostTestKeepSwapPromise::ChangeFrame,
+                              base::Unretained(this)));
+  }
+
+  void ChangeFrame() {
+    switch (layer_tree_host()->source_frame_number()) {
+      case 1:
+        layer_->SetBounds(gfx::Size(10, 11));
+        layer_tree_host()->QueueSwapPromise(
+            make_scoped_ptr(new TestSwapPromise(&swap_promise_result_)));
+        break;
+      case 2:
+        break;
+      default:
+        NOTREACHED();
+        break;
+    }
+  }
+
+  void SwapBuffersOnThread(LayerTreeHostImpl* host_impl, bool result) override {
+    EXPECT_TRUE(result);
+    if (host_impl->active_tree()->source_frame_number() >= 1) {
+      // The commit changes layers so it should cause a swap.
+      base::AutoLock lock(swap_promise_result_.lock);
+      EXPECT_TRUE(swap_promise_result_.did_swap_called);
+      EXPECT_FALSE(swap_promise_result_.did_not_swap_called);
+      EXPECT_TRUE(swap_promise_result_.dtor_called);
+      EndTest();
+    }
+  }
+
+  void AfterTest() override {}
+
+ private:
+  scoped_refptr<Layer> layer_;
+  TestSwapPromiseResult swap_promise_result_;
+};
+
+SINGLE_AND_MULTI_THREAD_TEST_F(LayerTreeHostTestKeepSwapPromise);
+
 class LayerTreeHostTestBreakSwapPromiseForVisibilityAbortedCommit
     : public LayerTreeHostTest {
  protected:
@@ -5571,7 +5626,7 @@ class LayerTreeHostTestCrispUpAfterPinchEnds : public LayerTreeHostTest {
     switch (frame_) {
       case 1:
         // Drew at page scale 1 before any pinching.
-        EXPECT_EQ(1.f, host_impl->active_tree()->total_page_scale_factor());
+        EXPECT_EQ(1.f, host_impl->active_tree()->current_page_scale_factor());
         EXPECT_EQ(1.f, quad_scale_delta);
         PostNextAfterDraw(host_impl);
         break;
@@ -5579,7 +5634,7 @@ class LayerTreeHostTestCrispUpAfterPinchEnds : public LayerTreeHostTest {
         if (quad_scale_delta != 1.f)
           break;
         // Drew at page scale 1.5 after pinching in.
-        EXPECT_EQ(1.5f, host_impl->active_tree()->total_page_scale_factor());
+        EXPECT_EQ(1.5f, host_impl->active_tree()->current_page_scale_factor());
         EXPECT_EQ(1.f, quad_scale_delta);
         PostNextAfterDraw(host_impl);
         break;
@@ -5590,7 +5645,7 @@ class LayerTreeHostTestCrispUpAfterPinchEnds : public LayerTreeHostTest {
         if (frame_data->has_no_damage)
           break;
         // Drew at page scale 1 with the 1.5 tiling while pinching out.
-        EXPECT_EQ(1.f, host_impl->active_tree()->total_page_scale_factor());
+        EXPECT_EQ(1.f, host_impl->active_tree()->current_page_scale_factor());
         EXPECT_EQ(1.5f, quad_scale_delta);
         // We don't PostNextAfterDraw here, instead we wait for the new tiling
         // to finish rastering so we don't get any noise in further steps.
@@ -5598,7 +5653,7 @@ class LayerTreeHostTestCrispUpAfterPinchEnds : public LayerTreeHostTest {
       case 4:
         // Drew at page scale 1 with the 1.5 tiling after pinching out completed
         // while waiting for texture uploads to complete.
-        EXPECT_EQ(1.f, host_impl->active_tree()->total_page_scale_factor());
+        EXPECT_EQ(1.f, host_impl->active_tree()->current_page_scale_factor());
         // This frame will not have any damage, since it's actually the same as
         // the last frame, and should contain no incomplete tiles. We just want
         // to make sure we drew here at least once after the pinch ended to be
@@ -5610,7 +5665,7 @@ class LayerTreeHostTestCrispUpAfterPinchEnds : public LayerTreeHostTest {
         if (quad_scale_delta != 1.f)
           break;
         // Drew at scale 1 after texture uploads are done.
-        EXPECT_EQ(1.f, host_impl->active_tree()->total_page_scale_factor());
+        EXPECT_EQ(1.f, host_impl->active_tree()->current_page_scale_factor());
         EXPECT_EQ(1.f, quad_scale_delta);
         EndTest();
         break;
@@ -5781,19 +5836,19 @@ class LayerTreeHostTestContinuousDrawWhenCreatingVisibleTiles
     switch (step_) {
       case 1:
         // Drew at scale 1 before any pinching.
-        EXPECT_EQ(1.f, host_impl->active_tree()->total_page_scale_factor());
+        EXPECT_EQ(1.f, host_impl->active_tree()->current_page_scale_factor());
         EXPECT_EQ(1.f, quad_scale_delta);
         break;
       case 2:
         if (quad_scale_delta != 1.f / 1.5f)
           break;
         // Drew at scale 1 still though the ideal is 1.5.
-        EXPECT_EQ(1.5f, host_impl->active_tree()->total_page_scale_factor());
+        EXPECT_EQ(1.5f, host_impl->active_tree()->current_page_scale_factor());
         EXPECT_EQ(1.f / 1.5f, quad_scale_delta);
         break;
       case 3:
         // Continuous draws are attempted.
-        EXPECT_EQ(1.5f, host_impl->active_tree()->total_page_scale_factor());
+        EXPECT_EQ(1.5f, host_impl->active_tree()->current_page_scale_factor());
         if (!frame_data->has_no_damage)
           EXPECT_EQ(1.f / 1.5f, quad_scale_delta);
         break;
@@ -5801,7 +5856,7 @@ class LayerTreeHostTestContinuousDrawWhenCreatingVisibleTiles
         if (quad_scale_delta != 1.f)
           break;
         // Drew at scale 1.5 when all the tiles completed.
-        EXPECT_EQ(1.5f, host_impl->active_tree()->total_page_scale_factor());
+        EXPECT_EQ(1.5f, host_impl->active_tree()->current_page_scale_factor());
         EXPECT_EQ(1.f, quad_scale_delta);
         break;
       case 5:
@@ -5886,5 +5941,60 @@ class LayerTreeHostTestContinuousDrawWhenCreatingVisibleTiles
 };
 
 MULTI_THREAD_TEST_F(LayerTreeHostTestContinuousDrawWhenCreatingVisibleTiles);
+
+class LayerTreeHostTestOneActivatePerManageTiles : public LayerTreeHostTest {
+ public:
+  LayerTreeHostTestOneActivatePerManageTiles()
+      : notify_ready_to_activate_count_(0u), scheduled_manage_tiles_count_(0) {}
+
+  void SetupTree() override {
+    client_.set_fill_with_nonsolid_color(true);
+    scoped_refptr<FakePictureLayer> root_layer =
+        FakePictureLayer::Create(&client_);
+    root_layer->SetBounds(gfx::Size(1500, 1500));
+    root_layer->SetIsDrawable(true);
+
+    layer_tree_host()->SetRootLayer(root_layer);
+    LayerTreeHostTest::SetupTree();
+  }
+
+  void BeginTest() override {
+    layer_tree_host()->SetViewportSize(gfx::Size(16, 16));
+    PostSetNeedsCommitToMainThread();
+  }
+
+  void InitializedRendererOnThread(LayerTreeHostImpl* host_impl,
+                                   bool success) override {
+    ASSERT_TRUE(success);
+    host_impl->tile_manager()->SetScheduledRasterTaskLimitForTesting(1);
+  }
+
+  void NotifyReadyToActivateOnThread(LayerTreeHostImpl* impl) override {
+    ++notify_ready_to_activate_count_;
+    EndTestAfterDelayMs(100);
+  }
+
+  void ScheduledActionManageTiles() override {
+    ++scheduled_manage_tiles_count_;
+  }
+
+  void AfterTest() override {
+    // Expect at most a notification for each scheduled manage tiles, plus one
+    // for the initial commit (which doesn't go through scheduled actions).
+    // The reason this is not an equality is because depending on timing, we
+    // might get a manage tiles but not yet get a notification that we're
+    // ready to activate. The intent of a test is to ensure that we don't
+    // get more than one notification per manage tiles, so this is OK.
+    EXPECT_LE(notify_ready_to_activate_count_,
+              1u + scheduled_manage_tiles_count_);
+  }
+
+ protected:
+  FakeContentLayerClient client_;
+  size_t notify_ready_to_activate_count_;
+  size_t scheduled_manage_tiles_count_;
+};
+
+MULTI_THREAD_IMPL_TEST_F(LayerTreeHostTestOneActivatePerManageTiles);
 
 }  // namespace cc

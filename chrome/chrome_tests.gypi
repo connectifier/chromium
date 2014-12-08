@@ -102,8 +102,8 @@
       'browser/chromeos/app_mode/kiosk_app_manager_browsertest.cc',
       'browser/chromeos/app_mode/kiosk_app_update_service_browsertest.cc',
       'browser/chromeos/attestation/attestation_policy_browsertest.cc',
-      'browser/chromeos/customization_document_browsertest.cc',
-      'browser/chromeos/customization_wallpaper_downloader_browsertest.cc',
+      'browser/chromeos/customization/customization_document_browsertest.cc',
+      'browser/chromeos/customization/customization_wallpaper_downloader_browsertest.cc',
       'browser/chromeos/device/input_service_proxy_browsertest.cc',
       'browser/chromeos/drive/drive_integration_service_browsertest.cc',
       'browser/chromeos/drive/drive_notification_manager_factory_browsertest.cc',
@@ -188,8 +188,6 @@
       'browser/chromeos/login/test/oobe_base_test.h',
       'browser/chromeos/login/test/wizard_in_process_browser_test.cc',
       'browser/chromeos/login/test/wizard_in_process_browser_test.h',
-      'browser/chromeos/login/test_login_utils.cc',
-      'browser/chromeos/login/test_login_utils.h',
       'browser/chromeos/login/ui/captive_portal_window_browsertest.cc',
       'browser/chromeos/login/ui/login_web_dialog_browsertest.cc',
       'browser/chromeos/login/ui/simple_web_view_dialog_browsertest.cc',
@@ -229,6 +227,8 @@
       'browser/devtools/device/adb/adb_client_socket_browsertest.cc',
       'browser/devtools/device/adb/mock_adb_server.cc',
       'browser/devtools/device/adb/mock_adb_server.h',
+      'browser/devtools/device/webrtc/webrtc_device_provider_browsertest.cc',
+      'browser/devtools/device/webrtc/webrtc_device_provider_browsertest.js',
       'browser/devtools/device/port_forwarding_browsertest.cc',
       'browser/devtools/device/usb/android_usb_browsertest.cc',
       'browser/devtools/devtools_window_testing.cc',
@@ -297,6 +297,7 @@
       'browser/extensions/api/idltest/idltest_apitest.cc',
       'browser/extensions/api/image_writer_private/image_writer_private_apitest.cc',
       'browser/extensions/api/image_writer_private/test_utils.cc',
+      'browser/extensions/api/inline_install_private/inline_install_private_apitest.cc',
       'browser/extensions/api/input_ime/input_ime_apitest_chromeos.cc',
       'browser/extensions/api/log_private/log_private_apitest_chromeos.cc',
       'browser/extensions/api/management/management_api_browsertest.cc',
@@ -337,10 +338,6 @@
       'browser/extensions/api/system_indicator/system_indicator_apitest.cc',
       'browser/extensions/api/system_display/system_display_apitest.cc',
       'browser/extensions/api/system_private/system_private_apitest.cc',
-      'browser/extensions/api/system_storage/storage_api_test_util.cc',
-      'browser/extensions/api/system_storage/storage_api_test_util.h',
-      'browser/extensions/api/system_storage/system_storage_apitest.cc',
-      'browser/extensions/api/system_storage/system_storage_eject_apitest.cc',
       'browser/extensions/api/tab_capture/tab_capture_apitest.cc',
       'browser/extensions/api/tabs/tabs_test.cc',
       'browser/extensions/api/terminal/terminal_private_apitest.cc',
@@ -718,6 +715,7 @@
       'browser/ui/webui/options/manage_profile_browsertest.js',
       'browser/ui/webui/options/options_browsertest.cc',
       'browser/ui/webui/options/options_browsertest.js',
+      'browser/ui/webui/options/options_browsertest_base.js',
       'browser/ui/webui/options/options_ui_browsertest.cc',
       'browser/ui/webui/options/options_ui_browsertest.h',
       'browser/ui/webui/options/password_manager_browsertest.js',
@@ -844,6 +842,7 @@
       'browser/apps/app_shim/app_shim_interactive_uitest_mac.mm',
       'browser/apps/app_shim/app_shim_quit_interactive_uitest_mac.mm',
       'browser/apps/app_window_interactive_uitest.cc',
+      'browser/apps/app_window_intercept_all_keys_uitest.cc',
       'browser/apps/web_view_interactive_browsertest.cc',
       'browser/autofill/autofill_interactive_uitest.cc',
       'browser/browser_keyevents_browsertest.cc',
@@ -1242,6 +1241,7 @@
       'browser/sync/test/integration/single_client_bookmarks_sync_test.cc',
       'browser/sync/test/integration/single_client_dictionary_sync_test.cc',
       'browser/sync/test/integration/single_client_directory_sync_test.cc',
+      'browser/sync/test/integration/single_client_e2e_test.cc',
       'browser/sync/test/integration/single_client_extensions_sync_test.cc',
       'browser/sync/test/integration/single_client_passwords_sync_test.cc',
       'browser/sync/test/integration/single_client_preferences_sync_test.cc',
@@ -1629,7 +1629,6 @@
             'test/chromedriver/embed_js_in_cpp.py',
             'test/chromedriver/js/add_cookie.js',
             'test/chromedriver/js/call_function.js',
-            'test/chromedriver/js/dispatch_context_menu_event.js',
             'test/chromedriver/js/execute_async_script.js',
             'test/chromedriver/js/focus.js',
             'test/chromedriver/js/get_element_region.js',
@@ -1645,7 +1644,6 @@
                       '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome',
                       'test/chromedriver/js/add_cookie.js',
                       'test/chromedriver/js/call_function.js',
-                      'test/chromedriver/js/dispatch_context_menu_event.js',
                       'test/chromedriver/js/execute_async_script.js',
                       'test/chromedriver/js/focus.js',
                       'test/chromedriver/js/get_element_region.js',
@@ -2306,10 +2304,6 @@
           'dependencies': [
             '../ui/views/views.gyp:views',
           ],
-          'sources!': [
-            # TODO(estade): port to views.
-            'browser/ui/webui/constrained_web_dialog_ui_browsertest.cc',
-          ],
         }, { # else: toolkit_views == 0
           'sources/': [
             ['exclude', '^../ui/views/'],
@@ -2340,7 +2334,7 @@
             ['exclude', '^browser/ui/webui/app_list/'],
           ],
         }],
-        ['enable_managed_users==0', {
+        ['enable_supervised_users==0', {
           'sources/': [
             ['exclude', '^browser/supervised_user/'],
             ['exclude', '^browser/ui/webui/downloads_ui_supervised_browsertest.cc'],
@@ -2753,7 +2747,7 @@
             'browser/sync/test/integration/two_client_app_list_sync_test.cc',
           ],
         }],
-        ['enable_managed_users==0', {
+        ['enable_supervised_users==0', {
           'sources!': [
             'browser/sync/test/integration/single_client_supervised_user_settings_sync_test.cc',
           ],

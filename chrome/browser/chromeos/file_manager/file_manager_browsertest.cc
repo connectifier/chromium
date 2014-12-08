@@ -36,11 +36,13 @@
 #include "chrome/browser/notifications/notification.h"
 #include "chrome/browser/notifications/notification_ui_manager.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/ui/ash/multi_user/multi_user_util.h"
 #include "chrome/browser/ui/ash/multi_user/multi_user_window_manager.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chromeos/chromeos_switches.h"
+#include "components/signin/core/browser/signin_manager.h"
 #include "components/user_manager/user_manager.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/test/test_utils.h"
@@ -826,14 +828,6 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
                       TestParameter(NOT_IN_GUEST_MODE, "fileDisplayDrive"),
                       TestParameter(NOT_IN_GUEST_MODE, "fileDisplayMtp")));
 
-// http://crbug.com/327719
-WRAPPED_INSTANTIATE_TEST_CASE_P(
-    DISABLED_OpenZipFiles,
-    FileManagerBrowserTest,
-    ::testing::Values(TestParameter(IN_GUEST_MODE, "zipOpenDownloads"),
-                      TestParameter(NOT_IN_GUEST_MODE, "zipOpenDownloads"),
-                      TestParameter(NOT_IN_GUEST_MODE, "zipOpenDrive")));
-
 // Slow tests are disabled on debug build. http://crbug.com/327719
 // Fails on official build. http://crbug.com/429294
 #if !defined(NDEBUG) || defined(OFFICIAL_BUILD)
@@ -1141,7 +1135,8 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
     FileManagerBrowserTest,
     ::testing::Values(TestParameter(NOT_IN_GUEST_MODE, "showGridViewDownloads"),
                       TestParameter(IN_GUEST_MODE, "showGridViewDownloads"),
-                      TestParameter(NOT_IN_GUEST_MODE, "showGridViewDrive")));
+                      TestParameter(NOT_IN_GUEST_MODE, "showGridViewDrive"),
+                      TestParameter(IN_GUEST_MODE, "checkFilesSorted")));
 
 // Structure to describe an account info.
 struct TestAccountInfo {
@@ -1212,8 +1207,9 @@ class MultiProfileFileManagerBrowserTest : public FileManagerBrowserTestBase {
       user_manager->UserLoggedIn(info.email, info.hash, false);
     user_manager->SaveUserDisplayName(info.email,
                                       base::UTF8ToUTF16(info.display_name));
-    chromeos::ProfileHelper::GetProfileByUserIdHash(info.hash)->GetPrefs()->
-        SetString(prefs::kGoogleServicesUsername, info.email);
+    SigninManagerFactory::GetForProfile(
+        chromeos::ProfileHelper::GetProfileByUserIdHash(info.hash))->
+            SetAuthenticatedUsername(info.email);
   }
 
  private:

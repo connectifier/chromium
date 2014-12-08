@@ -239,7 +239,7 @@ class ProfileIOData {
   }
 #endif
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
   const SupervisedUserURLFilter* supervised_user_url_filter() const {
     return supervised_user_url_filter_.get();
   }
@@ -328,7 +328,7 @@ class ProfileIOData {
     // and needs to be on the main thread.
     scoped_ptr<net::ProxyConfigService> proxy_config_service;
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
     scoped_refptr<const SupervisedUserURLFilter> supervised_user_url_filter;
 #endif
 
@@ -620,6 +620,8 @@ class ProfileIOData {
   mutable BooleanPrefMember enable_referrers_;
   mutable BooleanPrefMember enable_do_not_track_;
   mutable BooleanPrefMember force_safesearch_;
+  mutable BooleanPrefMember force_google_safesearch_;
+  mutable BooleanPrefMember force_youtube_safety_mode_;
   mutable BooleanPrefMember safe_browsing_enabled_;
   mutable BooleanPrefMember printing_enabled_;
   mutable BooleanPrefMember sync_disabled_;
@@ -708,7 +710,7 @@ class ProfileIOData {
   mutable scoped_ptr<ChromeHttpUserAgentSettings>
       chrome_http_user_agent_settings_;
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
   mutable scoped_refptr<const SupervisedUserURLFilter>
       supervised_user_url_filter_;
 #endif

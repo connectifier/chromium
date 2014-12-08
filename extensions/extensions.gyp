@@ -282,7 +282,7 @@
       'dependencies': [
         '../base/base.gyp:base',
         '../base/base.gyp:base_prefs',
-        '../components/components.gyp:copresence_sockets',
+        '../components/components.gyp:copresence_endpoints',
         '../components/components.gyp:keyed_service_content',
         '../components/components.gyp:keyed_service_core',
         '../components/components.gyp:pref_registry',
@@ -379,10 +379,10 @@
         'browser/api/cast_channel/logger.h',
         'browser/api/cast_channel/logger_util.cc',
         'browser/api/cast_channel/logger_util.h',
-        'browser/api/copresence_socket/copresence_socket_api.cc',
-        'browser/api/copresence_socket/copresence_socket_api.h',
-        'browser/api/copresence_socket/copresence_socket_resources.cc',
-        'browser/api/copresence_socket/copresence_socket_resources.h',
+        'browser/api/copresence_endpoints/copresence_endpoints_api.cc',
+        'browser/api/copresence_endpoints/copresence_endpoints_api.h',
+        'browser/api/copresence_endpoints/copresence_endpoint_resource.cc',
+        'browser/api/copresence_endpoints/copresence_endpoint_resource.h',
         'browser/api/declarative/deduping_factory.h',
         'browser/api/declarative/declarative_api.cc',
         'browser/api/declarative/declarative_api.h',
@@ -791,7 +791,6 @@
             'browser/api/vpn_provider/vpn_provider_api.h',
             'browser/api/vpn_provider/vpn_service.cc',
             'browser/api/vpn_provider/vpn_service.h',
-            'browser/api/vpn_provider/vpn_service_factory.cc',
             'browser/api/vpn_provider/vpn_service_factory.h'
           ]
         }],
@@ -1018,6 +1017,7 @@
       'type': 'static_library',
       'dependencies': [
         '../base/base.gyp:base',
+        '../base/base.gyp:base_prefs_test_support',
         '../components/components.gyp:user_prefs',
         '../content/content.gyp:content_browser',
         '../content/content.gyp:content_common',
@@ -1134,7 +1134,6 @@
       'type': 'executable',
       'dependencies': [
         '../base/base.gyp:base',
-        '../base/base.gyp:base_prefs_test_support',
         '../base/base.gyp:test_support_base',
         '../components/components.gyp:keyed_service_content',
         '../components/components.gyp:user_prefs',

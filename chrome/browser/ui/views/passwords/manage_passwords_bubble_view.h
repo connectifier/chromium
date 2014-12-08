@@ -53,6 +53,7 @@ class ManagePasswordsBubbleView : public ManagePasswordsBubble,
   }
 
  private:
+  class AskUserToSubmitURLView;
   class AccountChooserView;
   class BlacklistedView;
   class ConfirmNeverView;
@@ -114,10 +115,6 @@ class ManagePasswordsBubbleView : public ManagePasswordsBubble,
   static ManagePasswordsBubbleView* manage_passwords_bubble_;
 
   ManagePasswordsIconView* anchor_view_;
-
-  // If true upon destruction, the user has confirmed that she never wants to
-  // save passwords for a particular site.
-  bool never_save_passwords_;
 
   views::View* initially_focused_view_;
 

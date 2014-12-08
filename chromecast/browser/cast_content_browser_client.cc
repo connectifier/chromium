@@ -152,6 +152,7 @@ void CastContentBrowserClient::AllowCertificateError(
 void CastContentBrowserClient::SelectClientCertificate(
     int render_process_id,
     int render_view_id,
+    const net::HttpNetworkSession* network_session,
     net::SSLCertRequestInfo* cert_request_info,
     const base::Callback<void(net::X509Certificate*)>& callback) {
   GURL requesting_url("https://" + cert_request_info->host_and_port.ToString());
@@ -194,7 +195,9 @@ CastContentBrowserClient::SelectClientCertificateOnIOThread(
     return CastNetworkDelegate::DeviceCert();
   } else {
     LOG(ERROR) << "Invalid host for client certificate request: "
-               << requesting_url.host();
+               << requesting_url.host()
+               << " with render_process_id: "
+               << render_process_id;
     return NULL;
   }
 }

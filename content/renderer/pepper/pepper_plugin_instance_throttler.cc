@@ -11,7 +11,7 @@
 #include "base/time/time.h"
 #include "content/public/common/content_constants.h"
 #include "content/public/common/content_switches.h"
-#include "content/renderer/pepper/plugin_power_saver_helper.h"
+#include "content/renderer/pepper/plugin_power_saver_helper_impl.h"
 #include "content/renderer/render_thread_impl.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
 #include "ui/gfx/color_utils.h"
@@ -107,7 +107,7 @@ const int kMinimumConsecutiveInterestingFrames = 4;
 }  // namespace
 
 PepperPluginInstanceThrottler::PepperPluginInstanceThrottler(
-    PluginPowerSaverHelper* power_saver_helper,
+    PluginPowerSaverHelperImpl* power_saver_helper,
     const blink::WebRect& bounds,
     const std::string& module_name,
     const GURL& plugin_url,
@@ -130,11 +130,11 @@ PepperPluginInstanceThrottler::PepperPluginInstanceThrottler(
     RecordFlashSizeMetric(bounds.width, bounds.height);
   }
 
-  bool cross_origin = false;
+  bool is_main_attraction = false;
   is_peripheral_content_ =
       is_flash_plugin_ &&
-      power_saver_helper->ShouldThrottleContent(content_origin, bounds.width,
-                                                bounds.height, &cross_origin);
+      power_saver_helper->ShouldThrottleContent(
+          content_origin, bounds.width, bounds.height, &is_main_attraction);
 
   power_saver_enabled_ = is_peripheral_content_ &&
                          base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -155,7 +155,7 @@ PepperPluginInstanceThrottler::PepperPluginInstanceThrottler(
                      weak_factory_.GetWeakPtr(), true /* throttled */),
           base::TimeDelta::FromMilliseconds(kThrottleTimeout));
     }
-  } else if (cross_origin) {
+  } else if (is_main_attraction) {
     power_saver_helper->WhitelistContentOrigin(content_origin);
   }
 }

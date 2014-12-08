@@ -54,6 +54,8 @@ _NEGATIVE_FILTER = [
 
 _VERSION_SPECIFIC_FILTER = {}
 _VERSION_SPECIFIC_FILTER['HEAD'] = [
+    # https://code.google.com/p/chromedriver/issues/detail?id=992
+    'ChromeDownloadDirTest.testDownloadDirectoryOverridesExistingPreferences',
 ]
 _VERSION_SPECIFIC_FILTER['37'] = [
     # https://code.google.com/p/chromedriver/issues/detail?id=954
@@ -83,8 +85,6 @@ _OS_SPECIFIC_FILTER['linux'] = [
     'ChromeDriverTest.testWindowSize',
 ]
 _OS_SPECIFIC_FILTER['mac'] = [
-    # https://code.google.com/p/chromedriver/issues/detail?id=304
-    'ChromeDriverTest.testGoBackAndGoForward',
 ]
 
 _DESKTOP_NEGATIVE_FILTER = [
@@ -151,6 +151,8 @@ _ANDROID_NEGATIVE_FILTER['chromedriver_webview_shell'] = (
         # https://code.google.com/p/chromedriver/issues/detail?id=913
         'ChromeDriverTest.testChromeDriverSendLargeData',
         'PerformanceLoggerTest.testPerformanceLogger',
+        # https://code.google.com/p/chromedriver/issues/detail?id=994
+        'ChromeDriverTest.testSwitchToParentFrame',
     ]
 )
 
@@ -538,6 +540,13 @@ class ChromeDriverTest(ChromeDriverBaseTest):
     self._driver.Load(self.GetHttpUrlForFile('/chromedriver/empty.html'))
     self._driver.GoBack()
     self._driver.GoForward()
+
+  def testDontGoBackOrGoForward(self):
+    self.assertEquals('data:,', self._driver.GetCurrentUrl())
+    self._driver.GoBack()
+    self.assertEquals('data:,', self._driver.GetCurrentUrl())
+    self._driver.GoForward()
+    self.assertEquals('data:,', self._driver.GetCurrentUrl())
 
   def testRefresh(self):
     self._driver.Load(self.GetHttpUrlForFile('/chromedriver/empty.html'))

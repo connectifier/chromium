@@ -142,6 +142,10 @@ class AppListViewTestContext {
   // Closes the app list. This sets |view_| to NULL.
   void Close();
 
+  // Checks the search box widget is at |expected| in the contents view's
+  // coordinate space.
+  bool CheckSearchBoxWidget(const gfx::Rect& expected);
+
   // Gets the PaginationModel owned by |view_|.
   PaginationModel* GetPaginationModel();
 
@@ -180,8 +184,12 @@ AppListViewTestContext::AppListViewTestContext(int test_type,
     : test_type_(static_cast<TestType>(test_type)) {
   switch (test_type_) {
     case NORMAL:
+      base::CommandLine::ForCurrentProcess()->AppendSwitch(
+          switches::kDisableExperimentalAppList);
       break;
     case LANDSCAPE:
+      base::CommandLine::ForCurrentProcess()->AppendSwitch(
+          switches::kDisableExperimentalAppList);
       base::CommandLine::ForCurrentProcess()->AppendSwitch(
           switches::kEnableCenteredAppList);
       break;
@@ -257,6 +265,15 @@ void AppListViewTestContext::Close() {
 
   // |view_| should have been deleted and set to NULL via ViewClosing().
   EXPECT_FALSE(view_);
+}
+
+bool AppListViewTestContext::CheckSearchBoxWidget(const gfx::Rect& expected) {
+  ContentsView* contents_view = view_->app_list_main_view()->contents_view();
+  gfx::Point point = expected.origin();
+  views::View::ConvertPointToScreen(contents_view, &point);
+
+  return gfx::Rect(point, expected.size()) ==
+         view_->search_box_widget()->GetWindowBoundsInScreen();
 }
 
 PaginationModel* AppListViewTestContext::GetPaginationModel() {
@@ -432,7 +449,6 @@ void AppListViewTestContext::RunStartPageTest() {
 
     // Show the start page view.
     EXPECT_TRUE(SetAppListState(AppListModel::STATE_START));
-    EXPECT_FALSE(main_view->search_box_view()->visible());
     gfx::Size view_size(view_->GetPreferredSize());
 
     // Simulate clicking the "All apps" button. Check that we navigate to the
@@ -441,7 +457,6 @@ void AppListViewTestContext::RunStartPageTest() {
     SimulateClick(start_page_view->all_apps_button());
     main_view->contents_view()->Layout();
     EXPECT_TRUE(IsStateShown(AppListModel::STATE_APPS));
-    EXPECT_TRUE(main_view->search_box_view()->visible());
 
     // Hiding and showing the search box should not affect the app list's
     // preferred size. This is a regression test for http://crbug.com/386912.
@@ -565,13 +580,11 @@ void AppListViewTestContext::RunSearchResultsTest() {
   AppListMainView* main_view = view_->app_list_main_view();
   ContentsView* contents_view = main_view->contents_view();
   EXPECT_TRUE(SetAppListState(AppListModel::STATE_APPS));
-  EXPECT_TRUE(main_view->search_box_view()->visible());
 
   // Show the search results.
   contents_view->ShowSearchResults(true);
   contents_view->Layout();
   EXPECT_TRUE(contents_view->IsStateActive(AppListModel::STATE_SEARCH_RESULTS));
-  EXPECT_TRUE(main_view->search_box_view()->visible());
 
   const gfx::Rect default_contents_bounds =
       contents_view->GetDefaultContentsBounds();
@@ -594,51 +607,48 @@ void AppListViewTestContext::RunSearchResultsTest() {
   EXPECT_EQ(AppListModel::STATE_APPS, delegate_->GetTestModel()->state());
   EXPECT_EQ(default_contents_bounds,
             contents_view->apps_container_view()->bounds());
-  EXPECT_TRUE(main_view->search_box_view()->visible());
 
   if (test_type_ == EXPERIMENTAL) {
+    // Check that typing into the search box triggers the search page.
     EXPECT_TRUE(SetAppListState(AppListModel::STATE_START));
-    // Check that typing into the dummy search box triggers the search page.
+    view_->Layout();
+    EXPECT_EQ(default_contents_bounds,
+              contents_view->start_page_view()->bounds());
+    EXPECT_TRUE(CheckSearchBoxWidget(
+        contents_view->GetSearchBoxBoundsForState(AppListModel::STATE_START)));
+
     base::string16 search_text = base::UTF8ToUTF16("test");
-    SearchBoxView* dummy_search_box =
-        contents_view->start_page_view()->dummy_search_box_view();
-    EXPECT_TRUE(dummy_search_box->IsDrawn());
-    dummy_search_box->search_box()->InsertText(search_text);
-    contents_view->Layout();
+    main_view->search_box_view()->search_box()->SetText(base::string16());
+    main_view->search_box_view()->search_box()->InsertText(search_text);
     // Check that the current search is using |search_text|.
     EXPECT_EQ(search_text, delegate_->GetTestModel()->search_box()->text());
-    EXPECT_TRUE(main_view->search_box_view()->visible());
     EXPECT_EQ(search_text, main_view->search_box_view()->search_box()->text());
+    view_->Layout();
     EXPECT_TRUE(
         contents_view->IsStateActive(AppListModel::STATE_SEARCH_RESULTS));
-    EXPECT_EQ(AppListModel::STATE_SEARCH_RESULTS,
-              delegate_->GetTestModel()->state());
-    EXPECT_EQ(default_contents_bounds,
-              contents_view->search_results_page_view()->bounds());
+    EXPECT_TRUE(
+        CheckSearchBoxWidget(contents_view->GetDefaultSearchBoxBounds()));
 
-    // Check that typing into the real search box triggers the search page.
+    // Check that typing into the search box triggers the search page.
     EXPECT_TRUE(SetAppListState(AppListModel::STATE_APPS));
+    view_->Layout();
     EXPECT_EQ(default_contents_bounds,
               contents_view->apps_container_view()->bounds());
+    EXPECT_TRUE(
+        CheckSearchBoxWidget(contents_view->GetDefaultSearchBoxBounds()));
 
     base::string16 new_search_text = base::UTF8ToUTF16("apple");
     main_view->search_box_view()->search_box()->SetText(base::string16());
     main_view->search_box_view()->search_box()->InsertText(new_search_text);
-    // Check that the current search is using |search_text|.
+    // Check that the current search is using |new_search_text|.
     EXPECT_EQ(new_search_text, delegate_->GetTestModel()->search_box()->text());
     EXPECT_EQ(new_search_text,
               main_view->search_box_view()->search_box()->text());
-    contents_view->Layout();
+    view_->Layout();
     EXPECT_TRUE(
         contents_view->IsStateActive(AppListModel::STATE_SEARCH_RESULTS));
-    EXPECT_TRUE(main_view->search_box_view()->visible());
-    EXPECT_TRUE(dummy_search_box->search_box()->text().empty());
-
-    // Check that the dummy search box is clear when reshowing the start page.
-    EXPECT_TRUE(SetAppListState(AppListModel::STATE_APPS));
-    EXPECT_TRUE(SetAppListState(AppListModel::STATE_START));
-    EXPECT_TRUE(dummy_search_box->IsDrawn());
-    EXPECT_TRUE(dummy_search_box->search_box()->text().empty());
+    EXPECT_TRUE(
+        CheckSearchBoxWidget(contents_view->GetDefaultSearchBoxBounds()));
   }
 
   Close();

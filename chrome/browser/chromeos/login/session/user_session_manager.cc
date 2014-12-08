@@ -172,9 +172,12 @@ void InitLocaleAndInputMethodsForNewUser(
   }
 
   // Save the preferred languages in the user's preferences.
-  StringPrefMember language_preferred_languages;
-  language_preferred_languages.Init(prefs::kLanguagePreferredLanguages, prefs);
-  language_preferred_languages.SetValue(JoinString(language_codes, ','));
+  prefs->SetString(prefs::kLanguagePreferredLanguages,
+                   JoinString(language_codes, ','));
+
+  // Indicate that we need to merge the syncable input methods when we sync,
+  // since we have not applied the synced prefs before.
+  prefs->SetBoolean(prefs::kLanguageShouldMergeInputMethods, true);
 }
 
 #if defined(ENABLE_RLZ)
@@ -989,8 +992,7 @@ void UserSessionManager::FinalizePrepareProfile(Profile* profile) {
 void UserSessionManager::ActivateWizard(const std::string& screen_name) {
   LoginDisplayHost* host = LoginDisplayHostImpl::default_host();
   CHECK(host);
-  scoped_ptr<base::DictionaryValue> params;
-  host->StartWizard(screen_name, params.Pass());
+  host->StartWizard(screen_name);
 }
 
 void UserSessionManager::InitializeStartUrls() const {
@@ -1483,6 +1485,10 @@ void UserSessionManager::RunCallbackOnLocaleLoaded(
     InputEventsBlocker* /* input_events_blocker */,
     const locale_util::LanguageSwitchResult& /* result */) {
   callback.Run();
+}
+
+void UserSessionManager::RemoveProfileForTesting(Profile* profile) {
+  default_ime_states_.erase(profile);
 }
 
 }  // namespace chromeos

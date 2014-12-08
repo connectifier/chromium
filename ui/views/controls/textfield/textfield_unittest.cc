@@ -31,7 +31,6 @@
 #include "ui/views/test/test_views_delegate.h"
 #include "ui/views/test/views_test_base.h"
 #include "ui/views/widget/widget.h"
-#include "ui/wm/core/default_screen_position_client.h"
 #include "url/gurl.h"
 
 #if defined(OS_WIN)
@@ -160,14 +159,6 @@ class TextfieldTest : public ViewsTestBase, public TextfieldController {
   }
 
   // ::testing::Test:
-  void SetUp() override {
-    ViewsTestBase::SetUp();
-#if defined(USE_AURA)
-    aura::client::SetScreenPositionClient(GetContext(),
-                                          &screen_position_client_);
-#endif  // !defined(USE_AURA)
-  }
-
   void TearDown() override {
     if (widget_)
       widget_->Close();
@@ -384,7 +375,6 @@ class TextfieldTest : public ViewsTestBase, public TextfieldController {
 
  private:
   ui::ClipboardType copied_to_clipboard_;
-  wm::DefaultScreenPositionClient screen_position_client_;
 
   DISALLOW_COPY_AND_ASSIGN(TextfieldTest);
 };
@@ -1451,12 +1441,12 @@ TEST_F(TextfieldTest, TextCursorDisplayTest) {
   SendKeyEvent(0x05E1);
   EXPECT_EQ(WideToUTF16(L"ab\x05E1"), textfield_->text());
   x = GetCursorBounds().x();
-  EXPECT_EQ(prev_x, x);
+  EXPECT_GE(1, std::abs(x - prev_x));
 
   SendKeyEvent(0x05E2);
   EXPECT_EQ(WideToUTF16(L"ab\x05E1\x5E2"), textfield_->text());
   x = GetCursorBounds().x();
-  EXPECT_EQ(prev_x, x);
+  EXPECT_GE(1, std::abs(x - prev_x));
 
   // Clear text.
   SendKeyEvent(ui::VKEY_A, false, true);
@@ -1472,7 +1462,7 @@ TEST_F(TextfieldTest, TextCursorDisplayTest) {
   SendKeyEvent(0x05E2);
   EXPECT_EQ(WideToUTF16(L"\x05E1\x05E2"), textfield_->text());
   x = GetCursorBounds().x();
-  EXPECT_EQ(prev_x, x);
+  EXPECT_GE(1, std::abs(x - prev_x));
 
   SendKeyEvent('a');
   EXPECT_EQ(WideToUTF16(L"\x05E1\x5E2" L"a"), textfield_->text());
@@ -1501,7 +1491,7 @@ TEST_F(TextfieldTest, TextCursorDisplayInRTLTest) {
   SendKeyEvent('b');
   EXPECT_STR_EQ("ab", textfield_->text());
   x = GetCursorBounds().x();
-  EXPECT_EQ(prev_x, x);
+  EXPECT_GE(1, std::abs(x - prev_x));
 
   SendKeyEvent(0x05E1);
   EXPECT_EQ(WideToUTF16(L"ab\x05E1"), textfield_->text());
@@ -1532,7 +1522,7 @@ TEST_F(TextfieldTest, TextCursorDisplayInRTLTest) {
   SendKeyEvent('a');
   EXPECT_EQ(WideToUTF16(L"\x05E1\x5E2" L"a"), textfield_->text());
   x = GetCursorBounds().x();
-  EXPECT_EQ(prev_x, x);
+  EXPECT_GE(1, std::abs(x - prev_x));
   prev_x = x;
 
   SendKeyEvent('b');

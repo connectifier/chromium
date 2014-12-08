@@ -94,7 +94,8 @@
 #include "chrome/browser/signin/android_profile_oauth2_token_service.h"
 #endif
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
+#include "chrome/browser/supervised_user/supervised_user_constants.h"
 #include "chrome/browser/supervised_user/supervised_user_settings_service.h"
 #include "chrome/browser/supervised_user/supervised_user_settings_service_factory.h"
 #endif
@@ -393,7 +394,7 @@ void TestingProfile::Init() {
       this, CreateTestDesktopNotificationService);
 #endif
 
-#if defined(ENABLE_MANAGED_USERS)
+#if defined(ENABLE_SUPERVISED_USERS)
   if (!IsOffTheRecord()) {
     SupervisedUserSettingsService* settings_service =
         SupervisedUserSettingsServiceFactory::GetForProfile(this);
@@ -693,6 +694,18 @@ Profile* TestingProfile::GetOriginalProfile() {
 
 bool TestingProfile::IsSupervised() {
   return !supervised_user_id_.empty();
+}
+
+bool TestingProfile::IsChild() {
+#if defined(ENABLE_SUPERVISED_USERS)
+  return supervised_user_id_ == supervised_users::kChildAccountSUID;
+#else
+  return false;
+#endif
+}
+
+bool TestingProfile::IsLegacySupervised() {
+  return IsSupervised() && !IsChild();
 }
 
 #if defined(ENABLE_EXTENSIONS)

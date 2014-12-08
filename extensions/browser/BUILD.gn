@@ -7,11 +7,10 @@ import("//build/config/features.gni")
 
 # GYP version: extensions/extensions.gyp:extensions_browser
 source_set("browser") {
-  sources = [
-  ]
+  sources = []
 
   deps = [
-    "//components/copresence_sockets",
+    "//components/copresence_endpoints",
     "//components/keyed_service/content",
     "//components/keyed_service/core",
     "//components/pref_registry",
@@ -27,7 +26,7 @@ source_set("browser") {
     "//google_apis",
     "//skia",
     "//third_party/leveldatabase",
-    "//third_party/re2"
+    "//third_party/re2",
   ]
 
   if (enable_extensions) {
@@ -100,10 +99,10 @@ source_set("browser") {
       "api/cast_channel/logger.h",
       "api/cast_channel/logger_util.cc",
       "api/cast_channel/logger_util.h",
-      "api/copresence_socket/copresence_socket_api.cc",
-      "api/copresence_socket/copresence_socket_api.h",
-      "api/copresence_socket/copresence_socket_resources.cc",
-      "api/copresence_socket/copresence_socket_resources.h",
+      "api/copresence_endpoints/copresence_endpoints_api.cc",
+      "api/copresence_endpoints/copresence_endpoints_api.h",
+      "api/copresence_endpoints/copresence_endpoint_resource.cc",
+      "api/copresence_endpoints/copresence_endpoint_resource.h",
       "api/declarative/declarative_api.cc",
       "api/declarative/declarative_api.h",
       "api/declarative/declarative_rule.h",
@@ -509,13 +508,9 @@ source_set("browser") {
     ]
 
     if (use_openssl) {
-      sources += [
-        "api/cast_channel/cast_auth_util_openssl.cc",
-      ]
+      sources += [ "api/cast_channel/cast_auth_util_openssl.cc" ]
     } else {
-      sources += [
-        "api/cast_channel/cast_auth_util_nss.cc",
-      ]
+      sources += [ "api/cast_channel/cast_auth_util_nss.cc" ]
     }
 
     if (is_chromeos) {
@@ -524,15 +519,12 @@ source_set("browser") {
         "api/vpn_provider/vpn_provider_api.h",
         "api/vpn_provider/vpn_service.cc",
         "api/vpn_provider/vpn_service.h",
-        "api/vpn_provider/vpn_service_factory.cc",
         "api/vpn_provider/vpn_service_factory.h",
       ]
     }
   }
 
   if (is_win) {
-    cflags = [
-      "/wd4267", # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
-    ]
+    cflags = [ "/wd4267" ]  # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
   }
 }

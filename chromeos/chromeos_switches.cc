@@ -75,9 +75,6 @@ const char kDisableNetworkPortalNotification[] =
 // Enables switching between different cellular carriers from the UI.
 const char kEnableCarrierSwitching[] = "enable-carrier-switching";
 
-// Enables the next generation version of ChromeVox.
-const char kEnableChromeVoxNext[] = "enable-chromevox-next";
-
 // Enables cloud backup feature.
 const char kEnableCloudBackup[] = "enable-cloud-backup";
 
@@ -95,6 +92,9 @@ const char kEnableEmbeddedSignin[] = "enable-embedded-signin";
 // If this switch is set, the new Korean IME will be available in
 // chrome://settings/languages.
 const char kEnableNewKoreanIme[] = "enable-new-korean-ime";
+
+// If this switch is set, the input view keyboard will be in materia design.
+const char kEnableNewQPInputView[] = "enable-new-qp-input-view";
 
 // If this switch is set, the US keyboard input method will provide suggestions
 // as typing on physical keyboard.

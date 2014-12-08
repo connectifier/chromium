@@ -355,6 +355,7 @@
         }],
         ['OS=="android"', {
           'dependencies': [
+            '../ui/android/ui_android.gyp:ui_android',
             '../ui/shell_dialogs/shell_dialogs.gyp:shell_dialogs',
             'content.gyp:content_v8_external_data',
           ],
@@ -703,6 +704,7 @@
         'common/dwrite_font_platform_win_unittest.cc',
         'common/fileapi/file_system_util_unittest.cc',
         'common/gpu/client/gpu_memory_buffer_impl_unittest.cc',
+        'common/gpu/gpu_channel_manager_unittest.cc',
         'common/gpu/gpu_memory_buffer_factory_unittest.cc',
         'common/gpu/gpu_memory_manager_unittest.cc',
         'common/host_discardable_shared_memory_manager_unittest.cc',
@@ -1213,7 +1215,8 @@
             'browser/accessibility/cross_platform_accessibility_browsertest.cc',
             'browser/accessibility/dump_accessibility_tree_browsertest.cc',
             'browser/accessibility/site_per_process_accessibility_browsertest.cc',
-            'browser/battery_status/battery_status_browsertest.cc',
+            'browser/battery_status/battery_monitor_impl_browsertest.cc',
+            'browser/battery_status/battery_monitor_integration_browsertest.cc',
             'browser/compositor/image_transport_factory_browsertest.cc',
             'browser/bookmarklet_browsertest.cc',
             'browser/child_process_launcher_browsertest.cc',
@@ -1272,6 +1275,7 @@
             'child/site_isolation_policy_browsertest.cc',
             'renderer/accessibility/renderer_accessibility_browsertest.cc',
             'renderer/browser_render_view_browsertest.cc',
+            'renderer/devtools/v8_sampling_profiler_browsertest.cc',
             'renderer/dom_serializer_browsertest.cc',
             'renderer/gin_browsertest.cc',
             'renderer/mouse_lock_dispatcher_browsertest.cc',
@@ -1707,6 +1711,16 @@
         },
         {
           # TODO(GN)
+          'target_name': 'content_browsertests_manifest',
+          'type': 'none',
+          'variables': {
+            'jinja_inputs': ['shell/android/browsertests_apk/AndroidManifest.xml.jinja2'],
+            'jinja_output': '<(SHARED_INTERMEDIATE_DIR)/content_browsertests_manifest/AndroidManifest.xml',
+          },
+          'includes': [ '../build/android/jinja_template.gypi' ],
+        },
+        {
+          # TODO(GN)
           'target_name': 'content_browsertests_apk',
           'type': 'none',
           'dependencies': [
@@ -1720,6 +1734,7 @@
           'variables': {
             'apk_name': 'content_browsertests',
             'java_in_dir': 'shell/android/browsertests_apk',
+            'android_manifest_path': '<(SHARED_INTERMEDIATE_DIR)/content_browsertests_manifest/AndroidManifest.xml',
             'resource_dir': 'shell/android/browsertests_apk/res',
             'native_lib_target': 'libcontent_browsertests',
             'additional_input_paths': ['<(PRODUCT_DIR)/content_shell/assets/content_shell.pak'],
@@ -1754,6 +1769,16 @@
           'includes': [ '../build/apk_test.gypi' ],
         },
         {
+          # GN: //content/shell/android:chromium_linker_test_manifest
+          'target_name': 'chromium_linker_test_manifest',
+          'type': 'none',
+          'variables': {
+            'jinja_inputs': ['shell/android/linker_test_apk/AndroidManifest.xml.jinja2'],
+            'jinja_output': '<(SHARED_INTERMEDIATE_DIR)/chromium_linker_test_manifest/AndroidManifest.xml',
+          },
+          'includes': [ '../build/android/jinja_template.gypi' ],
+        },
+        {
           # GN: //content/shell/android:chromium_linker_test_apk
           'target_name': 'chromium_linker_test_apk',
           'type': 'none',
@@ -1768,6 +1793,7 @@
               ],
               'variables': {
                 'apk_name': 'ChromiumLinkerTest',
+                'android_manifest_path': '<(SHARED_INTERMEDIATE_DIR)/chromium_linker_test_manifest/AndroidManifest.xml',
                 'java_in_dir': 'shell/android/linker_test_apk',
                 'resource_dir': 'shell/android/linker_test_apk/res',
                 'native_lib_target': 'libchromium_android_linker_test',
@@ -1854,7 +1880,6 @@
           'dependencies': [
             '../base/base.gyp:base',
             '../base/base.gyp:base_java_test_support',
-            'content.gyp:content_common',
             'content.gyp:content_java',
           ],
           'variables': {

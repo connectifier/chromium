@@ -238,6 +238,7 @@ void GpuProcessTransportFactory::EstablishedGpuChannel(
             manager, compositor->surface_id_allocator(), context_provider));
     display_client->set_surface_output_surface(output_surface.get());
     output_surface->set_display_client(display_client.get());
+    display_client->display()->Resize(compositor->size());
     data->display_client = display_client.Pass();
     compositor->SetOutputSurface(output_surface.Pass());
     return;
@@ -264,13 +265,11 @@ void GpuProcessTransportFactory::EstablishedGpuChannel(
 #if defined(USE_OZONE)
   if (ui::SurfaceFactoryOzone::GetInstance()->CanShowPrimaryPlaneAsOverlay()) {
     surface.reset(new GpuSurfacelessBrowserCompositorOutputSurface(
-        context_provider,
-        data->surface_id,
-        &output_surface_map_,
+        context_provider, data->surface_id, &output_surface_map_,
         compositor->vsync_manager(),
-        CreateOverlayCandidateValidator(compositor->widget()),
-        GL_RGB,
-        compositor_thread_ != nullptr));
+        CreateOverlayCandidateValidator(compositor->widget()), GL_RGB,
+        compositor_thread_ != nullptr,
+        BrowserGpuMemoryBufferManager::current()));
   }
 #endif
   if (!surface)
@@ -373,6 +372,17 @@ scoped_ptr<cc::SurfaceIdAllocator>
 GpuProcessTransportFactory::CreateSurfaceIdAllocator() {
   return make_scoped_ptr(
       new cc::SurfaceIdAllocator(next_surface_id_namespace_++));
+}
+
+void GpuProcessTransportFactory::ResizeDisplay(ui::Compositor* compositor,
+                                               const gfx::Size& size) {
+  PerCompositorDataMap::iterator it = per_compositor_data_.find(compositor);
+  if (it == per_compositor_data_.end())
+    return;
+  PerCompositorData* data = it->second;
+  DCHECK(data);
+  if (data->display_client)
+    data->display_client->display()->Resize(size);
 }
 
 cc::SurfaceManager* GpuProcessTransportFactory::GetSurfaceManager() {

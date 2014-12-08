@@ -16,14 +16,6 @@ void StubPasswordManagerDriver::FillPasswordForm(
     const autofill::PasswordFormFillData& form_data) {
 }
 
-bool StubPasswordManagerDriver::DidLastPageLoadEncounterSSLErrors() {
-  return false;
-}
-
-bool StubPasswordManagerDriver::IsOffTheRecord() {
-  return false;
-}
-
 void StubPasswordManagerDriver::AllowPasswordGenerationForForm(
     const autofill::PasswordForm& form) {
 }
@@ -55,10 +47,6 @@ PasswordManager* StubPasswordManagerDriver::GetPasswordManager() {
 
 PasswordAutofillManager*
 StubPasswordManagerDriver::GetPasswordAutofillManager() {
-  return NULL;
-}
-
-autofill::AutofillManager* StubPasswordManagerDriver::GetAutofillManager() {
   return NULL;
 }
 

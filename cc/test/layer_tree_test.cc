@@ -91,7 +91,7 @@ class ExternalBeginFrameSourceForTest
 
   void TestOnBeginFrame() {
     DCHECK(CalledOnValidThread());
-    CallOnBeginFrame(CreateBeginFrameArgsForTesting());
+    CallOnBeginFrame(CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE));
   }
 
  private:
@@ -151,6 +151,11 @@ class ThreadProxyForTest : public ThreadProxy {
   void ScheduledActionBeginOutputSurfaceCreation() override {
     ThreadProxy::ScheduledActionBeginOutputSurfaceCreation();
     test_hooks_->ScheduledActionBeginOutputSurfaceCreation();
+  }
+
+  void ScheduledActionManageTiles() override {
+    ThreadProxy::ScheduledActionManageTiles();
+    test_hooks_->ScheduledActionManageTiles();
   }
 
   ThreadProxyForTest(

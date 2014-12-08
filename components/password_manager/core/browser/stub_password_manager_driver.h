@@ -20,8 +20,6 @@ class StubPasswordManagerDriver : public PasswordManagerDriver {
   // PasswordManagerDriver:
   void FillPasswordForm(
       const autofill::PasswordFormFillData& form_data) override;
-  bool DidLastPageLoadEncounterSSLErrors() override;
-  bool IsOffTheRecord() override;
   void AllowPasswordGenerationForForm(
       const autofill::PasswordForm& form) override;
   void AccountCreationFormsFound(
@@ -34,7 +32,6 @@ class StubPasswordManagerDriver : public PasswordManagerDriver {
   PasswordGenerationManager* GetPasswordGenerationManager() override;
   PasswordManager* GetPasswordManager() override;
   PasswordAutofillManager* GetPasswordAutofillManager() override;
-  autofill::AutofillManager* GetAutofillManager() override;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(StubPasswordManagerDriver);

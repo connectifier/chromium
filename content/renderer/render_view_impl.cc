@@ -44,6 +44,7 @@
 #include "content/common/dom_storage/dom_storage_types.h"
 #include "content/common/drag_messages.h"
 #include "content/common/frame_messages.h"
+#include "content/common/frame_replication_state.h"
 #include "content/common/gpu/client/webgraphicscontext3d_command_buffer_impl.h"
 #include "content/common/input_messages.h"
 #include "content/common/pepper_messages.h"
@@ -773,6 +774,9 @@ void RenderViewImpl::Initialize(
   if (CommandLine::ForCurrentProcess()->HasSwitch(switches::kSitePerProcess) &&
       proxy) {
     webview()->setMainFrame(proxy->web_frame());
+    // Initialize the WebRemoteFrame with information replicated from the
+    // browser process.
+    proxy->SetReplicatedState(params.replicated_frame_state);
   } else {
     webview()->setMainFrame(main_render_frame_->GetWebFrame());
   }
@@ -1019,9 +1023,6 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
   settings->setAccelerated2dCanvasMSAASampleCount(
       prefs.accelerated_2d_canvas_msaa_sample_count);
 
-  // Enable container culling if requested on the command line.
-  settings->setContainerCullingEnabled(prefs.container_culling_enabled);
-
   WebRuntimeFeatures::enableTextBlobs(prefs.text_blobs_enabled);
 
   settings->setAsynchronousSpellCheckingEnabled(
@@ -1124,7 +1125,13 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
       prefs.ignore_main_frame_overflow_hidden_quirk);
   settings->setReportScreenSizeInPhysicalPixelsQuirk(
       prefs.report_screen_size_in_physical_pixels_quirk);
-  settings->setMainFrameClipsContent(false);
+
+  bool record_full_layer =
+      RenderViewImpl::FromWebView(web_view)
+          ? RenderViewImpl::FromWebView(web_view)->DoesRecordFullLayer()
+          : false;
+  settings->setMainFrameClipsContent(!record_full_layer);
+
   settings->setShrinksStandaloneImagesToFit(false);
   settings->setShrinksViewportContentToFit(true);
 #endif
@@ -1140,6 +1147,10 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
   settings->setRubberBandingOnCompositorThread(
       prefs.rubber_banding_on_compositor_thread);
   settings->setUseSolidColorScrollbars(prefs.use_solid_color_scrollbars);
+
+#if defined(OS_WIN)
+  settings->setShowContextMenuOnMouseUp(true);
+#endif
 }
 
 /*static*/
@@ -1680,6 +1691,7 @@ WebView* RenderViewImpl::createView(WebLocalFrame* creator,
   // WebCore will take care of setting the correct name.
   view_params.frame_name = base::string16();
   view_params.swapped_out = false;
+  view_params.replicated_frame_state = FrameReplicationState();
   view_params.proxy_routing_id = MSG_ROUTING_NONE;
   view_params.hidden = (params.disposition == NEW_BACKGROUND_TAB);
   view_params.never_visible = never_visible;
@@ -3067,7 +3079,8 @@ void RenderViewImpl::OnDisableAutoResize(const gfx::Size& new_size) {
   if (!new_size.IsEmpty()) {
     Resize(new_size,
            physical_backing_size_,
-           top_controls_layout_height_,
+           top_controls_shrink_blink_size_,
+           top_controls_height_,
            visible_viewport_size_,
            resizer_rect_,
            is_fullscreen_,
@@ -3727,7 +3740,6 @@ void RenderViewImpl::GetSelectionBounds(gfx::Rect* start, gfx::Rect* end) {
   RenderWidget::GetSelectionBounds(start, end);
 }
 
-#if defined(OS_MACOSX) || defined(USE_AURA) || defined(OS_ANDROID)
 void RenderViewImpl::GetCompositionCharacterBounds(
     std::vector<gfx::Rect>* bounds) {
   DCHECK(bounds);
@@ -3772,7 +3784,6 @@ void RenderViewImpl::GetCompositionRange(gfx::Range* range) {
 #endif
   RenderWidget::GetCompositionRange(range);
 }
-#endif
 
 bool RenderViewImpl::CanComposeInline() {
 #if defined(ENABLE_PLUGINS)
@@ -4127,7 +4138,8 @@ void RenderViewImpl::SetDeviceScaleFactorForTesting(float factor) {
   params.visible_viewport_size = visible_viewport_size_;
   params.physical_backing_size =
       gfx::ToCeiledSize(gfx::ScaleSize(size(), factor));
-  params.top_controls_layout_height = 0.f;
+  params.top_controls_shrink_blink_size = false;
+  params.top_controls_height = 0.f;
   params.resizer_rect = WebRect();
   params.is_fullscreen = is_fullscreen();
   OnResize(params);

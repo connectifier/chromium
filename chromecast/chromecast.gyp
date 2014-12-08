@@ -28,6 +28,8 @@
         'base/metrics/cast_histograms.h',
         'base/metrics/cast_metrics_helper.cc',
         'base/metrics/cast_metrics_helper.h',
+        'base/metrics/grouped_histogram.cc',
+        'base/metrics/grouped_histogram.h'
       ],
     },  # end of target 'cast_base'
     {
@@ -151,6 +153,8 @@
         'browser/metrics/cast_stability_metrics_provider.cc',
         'browser/metrics/cast_stability_metrics_provider.h',
         'browser/metrics/platform_metrics_providers.h',
+        'browser/pref_service_helper.cc',
+        'browser/pref_service_helper.h',
         'browser/service/cast_service.cc',
         'browser/service/cast_service.h',
         'browser/url_request_context_factory.cc',
@@ -161,8 +165,6 @@
         'common/cast_paths.h',
         'common/cast_resource_delegate.cc',
         'common/cast_resource_delegate.h',
-        'common/chromecast_config.cc',
-        'common/chromecast_config.h',
         'common/chromecast_switches.cc',
         'common/chromecast_switches.h',
         'common/platform_client_auth.h',
@@ -183,7 +185,7 @@
             'browser/cast_network_delegate_simple.cc',
             'browser/devtools/remote_debugging_server_simple.cc',
             'browser/metrics/platform_metrics_providers_simple.cc',
-            'common/chromecast_config_simple.cc',
+            'browser/pref_service_helper_simple.cc',
             'common/platform_client_auth_simple.cc',
             'renderer/key_systems_cast_simple.cc',
           ],
@@ -328,6 +330,15 @@
           'includes': ['../build/java.gypi'],
         },  # end of target 'cast_shell_java'
         {
+          'target_name': 'cast_shell_manifest',
+          'type': 'none',
+          'variables': {
+            'jinja_inputs': ['browser/android/apk/AndroidManifest.xml.jinja2'],
+            'jinja_output': '<(SHARED_INTERMEDIATE_DIR)/cast_shell_manifest/AndroidManifest.xml',
+          },
+          'includes': [ '../build/android/jinja_template.gypi' ],
+        },
+        {
           'target_name': 'cast_shell_apk',
           'type': 'none',
           'dependencies': [
@@ -344,7 +355,7 @@
             # if the actual Java path is used.
             # This will hopefully be removable after the great GN migration.
             'java_in_dir': 'android',
-            'android_manifest_path': 'browser/android/apk/AndroidManifest.xml',
+            'android_manifest_path': '<(SHARED_INTERMEDIATE_DIR)/cast_shell_manifest/AndroidManifest.xml',
             'package_name': 'org.chromium.chromecast.shell',
             'native_lib_target': 'libcast_shell_android',
             'asset_location': '<(PRODUCT_DIR)/assets',

@@ -355,7 +355,7 @@ void PasswordFormManager::ProvisionallySave(
 
 void PasswordFormManager::Save() {
   DCHECK_EQ(state_, POST_MATCHING_PHASE);
-  DCHECK(!driver_->IsOffTheRecord());
+  DCHECK(!client_->IsOffTheRecord());
 
   if (IsNewLogin())
     SaveAsNewLogin(true);
@@ -381,8 +381,6 @@ void PasswordFormManager::FetchMatchingLoginsFromPasswordStore(
     NOTREACHED();
     return;
   }
-  // This logging is only temporary, to investigate http://crbug.com/423327.
-  VLOG(4) << "Asking the store for logins for this form: " << observed_form_;
   password_store->GetLogins(observed_form_, prompt_policy, this);
 }
 
@@ -512,20 +510,27 @@ void PasswordFormManager::OnRequestDone(
   // for |observed_form_|.
   driver_->AllowPasswordGenerationForForm(observed_form_);
 
+  MaybeTriggerAutofill();
+}
+
+void PasswordFormManager::MaybeTriggerAutofill() {
+  DCHECK_EQ(POST_MATCHING_PHASE, state_);
+  if (best_matches_.empty() || manager_action_ == kManagerActionBlacklisted)
+    return;
+
   // Proceed to autofill.
   // Note that we provide the choices but don't actually prefill a value if:
   // (1) we are in Incognito mode, (2) the ACTION paths don't match,
   // or (3) if it matched using public suffix domain matching.
-  bool wait_for_username =
-      driver_->IsOffTheRecord() ||
-      observed_form_.action.GetWithEmptyPath() !=
-          preferred_match_->action.GetWithEmptyPath() ||
-          preferred_match_->IsPublicSuffixMatch();
+  bool wait_for_username = client_->IsOffTheRecord() ||
+                           observed_form_.action.GetWithEmptyPath() !=
+                               preferred_match_->action.GetWithEmptyPath() ||
+                           preferred_match_->IsPublicSuffixMatch();
   if (wait_for_username)
     manager_action_ = kManagerActionNone;
   else
     manager_action_ = kManagerActionAutofilled;
-  password_manager_->Autofill(observed_form_, best_matches_,
+  password_manager_->Autofill(driver_, observed_form_, best_matches_,
                               *preferred_match_, wait_for_username);
 }
 
@@ -574,7 +579,7 @@ void PasswordFormManager::SaveAsNewLogin(bool reset_preferred_login) {
   // new_form contains the same basic data as observed_form_ (because its the
   // same form), but with the newly added credentials.
 
-  DCHECK(!driver_->IsOffTheRecord());
+  DCHECK(!client_->IsOffTheRecord());
 
   PasswordStore* password_store = client_->GetPasswordStore();
   if (!password_store) {
@@ -597,8 +602,6 @@ void PasswordFormManager::SaveAsNewLogin(bool reset_preferred_login) {
 
   pending_credentials_.date_created = Time::Now();
   SanitizePossibleUsernames(&pending_credentials_);
-  // This logging is only temporary, to investigate http://crbug.com/423327.
-  VLOG(4) << "Adding this login: " << pending_credentials_;
   password_store->AddLogin(pending_credentials_);
 
   if (reset_preferred_login) {
@@ -633,8 +636,6 @@ void PasswordFormManager::UpdatePreferredLoginState(
       iter->second->preferred = false;
       if (user_action_ == kUserActionNone)
         user_action_ = kUserActionChoose;
-      // This logging is only temporary, to investigate http://crbug.com/423327.
-      VLOG(4) << "Updating this login: " << *iter->second;
       password_store->UpdateLogin(*iter->second);
     }
   }
@@ -648,7 +649,7 @@ void PasswordFormManager::UpdateLogin() {
   // username, or the user selected one of the non-preferred matches,
   // thus requiring a swap of preferred bits.
   DCHECK(!IsNewLogin() && pending_credentials_.preferred);
-  DCHECK(!driver_->IsOffTheRecord());
+  DCHECK(!client_->IsOffTheRecord());
 
   PasswordStore* password_store = client_->GetPasswordStore();
   if (!password_store) {
@@ -677,8 +678,6 @@ void PasswordFormManager::UpdateLogin() {
     // username, so we delete the old credentials and add a new one instead.
     password_store->RemoveLogin(pending_credentials_);
     pending_credentials_.username_value = selected_username_;
-    // This logging is only temporary, to investigate http://crbug.com/423327.
-    VLOG(4) << "Adding this login: " << pending_credentials_;
     password_store->AddLogin(pending_credentials_);
   } else if ((observed_form_.scheme == PasswordForm::SCHEME_HTML) &&
              (observed_form_.origin.spec().length() >
@@ -703,8 +702,6 @@ void PasswordFormManager::UpdateLogin() {
     PasswordForm copy(pending_credentials_);
     copy.origin = observed_form_.origin;
     copy.action = observed_form_.action;
-    // This logging is only temporary, to investigate http://crbug.com/423327.
-    VLOG(4) << "Adding this login: " << copy;
     password_store->AddLogin(copy);
   } else if (observed_form_.new_password_element.empty() &&
              (pending_credentials_.password_element.empty() ||
@@ -720,12 +717,8 @@ void PasswordFormManager::UpdateLogin() {
     pending_credentials_.password_element = observed_form_.password_element;
     pending_credentials_.username_element = observed_form_.username_element;
     pending_credentials_.submit_element = observed_form_.submit_element;
-    // This logging is only temporary, to investigate http://crbug.com/423327.
-    VLOG(4) << "Adding this login: " << pending_credentials_;
     password_store->AddLogin(pending_credentials_);
   } else {
-    // This logging is only temporary, to investigate http://crbug.com/423327.
-    VLOG(4) << "Updating this login: " << pending_credentials_;
     password_store->UpdateLogin(pending_credentials_);
   }
 }
@@ -781,7 +774,7 @@ void PasswordFormManager::UploadPasswordForm(
     const autofill::FormData& form_data,
     const autofill::ServerFieldType& password_type) {
   autofill::AutofillManager* autofill_manager =
-      driver_->GetAutofillManager();
+      client_->GetAutofillManagerForMainFrame();
   if (!autofill_manager)
     return;
 

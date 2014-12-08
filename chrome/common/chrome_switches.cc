@@ -451,10 +451,10 @@ const char kEnhancedBookmarksExperiment[] = "enhanced-bookmarks-experiment";
 // installing in Chrome.
 const char kEnableEphemeralApps[]           = "enable-ephemeral-apps";
 
-// Enables v2 hotword detection features. These features include
+// Disables v2 hotword detection features. These features include
 // using a new component extension for performing hotword detection, new UI
 // flows, and always-on detection.
-const char kEnableExperimentalHotwording[]  = "enable-experimental-hotwording";
+const char kDisableExperimentalHotwording[] = "disable-experimental-hotwording";
 
 // Enables experimental hotword features specific to always-on.
 const char kEnableExperimentalHotwordHardware[] = "enable-hotword-hardware";
@@ -774,6 +774,10 @@ const char kInstantProcess[]                = "instant-process";
 // enabled.
 const char kInvalidationUseGCMChannel[]     = "invalidation-use-gcm-channel";
 
+// Disable latest shipping ECMAScript 6 features.
+const char kDisableJavaScriptHarmonyShipping[] =
+    "disable-javascript-harmony-shipping";
+
 // Enables experimental Harmony (ECMAScript 6) features.
 const char kJavaScriptHarmony[]             = "javascript-harmony";
 
@@ -1019,6 +1023,11 @@ const char kRecordMode[]                    = "record-mode";
 // time delta to remember certificates should be specified in seconds.
 const char kRememberCertErrorDecisions[]    = "remember-cert-error-decisions";
 
+// Requires presence of Certificate Transparency for Extended Validation
+// certificates. Enforce the policy detailed at:
+// http://dev.chromium.org/Home/chromium-security/certificate-transparency
+const char kRequireCTForEV[] = "require-ct-for-ev";
+
 // If set, the app list will forget it has been installed on startup. Note this
 // doesn't prevent the app list from running, it just makes Chrome think the app
 // list hasn't been enabled (as in kEnableAppList) yet.
@@ -1079,17 +1088,20 @@ const char kSilentDebuggerExtensionAPI[]    = "silent-debugger-extension-api";
 // one wishes to use Chrome as an ash server.
 const char kSilentLaunch[]                  = "silent-launch";
 
-// Simulates an update being available.
-const char kSimulateUpgrade[]               = "simulate-upgrade";
+// Simulates that elevation is needed to recover upgrade channel.
+const char kSimulateElevatedRecovery[]      = "simulate-elevated-recovery";
 
 // Simulates a critical update being available.
 const char kSimulateCriticalUpdate[]        = "simulate-critical-update";
 
 // Simulates that current version is outdated.
-const char kSimulateOutdated[]               = "simulate-outdated";
+const char kSimulateOutdated[]              = "simulate-outdated";
 
 // Simulates that current version is outdated and auto-update is off.
-const char kSimulateOutdatedNoAU[]           = "simulate-outdated-no-au";
+const char kSimulateOutdatedNoAU[]          = "simulate-outdated-no-au";
+
+// Simulates an update being available.
+const char kSimulateUpgrade[]               = "simulate-upgrade";
 
 // Speculative resource prefetching.
 const char kSpeculativeResourcePrefetching[] =

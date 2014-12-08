@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "base/debug/stack_trace.h"
+#include "base/format_macros.h"
 #include "base/logging.h"
 #include "base/stl_util.h"
 #include "base/strings/stringprintf.h"
@@ -57,10 +58,10 @@ const QuicPacketSequenceNumber kMaxPacketGap = 5000;
 const size_t kMaxFecGroups = 2;
 
 // Maximum number of acks received before sending an ack in response.
-const size_t kMaxPacketsReceivedBeforeAckSend = 20;
+const QuicPacketCount kMaxPacketsReceivedBeforeAckSend = 20;
 
 // Maximum number of tracked packets.
-const size_t kMaxTrackedPackets = 5 * kMaxTcpCongestionWindow;;
+const QuicPacketCount kMaxTrackedPackets = 5 * kMaxTcpCongestionWindow;
 
 bool Near(QuicPacketSequenceNumber a, QuicPacketSequenceNumber b) {
   QuicPacketSequenceNumber delta = (a > b) ? a - b : b - a;
@@ -191,7 +192,8 @@ QuicConnection::QuicConnection(QuicConnectionId connection_id,
                                bool is_server,
                                bool is_secure,
                                const QuicVersionVector& supported_versions)
-    : framer_(supported_versions, helper->GetClock()->ApproximateNow(),
+    : framer_(supported_versions,
+              helper->GetClock()->ApproximateNow(),
               is_server),
       helper_(helper),
       writer_(writer_factory.Create(this)),
@@ -212,6 +214,7 @@ QuicConnection::QuicConnection(QuicConnectionId connection_id,
       largest_seen_packet_with_stop_waiting_(0),
       max_undecryptable_packets_(0),
       pending_version_negotiation_packet_(false),
+      silent_close_enabled_(false),
       received_packet_manager_(&stats_),
       ack_queued_(false),
       num_packets_received_since_last_ack_sent_(0),
@@ -229,7 +232,9 @@ QuicConnection::QuicConnection(QuicConnectionId connection_id,
       time_of_last_sent_new_packet_(clock_->ApproximateNow()),
       sequence_number_of_last_sent_packet_(0),
       sent_packet_manager_(
-          is_server, clock_, &stats_,
+          is_server,
+          clock_,
+          &stats_,
           FLAGS_quic_use_bbr_congestion_control ? kBBR : kCubic,
           FLAGS_quic_use_time_loss_detection ? kTime : kNack,
           is_secure),
@@ -267,6 +272,9 @@ void QuicConnection::SetFromConfig(const QuicConfig& config) {
   if (config.negotiated()) {
     SetNetworkTimeouts(QuicTime::Delta::Infinite(),
                        config.IdleConnectionStateLifetime());
+    if (FLAGS_quic_allow_silent_close && config.SilentClose()) {
+      silent_close_enabled_ = true;
+    }
   } else {
     SetNetworkTimeouts(config.max_time_before_crypto_handshake(),
                        config.max_idle_time_before_crypto_handshake());
@@ -312,14 +320,8 @@ bool QuicConnection::SelectMutualVersion(
 void QuicConnection::OnError(QuicFramer* framer) {
   // Packets that we can not or have not decrypted are dropped.
   // TODO(rch): add stats to measure this.
-  if (FLAGS_quic_drop_junk_packets) {
-    if (!connected_ || last_packet_decrypted_ == false) {
-      return;
-    }
-  } else {
-    if (!connected_ || framer->error() == QUIC_DECRYPTION_FAILURE) {
-      return;
-    }
+  if (!connected_ || last_packet_decrypted_ == false) {
+    return;
   }
   SendConnectionCloseWithDetails(framer->error(), framer->detailed_error());
 }
@@ -949,14 +951,14 @@ void QuicConnection::MaybeCloseIfTooManyOutstandingPackets() {
           (sent_packet_manager_.GetLeastUnacked() + kMaxTrackedPackets)) {
     SendConnectionCloseWithDetails(
         QUIC_TOO_MANY_OUTSTANDING_SENT_PACKETS,
-        StringPrintf("More than %zu outstanding.", kMaxTrackedPackets));
+        StringPrintf("More than %" PRIu64 " outstanding.", kMaxTrackedPackets));
   }
   // This occurs if there are received packet gaps and the peer does not raise
   // the least unacked fast enough.
   if (received_packet_manager_.NumTrackedPackets() > kMaxTrackedPackets) {
     SendConnectionCloseWithDetails(
         QUIC_TOO_MANY_OUTSTANDING_RECEIVED_PACKETS,
-        StringPrintf("More than %zu outstanding.", kMaxTrackedPackets));
+        StringPrintf("More than %" PRIu64 " outstanding.", kMaxTrackedPackets));
   }
 }
 
@@ -1138,8 +1140,7 @@ const QuicConnectionStats& QuicConnection::GetStats() {
       sent_packet_manager_.GetRttStats()->min_rtt().ToMicroseconds();
   stats_.srtt_us =
       sent_packet_manager_.GetRttStats()->smoothed_rtt().ToMicroseconds();
-  stats_.estimated_bandwidth =
-      sent_packet_manager_.BandwidthEstimate().ToBytesPerSecond();
+  stats_.estimated_bandwidth = sent_packet_manager_.BandwidthEstimate();
   stats_.max_packet_size = packet_generator_.max_packet_length();
   return stats_;
 }
@@ -1854,6 +1855,12 @@ void QuicConnection::SendConnectionClosePacket(QuicErrorCode error,
   DVLOG(1) << ENDPOINT << "Force closing " << connection_id()
            << " with error " << QuicUtils::ErrorToString(error)
            << " (" << error << ") " << details;
+  // Don't send explicit connection close packets for timeouts.
+  // This is particularly important on mobile, where connections are short.
+  if (silent_close_enabled_ &&
+      error == QuicErrorCode::QUIC_CONNECTION_TIMED_OUT) {
+    return;
+  }
   ScopedPacketBundler ack_bundler(this, SEND_ACK);
   QuicConnectionCloseFrame* frame = new QuicConnectionCloseFrame();
   frame->error_code = error;

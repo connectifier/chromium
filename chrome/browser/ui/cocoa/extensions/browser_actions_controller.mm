@@ -137,6 +137,8 @@ class ToolbarActionsBarBridge : public ToolbarActionsBarDelegate {
   explicit ToolbarActionsBarBridge(BrowserActionsController* controller);
   ~ToolbarActionsBarBridge() override;
 
+  BrowserActionsController* controller_for_test() { return controller_; }
+
  private:
   // ToolbarActionsBarDelegate:
   void AddViewForAction(ToolbarActionViewController* action,
@@ -329,7 +331,13 @@ bool ToolbarActionsBarBridge::IsPopupRunning() const {
   DCHECK([referenceButton isFlipped]);
   NSPoint anchor = NSMakePoint(NSMidX(bounds),
                                NSMaxY(bounds) - kBrowserActionBubbleYOffset);
-  return [referenceButton convertPoint:anchor toView:nil];
+  // Convert the point to the container view's frame, and adjust for animation.
+  NSPoint anchorInContainer =
+      [containerView_ convertPoint:anchor fromView:referenceButton];
+  anchorInContainer.x -= NSMinX([containerView_ frame]) -
+      NSMinX([containerView_ animationEndFrame]);
+
+  return [containerView_ convertPoint:anchorInContainer toView:nil];
 }
 
 - (BOOL)chevronIsHidden {
@@ -693,6 +701,15 @@ bool ToolbarActionsBarBridge::IsPopupRunning() const {
 
 - (BrowserActionButton*)buttonWithIndex:(NSUInteger)index {
   return index < [buttons_ count] ? [buttons_ objectAtIndex:index] : nil;
+}
+
+- (ToolbarActionsBar*)toolbarActionsBar {
+  return toolbarActionsBar_.get();
+}
+
++ (BrowserActionsController*)fromToolbarActionsBarDelegate:
+    (ToolbarActionsBarDelegate*)delegate {
+  return static_cast<ToolbarActionsBarBridge*>(delegate)->controller_for_test();
 }
 
 @end

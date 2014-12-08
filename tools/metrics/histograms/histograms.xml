@@ -522,6 +522,19 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Apps.HostedAppLaunchContainer" enum="AppLaunchContainer">
+  <owner>benwells@chromium.org</owner>
+  <summary>
+    Records the container used for a hosted app launch. The definition of
+    'launch' for the purposes of this histogram is different to that used for
+    the launch type histograms. This definition is less inclusive, for example
+    it does not include navigations to the hosted app due to normal browsing,
+    which the other definition does include. This definition could be thought of
+    more as explicit launches via a launch surface such as the app launcher,
+    chrome://apps, or a shortcut.
+  </summary>
+</histogram>
+
 <histogram name="Ash.ActiveTouchPoints">
   <owner>kuscher@google.com</owner>
   <owner>rbyers@chromium.org</owner>
@@ -6259,7 +6272,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Enterprise.AutoEnrollmentExtraTime" units="milliseconds">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Time since the user logged in until the auto-enrollment protocol completed.
     0 is sampled when the protocol is done by the time the user logs in.
@@ -6267,13 +6280,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Enterprise.AutoEnrollmentProtocolTime" units="milliseconds">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>Total duration time of the auto-enrollment protocol.</summary>
 </histogram>
 
 <histogram name="Enterprise.AutoEnrollmentRequestNetworkErrorCode"
     enum="NetErrorCodes">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Network error code (if applicable) for auto-enrollment requests.
   </summary>
@@ -6281,7 +6294,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Enterprise.AutoEnrollmentRequestStatus"
     enum="EnterpriseDeviceManagementStatus">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>URL fetcher status for auto-enrollment requests.</summary>
 </histogram>
 
@@ -6307,7 +6320,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Enterprise.DMToken" enum="EnterpriseDMTokenType">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Events related to fetching, saving and loading DM server tokens. These are
     used to retrieve cloud policies.
@@ -6353,7 +6366,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Enterprise.Enrollment" enum="EnterpriseEnrollmentType">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Events related to device enrollment on new installs of Chrome OS devices.
   </summary>
@@ -6397,7 +6410,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Enterprise.IOSPolicies">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Number of policies loaded at startup on iOS, and when a change is detected
     at runtime.
@@ -6405,12 +6418,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Enterprise.ONC.PolicyValidation" enum="BooleanSuccess">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>Result of the OpenNetworkConfiguration policy validation.</summary>
 </histogram>
 
 <histogram name="Enterprise.Policies" enum="EnterprisePolicies">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     A set of enterprise policy rules that are in use. This is recorded every 24
     hours and at startup, if the last recording was earlier than a day before.
@@ -6418,7 +6431,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Enterprise.Policy" enum="EnterprisePolicyType">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Events related to fetching, saving and loading user policies, and also
     device policies on Chrome OS.
@@ -6435,7 +6448,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Enterprise.PolicyInvalidations"
     enum="EnterprisePolicyInvalidations">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Events for counting user policy invalidations received with and without
     payloads. Invalidations indicate that a policy has been updated and should
@@ -6446,7 +6459,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Enterprise.PolicyInvalidationsStartupTime"
     units="milliseconds">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Time since startup of the cloud policy code until the policy invalidation
     service first reported its online status.
@@ -6454,7 +6467,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Enterprise.PolicyLoadStatus" enum="EnterprisePolicyLoadStatus">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Load status from the policy loaders which pull policy settings from the
     underlying platform, such as Windows Group Policy.
@@ -6462,7 +6475,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Enterprise.PolicyRefresh" enum="EnterprisePolicyRefresh">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Events measuring effectiveness of refreshing user policy when invalidations
     are received from a service. For each refresh, indicates whether the policy
@@ -6497,50 +6510,50 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Enterprise.UserPolicyChromeOS.DelayInitialization"
     units="milliseconds">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>Initialization delay due to loading the user policy cache.</summary>
 </histogram>
 
 <histogram name="Enterprise.UserPolicyChromeOS.InitialFetch.ClientError"
     enum="EnterpriseDeviceManagementStatus">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>Policy client error during initial policy fetch.</summary>
 </histogram>
 
 <histogram
     name="Enterprise.UserPolicyChromeOS.InitialFetch.DelayClientRegister"
     units="milliseconds">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>Delay for registering the client with the policy server.</summary>
 </histogram>
 
 <histogram name="Enterprise.UserPolicyChromeOS.InitialFetch.DelayOAuth2Token"
     units="milliseconds">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>Delay for minting an OAuth2 acccess token.</summary>
 </histogram>
 
 <histogram name="Enterprise.UserPolicyChromeOS.InitialFetch.DelayPolicyFetch"
     units="milliseconds">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>Delay for fetching policy from the policy server.</summary>
 </histogram>
 
 <histogram name="Enterprise.UserPolicyChromeOS.InitialFetch.DelayTotal"
     units="milliseconds">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>Total delay for the initial policy fetch.</summary>
 </histogram>
 
 <histogram name="Enterprise.UserPolicyChromeOS.InitialFetch.OAuth2Error"
     enum="GoogleServiceAuthError">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>Service error during OAuth2 access token fetch.</summary>
 </histogram>
 
 <histogram name="Enterprise.UserPolicyChromeOS.InitialFetch.OAuth2NetworkError"
     enum="NetErrorCodes">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>Network error during OAuth2 access token fetch.</summary>
 </histogram>
 
@@ -6575,27 +6588,27 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Enterprise.WildcardLoginCheck.DelayPolicyTokenFetch"
     units="milliseconds">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Delay incurred by the token fetching step of the wildcard login check.
   </summary>
 </histogram>
 
 <histogram name="Enterprise.WildcardLoginCheck.DelayTotal" units="milliseconds">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>Total delay incurred by the wildcard login check.</summary>
 </histogram>
 
 <histogram name="Enterprise.WildcardLoginCheck.DelayUserInfoFetch"
     units="milliseconds">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     Delay incurred by the user info fetching step of the wildcard login check.
   </summary>
 </histogram>
 
 <histogram name="EnterpriseCheck.DomainBindSucceeded" enum="BooleanSuccess">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <owner>pastarmovj@chromium.org</owner>
   <summary>
     Whether we were able to contact the AD Domain Controller. This check is
@@ -6604,7 +6617,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="EnterpriseCheck.DomainCheckFailed" enum="EnterpriseCheckError">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <owner>pastarmovj@chromium.org</owner>
   <summary>
     Enum of possible things that can fail while checking for enterprise env.
@@ -6613,7 +6626,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="EnterpriseCheck.InDomain" enum="BooleanEnabled">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <owner>pastarmovj@chromium.org</owner>
   <summary>
     Whether the machine is part of an AD domain. This check is performed once at
@@ -6622,7 +6635,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="EnterpriseCheck.InvalidPolicies" enum="EnterprisePolicies">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <summary>
     A set of policy rules that were ignored due to integrity violations while
     parsing the policy data which happens on start-up and when the policy has
@@ -6632,7 +6645,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="EnterpriseCheck.InvalidPoliciesDetected"
     units="disabled policies">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <owner>pastarmovj@chromium.org</owner>
   <summary>
     The number of disabled policy entries on Windows due to integrity violations
@@ -6642,7 +6655,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="EnterpriseCheck.OSType" enum="OsSuite">
-  <owner>joaodasilva@chromium.org</owner>
+  <owner>mnissler@chromium.org</owner>
   <owner>pastarmovj@chromium.org</owner>
   <summary>
     The rough Windows suite we are runnnig on. This check is performed once at
@@ -6698,6 +6711,28 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rbyers@chromium.org</owner>
   <summary>
     Time between the first and last events in a coalesced touch events group.
+  </summary>
+</histogram>
+
+<histogram name="Event.Frequency.Renderer.FlingAnimate" units="hertz">
+  <owner>rbyers@chromium.org</owner>
+  <summary>
+    Emitted after a renderer process main-thread fling curve animation
+    terminates, for any reason, reporting the average animation frequency
+    (animations/second) of the fling instance over its lifetime. This is
+    computed as the number of fling animation ticks divided by the fling
+    animation duration.
+  </summary>
+</histogram>
+
+<histogram name="Event.Frequency.RendererImpl.FlingAnimate" units="hertz">
+  <owner>rbyers@chromium.org</owner>
+  <summary>
+    Emitted after a renderer process impl-thread fling curve animation
+    terminates, for any reason, reporting the average animation frequency
+    (animations/second) of the fling instance over its lifetime. This is
+    computed as the number of fling animation ticks divided by the fling
+    animation duration.
   </summary>
 </histogram>
 
@@ -7040,6 +7075,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     process the event. For touch events on Windows, we measure from when the
     event reaches Chrome, whereas on other platforms we use the timestamp from
     the kernel. On Windows, this metric is only reported when
+    |IsHighResNowFastAndReliable| is true, which will introduce some sampling
+    bias.
+  </summary>
+</histogram>
+
+<histogram name="Event.Latency.RendererImpl" units="microseconds">
+  <owner>rbyers@chromium.org</owner>
+  <summary>
+    Time between input event creation and the renderer impl thread receiving and
+    starting to process the event. For touch events on Windows, we measure from
+    when the event reaches Chrome, whereas on other platforms we use the
+    timestamp from the kernel. On Windows, this metric is only reported when
     |IsHighResNowFastAndReliable| is true, which will introduce some sampling
     bias.
   </summary>
@@ -7681,6 +7728,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Extensions.AppLaunchContainer" enum="AppLaunchContainer">
   <owner>benwells@chromium.org</owner>
   <owner>tapted@chromium.org</owner>
+  <obsolete>
+    Deprecated as of 12/2014, replaced by Apps.HostedAppLaunchContainer.
+  </obsolete>
   <summary>
     The number of times apps are launched grouped by
     extensions::LaunchContainer.
@@ -7722,13 +7772,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.BackgroundPageLoadTime" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>The time for an extension's background page to load.</summary>
 </histogram>
 
 <histogram name="Extensions.BackgroundPageType"
     units="ExtensionBackgroundPageType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The type (if any) of background page the extension has. Recorded for
     installed extensions on startup.
@@ -7770,12 +7820,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.CrxFetchError" enum="NetErrorCodes">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>Net error results from URLFetcher.</summary>
 </histogram>
 
 <histogram name="Extensions.CrxFetchFailureRetryCountGoogleUrl">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Number of times chrome retried to download an extension with a url on a
     google.com domain, before eventually giving up.
@@ -7783,7 +7833,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.CrxFetchFailureRetryCountOtherUrl">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Number of times chrome retried to download an extension with a url on a non
     google.com domain, before eventually giving up.
@@ -7791,7 +7841,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.CrxFetchSuccessRetryCountGoogleUrl">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Number of times chrome retried to download an extension with a url on a
     google.com domain, before eventually succeeding.
@@ -7799,7 +7849,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.CrxFetchSuccessRetryCountOtherUrl">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Number of times chrome retried to download an extension with a url on a non
     google.com domain, before eventually succeeding.
@@ -7807,7 +7857,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.CrxInstallDirPathLength">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Length of the path to the directory under which an extension is installed.
     This directory is in the user's profile.
@@ -7834,14 +7884,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.Disabled">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of extensions that are disabled at browser startup.
   </summary>
 </histogram>
 
 <histogram name="Extensions.DisabledForPermissions">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of extensions that are disabled at browser startup due to
     permissions increases.
@@ -7850,7 +7900,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Extensions.DisabledUIUserResponse"
     enum="ExtensionDisabledUIUserResponse">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     User response to the dialog shown when an extension is disabled due to an
     update requiring more permissions.
@@ -7878,7 +7928,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.ErrorCodeFromCrxOpen">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     If opening the CRX file for unpacking fails, this integer is the error code
     given by the OS.
@@ -7886,17 +7936,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.EventPageActiveTime" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>The time an extension's event page has spent loaded.</summary>
 </histogram>
 
 <histogram name="Extensions.EventPageIdleTime" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>The time an extension's event page has spent unloaded.</summary>
 </histogram>
 
 <histogram name="Extensions.EventPageLoadTime" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>The time for an extension's event page to load.</summary>
 </histogram>
 
@@ -7917,12 +7967,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.ExtensionInstalled">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>An extension has been installed.</summary>
 </histogram>
 
 <histogram name="Extensions.ExtensionLocation" enum="ExtensionLocation">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of extensions loaded at startup time grouped by
     Extension::Location.
@@ -7937,7 +7987,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.ExtensionServiceInitTime">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yoz@chromium.org</owner>
   <summary>
     Time taken for the ExtensionService to initialize, including the time it
     takes to load the extensions for the service's profile and parse their
@@ -7947,7 +7997,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.ExtensionUninstalled">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>An extension has been uninstalled.</summary>
 </histogram>
 
@@ -8010,7 +8060,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.FunctionCalls" enum="ExtensionFunctions">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>Number of calls to extension functions.</summary>
 </histogram>
 
@@ -8082,60 +8132,69 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.InjectCssTime" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
+  <owner>rdevlin.cronin@chromium.org</owner>
   <summary>
     The amount of time for a CSS file to be injected into a page.
   </summary>
 </histogram>
 
 <histogram name="Extensions.InjectEnd_ScriptCount">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
+  <owner>rdevlin.cronin@chromium.org</owner>
   <summary>Number of scripts injected at document end by extensions.</summary>
 </histogram>
 
 <histogram name="Extensions.InjectEnd_Time" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
+  <owner>rdevlin.cronin@chromium.org</owner>
   <summary>
     Time taken to inject all scripts at document end by extensions.
   </summary>
 </histogram>
 
 <histogram name="Extensions.InjectIdle_ScriptCount">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
+  <owner>rdevlin.cronin@chromium.org</owner>
   <summary>Number of scripts injected at document idle by extensions.</summary>
 </histogram>
 
 <histogram name="Extensions.InjectIdle_Time" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
+  <owner>rdevlin.cronin@chromium.org</owner>
   <summary>
     Time taken to inject all scripts at document idle by extensions.
   </summary>
 </histogram>
 
 <histogram name="Extensions.InjectScriptTime" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
+  <owner>rdevlin.cronin@chromium.org</owner>
   <summary>Time taken to inject all scripts by extensions.</summary>
 </histogram>
 
 <histogram name="Extensions.InjectStart_CssCount">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
+  <owner>rdevlin.cronin@chromium.org</owner>
   <summary>Number of css files injected by extensions.</summary>
 </histogram>
 
 <histogram name="Extensions.InjectStart_ScriptCount">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
+  <owner>rdevlin.cronin@chromium.org</owner>
   <summary>Number of scripts injected at document start by extensions.</summary>
 </histogram>
 
 <histogram name="Extensions.InjectStart_Time" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
+  <owner>rdevlin.cronin@chromium.org</owner>
   <summary>
     Time taken to inject css/scripts at document start by extensions.
   </summary>
 </histogram>
 
 <histogram name="Extensions.InstallPrompt.Accepted" enum="BooleanAccepted">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>meacer@chromium.org</owner>
   <summary>
     Whether the user accepted or aborted an extension installation.
   </summary>
@@ -8143,7 +8202,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Extensions.InstallPrompt.Type"
     enum="ExtensionInstallPromptType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>meacer@chromium.org</owner>
   <summary>
     Type of the extension install prompt displayed when an extension
     installation is triggered.
@@ -8169,55 +8228,55 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.InstallSource" enum="ExtensionLocation">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>Installs grouped by the location property in prefs.</summary>
 </histogram>
 
 <histogram name="Extensions.InstallType" enum="ExtensionType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>Installs grouped by Extension::HistogramType.</summary>
 </histogram>
 
 <histogram name="Extensions.LoadAll">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of extensions and themes loaded at browser startup.
   </summary>
 </histogram>
 
 <histogram name="Extensions.LoadAllTime" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>Time taken to load all extensions at browser startup.</summary>
 </histogram>
 
 <histogram name="Extensions.LoadApp">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>The number of apps loaded by each user at startup time.</summary>
 </histogram>
 
 <histogram name="Extensions.LoadAppExternal">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of externally managed apps loaded by each user at startup time.
   </summary>
 </histogram>
 
 <histogram name="Extensions.LoadAppUser">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of user-installed apps loaded by each user at startup time.
   </summary>
 </histogram>
 
 <histogram name="Extensions.LoadBrowserAction">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of browser action extensions loaded at browser startup.
   </summary>
 </histogram>
 
 <histogram name="Extensions.LoadContentPack">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     The number of content-pack extensions loaded at browser startup.
   </summary>
@@ -8232,26 +8291,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.LoadExtension">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>The number of extensions loaded at browser startup.</summary>
 </histogram>
 
 <histogram name="Extensions.LoadExtensionExternal">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of externally managed extensions loaded at browser startup.
   </summary>
 </histogram>
 
 <histogram name="Extensions.LoadExtensionUser">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of user-installed extensions loaded at browser startup.
   </summary>
 </histogram>
 
 <histogram name="Extensions.LoadExternal">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of externally managed extensions and apps loaded at browser
     startup.
@@ -8259,31 +8318,31 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.LoadHostedApp">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of hosted apps loaded by each user at startup time.
   </summary>
 </histogram>
 
 <histogram name="Extensions.LoadPackagedApp">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of legacy packaged apps loaded by each user at startup time.
   </summary>
 </histogram>
 
 <histogram name="Extensions.LoadPlatformApp">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>The number of platform apps loaded at browser startup.</summary>
 </histogram>
 
 <histogram name="Extensions.LoadTheme">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>The number of themes loaded at browser startup.</summary>
 </histogram>
 
 <histogram name="Extensions.LoadType" enum="ExtensionType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of extensions loaded at startup time grouped by
     Extension::HistogramType.
@@ -8291,7 +8350,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.LoadUserScript">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of converted user scripts loaded at browser startup.
   </summary>
@@ -8380,7 +8439,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.NonWebstoreLocation" enum="ExtensionLocation">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The number of apps/extensions with a non-webstore update_url loaded at
     startup time grouped by Extension::Location.
@@ -8654,7 +8713,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Extensions.ResourceDirectoryTimestampQueryLatency"
     units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     The initialization latency (in milliseconds) introduced to each extension
     resource request by querying the directory timestamp.
@@ -8662,7 +8721,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.ResourceLastModifiedDelta" units="seconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     The difference in seconds between an extension resource's last modification
     time and its extension base directory's creation time. Recorded on each
@@ -8674,7 +8733,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.ResourceLastModifiedNegativeDelta" units="seconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     The absolute difference in seconds between an extension resource's last
     modification time and extension base directory's creation time. Recorded on
@@ -8686,7 +8745,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackFailure">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Count the number of times a sandboxed extension unpack fails.
   </summary>
@@ -8694,22 +8753,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Extensions.SandboxUnpackFailureReason"
     enum="ExtensionUnpackFailureReason">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>What caused a sandboxed extension unpack to fail?</summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackFailureTime">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>Time taken to unpack an extension, when the unpack fails.</summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackInitialCrxPathLength">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>Length of the initial path to the CRX to be unpacked.</summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackLinkFreeCrxPathLength">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Length of the normalized (link/junction free) path to the temporary copy of
     a CRX made during unpacking.
@@ -8717,42 +8776,42 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackRate">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Rate at which a CRX file is unpacked in Kilobytes per second.
   </summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackRate1To2mB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Rate at which CRX files 1MB to 2MB are unpacked in Kilobytes per second.
   </summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackRate2To5mB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Rate at which CRX files 2MB to 5MB are unpacked in Kilobytes per second.
   </summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackRate50kBTo1mB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Rate at which CRX files 50kB to 1MB are unpacked in Kilobytes per second.
   </summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackRate5To10mB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Rate at which CRX files 5MB to 10 MB are unpacked in Kilobytes per second.
   </summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackRateOver10mB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Rate at which CRX files larger than 10MB are unpacked in Kilobytes per
     second.
@@ -8760,19 +8819,19 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackRateUnder50kB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Rate at which CRX files under 50 KB are unpacked in Kilobytes per second.
   </summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackSuccess">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>Count the number of times a sandboxed CRX unpack succeeds.</summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackSuccessCantGetCrxSize">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Count the number of times a sandboxed CRX unpack succeeds, but we can't get
     the file size.
@@ -8780,31 +8839,31 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackSuccessTime">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Time taken to unpack an extension, when the unpack succeeds.
   </summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackTempCrxPathLength">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Length of the path of the temporary copy of a CRX made during unpacking.
   </summary>
 </histogram>
 
 <histogram name="Extensions.SandboxUnpackUnpackedCrxPathLength">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>Length of the path under which a CRX is unpacked.</summary>
 </histogram>
 
 <histogram name="Extensions.StartupDelay" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>The time one extension delays network requests at startup.</summary>
 </histogram>
 
 <histogram name="Extensions.StartupDelay_Total" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>
     The total time extensions delay network requests at startup.
   </summary>
@@ -8816,13 +8875,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Extensions.UninstallType" enum="ExtensionType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>kalman@chromium.org</owner>
   <summary>Uninstalls grouped by Extension::HistogramType.</summary>
 </histogram>
 
 <histogram name="Extensions.UnpackFailureInstallCause"
     enum="ExtensionInstallCause">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Count failing CRX installs, grouped by the way an extension can be
     installed.
@@ -8831,7 +8890,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Extensions.UnpackFailureInstallSource"
     enum="ExtensionLocation">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Count successful CRX installs, grouped by the location property in prefs.
     installed.
@@ -8840,7 +8899,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Extensions.UnpackSuccessInstallCause"
     enum="ExtensionInstallCause">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Count successful CRX installs, grouped by the cause of the install.
   </summary>
@@ -8848,7 +8907,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Extensions.UnpackSuccessInstallSource"
     enum="ExtensionLocation">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Count successful CRX installs, grouped by the location property in prefs.
   </summary>
@@ -9066,6 +9125,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="FileBrowser.CloudImport.UserAction"
+    enum="CloudImportUserAction">
+  <owner>smckay@google.com</owner>
+  <summary>
+    Chrome OS File Browser - Specific actions taken by user such initiating
+    cloud import, canceling import, selecting a directory, or opting-in to
+    Drive&gt;Photos sync.
+  </summary>
+</histogram>
+
 <histogram name="FileBrowser.Create" enum="FileDialogType">
   <owner>joshwoodward@google.com</owner>
   <summary>Chrome OS File Browser opening mode.</summary>
@@ -9135,6 +9204,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Chrome OS File Browser: this is recorded when the user removes a folder
     shortcut.
+  </summary>
+</histogram>
+
+<histogram name="FileBrowser.HardUnpluggedAroundSuspend.TimeSinceResume"
+    units="milliseconds">
+  <owner>hirono@chromium.org</owner>
+  <summary>
+    Chrome OS File Browser: time from the SuspendDone event to the DiskRemoved
+    event. The UMA is added temporarily for crbug.com/433734.
+  </summary>
+</histogram>
+
+<histogram name="FileBrowser.HardUnpluggedAroundSuspend.TimeUntilSuspend"
+    units="milliseconds">
+  <owner>hirono@chromium.org</owner>
+  <summary>
+    Chrome OS File Browser: time from the DiskRemoved event to the Suspend
+    event. The UMA is added temporarily for crbug.com/433734.
   </summary>
 </histogram>
 
@@ -12747,6 +12834,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Visible width of HTML5 video.</summary>
 </histogram>
 
+<histogram name="Media.VTVDA.HardwareAccelerated"
+    enum="BooleanHardwareAccelerated">
+  <owner>sandersd@chromium.org</owner>
+  <summary>
+    Whether a VTDecompressionSession is internally using hardware accelerated
+    decoding.
+  </summary>
+</histogram>
+
 <histogram name="Media.YouTube.DelayedAndDroppedFramesPer5Sec"
     units="frames/5s">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
@@ -12865,7 +12961,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>kenjibaheux@google.com</owner>
   <owner>kouhei@chromium.org</owner>
   <summary>
-    The count of active chrome:// processes.  Recorded once per UMA ping.
+    The count of active chrome:// renderer processes.  Recorded once per UMA
+    ping.
   </summary>
 </histogram>
 
@@ -17661,6 +17758,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.QuicSession.AsyncRead">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    True if the result of reading a packet from the network was ERR_IO_PENDING.
+    Recorded for each packet when Read() returns.
+  </summary>
+</histogram>
+
 <histogram name="Net.QuicSession.BlockedFrames.Received">
   <owner>rtenneti@chromium.org</owner>
   <summary>
@@ -17968,6 +18073,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     by a server to Chrome at the start of a QUIC connection. This histogram is
     compared, bucket by bucket, with a second histogram to compute the ratio for
     each bucket (each packet sequence number).
+  </summary>
+</histogram>
+
+<histogram name="Net.QuicSession.PacketWriteTime">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    The time taken to Write() a QUIC packet to the socket. Recorded for each
+    packet when it is sent. The suffix specifies if the write completed
+    synchonously or asynchronously.
   </summary>
 </histogram>
 
@@ -18779,6 +18893,23 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Time from when the Connect() starts until it completes for google.com and
     any subdomain of it. This only includes users not in a 50% field trail that
     disables revocation for certificate pinned sites.
+  </summary>
+</histogram>
+
+<histogram name="Net.SSL_EVCertificateCTCompliance"
+    enum="CTRequirementCompliance">
+  <owner>eranm@chromium.org</owner>
+  <owner>rsleevi@chromium.org</owner>
+  <summary>
+    The state of compliance with Certificate Transparency presence requirements
+    for each EV certificate. An EV certificate could be non-compliant (in which
+    case it loses the EV status), comply through inclusion in the EV whitelist
+    or have the required number of Signed Certificate Timestamps. This metric
+    will gauge adoption rate of Certificate Transparency and will help identify
+    when the EV whitelist is no longer needed. Emitted during every SSL
+    connection establishment, but only if the client is checking compliance with
+    Certificate Transparency requirements (currently guarded by a Finch
+    experiment).
   </summary>
 </histogram>
 
@@ -30260,6 +30391,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Records a histogram of the reason why downloads are marked as being
     malicious or clean by the improved SafeBrowsing binary download protection.
+    Note that UNSUPPORTED_URL_SCHEME was split out of the INVALID_URL bucket in
+    M41.
   </summary>
 </histogram>
 
@@ -30749,6 +30882,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="SBIRS.DiscardedIncident" enum="IncidentType">
+  <owner>grt@google.com</owner>
+  <summary>
+    The type of incident discarded by the safe browsing incident reporting
+    service as a result of profile or service destruction.
+  </summary>
+</histogram>
+
 <histogram name="SBIRS.DownloadMetadata.DeleteSuccess" enum="BooleanSuccess">
   <owner>grt@chromium.org</owner>
   <summary>The result of deleting a profile's download metadata file.</summary>
@@ -30791,7 +30932,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="SBIRS.Incident" enum="IncidentType">
   <owner>grt@google.com</owner>
   <summary>
-    The type of incident given to the safe browsing incident reporting service.
+    The type of incident included in an incident report by the safe browsing
+    incident reporting service.
   </summary>
 </histogram>
 
@@ -30811,11 +30953,27 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="SBIRS.PrunedIncident" enum="IncidentType">
+  <owner>grt@google.com</owner>
+  <summary>
+    The type of incident pruned from a report in the safe browsing incident
+    reporting service as a result of having previously been reported.
+  </summary>
+</histogram>
+
 <histogram name="SBIRS.PruneRatio" units="percentage">
   <owner>grt@google.com</owner>
   <summary>
     The percentage of incidents pruned from a safe browsing incident report on
     account of having been previously reported.
+  </summary>
+</histogram>
+
+<histogram name="SBIRS.ReceivedIncident" enum="IncidentType">
+  <owner>grt@google.com</owner>
+  <summary>
+    The type of incident received by the safe browsing incident reporting
+    service.
   </summary>
 </histogram>
 
@@ -35390,6 +35548,52 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram
+    name="Startup.Experimental.FirstWebContents.MainFrameLoad.ManyBuckets"
+    units="milliseconds">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    An experimental metric only collected on the dev and canary channels.
+    Measure the elapsed time from process launch to the first main frame load of
+    the first web contents. Uses significantly more buckets, with reduced
+    ranges.
+  </summary>
+</histogram>
+
+<histogram
+    name="Startup.Experimental.FirstWebContents.MainFrameLoad.StandardBuckets"
+    units="milliseconds">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    An experimental metric only collected on the dev and canary channels.
+    Measure the elapsed time from process launch to the first main frame load of
+    the first web contents. Uses standard bucket ranges.
+  </summary>
+</histogram>
+
+<histogram
+    name="Startup.Experimental.FirstWebContents.NonEmptyPaint.ManyBuckets"
+    units="milliseconds">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    An experimental metric only collected on the dev and canary channels.
+    Measure the elapsed time from process launch to the first non-empty paint of
+    the first web contents. Uses significantly more buckets, with reduced
+    ranges.
+  </summary>
+</histogram>
+
+<histogram
+    name="Startup.Experimental.FirstWebContents.NonEmptyPaint.StandardBuckets"
+    units="milliseconds">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    An experimental metric only collected on the dev and canary channels.
+    Measure the elapsed time from process launch to the first non-empty paint of
+    the first web contents. Uses standard bucket ranges.
+  </summary>
+</histogram>
+
 <histogram name="Startup.Fling.TimeToDisplayVideo" units="milliseconds">
   <owner>jeremy@chromium.org</owner>
   <summary>
@@ -36464,6 +36668,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Sync.PassphraseType" enum="SyncPassphraseType">
+  <owner>maxbogue@chromium.org</owner>
+  <summary>The active sync passphrase type at sync startup.</summary>
+</histogram>
+
 <histogram name="Sync.PasswordAssociationTime" units="milliseconds">
   <owner>zea@chromium.org</owner>
   <summary>
@@ -37269,6 +37478,38 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>simonb@chromium.org</owner>
   <summary>
     Time between the event that selects a tab and the start of rendering.
+  </summary>
+</histogram>
+
+<histogram name="ThreadWatcher.ResponseTime" units="milliseconds">
+  <owner>rtenneti@chromium.org</owner>
+  <summary>
+    The time it takes indicated thread to respond with a pong message for a ping
+    message from WatchDog thread.
+  </summary>
+</histogram>
+
+<histogram name="ThreadWatcher.ResponsiveThreads">
+  <owner>rtenneti@chromium.org</owner>
+  <summary>
+    This is the total number of watched threads that are responding when we got
+    no response from the watched thread.
+  </summary>
+</histogram>
+
+<histogram name="ThreadWatcher.Unresponsive" units="milliseconds">
+  <owner>rtenneti@chromium.org</owner>
+  <summary>
+    This is the total unresponsive time since last pong message for the
+    indicated thread when we got no response from the watched thread.
+  </summary>
+</histogram>
+
+<histogram name="ThreadWatcher.UnresponsiveThreads">
+  <owner>rtenneti@chromium.org</owner>
+  <summary>
+    This is the total number of watched threads that are not responding when we
+    got no response from the watched thread.
   </summary>
 </histogram>
 
@@ -38664,6 +38905,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time spent in V8 compiler (full codegen).</summary>
 </histogram>
 
+<histogram name="V8.CompileDeserialize" units="milliseconds">
+  <owner>vogelheim@chromium.org</owner>
+  <summary>Time spent deseriailzing code, used by V8 code caching.</summary>
+</histogram>
+
 <histogram name="V8.CompileEval" units="milliseconds">
   <owner>jochen@chromium.org</owner>
   <owner>yangguo@chromium.org</owner>
@@ -38676,6 +38922,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </obsolete>
   <owner>jochen@chromium.org</owner>
   <summary>Time spent compiling functions lazily on first run.</summary>
+</histogram>
+
+<histogram name="V8.CompileSerialize" units="milliseconds">
+  <owner>vogelheim@chromium.org</owner>
+  <summary>Time spent serializing code, used by V8 code caching.</summary>
 </histogram>
 
 <histogram name="V8.DeferredCodeGeneration">
@@ -41161,6 +41412,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="9" label="SOURCE_SYSTEM_TRAY"/>
   <int value="10" label="SOURCE_ABOUT_PAGE"/>
   <int value="11" label="SOURCE_KEYBOARD"/>
+  <int value="12" label="SOURCE_EXTENSIONS_PAGE"/>
+  <int value="13" label="SOURCE_MANAGEMENT_API"/>
+  <int value="14" label="SOURCE_EPHEMERAL_APP"/>
+  <int value="15" label="SOURCE_BACKGROUND"/>
+  <int value="16" label="SOURCE_KIOSK"/>
+  <int value="17" label="SOURCE_CHROME_INTERNAL"/>
 </enum>
 
 <enum name="AppListEnableSource" type="int">
@@ -41791,6 +42048,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="Handshake confirmed"/>
 </enum>
 
+<enum name="BooleanHardwareAccelerated" type="int">
+  <int value="0" label="Not hardware accelerated"/>
+  <int value="1" label="Hardware accelerated"/>
+</enum>
+
 <enum name="BooleanHasCrc" type="int">
   <int value="0" label="No CRC"/>
   <int value="1" label="Has CRC"/>
@@ -42190,6 +42452,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="0" label="Write from non-Incognito"/>
   <int value="1" label="Write from Incognito"/>
   <int value="2" label="Read Text"/>
+</enum>
+
+<enum name="CloudImportUserAction" type="int">
+  <int value="0" label="IMPORT_INITIATED"/>
 </enum>
 
 <enum name="CloudPrintAuthEventType" type="int">
@@ -42772,6 +43038,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="6" label="Sheets"/>
   <int value="7" label="Slides"/>
   <int value="8" label="PlayMusic"/>
+</enum>
+
+<enum name="CTRequirementCompliance" type="int">
+  <int value="0" label="Not Compliant"/>
+  <int value="1" label="Whitelisted"/>
+  <int value="2" label="Has enough SCTs"/>
 </enum>
 
 <enum name="DailyEventIntervalType" type="int">
@@ -43693,23 +43965,27 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Registration / policy fetch failed: DM server reports that the serial number
     we try to register is not assigned to the domain used.
   </int>
-  <int value="9" label="Auto-enrollment Started">
-    Auto-enrollment started automatically after sign-in.
+  <int value="9" label="Auto-enrollment Started (unused)">
+    UNUSED: Auto-enrollment started automatically after sign-in.
   </int>
-  <int value="10" label="Auto-enrollment Failed">Auto-enrollment failed.</int>
-  <int value="11" label="Auto-enrollment Restarted">
-    Auto-enrollment started again after a failure.
+  <int value="10" label="Auto-enrollment Failed (unused)">
+    UNUSED: Auto-enrollment failed.
   </int>
-  <int value="12" label="Auto-enrollment Cancelled">
-    User opted-out of auto-enrollment.
+  <int value="11" label="Auto-enrollment Restarted (unused)">
+    UNUSED: Auto-enrollment started again after a failure.
   </int>
-  <int value="13" label="Auto-enrollment OK">Auto-enrollment OK.</int>
+  <int value="12" label="Auto-enrollment Cancelled (unused)">
+    UNUSED: User opted-out of auto-enrollment.
+  </int>
+  <int value="13" label="Auto-enrollment OK (unused)">
+    UNUSED: Auto-enrollment OK.
+  </int>
   <int value="14" label="Invalid enrollment mode">
     Registration failed: DM server returns unknown/disallowed enrollment mode.
   </int>
-  <int value="15" label="Auto-enrollment not supported">
-    Auto-enrollment is not supported for the mode supplied by the server.  This
-    presently means trying to auto-enroll in kiosk mode.
+  <int value="15" label="Auto-enrollment not supported (unused)">
+    UNUSED: Auto-enrollment is not supported for the mode supplied by the
+    server.  This presently means trying to auto-enroll in kiosk mode.
   </int>
   <int value="16" label="Install attributes timeout">
     Lockbox initialization took too long to complete.
@@ -44179,6 +44455,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="280" label="SSL fallback minimum version"/>
   <int value="281"
       label="Control the availability of the Contextual Search feature."/>
+  <int value="282" label="Force Google SafeSearch"/>
+  <int value="283" label="Force YouTube Safety Mode"/>
 </enum>
 
 <enum name="EnterprisePolicyInvalidations" type="int">
@@ -44436,6 +44714,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2048" label="REMOTE_INSTALL"/>
   <int value="4096" label="INACTIVE_EPHEMERAL_APP"/>
   <int value="8192" label="EXTERNAL_EXTENSION"/>
+  <int value="16384" label="UPDATE_REQUIRED_BY_POLICY"/>
 </enum>
 
 <enum name="ExtensionFileWriteResult" type="int">
@@ -45374,10 +45653,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="898" label="HOTWORDPRIVATE_SETHOTWORDALWAYSONSEARCHENABLED"/>
   <int value="899" label="WEBVIEWINTERNAL_LOADDATAWITHBASEURL"/>
   <int value="900" label="GUESTVIEWINTERNAL_DESTROYGUEST"/>
-  <int value="901" label="COPRESENCESOCKET_CREATEPEER"/>
-  <int value="902" label="COPRESENCESOCKET_DESTROYPEER"/>
-  <int value="903" label="COPRESENCESOCKET_SEND"/>
-  <int value="904" label="COPRESENCESOCKET_DISCONNECT"/>
+  <int value="901" label="DELETED_COPRESENCESOCKET_CREATEPEER"/>
+  <int value="902" label="DELETED_COPRESENCESOCKET_DESTROYPEER"/>
+  <int value="903" label="DELETED_COPRESENCESOCKET_SEND"/>
+  <int value="904" label="DELETED_COPRESENCESOCKET_DISCONNECT"/>
   <int value="905" label="BOOKMARKMANAGERPRIVATE_SETVERSION"/>
   <int value="906" label="FILESYSTEMPROVIDER_NOTIFY"/>
   <int value="907" label="USB_GETUSERSELECTEDDEVICES"/>
@@ -45400,6 +45679,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="924" label="HOTWORDPRIVATE_GETLOCALIZEDSTRINGS"/>
   <int value="925" label="HOTWORDPRIVATE_SETAUDIOHISTORYENABLED"/>
   <int value="926" label="HOTWORDPRIVATE_GETAUDIOHISTORYENABLED"/>
+  <int value="927" label="APP_CURRENTWINDOWINTERNAL_SETINTERCEPTALLKEYS"/>
+  <int value="928" label="LAUNCHERPAGE_PUSHSUBPAGE"/>
+  <int value="929" label="LAUNCHERPAGE_SHOW"/>
+  <int value="930" label="AUTOTESTPRIVATE_SETTOUCHPADSENSITIVITY"/>
+  <int value="931" label="AUTOTESTPRIVATE_SETTAPTOCLICK"/>
+  <int value="932" label="AUTOTESTPRIVATE_SETTHREEFINGERCLICK"/>
+  <int value="933" label="AUTOTESTPRIVATE_SETTAPDRAGGING"/>
+  <int value="934" label="AUTOTESTPRIVATE_SETNATURALSCROLL"/>
+  <int value="935" label="AUTOTESTPRIVATE_SETMOUSESENSITIVITY"/>
+  <int value="936" label="AUTOTESTPRIVATE_SETPRIMARYBUTTONRIGHT"/>
+  <int value="937" label="COPRESENCEENDPOINTS_CREATELOCALENDPOINT"/>
+  <int value="938" label="COPRESENCEENDPOINTS_DESTROYLOCALENDPOINT"/>
+  <int value="939" label="COPRESENCEENDPOINTS_SEND"/>
+  <int value="940" label="INLINE_INSTALL_PRIVATE_INSTALL"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -48793,6 +49086,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1052782474" label="enable-cloud-devices"/>
   <int value="-1052415111" label="malware-interstitial-v2"/>
   <int value="-1022971520" label="enable-search-button-in-omnibox-for-str"/>
+  <int value="-979057409" label="enable-seccomp-filter-sandbox"/>
   <int value="-979034258" label="disable-ntp-other-sessions-menu"/>
   <int value="-949178861" label="enable-new-avatar-menu"/>
   <int value="-926422468" label="disable-embedded-shared-worker"/>
@@ -48823,6 +49117,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-604814313" label="enable-pinch"/>
   <int value="-601384286" label="disable-contextual-search"/>
   <int value="-579192400" label="disable-input-view"/>
+  <int value="-567920515" label="disable-experimental-hotwording"/>
   <int value="-563980787" label="disable-webrtc"/>
   <int value="-562274241" label="enable-extension-action-redesign"/>
   <int value="-536289234" label="ssl-interstitial-v2-colorful"/>
@@ -48840,6 +49135,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-384589459" label="disable-supervised-user-safesites"/>
   <int value="-349057743" label="extensions-on-chrome-urls"/>
   <int value="-344343842" label="disable-experimental-app-list"/>
+  <int value="-340622848" label="disable-javascript-harmony-shipping"/>
   <int value="-340255045" label="allow-nacl-socket-api"/>
   <int value="-328361990" label="enable-experimental-extension-apis"/>
   <int value="-320820051" label="enable-zero-copy"/>
@@ -48906,6 +49202,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="606288133" label="enable-print-preview-register-promos"/>
   <int value="625273056" label="disable-boot-animation"/>
   <int value="630947363" label="touch-events"/>
+  <int value="643725031" label="disable-touch-feedback"/>
   <int value="689489984" label="disable-zero-suggest"/>
   <int value="709850261" label="disable-touch-editing"/>
   <int value="711424932" label="enable-cloud-print-xps"/>
@@ -48913,6 +49210,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="732703958" label="enable-gesture-tap-highlight"/>
   <int value="773919225" label="disable-office-editing-component-extension"/>
   <int value="779086132" label="enable-data-reduction-proxy-alt"/>
+  <int value="782167080" label="enable-new-qp-input-view"/>
   <int value="821192723" label="show-fps-counter"/>
   <int value="824961931" label="use-simple-cache-backend"/>
   <int value="834326277" label="enable-answers-in-suggest"/>
@@ -49022,6 +49320,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1966730288" label="disable-threaded-compositing"/>
   <int value="1969604362" label="enable-pinch-virtual-viewport"/>
   <int value="1980011075" label="debug-packed-apps"/>
+  <int value="2000091128" label="enable-touch-hover"/>
   <int value="2004829262" label="enable-webgl-draft-extensions"/>
   <int value="2037756154" label="enable-impl-side-painting"/>
   <int value="2059322877" label="new-avatar-menu"/>
@@ -52292,6 +52591,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1" label="Essential Same-Origin"/>
   <int value="2" label="Essential Cross-Origin Big"/>
   <int value="3" label="Essential Cross-Origin Whitelisted"/>
+  <int value="4" label="Essential Cross-Origin Tiny"/>
 </enum>
 
 <enum name="PluginPowerSaverUnthrottleMethod" type="int">
@@ -53445,6 +53745,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="3" label="Registration limit reached"/>
   <int value="4" label="Permission denied"/>
   <int value="5" label="Push service error"/>
+  <int value="6" label="No sender id provided"/>
+  <int value="7" label="Storage error"/>
 </enum>
 
 <enum name="QuicAddressMismatch" type="int">
@@ -54207,6 +54509,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="19" label="ARCHIVE_WITHOUT_BINARIES"/>
   <int value="20" label="DOWNLOAD_DANGEROUS_HOST"/>
   <int value="21" label="DOWNLOAD_POTENTIALLY_UNWANTED"/>
+  <int value="22" label="UNSUPPORTED_URL_SCHEME"/>
 </enum>
 
 <enum name="SBClientDownloadExtensions" type="int">
@@ -55762,6 +56065,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="24"
       label="Detected captive portal on an overridable SSL error page
              (DEPRECATED_CAPTIVE_PORTAL_DETECTED_OVERRIDABLE)"/>
+  <int value="25"
+      label="Displayed clock interstitial. (DISPLAYED_CLOCK_INTERSTITIAL)"/>
 </enum>
 
 <enum name="StartupURLsMigration" type="int">
@@ -56118,6 +56423,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="3" label="Not migrated for an unknown reason"/>
 </enum>
 
+<enum name="SyncPassphraseType" type="int">
+  <int value="0" label="IMPLICIT_PASSPHRASE"/>
+  <int value="1" label="KEYSTORE_PASSPHRASE"/>
+  <int value="2" label="FROZEN_IMPLICIT_PASSPHRASE"/>
+  <int value="3" label="CUSTOM_PASSPHRASE"/>
+</enum>
+
 <enum name="SyncSimpleConflictResolutions" type="int">
   <summary>
     Sync simple conflict resolutions. The codes are listed in
@@ -56294,26 +56606,28 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="TrackedPreference" type="int">
-  <int value="0" label="prefs::kShowHomeButton"/>
-  <int value="1" label="prefs::kHomePageIsNewTabPage"/>
-  <int value="2" label="prefs::kHomePage"/>
-  <int value="3" label="prefs::kRestoreOnStartup"/>
-  <int value="4" label="prefs::kURLsToRestoreOnStartup"/>
+  <int value="0" label="kShowHomeButton"/>
+  <int value="1" label="kHomePageIsNewTabPage"/>
+  <int value="2" label="kHomePage"/>
+  <int value="3" label="kRestoreOnStartup"/>
+  <int value="4" label="kURLsToRestoreOnStartup"/>
   <int value="5" label="extensions::pref_names::kExtensions"/>
-  <int value="6" label="prefs::kGoogleServicesLastUsername"/>
-  <int value="7" label="prefs::kSearchProviderOverrides"/>
-  <int value="8" label="prefs::kDefaultSearchProviderSearchURL"/>
-  <int value="9" label="prefs::kDefaultSearchProviderKeyword"/>
-  <int value="10" label="prefs::kDefaultSearchProviderName"/>
-  <int value="11" label="prefs::kPinnedTabs"/>
-  <int value="12"
-      label="extensions::pref_names::kKnownDisabled (Obsolete 07/2014)"/>
-  <int value="13" label="prefs::kProfileResetPromptMemento"/>
-  <int value="14"
-      label="DefaultSearchManager::kDefaultSearchProviderDataPrefName"/>
-  <int value="15" label="prefs::kPreferenceResetTime"/>
-  <int value="16" label="prefs::kSafeBrowsingIncidentReportSent"/>
-  <int value="17" label="sync_driver::prefs::kSyncRemainingRollbackTries"/>
+  <int value="6" label="kGoogleServicesLastUsername"/>
+  <int value="7" label="kSearchProviderOverrides"/>
+  <int value="8" label="kDefaultSearchProviderSearchURL"/>
+  <int value="9" label="kDefaultSearchProviderKeyword"/>
+  <int value="10" label="kDefaultSearchProviderName"/>
+  <int value="11" label="kPinnedTabs"/>
+  <int value="12" label="kKnownDisabled (Obsolete 07/2014)"/>
+  <int value="13" label="kProfileResetPromptMemento"/>
+  <int value="14" label="kDefaultSearchProviderDataPrefName"/>
+  <int value="15" label="kPreferenceResetTime"/>
+  <int value="16" label="kSafeBrowsingIncidentReportSent"/>
+  <int value="17" label="kSyncRemainingRollbackTries"/>
+  <int value="18" label="kSafeBrowsingIncidentsSent"/>
+  <int value="19" label="kSwReporterPromptVersion"/>
+  <int value="20" label="kSwReporterPromptReason"/>
+  <int value="21" label="kGoogleServicesUsername"/>
 </enum>
 
 <enum name="TranslateError" type="int">
@@ -58251,6 +58565,12 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="Net.TCP_Connection_Latency_Interval"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="IOMode" separator=".">
+  <suffix name="Synchronous"/>
+  <suffix name="Asynchronous"/>
+  <affected-histogram name="Net.QuicSession.PacketWriteTime"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="IPProtocolType" separator="_">
   <suffix name="UDP"/>
   <suffix name="TCP"/>
@@ -58390,15 +58710,46 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="AudioVideo.Other"
       label="PipelineStatus for the codecs that dont have an explicit metric."/>
   <suffix name="AudioVideo.VP8.SW"
-      label="PipelineStatus for AV streams with VP8 Software decoder."/>
+      label="PipelineStatus for AV streams with VP8 software decoder."/>
+  <suffix name="AudioVideo.VP8.HW"
+      label="PipelineStatus for AV streams with VP8 hardware decoder."/>
+  <suffix name="AudioVideo.VP8.DDS.SW"
+      label="PipelineStatus for AV streams with VP8 software codec and that
+             go through the DecryptingDemuxerStream (DDS)."/>
+  <suffix name="AudioVideo.VP8.DDS.HW"
+      label="PipelineStatus for AV streams with VP8 hardware codec and that
+             go through the DecryptingDemuxerStream (DDS)."/>
+  <suffix name="AudioVideo.VP8.DVD"
+      label="PipelineStatus for AV streams with VP8 codec and that go through
+             the DecryptingVideoDecoder (DVD)."/>
   <suffix name="AudioVideo.VP9.SW"
-      label="PipelineStatus for AV streams with VP9 Software decoder."/>
-  <suffix name="AudioVideo.H264.HW"
-      label="PipelineStatus for hardware decoded AV streams with H264
-             decoder."/>
+      label="PipelineStatus for AV streams with VP9 software decoder."/>
+  <suffix name="AudioVideo.VP9.HW"
+      label="PipelineStatus for AV streams with VP9 hardware decoder."/>
+  <suffix name="AudioVideo.VP9.DDS.SW"
+      label="PipelineStatus for AV streams with VP9 codec and that go through
+             the DecryptingDemuxerStream (DDS)."/>
+  <suffix name="AudioVideo.VP9.DDS.HW"
+      label="PipelineStatus for AV streams with VP9 hardware codec and that
+             go through the DecryptingDemuxerStream (DDS)."/>
+  <suffix name="AudioVideo.VP9.DVD"
+      label="PipelineStatus for AV streams with VP9 software codec and that
+             go through the DecryptingVideoDecoder (DVD)."/>
   <suffix name="AudioVideo.H264.SW"
       label="PipelineStatus for software decoded AV streams with H264
              decoder."/>
+  <suffix name="AudioVideo.H264.HW"
+      label="PipelineStatus for hardware decoded AV streams with H264
+             decoder."/>
+  <suffix name="AudioVideo.H264.DDS.SW"
+      label="PipelineStatus for AV streams with H264 software decoder and
+             that go through the DecryptingDemuxerStream (DDS)."/>
+  <suffix name="AudioVideo.H264.DDS.HW"
+      label="PipelineStatus for AV streams with H264 hardware decoder and
+             that go through the DecryptingDemuxerStream (DDS)."/>
+  <suffix name="AudioVideo.H264.DVD"
+      label="PipelineStatus for AV streams with H264 decoder and that go
+             through the DecryptingVideoDecoder (DVD)."/>
   <suffix name="AudioOnly" label="PipelineStatus for Audio-only streams."/>
   <suffix name="VideoOnly" label="PipelineStatus for Video-only streams."/>
   <suffix name="Unsupported" label="PipelineStatus for unsupported streams."/>
@@ -60533,6 +60884,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="Undefined" label="For unknown or undefined events."/>
   <affected-histogram name="Event.Latency.Renderer"/>
   <affected-histogram name="Event.Latency.Renderer2"/>
+  <affected-histogram name="Event.Latency.RendererImpl"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="ResourcePrefetchPredictorNetworkTypePrefetch"
@@ -60929,6 +61281,18 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="Tabs.SwitchFromExitLatency"/>
   <affected-histogram name="Tabs.SwitchFromNewLatency"/>
   <affected-histogram name="Tabs.SwitchFromUserLatency"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="ThreadWatcher" separator=".">
+  <suffix name="CACHE" label="where watched thread is CACHE BrowserThread."/>
+  <suffix name="DB" label="where watched thread is DB BrowserThread."/>
+  <suffix name="FILE" label="where watched thread is FILE BrowserThread."/>
+  <suffix name="IO" label="where watched thread is IO BrowserThread."/>
+  <suffix name="UI" label="where watched thread is UI BrowserThread."/>
+  <affected-histogram name="ThreadWatcher.ResponseTime"/>
+  <affected-histogram name="ThreadWatcher.ResponsiveThreads"/>
+  <affected-histogram name="ThreadWatcher.Unresponsive"/>
+  <affected-histogram name="ThreadWatcher.UnresponsiveThreads"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="Tps65090Fets" separator=".">

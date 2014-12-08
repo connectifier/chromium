@@ -99,9 +99,9 @@ class RenderFrameHost;
 class RenderProcessHost;
 class RenderViewHost;
 class ResourceContext;
+class ServiceRegistry;
 class SiteInstance;
 class SpeechRecognitionManagerDelegate;
-class VibrationProvider;
 class WebContents;
 class WebContentsViewDelegate;
 struct MainFunctionParams;
@@ -402,7 +402,7 @@ class CONTENT_EXPORT ContentBrowserClient {
       int render_process_id,
       int render_frame_id,
       net::SSLCertRequestInfo* cert_request_info,
-      const base::Callback<void(net::X509Certificate*)>& callback);
+      const base::Callback<void(net::X509Certificate*)>& callback) {}
 
   // Adds a new installable certificate or private key.
   // Typically used to install an X.509 user certificate.
@@ -564,13 +564,6 @@ class CONTENT_EXPORT ContentBrowserClient {
   // information.
   virtual LocationProvider* OverrideSystemLocationProvider();
 
-  // Allows an embedder to return its own VibrationProvider implementation.
-  // Return NULL to use the default one for the platform to be created.
-  // FYI: Used by an external project; please don't remove.
-  // Contact Viatcheslav Ostapenko at sl.ostapenko@samsung.com for more
-  // information.
-  virtual VibrationProvider* OverrideVibrationProvider();
-
   // Creates a new DevToolsManagerDelegate. The caller owns the returned value.
   // It's valid to return NULL.
   virtual DevToolsManagerDelegate* GetDevToolsManagerDelegate();
@@ -591,6 +584,17 @@ class CONTENT_EXPORT ContentBrowserClient {
   // This is called on the IO thread.
   virtual net::CookieStore* OverrideCookieStoreForRenderProcess(
       int render_process_id);
+
+  // Checks if |security_origin| has permission to access the microphone or
+  // camera. Note that this does not query the user. |type| must be
+  // MEDIA_DEVICE_AUDIO_CAPTURE or MEDIA_DEVICE_VIDEO_CAPTURE.
+  virtual bool CheckMediaAccessPermission(BrowserContext* browser_context,
+                                          const GURL& security_origin,
+                                          MediaStreamType type);
+
+  // Allows to override browser Mojo services exposed through the
+  // RenderProcessHost.
+  virtual void OverrideRenderProcessMojoServices(ServiceRegistry* registry) {}
 
 #if defined(OS_POSIX) && !defined(OS_MACOSX)
   // Populates |mappings| with all files that need to be mapped before launching
@@ -618,13 +622,6 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual ExternalVideoSurfaceContainer*
   OverrideCreateExternalVideoSurfaceContainer(WebContents* web_contents);
 #endif
-
-// Checks if |security_origin| has permission to access the microphone or
-// camera. Note that this does not query the user. |type| must be
-// MEDIA_DEVICE_AUDIO_CAPTURE or MEDIA_DEVICE_VIDEO_CAPTURE.
-virtual bool CheckMediaAccessPermission(BrowserContext* browser_context,
-                                        const GURL& security_origin,
-                                        MediaStreamType type);
 };
 
 }  // namespace content

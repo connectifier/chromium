@@ -18,6 +18,7 @@
 #include "cc/animation/animation_registrar.h"
 #include "cc/animation/scrollbar_animation_controller.h"
 #include "cc/base/cc_export.h"
+#include "cc/base/synced_property.h"
 #include "cc/debug/micro_benchmark_controller_impl.h"
 #include "cc/input/input_handler.h"
 #include "cc/input/layer_scroll_offset_delegate.h"
@@ -61,6 +62,14 @@ class TopControlsManager;
 class UIResourceBitmap;
 class UIResourceRequest;
 struct RendererCapabilitiesImpl;
+
+enum class GpuRasterizationStatus {
+  ON,
+  ON_FORCED,
+  OFF_DEVICE,
+  OFF_VIEWPORT,
+  OFF_CONTENT
+};
 
 // LayerTreeHost->Proxy callback interface.
 class LayerTreeHostImplClient {
@@ -279,6 +288,15 @@ class CC_EXPORT LayerTreeHostImpl
   TileManager* tile_manager() { return tile_manager_.get(); }
   void SetUseGpuRasterization(bool use_gpu);
   bool use_gpu_rasterization() const { return use_gpu_rasterization_; }
+
+  GpuRasterizationStatus gpu_rasterization_status() const {
+    return gpu_rasterization_status_;
+  }
+  void set_gpu_rasterization_status(
+      GpuRasterizationStatus gpu_rasterization_status) {
+    gpu_rasterization_status_ = gpu_rasterization_status;
+  }
+
   bool create_low_res_tiling() const {
     return settings_.create_low_res_tiling && !use_gpu_rasterization_;
   }
@@ -341,6 +359,8 @@ class CC_EXPORT LayerTreeHostImpl
 
   void SetDeviceScaleFactor(float device_scale_factor);
   float device_scale_factor() const { return device_scale_factor_; }
+
+  void SetPageScaleOnActiveTree(float page_scale_factor);
 
   const gfx::Transform& DrawTransform() const;
 
@@ -472,8 +492,6 @@ class CC_EXPORT LayerTreeHostImpl
   void GetPictureLayerImplPairs(std::vector<PictureLayerImpl::Pair>* layers,
                                 bool need_valid_tile_priorities) const;
 
-  void SetTopControlsLayoutHeight(float height);
-
   void SetRequiresHighResToDraw() { requires_high_res_to_draw_ = true; }
   void ResetRequiresHighResToDraw() { requires_high_res_to_draw_ = false; }
   bool RequiresHighResToDraw() const { return requires_high_res_to_draw_; }
@@ -591,6 +609,7 @@ class CC_EXPORT LayerTreeHostImpl
   scoped_ptr<ResourceProvider> resource_provider_;
   scoped_ptr<TileManager> tile_manager_;
   bool use_gpu_rasterization_;
+  GpuRasterizationStatus gpu_rasterization_status_;
   scoped_ptr<RasterWorkerPool> raster_worker_pool_;
   scoped_ptr<ResourcePool> resource_pool_;
   scoped_ptr<ResourcePool> staging_resource_pool_;

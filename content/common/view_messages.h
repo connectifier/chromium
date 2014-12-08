@@ -15,6 +15,7 @@
 #include "content/common/content_param_traits.h"
 #include "content/common/cookie_data.h"
 #include "content/common/date_time_suggestion.h"
+#include "content/common/frame_replication_state.h"
 #include "content/common/navigation_gesture.h"
 #include "content/common/view_message_enums.h"
 #include "content/common/webplugin_geometry.h"
@@ -49,13 +50,13 @@
 #include "ui/base/ime/text_input_mode.h"
 #include "ui/base/ime/text_input_type.h"
 #include "ui/base/ui_base_types.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/rect_f.h"
+#include "ui/gfx/geometry/vector2d.h"
+#include "ui/gfx/geometry/vector2d_f.h"
 #include "ui/gfx/ipc/gfx_param_traits.h"
-#include "ui/gfx/point.h"
 #include "ui/gfx/range/range.h"
-#include "ui/gfx/rect.h"
-#include "ui/gfx/rect_f.h"
-#include "ui/gfx/vector2d.h"
-#include "ui/gfx/vector2d_f.h"
 
 #if defined(OS_MACOSX)
 #include "content/common/mac/font_descriptor.h"
@@ -420,9 +421,12 @@ IPC_STRUCT_BEGIN(ViewMsg_Resize_Params)
   IPC_STRUCT_MEMBER(gfx::Size, new_size)
   // The size of the view's backing surface in non-DPI-adjusted pixels.
   IPC_STRUCT_MEMBER(gfx::Size, physical_backing_size)
-  // The amount that the viewport size given to Blink was shrunk by the URL-bar
-  // (always 0 on platforms where URL-bar hiding isn't supported).
-  IPC_STRUCT_MEMBER(float, top_controls_layout_height)
+  // Whether or not Blink's viewport size should be shrunk by the height of the
+  // URL-bar (always false on platforms where URL-bar hiding isn't supported).
+  IPC_STRUCT_MEMBER(bool, top_controls_shrink_blink_size)
+  // The height of the top controls (always 0 on platforms where URL-bar hiding
+  // isn't supported).
+  IPC_STRUCT_MEMBER(float, top_controls_height)
   // The size of the visible viewport, which may be smaller than the view if the
   // view is partially occluded (e.g. by a virtual keyboard).  The size is in
   // DPI-adjusted pixels.
@@ -461,6 +465,11 @@ IPC_STRUCT_BEGIN(ViewMsg_New_Params)
 
   // Whether the RenderView should initially be swapped out.
   IPC_STRUCT_MEMBER(bool, swapped_out)
+
+  // In --site-per-process mode, if this view is |swapped_out|, its main frame
+  // will become a RenderFrameProxy.  |replicated_frame_state| is used to
+  // replicate information such as security origin to that RenderFrameProxy.
+  IPC_STRUCT_MEMBER(content::FrameReplicationState, replicated_frame_state)
 
   // The ID of the proxy object for the main frame in this view. It is only
   // used if |swapped_out| is true.
@@ -1546,15 +1555,6 @@ IPC_MESSAGE_ROUTED0(ViewHostMsg_WillInsertBody)
 IPC_MESSAGE_ROUTED1(ViewHostMsg_UpdateFaviconURL,
                     std::vector<content::FaviconURL> /* candidates */)
 
-// Sent by the renderer to the browser to start a vibration with the given
-// duration.
-IPC_MESSAGE_CONTROL1(ViewHostMsg_Vibrate,
-                     int64 /* milliseconds */)
-
-// Sent by the renderer to the browser to cancel the currently running
-// vibration, if there is one.
-IPC_MESSAGE_CONTROL0(ViewHostMsg_CancelVibration)
-
 // Message sent from renderer to the browser when the element that is focused
 // has been touched. A bool is passed in this message which indicates if the
 // node is editable.
@@ -1644,27 +1644,6 @@ IPC_MESSAGE_ROUTED1(ViewMsg_GetRenderedTextCompleted, std::string);
 IPC_SYNC_MESSAGE_CONTROL2_0(ViewHostMsg_PreCacheFontCharacters,
                             LOGFONT /* font_data */,
                             base::string16 /* characters */)
-#endif
-
-#if defined(OS_POSIX)
-// On POSIX, we cannot allocated shared memory from within the sandbox, so
-// this call exists for the renderer to ask the browser to allocate memory
-// on its behalf. We return a file descriptor to the POSIX shared memory.
-// If the |cache_in_browser| flag is |true|, then a copy of the shmem is kept
-// by the browser, and it is the caller's repsonsibility to send a
-// ViewHostMsg_FreeTransportDIB message in order to release the cached shmem.
-// In all cases, the caller is responsible for deleting the resulting
-// TransportDIB.
-IPC_SYNC_MESSAGE_CONTROL2_1(ViewHostMsg_AllocTransportDIB,
-                            uint32_t, /* bytes requested */
-                            bool, /* cache in the browser */
-                            TransportDIB::Handle /* DIB */)
-
-// Since the browser keeps handles to the allocated transport DIBs, this
-// message is sent to tell the browser that it may release them when the
-// renderer is finished with them.
-IPC_MESSAGE_CONTROL1(ViewHostMsg_FreeTransportDIB,
-                     TransportDIB::Id /* DIB id */)
 #endif
 
 // Adding a new message? Stick to the sort order above: first platform

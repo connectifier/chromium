@@ -32,6 +32,8 @@
         'bluetooth_adapter_mac.mm',
         'bluetooth_adapter_win.cc',
         'bluetooth_adapter_win.h',
+        'bluetooth_audio_sink.cc',
+        'bluetooth_audio_sink.h',
         'bluetooth_channel_mac.mm',
         'bluetooth_channel_mac.h',
         'bluetooth_device.cc',
@@ -109,7 +111,9 @@
           ]
         }],
         ['OS=="win"', {
-          'all_dependent_settings': {
+          # The following two blocks are duplicated. They apply to static lib
+          # and shared lib configurations respectively.
+          'all_dependent_settings': {  # For static lib, apply to dependents.
             'msvs_settings': {
               'VCLinkerTool': {
                 'DelayLoadDLLs': [
@@ -120,6 +124,17 @@
                   'setupapi.dll',
                 ],
               },
+            },
+          },
+          'msvs_settings': {  # For shared lib, apply to self.
+            'VCLinkerTool': {
+              'DelayLoadDLLs': [
+                'BluetoothApis.dll',
+                # Despite MSDN stating that Bthprops.dll contains the
+                # symbols declared by bthprops.lib, they actually reside here:
+                'Bthprops.cpl',
+                'setupapi.dll',
+              ],
             },
           },
         }],
