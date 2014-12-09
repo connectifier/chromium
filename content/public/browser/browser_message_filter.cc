@@ -17,7 +17,6 @@
 #include "content/public/common/result_codes.h"
 #include "ipc/ipc_sync_message.h"
 #include "ipc/message_filter.h"
-#include "base/debug/stack_trace.h"
 
 using content::BrowserMessageFilter;
 
@@ -214,15 +213,11 @@ BrowserMessageFilter::~BrowserMessageFilter() {
     base::CloseProcessHandle(peer_handle_);
 #endif
 }
-extern bool logit;
+
 IPC::MessageFilter* BrowserMessageFilter::GetFilter() {
   // We create this on demand so that if a filter is used in a unit test but
   // never attached to a channel, we don't leak Internal and this;
-fprintf(stderr, "GetFilter: %p\n", this);
   DCHECK(!internal_) << "Should only be called once.";
-if (logit) {
-  base::debug::StackTrace().Print(); 
-}
   internal_ = new Internal(this);
   return internal_;
 }

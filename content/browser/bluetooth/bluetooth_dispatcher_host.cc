@@ -8,7 +8,6 @@
 #include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_adapter_factory.h"
 #include "device/bluetooth/bluetooth_device.h"
-#include "base/debug/stack_trace.h"
 
 #if defined(OS_CHROMEOS)
 #include "chromeos/dbus/dbus_thread_manager.h"
@@ -21,29 +20,15 @@ using device::BluetoothDevice;
 namespace content {
 
 scoped_refptr<BluetoothDispatcherHost> BluetoothDispatcherHost::Create() {
-  scoped_refptr<BluetoothDispatcherHost> host(new BluetoothDispatcherHost());
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
 
-  //
-//
-// remove, probably not needed
-//
-//
-#if defined(OS_CHROMEOS)
-  // GetAdapter must wait for DBusThreadManager::IsInitialized();
-  DCHECK(chromeos::DBusThreadManager::IsInitialized());
-#endif
-  //
-  //
-  //
-  //
-  //
-  fprintf(stderr, "%s:%d \n", __FUNCTION__, __LINE__);
-if (BluetoothAdapterFactory::IsBluetoothAdapterAvailable())
-  BluetoothAdapterFactory::GetAdapter(
-      base::Bind(&BluetoothDispatcherHost::set_adapter, host));
-  fprintf(stderr, "%s:%d \n", __FUNCTION__, __LINE__);
-
+  // Hold a reference to the BluetoothDispatcherHost because the callback below
+  // may run and would otherwise release the BluetoothDispatcherHost
+  // prematurely.
+  scoped_refptr<BluetoothDispatcherHost> host(new BluetoothDispatcherHost());
+  if (BluetoothAdapterFactory::IsBluetoothAdapterAvailable())
+    BluetoothAdapterFactory::GetAdapter(
+        base::Bind(&BluetoothDispatcherHost::set_adapter, host));
   return host;
 }
 
@@ -67,7 +52,6 @@ BluetoothDispatcherHost::BluetoothDispatcherHost()
 }
 
 BluetoothDispatcherHost::~BluetoothDispatcherHost() {
-  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
   // Clear adapter, releasing observer references.
   set_adapter(scoped_refptr<device::BluetoothAdapter>());
 }
@@ -76,7 +60,6 @@ void BluetoothDispatcherHost::set_adapter(
     scoped_refptr<device::BluetoothAdapter> adapter) {
   if (adapter_.get())
     adapter_->RemoveObserver(this);
-  fprintf(stderr, "%s:%d %p\n", __FUNCTION__, __LINE__, adapter.get());
   adapter_ = adapter;
   if (adapter_.get())
     adapter_->AddObserver(this);

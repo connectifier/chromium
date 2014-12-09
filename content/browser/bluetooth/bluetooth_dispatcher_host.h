@@ -21,6 +21,7 @@ namespace content {
 class BluetoothDispatcherHost : public BrowserMessageFilter,
                                 public device::BluetoothAdapter::Observer {
  public:
+  // Creates a BluetoothDispatcherHost.
   static scoped_refptr<BluetoothDispatcherHost> Create();
 
   // BrowserMessageFilter:
