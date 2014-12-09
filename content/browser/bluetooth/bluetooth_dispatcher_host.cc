@@ -72,13 +72,14 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
     case MockData::NOT_MOCKING: {
       BluetoothAdapter::DeviceList devices = adapter_->GetDevices();
       if (devices.begin() == devices.end()) {
-      Send(new BluetoothMsg_RequestDeviceError(thread_id, request_id,
-                                               BluetoothError::NOT_FOUND));
-      return;
+        Send(new BluetoothMsg_RequestDeviceError(thread_id, request_id,
+                                                 BluetoothError::NOT_FOUND));
+        return;
       }
       BluetoothDevice* device = *devices.begin();
       Send(new BluetoothMsg_RequestDeviceSuccess(thread_id, request_id,
                                                  device->GetAddress()));
+      return;
     }
     case MockData::REJECT: {
       Send(new BluetoothMsg_RequestDeviceError(
