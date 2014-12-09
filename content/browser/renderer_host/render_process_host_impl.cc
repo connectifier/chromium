@@ -678,6 +678,8 @@ scoped_ptr<IPC::ChannelProxy> RenderProcessHostImpl::CreateChannelProxy(
       channel_id, IPC::Channel::MODE_SERVER, this, runner.get());
 }
 
+bool logit = false;
+
 void RenderProcessHostImpl::CreateMessageFilters() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   const base::CommandLine& browser_command_line =
@@ -880,10 +882,15 @@ void RenderProcessHostImpl::CreateMessageFilters() {
 #endif
   AddFilter(new GeofencingDispatcherHost(
       storage_partition_impl_->GetGeofencingManager()));
+  logit = true;
   fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
   if (browser_command_line.HasSwitch(
-          switches::kEnableExperimentalWebPlatformFeatures))
-    AddFilter(new BluetoothDispatcherHost());
+          switches::kEnableExperimentalWebPlatformFeatures)) {
+    scoped_refptr<BluetoothDispatcherHost> bt(BluetoothDispatcherHost::Create());
+    AddFilter(bt.get());
+  }
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
+  logit = false;
 }
 
 void RenderProcessHostImpl::RegisterMojoServices() {

@@ -8,6 +8,7 @@
 #include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_adapter_factory.h"
 #include "device/bluetooth/bluetooth_device.h"
+#include "base/debug/stack_trace.h"
 
 #if defined(OS_CHROMEOS)
 #include "chromeos/dbus/dbus_thread_manager.h"
@@ -19,13 +20,11 @@ using device::BluetoothDevice;
 
 namespace content {
 
-BluetoothDispatcherHost::BluetoothDispatcherHost()
-    : BrowserMessageFilter(BluetoothMsgStart),
-      bluetooth_mock_data_set_(MockData::NOT_MOCKING),
-      bluetooth_request_device_reject_type_(BluetoothError::NOT_FOUND) {
+scoped_refptr<BluetoothDispatcherHost> BluetoothDispatcherHost::Create() {
+  scoped_refptr<BluetoothDispatcherHost> host(new BluetoothDispatcherHost());
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
 
-//
+  //
 //
 // remove, probably not needed
 //
@@ -39,25 +38,13 @@ BluetoothDispatcherHost::BluetoothDispatcherHost()
   //
   //
   //
-  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
-  if (BluetoothAdapterFactory::IsBluetoothAdapterAvailable())
-    BluetoothAdapterFactory::GetAdapter(
-        base::Bind(&BluetoothDispatcherHost::set_adapter, this));
-}
+  fprintf(stderr, "%s:%d \n", __FUNCTION__, __LINE__);
+if (BluetoothAdapterFactory::IsBluetoothAdapterAvailable())
+  BluetoothAdapterFactory::GetAdapter(
+      base::Bind(&BluetoothDispatcherHost::set_adapter, host));
+  fprintf(stderr, "%s:%d \n", __FUNCTION__, __LINE__);
 
-BluetoothDispatcherHost::~BluetoothDispatcherHost() {
-  // Clear adapter, releasing observer references.
-  set_adapter(scoped_refptr<device::BluetoothAdapter>());
-}
-
-void BluetoothDispatcherHost::set_adapter(
-    scoped_refptr<device::BluetoothAdapter> adapter) {
-  if (adapter_.get())
-    adapter_->RemoveObserver(this);
-  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
-  adapter_ = adapter;
-  if (adapter_.get())
-    adapter_->AddObserver(this);
+  return host;
 }
 
 bool BluetoothDispatcherHost::OnMessageReceived(const IPC::Message& message) {
@@ -70,6 +57,29 @@ bool BluetoothDispatcherHost::OnMessageReceived(const IPC::Message& message) {
   IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   return handled;
+}
+
+BluetoothDispatcherHost::BluetoothDispatcherHost()
+    : BrowserMessageFilter(BluetoothMsgStart),
+      bluetooth_mock_data_set_(MockData::NOT_MOCKING),
+      bluetooth_request_device_reject_type_(BluetoothError::NOT_FOUND) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+}
+
+BluetoothDispatcherHost::~BluetoothDispatcherHost() {
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
+  // Clear adapter, releasing observer references.
+  set_adapter(scoped_refptr<device::BluetoothAdapter>());
+}
+
+void BluetoothDispatcherHost::set_adapter(
+    scoped_refptr<device::BluetoothAdapter> adapter) {
+  if (adapter_.get())
+    adapter_->RemoveObserver(this);
+  fprintf(stderr, "%s:%d %p\n", __FUNCTION__, __LINE__, adapter.get());
+  adapter_ = adapter;
+  if (adapter_.get())
+    adapter_->AddObserver(this);
 }
 
 void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {

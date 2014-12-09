@@ -21,12 +21,13 @@ namespace content {
 class BluetoothDispatcherHost : public BrowserMessageFilter,
                                 public device::BluetoothAdapter::Observer {
  public:
-  BluetoothDispatcherHost();
+  static scoped_refptr<BluetoothDispatcherHost> Create();
 
   // BrowserMessageFilter:
   bool OnMessageReceived(const IPC::Message& message) override;
 
  protected:
+  BluetoothDispatcherHost();
   ~BluetoothDispatcherHost() override;
 
  private:
