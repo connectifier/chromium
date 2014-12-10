@@ -10,7 +10,7 @@
     '../device/vibration/vibration.gyp:device_vibration_mojo_bindings',
     '../device/battery/battery.gyp:device_battery',
     '../device/battery/battery.gyp:device_battery_mojo_bindings',
-    '../device/battery/bluetooth.gyp:device_bluetooth',
+    '../device/bluetooth/bluetooth.gyp:device_bluetooth',
     '../google_apis/google_apis.gyp:google_apis',
     '../net/net.gyp:net',
     '../skia/skia.gyp:skia',
