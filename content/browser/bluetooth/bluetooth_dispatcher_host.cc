@@ -9,10 +9,6 @@
 #include "device/bluetooth/bluetooth_adapter_factory.h"
 #include "device/bluetooth/bluetooth_device.h"
 
-#if defined(OS_CHROMEOS)
-#include "chromeos/dbus/dbus_thread_manager.h"
-#endif  // defined(OS_CHROMEOS)
-
 using device::BluetoothAdapter;
 using device::BluetoothAdapterFactory;
 using device::BluetoothDevice;
@@ -76,11 +72,11 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
       if (devices.begin() == devices.end()) {
         Send(new BluetoothMsg_RequestDeviceError(thread_id, request_id,
                                                  BluetoothError::NOT_FOUND));
-        return;
+      } else {
+        BluetoothDevice* device = *devices.begin();
+        Send(new BluetoothMsg_RequestDeviceSuccess(thread_id, request_id,
+                                                   device->GetAddress()));
       }
-      BluetoothDevice* device = *devices.begin();
-      Send(new BluetoothMsg_RequestDeviceSuccess(thread_id, request_id,
-                                                 device->GetAddress()));
       return;
     }
     case MockData::REJECT: {
