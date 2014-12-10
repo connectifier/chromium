@@ -63,11 +63,13 @@ void BluetoothDispatcherHost::set_adapter(
 
 void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  // Mock implementation util a more complete implementation is built out.
+  // TODO(scheib) Extend this very simple mock implementation by using
+  // device/bluetooth/test mock adapter and related classes.
   switch (bluetooth_mock_data_set_) {
     case MockData::NOT_MOCKING: {
       // TODO(scheib): Filter devices by services: crbug.com/440594
       // TODO(scheib): Device selection UI: crbug.com/436280
+      // TODO(scheib): Utilize BluetoothAdapter::Observer::DeviceAdded/Removed.
       BluetoothAdapter::DeviceList devices = adapter_->GetDevices();
       if (devices.begin() == devices.end()) {
         Send(new BluetoothMsg_RequestDeviceError(thread_id, request_id,
