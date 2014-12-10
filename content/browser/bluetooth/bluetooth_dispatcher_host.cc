@@ -70,6 +70,8 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
   // Mock implementation util a more complete implementation is built out.
   switch (bluetooth_mock_data_set_) {
     case MockData::NOT_MOCKING: {
+      // TODO(scheib): Filter devices by services: crbug.com/440594
+      // TODO(scheib): Device selection UI: crbug.com/436280
       BluetoothAdapter::DeviceList devices = adapter_->GetDevices();
       if (devices.begin() == devices.end()) {
         Send(new BluetoothMsg_RequestDeviceError(thread_id, request_id,
