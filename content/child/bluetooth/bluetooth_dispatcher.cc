@@ -101,14 +101,14 @@ void BluetoothDispatcher::OnWorkerRunLoopStopped() {
   delete this;
 }
 
-void BluetoothDispatcher::OnRequestDeviceSuccess(
-    int thread_id,
-    int request_id,
-    const std::string& device_instance_id) {
+void BluetoothDispatcher::OnRequestDeviceSuccess(int thread_id,
+                                                 int request_id,
+                                                 BluetoothDevice device) {
   DCHECK(pending_requests_.Lookup(request_id)) << request_id;
   pending_requests_.Lookup(request_id)
       ->onSuccess(
-          new WebBluetoothDevice(WebString::fromUTF8(device_instance_id)));
+          new WebBluetoothDevice(WebString::fromUTF8(device.instance_id),
+                                 WebString(device.name)));
   pending_requests_.Remove(request_id);
 }
 

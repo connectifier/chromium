@@ -11,7 +11,6 @@
 
 using device::BluetoothAdapter;
 using device::BluetoothAdapterFactory;
-using device::BluetoothDevice;
 
 namespace content {
 
@@ -75,9 +74,12 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
         Send(new BluetoothMsg_RequestDeviceError(thread_id, request_id,
                                                  BluetoothError::NOT_FOUND));
       } else {
-        BluetoothDevice* device = *devices.begin();
+        device::BluetoothDevice* device = *devices.begin();
+        content::BluetoothDevice device_ipc;
+        device_ipc.instance_id = device->GetAddress();
+        device_ipc.name = device->GetName();
         Send(new BluetoothMsg_RequestDeviceSuccess(thread_id, request_id,
-                                                   device->GetAddress()));
+                                                   device_ipc));
       }
       return;
     }
@@ -87,8 +89,12 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
       return;
     }
     case MockData::RESOLVE: {
+        content::BluetoothDevice device_ipc;
+        // TODO(scheib): "Empty Mock Device instanceId"
+        device_ipc.instance_id = "Empty Mock deviceId";
+        // TODO(scheib): device_ipc.name; --- how to construct string16?
       Send(new BluetoothMsg_RequestDeviceSuccess(thread_id, request_id,
-                                                 "Empty Mock deviceId"));
+                                                 device_ipc));
       return;
     }
   }
