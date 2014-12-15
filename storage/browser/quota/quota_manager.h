@@ -54,8 +54,6 @@ class QuotaTemporaryStorageEvictor;
 class StorageMonitor;
 class UsageTracker;
 
-struct QuotaManagerDeleter;
-
 struct STORAGE_EXPORT UsageAndQuota {
   int64 usage;
   int64 global_limited_usage;
@@ -112,7 +110,8 @@ struct UsageInfo {
 class STORAGE_EXPORT QuotaManager
     : public QuotaTaskObserver,
       public QuotaEvictionHandler,
-      public base::RefCountedThreadSafe<QuotaManager, QuotaManagerDeleter> {
+      public base::RefCountedThreadSafe<
+          QuotaManager, DeleteOnCorrectThreadRefCountedThreadSafeTraits> {
  public:
   typedef base::Callback<void(QuotaStatusCode,
                               int64 /* usage */,
@@ -265,7 +264,8 @@ class STORAGE_EXPORT QuotaManager
 
  private:
   friend class base::DeleteHelper<QuotaManager>;
-  friend class base::RefCountedThreadSafe<QuotaManager, QuotaManagerDeleter>;
+  friend class base::RefCountedThreadSafe<
+      QuotaManager, DeleteOnCorrectThreadRefCountedThreadSafeTraits>;
   friend class content::QuotaManagerTest;
   friend class content::StorageMonitorTest;
   friend class content::MockQuotaManager;
@@ -273,7 +273,7 @@ class STORAGE_EXPORT QuotaManager
   friend class quota_internals::QuotaInternalsProxy;
   friend class QuotaManagerProxy;
   friend class QuotaTemporaryStorageEvictor;
-  friend struct QuotaManagerDeleter;
+  friend struct DeleteOnCorrectThreadRefCountedThreadSafeTraits;
 
   class GetUsageInfoTask;
 
@@ -450,12 +450,6 @@ class STORAGE_EXPORT QuotaManager
   base::WeakPtrFactory<QuotaManager> weak_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(QuotaManager);
-};
-
-struct QuotaManagerDeleter {
-  static void Destruct(const QuotaManager* manager) {
-    manager->DeleteOnCorrectThread();
-  }
 };
 
 }  // namespace storage

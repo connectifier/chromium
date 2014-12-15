@@ -157,6 +157,13 @@ struct DefaultRefCountedThreadSafeTraits {
   }
 };
 
+// Convenience traits for RefCountedThreadSafe<T>.
+// Calls DeleteOnCorrectThread() on an object when its ref count reaches 0.
+template<typename T>
+struct DeleteOnCorrectThreadRefCountedThreadSafeTraits {
+  static void Destruct(const T* x) { x->DeleteOnCorrectThread(); }
+};
+
 //
 // A thread-safe variant of RefCounted<T>
 //

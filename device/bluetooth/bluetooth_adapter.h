@@ -33,7 +33,7 @@ class BluetoothUUID;
 // known to the adapter, discovering new devices, and providing notification of
 // updates to device information.
 class DEVICE_BLUETOOTH_EXPORT BluetoothAdapter
-    : public base::RefCounted<BluetoothAdapter> {
+    : public base::RefCountedThreadSafe<BluetoothAdapter, > {
  public:
   // Interface for observing changes from bluetooth adapters.
   class Observer {

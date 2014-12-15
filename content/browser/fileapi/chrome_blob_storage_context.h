@@ -17,7 +17,6 @@ class BlobStorageContext;
 namespace content {
 class BlobHandle;
 class BrowserContext;
-struct ChromeBlobStorageContextDeleter;
 
 // A context class that keeps track of BlobStorageController used by the chrome.
 // There is an instance associated with each BrowserContext. There could be
@@ -28,7 +27,7 @@ struct ChromeBlobStorageContextDeleter;
 // the IO thread (unless specifically called out in doc comments).
 class CONTENT_EXPORT ChromeBlobStorageContext
     : public base::RefCountedThreadSafe<ChromeBlobStorageContext,
-                                        ChromeBlobStorageContextDeleter> {
+        DeleteOnCorrectThreadRefCountedThreadSafeTraits> {
  public:
   ChromeBlobStorageContext();
 
@@ -49,18 +48,12 @@ class CONTENT_EXPORT ChromeBlobStorageContext
  private:
   friend class base::DeleteHelper<ChromeBlobStorageContext>;
   friend class base::RefCountedThreadSafe<ChromeBlobStorageContext,
-                                          ChromeBlobStorageContextDeleter>;
-  friend struct ChromeBlobStorageContextDeleter;
+      DeleteOnCorrectThreadRefCountedThreadSafeTraits>;
+  friend struct DeleteOnCorrectThreadRefCountedThreadSafeTraits;
 
   void DeleteOnCorrectThread() const;
 
   scoped_ptr<storage::BlobStorageContext> context_;
-};
-
-struct ChromeBlobStorageContextDeleter {
-  static void Destruct(const ChromeBlobStorageContext* context) {
-    context->DeleteOnCorrectThread();
-  }
 };
 
 }  // namespace content
