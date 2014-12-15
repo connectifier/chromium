@@ -129,8 +129,8 @@ void SingleThreadProxy::SetOutputSurface(
   output_surface_creation_requested_ = false;
   renderer_capabilities_for_main_thread_ = RendererCapabilities();
 
-  bool success = !!output_surface;
-  if (success) {
+  bool success;
+  {
     DebugScopedSetMainThreadBlocked main_thread_blocked(this);
     DebugScopedSetImplThread impl(this);
     layer_tree_host_->DeleteContentsTexturesOnImplThread(
@@ -138,15 +138,14 @@ void SingleThreadProxy::SetOutputSurface(
     success = layer_tree_host_impl_->InitializeRenderer(output_surface.Pass());
   }
 
-  layer_tree_host_->OnCreateAndInitializeOutputSurfaceAttempted(success);
-
   if (success) {
+    layer_tree_host_->DidInitializeOutputSurface();
     if (scheduler_on_impl_thread_)
       scheduler_on_impl_thread_->DidCreateAndInitializeOutputSurface();
     else if (!inside_synchronous_composite_)
       SetNeedsCommit();
-  } else if (Proxy::MainThreadTaskRunner()) {
-    ScheduleRequestNewOutputSurface();
+  } else {
+    layer_tree_host_->DidFailToInitializeOutputSurface();
   }
 }
 
@@ -372,10 +371,10 @@ void SingleThreadProxy::SetNeedsAnimateOnImplThread() {
     scheduler_on_impl_thread_->SetNeedsAnimate();
 }
 
-void SingleThreadProxy::SetNeedsManageTilesOnImplThread() {
-  TRACE_EVENT0("cc", "SingleThreadProxy::SetNeedsManageTilesOnImplThread");
+void SingleThreadProxy::SetNeedsPrepareTilesOnImplThread() {
+  TRACE_EVENT0("cc", "SingleThreadProxy::SetNeedsPrepareTilesOnImplThread");
   if (scheduler_on_impl_thread_)
-    scheduler_on_impl_thread_->SetNeedsManageTiles();
+    scheduler_on_impl_thread_->SetNeedsPrepareTiles();
 }
 
 void SingleThreadProxy::SetNeedsRedrawRectOnImplThread(
@@ -438,11 +437,11 @@ void SingleThreadProxy::DidActivateSyncTree() {
   timing_history_.DidActivateSyncTree();
 }
 
-void SingleThreadProxy::DidManageTiles() {
+void SingleThreadProxy::DidPrepareTiles() {
   DCHECK(layer_tree_host_impl_->settings().impl_side_painting);
   DCHECK(Proxy::IsImplThread());
   if (scheduler_on_impl_thread_)
-    scheduler_on_impl_thread_->DidManageTiles();
+    scheduler_on_impl_thread_->DidPrepareTiles();
 }
 
 void SingleThreadProxy::UpdateRendererCapabilitiesOnImplThread() {
@@ -507,7 +506,7 @@ void SingleThreadProxy::CompositeImmediately(base::TimeTicks frame_begin_time) {
     if (layer_tree_host_impl_->settings().impl_side_painting) {
       layer_tree_host_impl_->ActivateSyncTree();
       layer_tree_host_impl_->active_tree()->UpdateDrawProperties();
-      layer_tree_host_impl_->ManageTiles();
+      layer_tree_host_impl_->PrepareTiles();
       layer_tree_host_impl_->SynchronouslyInitializeAllTiles();
     }
 
@@ -771,11 +770,11 @@ void SingleThreadProxy::ScheduledActionBeginOutputSurfaceCreation() {
   }
 }
 
-void SingleThreadProxy::ScheduledActionManageTiles() {
-  TRACE_EVENT0("cc", "SingleThreadProxy::ScheduledActionManageTiles");
+void SingleThreadProxy::ScheduledActionPrepareTiles() {
+  TRACE_EVENT0("cc", "SingleThreadProxy::ScheduledActionPrepareTiles");
   DCHECK(layer_tree_host_impl_->settings().impl_side_painting);
   DebugScopedSetImplThread impl(this);
-  layer_tree_host_impl_->ManageTiles();
+  layer_tree_host_impl_->PrepareTiles();
 }
 
 void SingleThreadProxy::DidAnticipatedDrawTimeChange(base::TimeTicks time) {

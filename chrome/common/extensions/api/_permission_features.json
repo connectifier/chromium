@@ -260,6 +260,14 @@
       "AFA728615D3A82D4017BDECEE86978543194D198"  // Whispernet Proxy
     ]
   },
+  "cryptotokenPrivate": {
+    "channel": "dev",
+    "extension_types": ["extension"],
+    "location": "component",
+    "whitelist": [
+      "E24F1786D842E91E74C27929B0B3715A4689A473"  // Cryptotoken
+    ]
+  },
   "diagnostics": [
     {
       "channel": "dev",
@@ -379,6 +387,7 @@
   },
   "experimental": {
     "channel": "stable",
+    "command_line_switch": "experimental-extension-apis",
     "extension_types": [
       "extension", "legacy_packaged_app", "hosted_app", "platform_app"
     ]
@@ -947,13 +956,6 @@
     "channel": "stable",
     "extension_types": ["platform_app"]
   },
-  "syncedNotificationsPrivate": {
-    "channel": "dev",
-    "extension_types": ["platform_app"],
-    "whitelist": [
-      "34967F9FA3C399E1EC380B443D7331AA93AC445B"  // http://crbug.com/400436
-    ]
-  },
   "systemPrivate": {
     "channel": "stable",
     "extension_types": ["extension", "legacy_packaged_app", "platform_app"],
@@ -998,12 +1000,6 @@
   "ttsEngine": {
     "channel": "stable",
     "extension_types": ["extension", "legacy_packaged_app"]
-  },
-  "unlimitedStorage": {
-    "channel": "stable",
-    "extension_types": [
-      "extension", "legacy_packaged_app", "hosted_app", "platform_app"
-    ]
   },
   "virtualKeyboardPrivate": {
     "channel": "stable",

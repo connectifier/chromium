@@ -33,13 +33,11 @@ CONTENT_EXPORT extern const char kDefaultTileHeight[];
 CONTENT_EXPORT extern const char kDisable2dCanvasAntialiasing[];
 CONTENT_EXPORT extern const char kDisable3DAPIs[];
 CONTENT_EXPORT extern const char kDisableAccelerated2dCanvas[];
-CONTENT_EXPORT extern const char kDisableLayerSquashing[];
 CONTENT_EXPORT extern const char kDisableAcceleratedVideoDecode[];
 CONTENT_EXPORT extern const char kDisableApplicationCache[];
 extern const char kDisableBackingStoreLimit[];
 CONTENT_EXPORT extern const char kDisableBlinkScheduler[];
 CONTENT_EXPORT extern const char kDisablePreferCompositingToLCDText[];
-CONTENT_EXPORT extern const char kDisableCompositingForTransition[];
 CONTENT_EXPORT extern const char kDisableDatabases[];
 CONTENT_EXPORT extern const char kDisableDelegatedRenderer[];
 extern const char kDisableDirectNPAPIRequests[];
@@ -94,12 +92,10 @@ CONTENT_EXPORT extern const char kDomAutomationController[];
 extern const char kEnable2dCanvasClipAntialiasing[];
 CONTENT_EXPORT extern const char kEnableAcceleratedJpegDecoding[];
 CONTENT_EXPORT extern const char kEnableBleedingEdgeRenderingFastPaths[];
-CONTENT_EXPORT extern const char kEnableLayerSquashing[];
 CONTENT_EXPORT extern const char kEnableCredentialManagerAPI[];
 CONTENT_EXPORT extern const char kEnableBeginFrameScheduling[];
 CONTENT_EXPORT extern const char kEnablePreferCompositingToLCDText[];
 CONTENT_EXPORT extern const char kEnableBrowserSideNavigation[];
-CONTENT_EXPORT extern const char kEnableCompositingForTransition[];
 CONTENT_EXPORT extern const char kEnableDeferredImageDecoding[];
 CONTENT_EXPORT extern const char kEnableDelegatedRenderer[];
 CONTENT_EXPORT extern const char kEnableDisplayList2dCanvas[];
@@ -293,10 +289,12 @@ CONTENT_EXPORT extern const char kDeviceScaleFactor[];
 CONTENT_EXPORT extern const char kDisableLegacyIntermediateWindow[];
 // This switch will be removed when we enable the win32K lockdown process
 // mitigation.
+CONTENT_EXPORT extern const char kDisableWin32kRendererLockDown[];
 CONTENT_EXPORT extern const char kEnableWin32kRendererLockDown[];
 // Switch to uniquely identify names shared memory section for font cache
 // across chromium flavors.
 CONTENT_EXPORT extern const char kFontCacheSharedMemSuffix[];
+CONTENT_EXPORT bool IsWin32kRendererLockdownEnabled();
 #endif
 
 #if defined(ENABLE_PLUGINS)

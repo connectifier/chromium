@@ -619,7 +619,7 @@
       # completion, but only actually requires them for layout tests. However,
       # we need to maintain all the old behaviors while the plumbing is put in
       # place on both sides of the repo boundary.
-      'enable_load_completion_hacks%': 1,
+      'enable_load_completion_hacks%': 0,
 
       # Automatically select platforms under ozone. Turn this off to
       # build only explicitly selected platforms.
@@ -704,6 +704,13 @@
           'use_dbus%': 1,
         }, {
           'use_dbus%': 0,
+        }],
+
+        # Libxkbcommon usage.
+        ['use_ozone==1 and embedded==0', {
+          'use_xkbcommon%': 1,
+        }, {
+          'use_xkbcommon%': 0,
         }],
 
         # We always use skia text rendering in Aura on Windows, since GDI
@@ -1087,6 +1094,7 @@
     'use_cairo%': '<(use_cairo)',
     'use_ozone%': '<(use_ozone)',
     'use_ozone_evdev%': '<(use_ozone_evdev)',
+    'use_xkbcommon%': '<(use_xkbcommon)',
     'use_clipboard_aurax11%': '<(use_clipboard_aurax11)',
     'desktop_linux%': '<(desktop_linux)',
     'use_x11%': '<(use_x11)',
@@ -1974,7 +1982,7 @@
         'enable_pepper_cdms%': 0,
       }],
 
-      ['OS=="android"', {
+      ['OS=="android" or chromecast==1', {
         'enable_browser_cdms%': 1,
       }, {
         'enable_browser_cdms%': 0,
@@ -4188,6 +4196,13 @@
                 ],
               }],
             ],
+            'conditions': [
+              ['OS=="mac"', {
+                'cflags': [
+                  '-mllvm -asan-globals=0',  # http://crbug.com/352073
+                ],
+              }],
+            ],
           }],
           ['ubsan==1', {
             'target_conditions': [
@@ -4893,6 +4908,7 @@
             'xcode_settings': {
               'OTHER_CFLAGS': [
                 '-fsanitize=address',
+                '-mllvm -asan-globals=0',  # http://crbug.com/352073
                 '-gline-tables-only',
               ],
             },

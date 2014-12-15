@@ -22,6 +22,7 @@
 #include "third_party/WebKit/public/platform/WebServiceWorkerClientFocusCallback.h"
 #include "third_party/WebKit/public/platform/WebServiceWorkerClientsInfo.h"
 #include "third_party/WebKit/public/platform/WebServiceWorkerEventResult.h"
+#include "third_party/WebKit/public/platform/WebServiceWorkerSkipWaitingCallbacks.h"
 
 namespace blink {
 struct WebCircularGeofencingRegion;
@@ -35,7 +36,7 @@ class Message;
 namespace content {
 
 class EmbeddedWorkerContextClient;
-struct ShowDesktopNotificationHostMsgParams;
+struct PlatformNotificationData;
 
 // TODO(kinuko): This should implement WebServiceWorkerContextClient
 // rather than having EmbeddedWorkerContextClient implement it.
@@ -71,6 +72,7 @@ class ServiceWorkerScriptContext {
       scoped_ptr<blink::WebMessagePortChannelArray> channels);
   void FocusClient(int client_id,
                    blink::WebServiceWorkerClientFocusCallback* callback);
+  void SkipWaiting(blink::WebServiceWorkerSkipWaitingCallbacks* callbacks);
 
   // Send a message to the browser. Takes ownership of |message|.
   void Send(IPC::Message* message);
@@ -88,6 +90,8 @@ class ServiceWorkerScriptContext {
       ClientsCallbacksMap;
   typedef IDMap<blink::WebServiceWorkerClientFocusCallback, IDMapOwnPointer>
       FocusClientCallbacksMap;
+  typedef IDMap<blink::WebServiceWorkerSkipWaitingCallbacks, IDMapOwnPointer>
+      SkipWaitingCallbacksMap;
 
   void OnActivateEvent(int request_id);
   void OnInstallEvent(int request_id, int active_version_id);
@@ -96,7 +100,7 @@ class ServiceWorkerScriptContext {
   void OnNotificationClickEvent(
       int request_id,
       const std::string& notification_id,
-      const ShowDesktopNotificationHostMsgParams& notification_data);
+      const PlatformNotificationData& notification_data);
   void OnPushEvent(int request_id, const std::string& data);
   void OnGeofencingEvent(int request_id,
                          blink::WebGeofencingEventType event_type,
@@ -106,8 +110,9 @@ class ServiceWorkerScriptContext {
                      const std::vector<int>& sent_message_port_ids,
                      const std::vector<int>& new_routing_ids);
   void OnDidGetClientDocuments(
-      int request_id, const std::vector<int>& client_ids);
+      int request_id, const std::vector<ServiceWorkerClientInfo>& clients);
   void OnFocusClientResponse(int request_id, bool result);
+  void OnDidSkipWaiting(int request_id);
 
   scoped_ptr<ServiceWorkerCacheStorageDispatcher> cache_storage_dispatcher_;
 
@@ -127,6 +132,9 @@ class ServiceWorkerScriptContext {
 
   // Pending callbacks for FocusClient().
   FocusClientCallbacksMap pending_focus_client_callbacks_;
+
+  // Pending callbacks for SkipWaiting().
+  SkipWaitingCallbacksMap pending_skip_waiting_callbacks_;
 
   // Capture timestamps for UMA
   std::map<int, base::TimeTicks> activate_start_timings_;

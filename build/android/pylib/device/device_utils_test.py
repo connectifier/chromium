@@ -254,13 +254,18 @@ class DeviceUtilsOldImplTest(unittest.TestCase):
   def tearDown(self):
     self._get_adb_path_patch.stop()
 
+
+def _AdbWrapperMock(test_serial):
+  adb = mock.Mock(spec=adb_wrapper.AdbWrapper)
+  adb.__str__ = mock.Mock(return_value=test_serial)
+  adb.GetDeviceSerial.return_value = test_serial
+  return adb
+
+
 class DeviceUtilsNewImplTest(mock_calls.TestCase):
 
   def setUp(self):
-    test_serial = '0123456789abcdef'
-    self.adb = mock.Mock(spec=adb_wrapper.AdbWrapper)
-    self.adb.__str__ = mock.Mock(return_value=test_serial)
-    self.adb.GetDeviceSerial.return_value = test_serial
+    self.adb = _AdbWrapperMock('0123456789abcdef')
     self.device = device_utils.DeviceUtils(
         self.adb, default_timeout=10, default_retries=0)
     self.watchMethodCalls(self.call.adb, ignore=['GetDeviceSerial'])
@@ -365,19 +370,25 @@ class DeviceUtilsGetExternalStoragePathTest(DeviceUtilsNewImplTest):
 class DeviceUtilsGetApplicationPathTest(DeviceUtilsNewImplTest):
 
   def testGetApplicationPath_exists(self):
-    with self.assertCall(self.call.adb.Shell('pm path android'),
-                         'package:/path/to/android.apk\n'):
+    with self.assertCalls(
+        (self.call.adb.Shell('getprop ro.build.version.sdk'), '19\n'),
+        (self.call.adb.Shell('pm path android'),
+         'package:/path/to/android.apk\n')):
       self.assertEquals('/path/to/android.apk',
                         self.device.GetApplicationPath('android'))
 
   def testGetApplicationPath_notExists(self):
-    with self.assertCall(self.call.adb.Shell('pm path not.installed.app'), ''):
+    with self.assertCalls(
+        (self.call.adb.Shell('getprop ro.build.version.sdk'), '19\n'),
+        (self.call.adb.Shell('pm path not.installed.app'), '')):
       self.assertEquals(None,
                         self.device.GetApplicationPath('not.installed.app'))
 
   def testGetApplicationPath_fails(self):
-    with self.assertCall(self.call.adb.Shell('pm path android'),
-        self.CommandError('ERROR. Is package manager running?\n')):
+    with self.assertCalls(
+        (self.call.adb.Shell('getprop ro.build.version.sdk'), '19\n'),
+        (self.call.adb.Shell('pm path android'),
+         self.CommandError('ERROR. Is package manager running?\n'))):
       with self.assertRaises(device_errors.CommandFailedError):
         self.device.GetApplicationPath('android')
 
@@ -1181,7 +1192,7 @@ class DeviceUtilsWriteFileTest(DeviceUtilsNewImplTest):
     with self.assertCalls(
         (mock.call.tempfile.NamedTemporaryFile(), tmp_host),
         (self.call.device.NeedsSU(), True),
-        (mock.call.pylib.utils.device_temp_file.DeviceTempFile(self.device),
+        (mock.call.pylib.utils.device_temp_file.DeviceTempFile(self.adb),
          MockTempFile('/external/path/tmp/on.device')),
         self.call.adb.Push('/tmp/file/on.host', '/external/path/tmp/on.device'),
         self.call.device.RunShellCommand(
@@ -1516,6 +1527,21 @@ class DeviceUtilsStrTest(DeviceUtilsNewImplTest):
     with self.assertCalls(
         (self.call.adb.GetDeviceSerial(), '0123456789abcdef')):
       self.assertEqual('0123456789abcdef', str(self.device))
+
+
+class DeviceUtilsParallelTest(mock_calls.TestCase):
+
+  def testParallel_default(self):
+    test_serials = ['0123456789abcdef', 'fedcba9876543210']
+    with self.assertCall(
+        mock.call.pylib.device.adb_wrapper.AdbWrapper.GetDevices(),
+        [_AdbWrapperMock(serial) for serial in test_serials]):
+      parallel_devices = device_utils.DeviceUtils.parallel()
+    for serial, device in zip(test_serials, parallel_devices.pGet(None)):
+      self.assertTrue(
+          isinstance(device, device_utils.DeviceUtils)
+          and serial == str(device),
+          'Expected a DeviceUtils object with serial %s' % serial)
 
 
 if __name__ == '__main__':

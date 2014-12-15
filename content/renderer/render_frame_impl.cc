@@ -95,11 +95,11 @@
 #include "content/renderer/websharedworker_proxy.h"
 #include "gin/modules/module_registry.h"
 #include "media/base/audio_renderer_mixer_input.h"
-#include "media/base/renderer.h"
-#include "media/blink/encrypted_media_player_support.h"
+#include "media/base/media_log.h"
 #include "media/blink/webcontentdecryptionmodule_impl.h"
 #include "media/blink/webmediaplayer_impl.h"
 #include "media/blink/webmediaplayer_params.h"
+#include "media/filters/default_renderer_factory.h"
 #include "media/filters/gpu_video_accelerator_factories.h"
 #include "mojo/edk/js/core.h"
 #include "mojo/edk/js/support.h"
@@ -247,7 +247,7 @@ void GetRedirectChain(WebDataSource* ds, std::vector<GURL>* result) {
 // Returns the original request url. If there is no redirect, the original
 // url is the same as ds->request()->url(). If the WebDataSource belongs to a
 // frame was loaded by loadData, the original url will be ds->unreachableURL()
-static GURL GetOriginalRequestURL(WebDataSource* ds) {
+GURL GetOriginalRequestURL(WebDataSource* ds) {
   // WebDataSource has unreachable URL means that the frame is loaded through
   // blink::WebFrame::loadData(), and the base URL will be in the redirect
   // chain. However, we never visited the baseURL. So in this case, we should
@@ -263,7 +263,7 @@ static GURL GetOriginalRequestURL(WebDataSource* ds) {
   return ds->originalRequest().url();
 }
 
-NOINLINE static void CrashIntentionally() {
+NOINLINE void CrashIntentionally() {
   // NOTE(shess): Crash directly rather than using NOTREACHED() so
   // that the signature is easier to triage in crash reports.
   volatile int* zero = NULL;
@@ -271,7 +271,7 @@ NOINLINE static void CrashIntentionally() {
 }
 
 #if defined(ADDRESS_SANITIZER) || defined(SYZYASAN)
-NOINLINE static void MaybeTriggerAsanError(const GURL& url) {
+NOINLINE void MaybeTriggerAsanError(const GURL& url) {
   // NOTE(rogerm): We intentionally perform an invalid heap access here in
   //     order to trigger an Address Sanitizer (ASAN) error report.
   const char kCrashDomain[] = "crash";
@@ -306,7 +306,7 @@ NOINLINE static void MaybeTriggerAsanError(const GURL& url) {
 }
 #endif  // ADDRESS_SANITIZER || SYZYASAN
 
-static void MaybeHandleDebugURL(const GURL& url) {
+void MaybeHandleDebugURL(const GURL& url) {
   if (!url.SchemeIs(kChromeUIScheme))
     return;
   if (url == GURL(kChromeUICrashURL)) {
@@ -333,15 +333,15 @@ static void MaybeHandleDebugURL(const GURL& url) {
 }
 
 // Returns false unless this is a top-level navigation.
-static bool IsTopLevelNavigation(WebFrame* frame) {
+bool IsTopLevelNavigation(WebFrame* frame) {
   return frame->parent() == NULL;
 }
 
 // Returns false unless this is a top-level navigation that crosses origins.
-static bool IsNonLocalTopLevelNavigation(const GURL& url,
-                                         WebFrame* frame,
-                                         WebNavigationType type,
-                                         bool is_form_post) {
+bool IsNonLocalTopLevelNavigation(const GURL& url,
+                                  WebFrame* frame,
+                                  WebNavigationType type,
+                                  bool is_form_post) {
   if (!IsTopLevelNavigation(frame))
     return false;
 
@@ -473,10 +473,11 @@ CommonNavigationParams MakeCommonNavigationParams(
   return params;
 }
 
+RenderFrameImpl::CreateRenderFrameImplFunction g_create_render_frame_impl =
+    nullptr;
+
 }  // namespace
 
-static RenderFrameImpl* (*g_create_render_frame_impl)(RenderViewImpl*, int32) =
-    NULL;
 
 // static
 RenderFrameImpl* RenderFrameImpl::Create(RenderViewImpl* render_view,
@@ -549,7 +550,7 @@ RenderFrameImpl* RenderFrameImpl::FromWebFrame(blink::WebFrame* web_frame) {
 
 // static
 void RenderFrameImpl::InstallCreateHook(
-    RenderFrameImpl* (*create_render_frame_impl)(RenderViewImpl*, int32)) {
+    CreateRenderFrameImplFunction create_render_frame_impl) {
   CHECK(!g_create_render_frame_impl);
   g_create_render_frame_impl = create_render_frame_impl;
 }
@@ -604,7 +605,7 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
 #endif
 
 #if defined(ENABLE_PLUGINS)
-  plugin_power_saver_helper_ = new PluginPowerSaverHelperImpl(this);
+  plugin_power_saver_helper_ = new PluginPowerSaverHelper(this);
 #endif
 
   manifest_manager_ = new ManifestManager(this);
@@ -919,6 +920,7 @@ bool RenderFrameImpl::OnMessageReceived(const IPC::Message& msg) {
                         OnSetEditableSelectionOffsets)
     IPC_MESSAGE_HANDLER(FrameMsg_SetupTransitionView, OnSetupTransitionView)
     IPC_MESSAGE_HANDLER(FrameMsg_BeginExitTransition, OnBeginExitTransition)
+    IPC_MESSAGE_HANDLER(FrameMsg_RevertExitTransition, OnRevertExitTransition)
     IPC_MESSAGE_HANDLER(FrameMsg_HideTransitionElements,
                         OnHideTransitionElements)
     IPC_MESSAGE_HANDLER(FrameMsg_ShowTransitionElements,
@@ -948,35 +950,26 @@ void RenderFrameImpl::OnNavigate(const FrameMsg_Navigate_Params& params) {
   TRACE_EVENT2("navigation", "RenderFrameImpl::OnNavigate",
                "id", routing_id_,
                "url", params.common_params.url.possibly_invalid_spec());
+
   bool is_reload =
       RenderViewImpl::IsReload(params.common_params.navigation_type);
+  bool is_history_navigation = params.commit_params.page_state.IsValid();
   WebURLRequest::CachePolicy cache_policy =
       WebURLRequest::UseProtocolCachePolicy;
   if (!RenderFrameImpl::PrepareRenderViewForNavigation(
       params.common_params.url, params.common_params.navigation_type,
-      params.commit_params.page_state, true, params.pending_history_list_offset,
-      params.page_id, &is_reload, &cache_policy)) {
+      params.commit_params.page_state, true, is_history_navigation,
+      params.current_history_list_offset, params.page_id, &is_reload,
+      &cache_policy)) {
+    Send(new FrameHostMsg_DidDropNavigation(routing_id_));
     return;
   }
 
-  int pending_history_list_offset = params.pending_history_list_offset;
-  int current_history_list_offset = params.current_history_list_offset;
-  int current_history_list_length = params.current_history_list_length;
+  render_view_->history_list_offset_ = params.current_history_list_offset;
+  render_view_->history_list_length_ = params.current_history_list_length;
   if (params.should_clear_history_list) {
-    CHECK_EQ(pending_history_list_offset, -1);
-    CHECK_EQ(current_history_list_offset, -1);
-    CHECK_EQ(current_history_list_length, 0);
-  }
-  render_view_->history_list_offset_ = current_history_list_offset;
-  render_view_->history_list_length_ = current_history_list_length;
-  if (render_view_->history_list_length_ >= 0) {
-    render_view_->history_page_ids_.resize(
-        render_view_->history_list_length_, -1);
-  }
-  if (pending_history_list_offset >= 0 &&
-      pending_history_list_offset < render_view_->history_list_length_) {
-    render_view_->history_page_ids_[pending_history_list_offset] =
-        params.page_id;
+    CHECK_EQ(-1, render_view_->history_list_offset_);
+    CHECK_EQ(0, render_view_->history_list_length_);
   }
 
   GetContentClient()->SetActiveURL(params.common_params.url);
@@ -1014,7 +1007,7 @@ void RenderFrameImpl::OnNavigate(const FrameMsg_Navigate_Params& params) {
       frame->reloadWithOverrideURL(params.common_params.url, true);
     else
       frame->reload(ignore_cache);
-  } else if (params.commit_params.page_state.IsValid()) {
+  } else if (is_history_navigation) {
     // We must know the page ID of the page we are navigating back to.
     DCHECK_NE(params.page_id, -1);
     scoped_ptr<HistoryEntry> entry =
@@ -1494,26 +1487,29 @@ void RenderFrameImpl::OnAddStyleSheetByURL(const std::string& url) {
 }
 
 void RenderFrameImpl::OnSetupTransitionView(const std::string& markup) {
-  frame_->document().setIsTransitionDocument();
+  frame_->document().setIsTransitionDocument(true);
   frame_->navigateToSandboxedMarkup(WebData(markup.data(), markup.length()));
 }
 
 void RenderFrameImpl::OnBeginExitTransition(const std::string& css_selector,
                                             bool exit_to_native_app) {
-  frame_->document().setIsTransitionDocument();
+  frame_->document().setIsTransitionDocument(true);
   frame_->document().beginExitTransition(WebString::fromUTF8(css_selector),
                                          exit_to_native_app);
 }
 
+void RenderFrameImpl::OnRevertExitTransition() {
+  frame_->document().setIsTransitionDocument(false);
+  frame_->document().revertExitTransition();
+}
+
 void RenderFrameImpl::OnHideTransitionElements(
     const std::string& css_selector) {
-  frame_->document().setIsTransitionDocument();
   frame_->document().hideTransitionElements(WebString::fromUTF8(css_selector));
 }
 
 void RenderFrameImpl::OnShowTransitionElements(
     const std::string& css_selector) {
-  frame_->document().setIsTransitionDocument();
   frame_->document().showTransitionElements(WebString::fromUTF8(css_selector));
 }
 
@@ -1597,20 +1593,16 @@ blink::WebPlugin* RenderFrameImpl::CreatePlugin(
     blink::WebFrame* frame,
     const WebPluginInfo& info,
     const blink::WebPluginParams& params,
-    CreatePluginGesture gesture) {
+    PluginPowerSaverMode power_saver_mode) {
   DCHECK_EQ(frame_, frame);
 #if defined(ENABLE_PLUGINS)
-  if (gesture == CREATE_PLUGIN_GESTURE_HAS_USER_GESTURE) {
-    plugin_power_saver_helper_->WhitelistContentOrigin(
-        GURL(params.url).GetOrigin());
-  }
-
   bool pepper_plugin_was_registered = false;
   scoped_refptr<PluginModule> pepper_module(PluginModule::Create(
       this, info, &pepper_plugin_was_registered));
   if (pepper_plugin_was_registered) {
     if (pepper_module.get()) {
-      return new PepperWebPluginImpl(pepper_module.get(), params, this);
+      return new PepperWebPluginImpl(pepper_module.get(), params, this,
+                                     power_saver_mode);
     }
   }
 #if defined(OS_CHROMEOS)
@@ -1641,11 +1633,26 @@ ServiceRegistry* RenderFrameImpl::GetServiceRegistry() {
 }
 
 #if defined(ENABLE_PLUGINS)
-PluginPowerSaverHelperImpl* RenderFrameImpl::GetPluginPowerSaverHelper() {
-  DCHECK(plugin_power_saver_helper_);
-  return plugin_power_saver_helper_;
+void RenderFrameImpl::RegisterPeripheralPlugin(
+    const GURL& content_origin,
+    const base::Closure& unthrottle_callback) {
+  return plugin_power_saver_helper_->RegisterPeripheralPlugin(
+      content_origin, unthrottle_callback);
 }
-#endif
+
+bool RenderFrameImpl::ShouldThrottleContent(
+    const blink::WebPluginParams& params,
+    const GURL& page_frame_url,
+    GURL* poster_image,
+    bool* cross_origin_main_content) const {
+  return plugin_power_saver_helper_->ShouldThrottleContent(
+      params, page_frame_url, poster_image, cross_origin_main_content);
+}
+
+void RenderFrameImpl::WhitelistContentOrigin(const GURL& content_origin) {
+  return plugin_power_saver_helper_->WhitelistContentOrigin(content_origin);
+}
+#endif  // defined(ENABLE_PLUGINS)
 
 bool RenderFrameImpl::IsFTPDirectoryListing() {
   WebURLResponseExtraDataImpl* extra_data =
@@ -1741,8 +1748,7 @@ blink::WebPlugin* RenderFrameImpl::createPlugin(
 
   WebPluginParams params_to_use = params;
   params_to_use.mimeType = WebString::fromUTF8(mime_type);
-  return CreatePlugin(frame, info, params_to_use,
-                      CREATE_PLUGIN_GESTURE_NO_USER_GESTURE);
+  return CreatePlugin(frame, info, params_to_use, POWER_SAVER_MODE_ESSENTIAL);
 #else
   return NULL;
 #endif  // defined(ENABLE_PLUGINS)
@@ -1775,6 +1781,8 @@ blink::WebMediaPlayer* RenderFrameImpl::createMediaPlayer(
 #if defined(OS_ANDROID)
   return CreateAndroidWebMediaPlayer(url, client, initial_cdm);
 #else
+  scoped_refptr<media::MediaLog> media_log(new RenderMediaLog());
+
   RenderThreadImpl* render_thread = RenderThreadImpl::current();
   media::WebMediaPlayerParams params(
       base::Bind(&ContentRendererClient::DeferMediaLoad,
@@ -1782,12 +1790,8 @@ blink::WebMediaPlayer* RenderFrameImpl::createMediaPlayer(
                  static_cast<RenderFrame*>(this)),
       render_thread->GetAudioRendererMixerManager()->CreateInput(
           render_view_->routing_id_, routing_id_),
-      *render_thread->GetAudioHardwareConfig(),
-      new RenderMediaLog(),
-      render_thread->GetGpuFactories(),
-      render_thread->GetMediaThreadTaskRunner(),
-      render_thread->compositor_message_loop_proxy(),
-      initial_cdm);
+      media_log, render_thread->GetMediaThreadTaskRunner(),
+      render_thread->compositor_message_loop_proxy(), initial_cdm);
 
 #if defined(ENABLE_PEPPER_CDMS)
   scoped_ptr<media::CdmFactory> cdm_factory(
@@ -1799,12 +1803,17 @@ blink::WebMediaPlayer* RenderFrameImpl::createMediaPlayer(
   scoped_ptr<media::CdmFactory> cdm_factory(new RenderCdmFactory());
 #endif
 
-  scoped_ptr<media::Renderer> media_renderer =
-      GetContentClient()->renderer()->CreateMediaRenderer(
-          this, render_thread->GetMediaThreadTaskRunner());
+  scoped_ptr<media::RendererFactory> media_renderer_factory =
+      GetContentClient()->renderer()->CreateMediaRendererFactory(this);
+
+  if (!media_renderer_factory.get()) {
+    media_renderer_factory.reset(new media::DefaultRendererFactory(
+        media_log, render_thread->GetGpuFactories(),
+        *render_thread->GetAudioHardwareConfig()));
+  }
 
   return new media::WebMediaPlayerImpl(
-      frame, client, weak_factory_.GetWeakPtr(), media_renderer.Pass(),
+      frame, client, weak_factory_.GetWeakPtr(), media_renderer_factory.Pass(),
       cdm_factory.Pass(), params);
 #endif  // defined(OS_ANDROID)
 }
@@ -2164,7 +2173,8 @@ void RenderFrameImpl::didCreateDataSource(blink::WebLocalFrame* frame,
 }
 
 void RenderFrameImpl::didStartProvisionalLoad(blink::WebLocalFrame* frame,
-                                              bool is_transition_navigation) {
+                                              bool is_transition_navigation,
+                                              double triggering_event_time) {
   DCHECK(!frame_ || frame_ == frame);
   WebDataSource* ds = frame->provisionalDataSource();
 
@@ -2183,10 +2193,9 @@ void RenderFrameImpl::didStartProvisionalLoad(blink::WebLocalFrame* frame,
         "Heard swappedout:// when not swapped out.";
 
   // Update the request time if WebKit has better knowledge of it.
-  if (document_state->request_time().is_null()) {
-    double event_time = ds->triggeringEventTime();
-    if (event_time != 0.0)
-      document_state->set_request_time(Time::FromDoubleT(event_time));
+  if (document_state->request_time().is_null() &&
+          triggering_event_time != 0.0) {
+    document_state->set_request_time(Time::FromDoubleT(triggering_event_time));
   }
 
   // Start time is only set after request time.
@@ -2369,7 +2378,7 @@ void RenderFrameImpl::didCommitProvisionalLoad(
     // We bump our Page ID to correspond with the new session history entry.
     render_view_->page_id_ = render_view_->next_page_id_++;
 
-    // Don't update history_page_ids_ (etc) for kSwappedOutURL, since
+    // Don't update history list values for kSwappedOutURL, since
     // we don't want to forget the entry that was there, and since we will
     // never come back to kSwappedOutURL.  Note that we have to call
     // UpdateSessionHistory and update page_id_ even in this case, so that
@@ -2383,10 +2392,6 @@ void RenderFrameImpl::didCommitProvisionalLoad(
         render_view_->history_list_offset_ = kMaxSessionHistoryEntries - 1;
       render_view_->history_list_length_ =
           render_view_->history_list_offset_ + 1;
-      render_view_->history_page_ids_.resize(
-          render_view_->history_list_length_, -1);
-      render_view_->history_page_ids_[render_view_->history_list_offset_] =
-          render_view_->page_id_;
     }
   } else {
     // Inspect the navigation_state on this frame to see if the navigation
@@ -2407,14 +2412,6 @@ void RenderFrameImpl::didCommitProvisionalLoad(
 
       render_view_->history_list_offset_ =
           navigation_state->pending_history_list_offset();
-
-      // If the history list is valid, our list of page IDs should be correct.
-      DCHECK(render_view_->history_list_length_ <= 0 ||
-             render_view_->history_list_offset_ < 0 ||
-             render_view_->history_list_offset_ >=
-                 render_view_->history_list_length_ ||
-             render_view_->history_page_ids_[render_view_->history_list_offset_]
-                  == render_view_->page_id_);
     }
   }
 
@@ -2540,8 +2537,17 @@ void RenderFrameImpl::didFinishDocumentLoad(blink::WebLocalFrame* frame) {
 
 void RenderFrameImpl::didHandleOnloadEvents(blink::WebLocalFrame* frame) {
   DCHECK(!frame_ || frame_ == frame);
-  if (!frame->parent())
-    Send(new FrameHostMsg_DocumentOnLoadCompleted(routing_id_));
+  if (!frame->parent()) {
+    FrameMsg_UILoadMetricsReportType::Value report_type =
+        static_cast<FrameMsg_UILoadMetricsReportType::Value>(
+            frame->dataSource()->request().inputPerfMetricReportPolicy());
+    base::TimeTicks ui_timestamp = base::TimeTicks() +
+        base::TimeDelta::FromSecondsD(
+            frame->dataSource()->request().uiStartTime());
+
+    Send(new FrameHostMsg_DocumentOnLoadCompleted(
+        routing_id_, report_type, ui_timestamp));
+  }
 }
 
 void RenderFrameImpl::didFailLoad(blink::WebLocalFrame* frame,
@@ -3612,6 +3618,11 @@ void RenderFrameImpl::SendDidCommitProvisionalLoad(blink::WebFrame* frame) {
     params.history_list_was_cleared =
         navigation_state->history_list_was_cleared();
 
+    params.report_type = static_cast<FrameMsg_UILoadMetricsReportType::Value>(
+        frame->dataSource()->request().inputPerfMetricReportPolicy());
+    params.ui_timestamp = base::TimeTicks() + base::TimeDelta::FromSecondsD(
+        frame->dataSource()->request().uiStartTime());
+
     // Save some histogram data so we can compute the average memory used per
     // page load of the glyphs.
     UMA_HISTOGRAM_COUNTS_10000("Memory.GlyphPagesPerLoad",
@@ -3636,6 +3647,7 @@ void RenderFrameImpl::SendDidCommitProvisionalLoad(blink::WebFrame* frame) {
 
     DCHECK(!navigation_state->history_list_was_cleared());
     params.history_list_was_cleared = false;
+    params.report_type = FrameMsg_UILoadMetricsReportType::NO_REPORT;
 
     // Don't send this message while the subframe is swapped out.
     if (!is_swapped_out())
@@ -3711,11 +3723,14 @@ void RenderFrameImpl::OnCommitNavigation(
   CHECK(CommandLine::ForCurrentProcess()->HasSwitch(
       switches::kEnableBrowserSideNavigation));
   bool is_reload = false;
+  bool is_history_navigation = commit_params.page_state.IsValid();
   WebURLRequest::CachePolicy cache_policy =
       WebURLRequest::UseProtocolCachePolicy;
   if (!RenderFrameImpl::PrepareRenderViewForNavigation(
       common_params.url, common_params.navigation_type,
-      commit_params.page_state, false, -1, -1, &is_reload, &cache_policy)) {
+      commit_params.page_state, false /* check_for_stale_navigation */,
+      is_history_navigation, -1 /* current_history_list_offset; TODO(clamy)*/,
+      -1, &is_reload, &cache_policy)) {
     return;
   }
 
@@ -4060,8 +4075,7 @@ void RenderFrameImpl::SyncSelectionIfRequired() {
       length = location + length - offset + kExtraCharsBeforeAndAfterSelection;
       WebRange webrange = WebRange::fromDocumentRange(frame_, offset, length);
       if (!webrange.isNull())
-        text = WebRange::fromDocumentRange(
-            frame_, offset, length).toPlainText();
+        text = webrange.toPlainText();
     } else {
       offset = location;
       text = frame_->selectionAsText();
@@ -4137,8 +4151,9 @@ bool RenderFrameImpl::PrepareRenderViewForNavigation(
     const GURL& url,
     FrameMsg_Navigate_Type::Value navigate_type,
     const PageState& state,
-    bool check_history,
-    int pending_history_list_offset,
+    bool check_for_stale_navigation,
+    bool is_history_navigation,
+    int current_history_list_offset,
     int32 page_id,
     bool* is_reload,
     WebURLRequest::CachePolicy* cache_policy) {
@@ -4150,10 +4165,14 @@ bool RenderFrameImpl::PrepareRenderViewForNavigation(
       RenderViewObserver, render_view_->observers_, Navigate(url));
 
   // If this is a stale back/forward (due to a recent navigation the browser
-  // didn't know about), ignore it.
-  if (check_history && render_view_->IsBackForwardToStaleEntry(
-      state, pending_history_list_offset, page_id, *is_reload))
+  // didn't know about), ignore it. Only check if swapped in because if the
+  // frame is swapped out, it won't commit before asking the browser.
+  // TODO(clamy): remove check_for_stale_navigation
+  if (check_for_stale_navigation &&
+      !render_view_->is_swapped_out() && is_history_navigation &&
+      render_view_->history_list_offset_ != current_history_list_offset) {
     return false;
+  }
 
   if (!is_swapped_out_ || frame_->parent())
     return true;

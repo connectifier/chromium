@@ -59,6 +59,28 @@ MockFileSystem.prototype.populate = function(paths) {
 };
 
 /**
+ * Returns all children of the supplied directoryEntry.
+ * @param  {!DirectoryEntry} directoryEntry
+ * @return {!Array.<!Entry>}
+ * @private
+ */
+MockFileSystem.prototype.findChildren_ = function(directory) {
+  var parentPath = directory.fullPath.replace(/\/?$/, '/');
+  var children = [];
+  for (var path in this.entries) {
+    if (path.indexOf(parentPath) === 0 && path !== parentPath) {
+      var nextSeparator = path.indexOf('/', parentPath.length);
+      // Add immediate children files and directories...
+      if (nextSeparator === -1 ||
+          nextSeparator === path.length - 1) {
+        children.push(this.entries[path]);
+      }
+    }
+  }
+  return children;
+};
+
+/**
  * Base class of mock entries.
  *
  * @param {TestFileSystem} filesystem File system where the entry is localed.
@@ -154,7 +176,7 @@ MockEntry.prototype.clone = function(fullpath) {
  */
 function MockFileEntry(filesystem, fullPath, metadata) {
   MockEntry.call(this, filesystem, fullPath);
-  this.metadata_ = metadata;
+  this.metadata = metadata;
   this.isFile = true;
   this.isDirectory = false;
 }
@@ -165,13 +187,17 @@ MockFileEntry.prototype = {
 
 /**
  * Obtains metadata of the entry.
- * @param {function(Object)} callback Function to take the metadata.
+ *
+ * @param {function(!Metadata)} onSuccess Function to take the metadata.
+ * @param {function(Error)} onError
  */
-MockFileEntry.prototype.getMetadata = function(callback) {
-  Promise.resolve(this.metadata_).then(callback).catch(function(error) {
-    console.error(error.stack || error);
-    window.onerror();
-  });
+MockFileEntry.prototype.getMetadata = function(onSuccess, onError) {
+  new Promise(function(fulfill, reject) {
+    if (this.filesystem && !this.filesystem.entries[this.fullPath])
+      reject(new DOMError('NotFoundError'));
+    else
+      onSuccess(this.metadata);
+  }.bind(this)).then(onSuccess, onError);
 };
 
 /**
@@ -260,21 +286,29 @@ MockDirectoryEntry.prototype.getDirectory =
  * @return {DirectoryReader} A directory reader.
  */
 MockDirectoryEntry.prototype.createReader = function() {
-  return new MockDirectoryReader();
+  return new MockDirectoryReader(this.filesystem.findChildren_(this));
 };
 
 /**
  * Mock class for DirectoryReader.
+ * @param {!Array.<!Entry>} entries
  */
-function MockDirectoryReader() {}
+function MockDirectoryReader(entries) {
+  this.entries_ = entries;
+}
 
 /**
- * Reads entries.
- * Current implementation just calls success callback with an empty list.
+ * Returns entries from the filesystem associated with this directory
+ * in chunks of 2.
  *
  * @param {function(Array)} success Success callback.
  * @param {function} error Error callback.
  */
 MockDirectoryReader.prototype.readEntries = function(success, error) {
-  success([]);
+  if (this.entries_.length > 0) {
+    var chunk = this.entries_.splice(0, 2);
+    success(chunk);
+  } else {
+    success([]);
+  }
 };

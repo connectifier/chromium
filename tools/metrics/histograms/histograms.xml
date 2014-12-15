@@ -1914,6 +1914,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>TBD.</summary>
 </histogram>
 
+<histogram name="Autofill.ScanCreditCardPrompt"
+    enum="AutofillScanCreditCardPrompt">
+  <owner>estade@chromium.org</owner>
+  <summary>Usage of the &quot;Scan card&quot; control item.</summary>
+</histogram>
+
 <histogram name="Autofill.ServerExperimentId" enum="AutofillExperimentId">
   <obsolete>
     Deprecated as of 6/2011, replaced by Autofill.ServerExperimentId.Query.
@@ -14492,6 +14498,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Navigation.UI_OnCommitProvisionalLoad.Link"
+    units="milliseconds">
+  <owner>clamy@chromium.org</owner>
+  <summary>Time between clicking on a link and the navigation commit.</summary>
+</histogram>
+
+<histogram name="Navigation.UI_OnLoadComplete.Link" units="milliseconds">
+  <owner>clamy@chromium.org</owner>
+  <summary>
+    Time between clicking on a link and the document load complete event for a
+    navigation in the main frame.
+  </summary>
+</histogram>
+
 <histogram name="NCN.CM.FastestRTTOn2G" units="milliseconds">
   <owner>pauljensen@chromium.org</owner>
   <summary>
@@ -18987,6 +19007,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.SSLSessionVersionMatch" enum="BooleanMatched">
+  <owner>davidben@chromium.org</owner>
+  <summary>
+    For each SSL connection that resumed a session, whether the session was
+    resumed at the same version it was established at. This is only recorded in
+    BoringSSL ports.
+  </summary>
+</histogram>
+
 <histogram name="Net.SSLv3FallbackToRenegoPatchedServer"
     enum="TLSRenegotiationPatched">
   <obsolete>
@@ -22279,6 +22308,23 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>mpearson@chromium.org</owner>
   <summary>
     The type of search engine associated with a match opened from the omnibox.
+  </summary>
+</histogram>
+
+<histogram name="Omnibox.SearchProvider.AddHistoryResultsTime"
+    units="milliseconds">
+  <owner>mpearson@chromium.org</owner>
+  <summary>
+    Time it takes to add all the raw history results to the list of matches.
+  </summary>
+</histogram>
+
+<histogram name="Omnibox.SearchProvider.ConvertResultsTime"
+    units="milliseconds">
+  <owner>mpearson@chromium.org</owner>
+  <summary>
+    Time it takes to convert all the results to matches and add them to a map,
+    to keep the most relevant match for each result.
   </summary>
 </histogram>
 
@@ -35438,6 +35484,71 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Stability.ExitFunnel.BackgroundOff" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.BackgroundOn" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.BrowserExit" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.EndSession" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.ES_CloseApp" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.ES_Critical" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.ES_Logoff" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.ES_Other" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.KillProcess" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.LastWindowClose" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.SessionEnding" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.TraybarExit" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
+<histogram name="Stability.ExitFunnel.WM_ENDSESSION" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
 <histogram name="Stars.Goog_Related" units="percent">
   <owner>yefim@chromium.org</owner>
   <summary>
@@ -35935,10 +36046,28 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Sync.Attachments.DownloadChecksumResult" enum="BooleanMatched">
+  <owner>maxbogue@chromium.org</owner>
+  <summary>Whether attachment checksums match on download or not.</summary>
+</histogram>
+
 <histogram name="Sync.Attachments.DownloadResponseCode"
     enum="CombinedHttpResponseAndNetErrorCode">
   <owner>maxbogue@chromium.org</owner>
   <summary>Response or error codes from downloading sync attachments.</summary>
+</histogram>
+
+<histogram name="Sync.Attachments.DownloadTotalTime" units="milliseconds">
+  <owner>maxbogue@chromium.org</owner>
+  <summary>
+    The total time a download takes including request and server overhead.
+  </summary>
+</histogram>
+
+<histogram name="Sync.Attachments.StoreInitResult"
+    enum="SyncAttachmentStoreResult">
+  <owner>maxbogue@chromium.org</owner>
+  <summary>The result of initializing the sync attachment store.</summary>
 </histogram>
 
 <histogram name="Sync.Attachments.UploadResponseCode"
@@ -39519,6 +39648,45 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="VideoPlayer.CastAPIExtensionStatus"
+    enum="VideoPlayerCastAPIExtensionStatus">
+  <owner>yoshiki@chromium.org</owner>
+  <summary>
+    Chrome OS Video Player: the results of the cast API extension load. This is
+    recorded after the initialization of the extension is finished.
+  </summary>
+</histogram>
+
+<histogram name="VideoPlayer.CastedVideoLength" units="seconds">
+  <owner>yoshiki@chromium.org</owner>
+  <summary>
+    Chrome OS Video Player: the length of casted video (in seconds).
+  </summary>
+</histogram>
+
+<histogram name="VideoPlayer.NumberOfCastDevices">
+  <owner>yoshiki@chromium.org</owner>
+  <summary>
+    Chrome OS Video Player: the number of cast devices. This is recorded when
+    the cast extension finishes the discovery.
+  </summary>
+</histogram>
+
+<histogram name="VideoPlayer.NumberOfOpenedFiles">
+  <owner>yoshiki@chromium.org</owner>
+  <summary>
+    Chrome OS Video Player: the number of files being opened on launch.
+  </summary>
+</histogram>
+
+<histogram name="VideoPlayer.PlayType" enum="VideoPlayerPlayType">
+  <owner>yoshiki@chromium.org</owner>
+  <summary>
+    Chrome OS Video Player: type of playback (eg. local play, cast). This is
+    recorded when a video starts playing.
+  </summary>
+</histogram>
+
 <histogram name="Viewport.MetaTagType" enum="MetaTagTypeEnum">
   <owner>bokan@chromium.org</owner>
   <summary>
@@ -40902,6 +41070,54 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="WebRTC.Video.BitrateReceivedInKbps" units="kbps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of received bits per second for a received video stream. Recorded
+    when a stream is removed.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.BitrateSentInKbps" units="kbps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of sent bits per second for a sent video stream. Recorded when a
+    stream is removed.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.CompleteFramesReceivedPerSecond" units="fps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of complete frames received per second for a received video
+    stream. Recorded when a stream is removed.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.DecodedFramesPerSecond" units="fps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of decoded frames per second for a received video stream.
+    Recorded when a stream is removed.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.DelayedFramesToRenderer" units="%">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    Percentage of delayed frames to renderer for a received video stream.
+    Recorded when a stream is removed.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.DelayedFramesToRenderer_AvgDelayInMs" units="ms">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The average delay of delayed frames to renderer for a received video stream.
+    Recorded when a stream is removed.
+  </summary>
+</histogram>
+
 <histogram name="WebRTC.Video.DiscardedPacketsInPercent" units="%">
   <owner>asapersson@chromium.org</owner>
   <summary>
@@ -40953,6 +41169,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="WebRTC.Video.MediaBitrateReceivedInKbps" units="kbps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of received media payload bits per second for a received video
+    stream. Recorded when a stream is removed.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.MediaBitrateSentInKbps" units="kbps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of sent media payload bits per second for a sent video stream.
+    Recorded when a stream is removed.
+  </summary>
+</histogram>
+
 <histogram name="WebRTC.Video.NackPacketsReceivedPerMinute"
     units="packets/minute">
   <owner>asapersson@chromium.org</owner>
@@ -40972,6 +41204,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="WebRTC.Video.PaddingBitrateReceivedInKbps" units="kbps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of received padding bits per second for a received video stream.
+    Recorded when a stream is removed.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.PaddingBitrateSentInKbps" units="kbps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of sent padding bits per second for a sent video stream. Recorded
+    when a stream is removed.
+  </summary>
+</histogram>
+
 <histogram name="WebRTC.Video.PliPacketsReceivedPerMinute"
     units="packets/minute">
   <owner>asapersson@chromium.org</owner>
@@ -40988,6 +41236,38 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     The number of sent RTCP PLI packets per minute for a received video stream.
     Recorded when a stream is removed. The total number of packets is divided by
     the time the video stream exists.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.RetransmittedBitrateReceivedInKbps" units="kbps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of retransmitted bits per second for a received video stream.
+    Recorded when a stream is removed.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.RetransmittedBitrateSentInKbps" units="kbps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of retransmitted bits per second for a sent video stream.
+    Recorded when a stream is removed.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.RtxBitrateReceivedInKbps" units="kbps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of received bits over RTX per second for a received video stream.
+    Recorded when a stream is removed.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.RtxBitrateSentInKbps" units="kbps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of sent bits over RTX per second for a sent video stream.
+    Recorded when a stream is removed.
   </summary>
 </histogram>
 
@@ -41053,8 +41333,39 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="WebsiteSettings.OriginInfo.PermissionChanged"
+    enum="ContentType">
+  <owner>sashab@chromium.org</owner>
+  <owner>felt@chromium.org</owner>
+  <summary>
+    Count of how often a specific content type (permission) is changed using the
+    Origin Info dialog on Android.
+  </summary>
+</histogram>
+
+<histogram name="WebsiteSettings.OriginInfo.PermissionChanged.Allowed"
+    enum="ContentType">
+  <owner>sashab@chromium.org</owner>
+  <owner>felt@chromium.org</owner>
+  <summary>
+    Count of how often a specific content type (permission) is set to 'Allowed'
+    using the Origin Info dialog on Android.
+  </summary>
+</histogram>
+
+<histogram name="WebsiteSettings.OriginInfo.PermissionChanged.Blocked"
+    enum="ContentType">
+  <owner>sashab@chromium.org</owner>
+  <owner>felt@chromium.org</owner>
+  <summary>
+    Count of how often a specific content type (permission) is set to 'Blocked'
+    using the Origin Info dialog on Android.
+  </summary>
+</histogram>
+
 <histogram name="WebsiteSettings.PermissionChanged" enum="ContentType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>lgarron@chromium.org</owner>
+  <owner>sashab@chromium.org</owner>
   <summary>
     Count of how often a specific content type (permission) is changed using the
     Website Settings UI.
@@ -41080,6 +41391,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Windows.Tablet" enum="BooleanTablet">
   <owner>zturner@chromium.org</owner>
   <summary>Count of browser launches from a Windows tablet pc.</summary>
+</histogram>
+
+<histogram name="Windows.Win32kRendererLockdown" enum="BooleanEnabled">
+  <owner>wfh@chromium.org</owner>
+  <summary>
+    Count of browser launches where Win32k renderer lockdown is enabled.
+  </summary>
 </histogram>
 
 <histogram name="WinJumplist.Action" enum="WinJumplistCategory">
@@ -41435,6 +41753,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="15" label="SOURCE_BACKGROUND"/>
   <int value="16" label="SOURCE_KIOSK"/>
   <int value="17" label="SOURCE_CHROME_INTERNAL"/>
+  <int value="18" label="SOURCE_TEST"/>
 </enum>
 
 <enum name="AppListEnableSource" type="int">
@@ -41452,6 +41771,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="WEBSTORE"/>
   <int value="3" label="SEARCH_WEBSTORE"/>
   <int value="4" label="SEARCH_PEOPLE"/>
+  <int value="5" label="SUGGESTION"/>
 </enum>
 
 <enum name="AppLocation" type="int">
@@ -41790,6 +42110,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="3" label="Response matches local"/>
   <int value="4" label="Response improves local (nonempty)"/>
   <int value="5" label="Response improves local (empty)"/>
+</enum>
+
+<enum name="AutofillScanCreditCardPrompt" type="int">
+  <int value="0" label="Scan card shown"/>
+  <int value="1" label="Scan card selected"/>
+  <int value="2" label="Some other item selected"/>
 </enum>
 
 <enum name="AutofillTypeQuality" type="int">
@@ -42915,6 +43241,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="ContentType" type="int">
+  <int value="-1" label="Invalid setting"/>
   <int value="0" label="Cookies setting"/>
   <int value="1" label="Images setting"/>
   <int value="2" label="JavaScript setting"/>
@@ -42922,14 +43249,23 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="4" label="Popups setting"/>
   <int value="5" label="Location setting"/>
   <int value="6" label="Notifications setting"/>
-  <int value="7" label="Web Intents setting"/>
-  <int value="8" label="Auto Select Cert setting"/>
-  <int value="9" label="Fullscreen setting"/>
-  <int value="10" label="Mouselock setting"/>
-  <int value="11" label="Mixed Script setting"/>
-  <int value="12" label="Media setting"/>
-  <int value="13" label="Protocol Handler setting"/>
-  <int value="14" label="PPAPI Broker setting"/>
+  <int value="7" label="Auto Select Cert setting"/>
+  <int value="8" label="Fullscreen setting"/>
+  <int value="9" label="Mouselock setting"/>
+  <int value="10" label="Mixed Script setting"/>
+  <int value="11" label="Media setting (default for mic and camera)"/>
+  <int value="12" label="Media setting (mic)"/>
+  <int value="13" label="Media setting (camera)"/>
+  <int value="14" label="Protocol Handler setting"/>
+  <int value="15" label="PPAPI Broker setting"/>
+  <int value="16" label="Automatic downloads setting"/>
+  <int value="17" label="MIDI sysex setting"/>
+  <int value="18" label="Push messaging setting"/>
+  <int value="19" label="SSL Certificate Decisions setting"/>
+  <int value="20" label="Metro switch-to-desktop setting (Windows only)"/>
+  <int value="21"
+      label="Protected media identifier setting (Android/ChromeOS only)"/>
+  <int value="22" label="App banner setting (Android only)"/>
 </enum>
 
 <enum name="CookieDeletionCause" type="int">
@@ -45718,6 +46054,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="938" label="COPRESENCEENDPOINTS_DESTROYLOCALENDPOINT"/>
   <int value="939" label="COPRESENCEENDPOINTS_SEND"/>
   <int value="940" label="INLINE_INSTALL_PRIVATE_INSTALL"/>
+  <int value="941" label="LAUNCHERPAGE_SETENABLED"/>
+  <int value="942" label="CRYPTOTOKEN_REQUESTPERMISSION"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -47899,6 +48237,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="TrackedPreference"/>
   <int value="2" label="BinaryIntegrity"/>
   <int value="3" label="BlacklistLoad"/>
+  <int value="4" label="OmniboxInteraction"/>
 </enum>
 
 <enum name="Inconsistencies" type="int">
@@ -49146,6 +49485,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-567920515" label="disable-experimental-hotwording"/>
   <int value="-563980787" label="disable-webrtc"/>
   <int value="-562274241" label="enable-extension-action-redesign"/>
+  <int value="-560551550" label="use-memory-pressure-chromeos"/>
   <int value="-536289234" label="ssl-interstitial-v2-colorful"/>
   <int value="-516845951" label="enable-embedded-extension-options"/>
   <int value="-512971943" label="disable-one-copy"/>
@@ -49159,6 +49499,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-418868128" label="enable-experimental-web-platform-features"/>
   <int value="-385337473" label="enable-fast-unload"/>
   <int value="-384589459" label="disable-supervised-user-safesites"/>
+  <int value="-378033324" label="disable-win32k-renderer-lockdown"/>
   <int value="-349057743" label="extensions-on-chrome-urls"/>
   <int value="-344343842" label="disable-experimental-app-list"/>
   <int value="-340622848" label="disable-javascript-harmony-shipping"/>
@@ -49238,6 +49579,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="773919225" label="disable-office-editing-component-extension"/>
   <int value="779086132" label="enable-data-reduction-proxy-alt"/>
   <int value="782167080" label="enable-new-qp-input-view"/>
+  <int value="811374216" label="disable-new-bookmark-apps"/>
   <int value="821192723" label="show-fps-counter"/>
   <int value="824961931" label="use-simple-cache-backend"/>
   <int value="834326277" label="enable-answers-in-suggest"/>
@@ -49292,6 +49634,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1352447982" label="enable-lcd-text"/>
   <int value="1361047396" label="disable-click-delay"/>
   <int value="1367671275" label="enable-proximity-auth-proximity-detection"/>
+  <int value="1371907429" label="enable-wallet-card-import"/>
   <int value="1378310092" label="disable-suggestions-service"/>
   <int value="1381746642" label="enable-automatic-password-saving"/>
   <int value="1382500494" label="disable-drive-apps-in-app-list"/>
@@ -49307,6 +49650,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1466380480" label="enable-device-discovery-notifications"/>
   <int value="1469407485" label="disable-accelerated-2d-canvas"/>
   <int value="1481562816" label="disable-password-link"/>
+  <int value="1486171015" label="disable-fill-on-account-select"/>
+  <int value="1490043732" label="enable-fill-on-account-select"/>
   <int value="1490255042" label="enable-overlay-scrollbar"/>
   <int value="1497924954" label="js-flags"/>
   <int value="1505194447" label="disable-transition-compositing"/>
@@ -49350,13 +49695,16 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2000091128" label="enable-touch-hover"/>
   <int value="2004829262" label="enable-webgl-draft-extensions"/>
   <int value="2037756154" label="enable-impl-side-painting"/>
+  <int value="2052321823" label="enable-worker-frame"/>
   <int value="2059322877" label="new-avatar-menu"/>
+  <int value="2071461362" label="disable-credit-card-scan"/>
   <int value="2093235103" label="default-tile-width"/>
   <int value="2101151142" label="disable-direct-write"/>
   <int value="2119964154" label="enable-download-resumption"/>
   <int value="2121776031" label="auto-virtual-keyboard"/>
   <int value="2122876605" label="enable-bleeding-edge-rendering-fast-paths"/>
   <int value="2137347307" label="enable-drive-apps-in-app-list"/>
+  <int value="2137599770" label="enable-win32k-renderer-lockdown"/>
 </enum>
 
 <enum name="LoginFailureReason" type="int">
@@ -52408,6 +52756,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1008493701" label="PPB_UDPSocket;1.0"/>
   <int value="1017579801" label="PPB_OpenGLES2FramebufferBlit;1.0"/>
   <int value="1032125598" label="PPB_HostResolver;1.0"/>
+  <int value="1032205959" label="PPB_UDPSocket;1.1"/>
   <int value="1039206341" label="PPB_UDPSocket_Private;0.2"/>
   <int value="1042058362" label="PPB_Core;1.0"/>
   <int value="1050892821" label="PPB_OpenGLES2InstancedArrays;1.0"/>
@@ -52450,6 +52799,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1645591549" label="PPB_Widget(Dev);0.3"/>
   <int value="1677958987" label="PPB_ImageData;1.0"/>
   <int value="1680873803" label="PPB_Console;1.0"/>
+  <int value="1681523535" label="PPB_TCPSocket;1.2"/>
   <int value="1703245231" label="PPB_NetworkList;1.0"/>
   <int value="1721408268" label="PPB_URLLoader;1.0"/>
   <int value="1753813390" label="PPB_Flash_Clipboard;4.0"/>
@@ -52515,6 +52865,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2" label="PERMISSION_PUSH_MESSAGING"/>
   <int value="3" label="PERMISSION_NOTIFICATIONS"/>
   <int value="4" label="PERMISSION_GEOLOCATION"/>
+  <int value="5" label="PERMISSION_PROTECTED_MEDIA"/>
 </enum>
 
 <enum name="PhotoEditorFileType" type="int">
@@ -53766,7 +54117,7 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="PushRegistrationStatus" type="int">
-  <int value="0" label="Successful"/>
+  <int value="0" label="Successful - from push service"/>
   <int value="1" label="Page has no active Service Worker"/>
   <int value="2" label="Push service not available"/>
   <int value="3" label="Registration limit reached"/>
@@ -53774,6 +54125,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="5" label="Push service error"/>
   <int value="6" label="No sender id provided"/>
   <int value="7" label="Storage error"/>
+  <int value="8" label="Successful - from cache"/>
 </enum>
 
 <enum name="QuicAddressMismatch" type="int">
@@ -54936,6 +55288,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2" label="Low battery"/>
   <int value="3" label="Suspend failures"/>
   <int value="4" label="Dark resume"/>
+  <int value="5" label="System update"/>
+  <int value="6" label="Dark resume failed"/>
 </enum>
 
 <enum name="SideloadUIEvents" type="int">
@@ -56293,6 +56647,12 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="6" label="Reset retries"/>
 </enum>
 
+<enum name="SyncAttachmentStoreResult" type="int">
+  <int value="0" label="SUCCESS"/>
+  <int value="1" label="UNSPECIFIED_ERROR"/>
+  <int value="2" label="STORE_INITIALIZATION_FAILED"/>
+</enum>
+
 <enum name="SyncAuthError" type="int">
   <int value="0"
       label="Number of times clients have encountered an Auth error."/>
@@ -56568,7 +56928,7 @@ To add a new entry, add it with any value and run test to compute valid value.
 <enum name="TempFileFailure" type="int">
   <int value="0" label="Creating"/>
   <int value="1" label="Opening"/>
-  <int value="2" label="Closing"/>
+  <int value="2" label="Closing (unused)"/>
   <int value="3" label="Writing"/>
   <int value="4" label="Renaming"/>
   <int value="5" label="Flushing"/>
@@ -57103,6 +57463,19 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="5" label="HOLE"/>
   <int value="6" label="NATIVE_TEXTURE"/>
   <int value="7" label="YV12J"/>
+</enum>
+
+<enum name="VideoPlayerCastAPIExtensionStatus" type="int">
+  <int value="0" label="Skipped (Cast extension is unavailable)"/>
+  <int value="1" label="Installation failed"/>
+  <int value="2" label="Load failed"/>
+  <int value="3" label="Loaded successfully (newly installed)"/>
+  <int value="4" label="Loaded successfully (already installed)"/>
+</enum>
+
+<enum name="VideoPlayerPlayType" type="int">
+  <int value="0" label="Local playback"/>
+  <int value="1" label="Play on cast device"/>
 </enum>
 
 <enum name="VideoRotation" type="int">
@@ -57895,6 +58268,18 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="ContentLength_Image"
       label="for each carrier, number of image responses whose Content-Length
              header has been tampered with"/>
+  <suffix name="ContentLength_Image_GIF"
+      label="for each carrier, number of GIF image responses whose
+             Content-Length header has been tampered with"/>
+  <suffix name="ContentLength_Image_JPG"
+      label="for each carrier, number of JPEG image responses whose
+             Content-Length header has been tampered with"/>
+  <suffix name="ContentLength_Image_PNG"
+      label="for each carrier, number of PNG image responses whose
+             Content-Length header has been tampered with"/>
+  <suffix name="ContentLength_Image_WEBP"
+      label="for each carrier, number of WebP image responses whose
+             Content-Length header has been tampered with"/>
   <suffix name="ContentLength_JS"
       label="for each carrier, number of JavaScript responses whose
              Content-Length header has been tampered with"/>
@@ -60294,6 +60679,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="PPAPIFlashProcess"/>
   <suffix name="PPAPIProcess"/>
   <suffix name="RendererProcess"/>
+  <suffix name="RendererExtensionEventProcess"/>
+  <suffix name="RendererExtensionPersistentProcess"/>
   <suffix name="WorkerProcess"/>
   <affected-histogram name="PerformanceMonitor.AverageCPU"/>
   <affected-histogram name="PerformanceMonitor.HighCPU"/>
@@ -60304,6 +60691,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="PushMessaging" label="Push messaging permission actions"/>
   <suffix name="Notifications" label="Notification permission actions"/>
   <suffix name="Geolocation" label="Geolocation permission actions"/>
+  <suffix name="ProtectedMedia" label="Protected media permission actions"/>
   <affected-histogram name="ContentSettings.PermissionActions"/>
   <affected-histogram name="ContentSettings.PermissionActionsInsecureOrigin"/>
   <affected-histogram name="ContentSettings.PermissionActionsSecureOrigin"/>

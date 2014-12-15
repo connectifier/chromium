@@ -6,6 +6,7 @@
 #define UI_APP_LIST_SEARCH_MIXER_H_
 
 #include <map>
+#include <vector>
 
 #include "base/basictypes.h"
 #include "base/gtest_prod_util.h"
@@ -37,6 +38,7 @@ class APP_LIST_EXPORT Mixer {
     OMNIBOX_GROUP = 1,
     WEBSTORE_GROUP = 2,
     PEOPLE_GROUP = 3,
+    SUGGESTIONS_GROUP = 4,
   };
 
   explicit Mixer(AppListModel::SearchResults* ui_results);

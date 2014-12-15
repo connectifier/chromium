@@ -333,6 +333,8 @@
         'base/ranges.h',
         'base/renderer.cc',
         'base/renderer.h',
+        'base/renderer_factory.cc',
+        'base/renderer_factory.h',
         'base/sample_format.cc',
         'base/sample_format.h',
         'base/scoped_histogram_timer.h',
@@ -425,6 +427,8 @@
         'filters/decrypting_demuxer_stream.h',
         'filters/decrypting_video_decoder.cc',
         'filters/decrypting_video_decoder.h',
+        'filters/default_renderer_factory.cc',
+        'filters/default_renderer_factory.h',
         'filters/ffmpeg_audio_decoder.cc',
         'filters/ffmpeg_audio_decoder.h',
         'filters/ffmpeg_bitstream_converter.h',
@@ -676,6 +680,8 @@
             'base/media_stub.cc',
           ],
           'sources!': [
+            'filters/default_renderer_factory.cc',
+            'filters/default_renderer_factory.h',
             'filters/opus_audio_decoder.cc',
             'filters/opus_audio_decoder.h',
           ],
@@ -1773,23 +1779,6 @@
     }],
     ['media_use_ffmpeg==1', {
       'targets': [
-        {
-          # GN version: //media:ffmpeg_unittests
-          'target_name': 'ffmpeg_unittests',
-          'type': 'executable',
-          'dependencies': [
-            '../base/base.gyp:base',
-            '../base/base.gyp:base_i18n',
-            '../base/base.gyp:test_support_base',
-            '../testing/gtest.gyp:gtest',
-            '../third_party/ffmpeg/ffmpeg.gyp:ffmpeg',
-            'media',
-            'media_test_support',
-          ],
-          'sources': [
-            'ffmpeg/ffmpeg_unittest.cc',
-          ],
-        },
         {
           # GN version: //media:ffmpeg_regression_tests
           'target_name': 'ffmpeg_regression_tests',

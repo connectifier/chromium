@@ -56,11 +56,13 @@
 #include "chrome/browser/search_engines/template_url_service_android.h"
 #include "chrome/browser/signin/android_profile_oauth2_token_service.h"
 #include "chrome/browser/speech/tts_android.h"
+#include "chrome/browser/supervised_user/child_accounts/child_account_service_android.h"
 #include "chrome/browser/sync/profile_sync_service_android.h"
 #include "chrome/browser/ui/android/autofill/autofill_dialog_controller_android.h"
 #include "chrome/browser/ui/android/autofill/autofill_dialog_result.h"
 #include "chrome/browser/ui/android/autofill/autofill_logger_android.h"
 #include "chrome/browser/ui/android/autofill/autofill_popup_view_android.h"
+#include "chrome/browser/ui/android/autofill/card_unmask_prompt_view_android.h"
 #include "chrome/browser/ui/android/autofill/credit_card_scanner_view_android.h"
 #include "chrome/browser/ui/android/autofill/password_generation_popup_view_android.h"
 #include "chrome/browser/ui/android/chrome_http_auth_handler.h"
@@ -125,7 +127,9 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
     {"AutofillPopup",
      autofill::AutofillPopupViewAndroid::RegisterAutofillPopupViewAndroid},
     {"BookmarksBridge", BookmarksBridge::RegisterBookmarksBridge},
+    {"CardUnmaskPrompt", autofill::CardUnmaskPromptViewAndroid::Register},
     {"CertificateViewer", RegisterCertificateViewer},
+    {"ChildAccountService", RegisterChildAccountService},
     {"ChromeBrowserProvider",
      ChromeBrowserProvider::RegisterChromeBrowserProvider},
     {"ChromeHttpAuthHandler",

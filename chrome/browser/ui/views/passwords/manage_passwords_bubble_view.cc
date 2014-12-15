@@ -20,7 +20,6 @@
 #include "content/public/browser/notification_source.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/web_contents.h"
-#include "ui/aura/window.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/views/controls/button/blue_button.h"
@@ -32,6 +31,7 @@
 #include "ui/views/controls/separator.h"
 #include "ui/views/controls/styled_label.h"
 #include "ui/views/controls/styled_label_listener.h"
+#include "ui/views/event_monitor.h"
 #include "ui/views/layout/fill_layout.h"
 #include "ui/views/layout/grid_layout.h"
 #include "ui/views/layout/layout_constants.h"
@@ -451,7 +451,12 @@ void ManagePasswordsBubbleView::PendingView::ButtonPressed(
     const ui::Event& event) {
   DCHECK(sender == save_button_);
   parent_->model()->OnSaveClicked();
-  parent_->Close();
+  if (parent_->model()->state() ==
+      password_manager::ui::SETUP_OS_PASSWORD_BUBBLE_STATE) {
+    parent_->Refresh();
+  } else {
+    parent_->Close();
+  }
 }
 
 void ManagePasswordsBubbleView::PendingView::OnPerformAction(
@@ -468,7 +473,90 @@ void ManagePasswordsBubbleView::PendingView::OnPerformAction(
   }
 }
 
-// ManagePasswordsBubbleView::ConfirmNeverView ---------------------------------
+// ManagePasswordsBubbleView::SetupOSPasswordView -----------------------------
+
+// A view giving the user a hint to set up an OS password. Contains two
+// wide buttons leading to the Help Center and dismissing the bubble forever
+// and a "Cancel" button.
+class ManagePasswordsBubbleView::SetupOSPasswordView
+    : public views::View,
+      public views::ButtonListener {
+ public:
+  explicit SetupOSPasswordView(ManagePasswordsBubbleView* parent);
+
+ private:
+  // views::ButtonListener:
+  void ButtonPressed(views::Button* sender, const ui::Event& event) override;
+
+  ManagePasswordsBubbleView* parent_;
+
+  views::LabelButton* read_more_button_;
+  views::LabelButton* hide_button_;
+  views::LabelButton* cancel_button_;
+};
+
+ManagePasswordsBubbleView::SetupOSPasswordView::SetupOSPasswordView(
+    ManagePasswordsBubbleView* parent)
+    : parent_(parent) {
+  views::GridLayout* layout = new views::GridLayout(this);
+  layout->set_minimum_size(gfx::Size(kDesiredBubbleWidth, 0));
+  SetLayoutManager(layout);
+
+  read_more_button_ = new views::LabelButton(
+      this,
+      l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_SETUP_OS_LINK_BUTTON));
+  read_more_button_->SetFontList(
+      ui::ResourceBundle::GetSharedInstance().GetFontList(
+          ui::ResourceBundle::BaseFont));
+  hide_button_ = new views::LabelButton(
+      this,
+      l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_DISMISS_OS_BUBBLE_BUTTON));
+  hide_button_->SetFontList(
+      ui::ResourceBundle::GetSharedInstance().GetFontList(
+          ui::ResourceBundle::BaseFont));
+  cancel_button_ =
+      new views::LabelButton(this, l10n_util::GetStringUTF16(IDS_CANCEL));
+  cancel_button_->SetStyle(views::Button::STYLE_BUTTON);
+  cancel_button_->SetFontList(
+      ui::ResourceBundle::GetSharedInstance().GetFontList(
+          ui::ResourceBundle::SmallFont));
+
+  // Title row.
+  BuildColumnSet(layout, SINGLE_VIEW_COLUMN_SET);
+  AddTitleRow(layout, parent_->model());
+
+  layout->StartRow(0, SINGLE_VIEW_COLUMN_SET);
+  layout->AddView(read_more_button_);
+  layout->StartRow(0, SINGLE_VIEW_COLUMN_SET);
+  layout->AddView(hide_button_);
+
+  // Button row.
+  BuildColumnSet(layout, SINGLE_BUTTON_COLUMN_SET);
+  layout->StartRowWithPadding(
+      0, SINGLE_BUTTON_COLUMN_SET, 0, views::kRelatedControlVerticalSpacing);
+  layout->AddView(cancel_button_);
+
+  // Extra padding for visual awesomeness.
+  layout->AddPaddingRow(0, views::kRelatedControlVerticalSpacing);
+
+  parent_->set_initially_focused_view(cancel_button_);
+}
+
+void ManagePasswordsBubbleView::SetupOSPasswordView::ButtonPressed(
+    views::Button* sender,
+    const ui::Event& event) {
+  if (sender == read_more_button_) {
+    parent_->model()->OnShowOSPasswordHelpArticle();
+  } else if (sender == hide_button_) {
+    parent_->model()->OnHideOSPasswordBubble(true);
+  } else {
+    DCHECK(sender == cancel_button_);
+    parent_->model()->OnHideOSPasswordBubble(false);
+  }
+  parent_->Close();
+}
+
+// ManagePasswordsBubbleView::ConfirmNeverView --------------------------------
 
 // A view offering the user the ability to undo her decision to never save
 // passwords for a particular site.
@@ -827,15 +915,13 @@ class ManagePasswordsBubbleView::WebContentMouseHandler
     : public ui::EventHandler {
  public:
   explicit WebContentMouseHandler(ManagePasswordsBubbleView* bubble);
-  ~WebContentMouseHandler() override;
 
   void OnKeyEvent(ui::KeyEvent* event) override;
   void OnMouseEvent(ui::MouseEvent* event) override;
 
  private:
-  aura::Window* GetWebContentsWindow();
-
   ManagePasswordsBubbleView* bubble_;
+  scoped_ptr<views::EventMonitor> event_monitor_;
 
   DISALLOW_COPY_AND_ASSIGN(WebContentMouseHandler);
 };
@@ -843,17 +929,15 @@ class ManagePasswordsBubbleView::WebContentMouseHandler
 ManagePasswordsBubbleView::WebContentMouseHandler::WebContentMouseHandler(
     ManagePasswordsBubbleView* bubble)
     : bubble_(bubble) {
-  GetWebContentsWindow()->AddPreTargetHandler(this);
-}
-
-ManagePasswordsBubbleView::WebContentMouseHandler::~WebContentMouseHandler() {
-  if (aura::Window* window = GetWebContentsWindow())
-    window->RemovePreTargetHandler(this);
+  content::WebContents* web_contents = bubble_->web_contents();
+  DCHECK(web_contents);
+  event_monitor_ = views::EventMonitor::CreateWindowMonitor(
+      this, web_contents->GetTopLevelNativeWindow());
 }
 
 void ManagePasswordsBubbleView::WebContentMouseHandler::OnKeyEvent(
     ui::KeyEvent* event) {
-  content::WebContents* web_contents = bubble_->model()->web_contents();
+  content::WebContents* web_contents = bubble_->web_contents();
   content::RenderViewHost* rvh = web_contents->GetRenderViewHost();
   if (rvh->IsFocusedElementEditable() &&
       event->type() == ui::ET_KEY_PRESSED)
@@ -864,12 +948,6 @@ void ManagePasswordsBubbleView::WebContentMouseHandler::OnMouseEvent(
     ui::MouseEvent* event) {
   if (event->type() == ui::ET_MOUSE_PRESSED)
     bubble_->Close();
-}
-
-aura::Window*
-ManagePasswordsBubbleView::WebContentMouseHandler::GetWebContentsWindow() {
-  content::WebContents* web_contents = bubble_->model()->web_contents();
-  return web_contents ? web_contents->GetNativeView() : NULL;
 }
 
 // ManagePasswordsBubbleView --------------------------------------------------
@@ -898,10 +976,8 @@ void ManagePasswordsBubbleView::ShowBubble(content::WebContents* web_contents,
   manage_passwords_bubble_ = new ManagePasswordsBubbleView(
       web_contents, anchor_view, reason);
 
-  if (is_fullscreen) {
-    manage_passwords_bubble_->set_parent_window(
-        web_contents->GetTopLevelNativeWindow());
-  }
+  if (is_fullscreen)
+    manage_passwords_bubble_->set_parent_window(web_contents->GetNativeView());
 
   views::BubbleDelegateView::CreateBubble(manage_passwords_bubble_);
 
@@ -991,6 +1067,7 @@ void ManagePasswordsBubbleView::Close() {
 void ManagePasswordsBubbleView::Refresh() {
   RemoveAllChildViews(true);
   initially_focused_view_ = NULL;
+  bool need_resize = false;
   if (password_manager::ui::IsPendingState(model()->state())) {
     if (model()->never_save_passwords())
       AddChildView(new ConfirmNeverView(this));
@@ -1004,10 +1081,16 @@ void ManagePasswordsBubbleView::Refresh() {
     AddChildView(new SaveConfirmationView(this));
   } else if (password_manager::ui::IsCredentialsState(model()->state())) {
     AddChildView(new AccountChooserView(this));
+  } else if (model()->state() ==
+      password_manager::ui::SETUP_OS_PASSWORD_BUBBLE_STATE) {
+    AddChildView(new SetupOSPasswordView(this));
+    need_resize = true;
   } else {
     AddChildView(new ManageView(this));
   }
   GetLayoutManager()->Layout(this);
+  if (need_resize)
+    SizeToContents();
 }
 
 void ManagePasswordsBubbleView::NotifyNeverForThisSiteClicked() {

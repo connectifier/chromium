@@ -309,7 +309,7 @@ void LayerTreeHostImpl::CommitComplete() {
     sync_tree()->UpdateDrawProperties();
     // Start working on newly created tiles immediately if needed.
     if (tile_manager_ && tile_priorities_dirty_)
-      ManageTiles();
+      PrepareTiles();
     else
       NotifyReadyToActivate();
   } else {
@@ -382,16 +382,16 @@ void LayerTreeHostImpl::Animate(base::TimeTicks monotonic_time) {
   AnimateTopControls(monotonic_time);
 }
 
-void LayerTreeHostImpl::ManageTiles() {
+void LayerTreeHostImpl::PrepareTiles() {
   if (!tile_manager_)
     return;
   if (!tile_priorities_dirty_)
     return;
 
   tile_priorities_dirty_ = false;
-  tile_manager_->ManageTiles(global_tile_state_);
+  tile_manager_->PrepareTiles(global_tile_state_);
 
-  client_->DidManageTiles();
+  client_->DidPrepareTiles();
 }
 
 void LayerTreeHostImpl::StartPageScaleAnimation(
@@ -1186,9 +1186,9 @@ void LayerTreeHostImpl::UpdateTileManagerMemoryPolicy(
 
 void LayerTreeHostImpl::DidModifyTilePriorities() {
   DCHECK(settings_.impl_side_painting);
-  // Mark priorities as dirty and schedule a ManageTiles().
+  // Mark priorities as dirty and schedule a PrepareTiles().
   tile_priorities_dirty_ = true;
-  client_->SetNeedsManageTilesOnImplThread();
+  client_->SetNeedsPrepareTilesOnImplThread();
 }
 
 void LayerTreeHostImpl::GetPictureLayerImplPairs(
@@ -1589,11 +1589,13 @@ void LayerTreeHostImpl::SetUseGpuRasterization(bool use_gpu) {
   if (use_gpu == use_gpu_rasterization_)
     return;
 
+  // Note that this must happen first, in case the rest of the calls want to
+  // query the new state of |use_gpu_rasterization_|.
   use_gpu_rasterization_ = use_gpu;
-  ReleaseTreeResources();
 
-  // Replace existing tile manager with another one that uses appropriate
-  // rasterizer.
+  // Clean up and replace existing tile manager with another one that uses
+  // appropriate rasterizer.
+  ReleaseTreeResources();
   if (tile_manager_) {
     DestroyTileManager();
     CreateAndSetTileManager();
@@ -1857,7 +1859,7 @@ void LayerTreeHostImpl::SetVisible(bool visible) {
   // Evict tiles immediately if invisible since this tab may never get another
   // draw or timer tick.
   if (!visible_)
-    ManageTiles();
+    PrepareTiles();
 
   if (!renderer_)
     return;
@@ -1964,8 +1966,7 @@ void LayerTreeHostImpl::CreateAndSetTileManager() {
                                     : settings_.scheduled_raster_task_limit;
   tile_manager_ = TileManager::Create(
       this, task_runner, resource_pool_.get(),
-      tile_task_worker_pool_->AsTileTaskRunner(),
-      rendering_stats_instrumentation_, scheduled_raster_task_limit);
+      tile_task_worker_pool_->AsTileTaskRunner(), scheduled_raster_task_limit);
 
   UpdateTileManagerMemoryPolicy(ActualManagedMemoryPolicy());
 }
@@ -2562,10 +2563,6 @@ bool LayerTreeHostImpl::ShouldTopControlsConsumeScroll(
   // Always consume if it's in the direction to show the top controls.
   if (scroll_delta.y() < 0)
     return true;
-
-  if (CurrentlyScrollingLayer() != InnerViewportScrollLayer() &&
-      CurrentlyScrollingLayer() != OuterViewportScrollLayer())
-    return false;
 
   if (active_tree()->TotalScrollOffset().y() <
       active_tree()->TotalMaxScrollOffset().y())

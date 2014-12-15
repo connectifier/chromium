@@ -34,6 +34,11 @@ from pylib.utils import timeout_retry
 _DEFAULT_TIMEOUT = 30
 _DEFAULT_RETRIES = 3
 
+# A sentinel object for default values
+# TODO(jbudorick,perezju): revisit how default values are handled by
+# the timeout_retry decorators.
+DEFAULT = object()
+
 
 @decorators.WithExplicitTimeoutAndRetries(
     _DEFAULT_TIMEOUT, _DEFAULT_RETRIES)
@@ -146,7 +151,7 @@ class DeviceUtils(object):
     except device_errors.AdbCommandFailedError:
       return False
 
-  def NeedsSU(self, timeout=None, retries=None):
+  def NeedsSU(self, timeout=DEFAULT, retries=DEFAULT):
     """Checks whether 'su' is needed to access protected resources.
 
     Args:
@@ -165,8 +170,10 @@ class DeviceUtils(object):
     """
     if 'needs_su' not in self._cache:
       try:
-        self.RunShellCommand('su -c ls /root && ! ls /root', check_return=True,
-                             timeout=timeout, retries=retries)
+        self.RunShellCommand(
+            'su -c ls /root && ! ls /root', check_return=True,
+            timeout=self._default_timeout if timeout is DEFAULT else timeout,
+            retries=self._default_retries if retries is DEFAULT else retries)
         self._cache['needs_su'] = True
       except device_errors.AdbCommandFailedError:
         self._cache['needs_su'] = False
@@ -249,8 +256,14 @@ class DeviceUtils(object):
     Returns:
       Path to the apk on the device if it exists, None otherwise.
     """
+    # 'pm path' is liable to incorrectly exit with a nonzero number starting
+    # in Lollipop.
+    # TODO(jbudorick): Check if this is fixed as new Android versions are
+    # released to put an upper bound on this.
+    should_check_return = (self.build_version_sdk <
+                           constants.ANDROID_SDK_VERSION_CODES.LOLLIPOP)
     output = self.RunShellCommand(['pm', 'path', package], single_line=True,
-                                  check_return=True)
+                                  check_return=should_check_return)
     if not output:
       return None
     if not output.startswith('package:'):
@@ -918,7 +931,7 @@ class DeviceUtils(object):
         host_temp.write(contents)
         host_temp.flush()
         if as_root and self.NeedsSU():
-          with device_temp_file.DeviceTempFile(self) as device_temp:
+          with device_temp_file.DeviceTempFile(self.adb) as device_temp:
             self.adb.Push(host_temp.name, device_temp.name)
             # Here we need 'cp' rather than 'mv' because the temp and
             # destination files might be on different file systems (e.g.
@@ -994,12 +1007,77 @@ class DeviceUtils(object):
     """
     return self.old_interface.SetJavaAssertsEnabled(enabled)
 
+
+  @property
+  def build_description(self):
+    """Returns the build description of the system.
+
+    For example:
+      nakasi-user 4.4.4 KTU84P 1227136 release-keys
+    """
+    return self.GetProp('ro.build.description', cache=True)
+
+  @property
+  def build_fingerprint(self):
+    """Returns the build fingerprint of the system.
+
+    For example:
+      google/nakasi/grouper:4.4.4/KTU84P/1227136:user/release-keys
+    """
+    return self.GetProp('ro.build.fingerprint', cache=True)
+
+  @property
+  def build_id(self):
+    """Returns the build ID of the system (e.g. 'KTU84P')."""
+    return self.GetProp('ro.build.id', cache=True)
+
+  @property
+  def build_product(self):
+    """Returns the build product of the system (e.g. 'grouper')."""
+    return self.GetProp('ro.build.product', cache=True)
+
   @property
   def build_type(self):
-    """Returns the build type of the system (e.g. userdebug)."""
+    """Returns the build type of the system (e.g. 'user')."""
     return self.GetProp('ro.build.type', cache=True)
 
-  def GetProp(self, property_name, cache=False, timeout=None, retries=None):
+  @property
+  def build_version_sdk(self):
+    """Returns the build version sdk of the system as a number (e.g. 19).
+
+    For version code numbers see:
+    http://developer.android.com/reference/android/os/Build.VERSION_CODES.html
+
+    For named constants see:
+    pylib.constants.ANDROID_SDK_VERSION_CODES
+
+    Raises:
+      CommandFailedError if the build version sdk is not a number.
+    """
+    value = self.GetProp('ro.build.version.sdk', cache=True)
+    try:
+      return int(value)
+    except ValueError:
+      raise device_errors.CommandFailedError(
+          'Invalid build version sdk: %r' % value)
+
+  @property
+  def product_cpu_abi(self):
+    """Returns the product cpu abi of the device (e.g. 'armeabi-v7a')."""
+    return self.GetProp('ro.product.cpu.abi', cache=True)
+
+  @property
+  def product_model(self):
+    """Returns the name of the product model (e.g. 'Nexus 7')."""
+    return self.GetProp('ro.product.model', cache=True)
+
+  @property
+  def product_name(self):
+    """Returns the product name of the device (e.g. 'nakasi')."""
+    return self.GetProp('ro.product.name', cache=True)
+
+  def GetProp(self, property_name, cache=False, timeout=DEFAULT,
+              retries=DEFAULT):
     """Gets a property from the device.
 
     Args:
@@ -1024,9 +1102,10 @@ class DeviceUtils(object):
     else:
       # timeout and retries are handled down at run shell, because we don't
       # want to apply them in the other branch when reading from the cache
-      value = self.RunShellCommand(['getprop', property_name],
-                                   single_line=True, check_return=True,
-                                   timeout=timeout, retries=retries)
+      value = self.RunShellCommand(
+          ['getprop', property_name], single_line=True, check_return=True,
+          timeout=self._default_timeout if timeout is DEFAULT else timeout,
+          retries=self._default_retries if retries is DEFAULT else retries)
       if cache or cache_key in self._cache:
         self._cache[cache_key] = value
       return value
@@ -1173,8 +1252,8 @@ class DeviceUtils(object):
     """Returns the device serial."""
     return self.adb.GetDeviceSerial()
 
-  @staticmethod
-  def parallel(devices=None, async=False):
+  @classmethod
+  def parallel(cls, devices=None, async=False):
     """Creates a Parallelizer to operate over the provided list of devices.
 
     If |devices| is either |None| or an empty list, the Parallelizer will
@@ -1190,10 +1269,10 @@ class DeviceUtils(object):
     Returns:
       A Parallelizer operating over |devices|.
     """
-    if not devices or len(devices) == 0:
-      devices = pylib.android_commands.GetAttachedDevices()
-    parallelizer_type = (parallelizer.Parallelizer if async
-                         else parallelizer.SyncParallelizer)
-    return parallelizer_type([
-        d if isinstance(d, DeviceUtils) else DeviceUtils(d)
-        for d in devices])
+    if not devices:
+      devices = adb_wrapper.AdbWrapper.GetDevices()
+    devices = [d if isinstance(d, cls) else cls(d) for d in devices]
+    if async:
+      return parallelizer.Parallelizer(devices)
+    else:
+      return parallelizer.SyncParallelizer(devices)

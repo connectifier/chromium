@@ -18,6 +18,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window_testing_views.h"
+#include "chrome/browser/ui/infobar_container_delegate.h"
 #include "chrome/browser/ui/omnibox/omnibox_popup_model_observer.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "chrome/browser/ui/views/frame/browser_frame.h"
@@ -25,7 +26,6 @@
 #include "chrome/browser/ui/views/frame/immersive_mode_controller.h"
 #include "chrome/browser/ui/views/frame/web_contents_close_handler.h"
 #include "chrome/browser/ui/views/load_complete_listener.h"
-#include "components/infobars/core/infobar_container.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/models/simple_menu_model.h"
 #include "ui/gfx/native_widget_types.h"
@@ -48,7 +48,7 @@ class Browser;
 class BrowserViewLayout;
 class ContentsLayoutManager;
 class DownloadShelfView;
-class FullscreenExitBubbleViews;
+class ExclusiveAccessBubbleViews;
 class InfoBarContainerView;
 class LocationBarView;
 class PermissionBubbleViewViews;
@@ -91,7 +91,7 @@ class BrowserView : public BrowserWindow,
                     public views::WidgetDelegate,
                     public views::WidgetObserver,
                     public views::ClientView,
-                    public infobars::InfoBarContainer::Delegate,
+                    public InfoBarContainerDelegate,
                     public LoadCompleteListener::Delegate,
                     public OmniboxPopupModelObserver {
  public:
@@ -179,8 +179,8 @@ class BrowserView : public BrowserWindow,
   InfoBarContainerView* infobar_container() { return infobar_container_; }
 
   // Accessor for the FullscreenExitBubbleViews.
-  FullscreenExitBubbleViews* fullscreen_exit_bubble() {
-    return fullscreen_bubble_.get();
+  ExclusiveAccessBubbleViews* exclusive_access_bubble() {
+    return exclusive_access_bubble_.get();
   }
 
   // Returns true if various window components are visible.
@@ -281,12 +281,12 @@ class BrowserView : public BrowserWindow,
   void Minimize() override;
   void Restore() override;
   void EnterFullscreen(const GURL& url,
-                       FullscreenExitBubbleType bubble_type,
+                       ExclusiveAccessBubbleType bubble_type,
                        bool with_toolbar) override;
   void ExitFullscreen() override;
   void UpdateFullscreenExitBubbleContent(
       const GURL& url,
-      FullscreenExitBubbleType bubble_type) override;
+      ExclusiveAccessBubbleType bubble_type) override;
   bool ShouldHideUIForFullscreen() const override;
   bool IsFullscreen() const override;
   bool IsFullscreenBubbleVisible() const override;
@@ -359,8 +359,6 @@ class BrowserView : public BrowserWindow,
   FindBar* CreateFindBar() override;
   web_modal::WebContentsModalDialogHost* GetWebContentsModalDialogHost()
       override;
-  void ShowAvatarBubble(content::WebContents* web_contents,
-                        const gfx::Rect& rect) override;
   void ShowAvatarBubbleFromAvatarButton(
       AvatarBubbleMode mode,
       const signin::ManageAccountsParams& manage_accounts_params) override;
@@ -423,7 +421,7 @@ class BrowserView : public BrowserWindow,
   int NonClientHitTest(const gfx::Point& point) override;
   gfx::Size GetMinimumSize() const override;
 
-  // InfoBarContainer::Delegate overrides
+  // InfoBarContainerDelegate:
   SkColor GetInfoBarSeparatorColor() const override;
   void InfoBarContainerStateChanged(bool is_animating) override;
   bool DrawInfoBarArrows(int* x) const override;
@@ -527,7 +525,7 @@ class BrowserView : public BrowserWindow,
   void ProcessFullscreen(bool fullscreen,
                          FullscreenMode mode,
                          const GURL& url,
-                         FullscreenExitBubbleType bubble_type);
+                         ExclusiveAccessBubbleType bubble_type);
 
   // Returns whether immmersive fullscreen should replace fullscreen. This
   // should only occur for "browser-fullscreen" for tabbed-typed windows (not
@@ -667,7 +665,7 @@ class BrowserView : public BrowserWindow,
   // jankiness.
   bool in_process_fullscreen_;
 
-  scoped_ptr<FullscreenExitBubbleViews> fullscreen_bubble_;
+  scoped_ptr<ExclusiveAccessBubbleViews> exclusive_access_bubble_;
 
 #if defined(OS_WIN)
   // This object is used to perform periodic actions in a worker

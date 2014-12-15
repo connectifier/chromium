@@ -176,6 +176,14 @@ QuotaPermissionContext* ContentBrowserClient::CreateQuotaPermissionContext() {
   return NULL;
 }
 
+void ContentBrowserClient::SelectClientCertificate(
+    int render_process_id,
+    int render_frame_id,
+    net::SSLCertRequestInfo* cert_request_info,
+    const base::Callback<void(net::X509Certificate*)>& callback) {
+  callback.Run(NULL);
+}
+
 net::URLRequestContext* ContentBrowserClient::OverrideRequestContextForURL(
     const GURL& url, ResourceContext* context) {
   return NULL;
@@ -211,12 +219,9 @@ MediaObserver* ContentBrowserClient::GetMediaObserver() {
   return NULL;
 }
 
-blink::WebNotificationPermission
-ContentBrowserClient::CheckDesktopNotificationPermission(
-    const GURL& source_origin,
-    ResourceContext* context,
-    int render_process_id) {
-  return blink::WebNotificationPermissionDenied;
+PlatformNotificationService*
+ContentBrowserClient::GetPlatformNotificationService() {
+  return NULL;
 }
 
 void ContentBrowserClient::RequestPermission(

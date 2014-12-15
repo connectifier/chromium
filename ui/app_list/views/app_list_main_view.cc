@@ -26,6 +26,7 @@
 #include "ui/app_list/views/apps_grid_view.h"
 #include "ui/app_list/views/contents_view.h"
 #include "ui/app_list/views/search_box_view.h"
+#include "ui/app_list/views/start_page_view.h"
 #include "ui/views/border.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/button/custom_button.h"
@@ -114,10 +115,12 @@ AppListMainView::AppListMainView(AppListViewDelegate* delegate)
       custom_page_clickzone_(nullptr),
       weak_ptr_factory_(this) {
   SetLayoutManager(new views::BoxLayout(views::BoxLayout::kVertical, 0, 0, 0));
+  model_->AddObserver(this);
 }
 
 AppListMainView::~AppListMainView() {
   pending_icon_loaders_.clear();
+  model_->RemoveObserver(this);
 }
 
 void AppListMainView::Init(gfx::NativeView parent,
@@ -189,7 +192,9 @@ void AppListMainView::Prerender() {
 
 void AppListMainView::ModelChanged() {
   pending_icon_loaders_.clear();
+  model_->RemoveObserver(this);
   model_ = delegate_->GetModel();
+  model_->AddObserver(this);
   search_box_view_->ModelChanged();
   delete contents_view_;
   contents_view_ = NULL;
@@ -307,6 +312,12 @@ void AppListMainView::InitWidgets() {
     custom_page_clickzone_->Hide();
 }
 
+void AppListMainView::OnCustomLauncherPageEnabledStateChanged(bool enabled) {
+  // Allow the start page to update |custom_page_clickzone_|.
+  if (contents_view_->IsStateActive(AppListModel::STATE_START))
+    contents_view_->start_page_view()->UpdateCustomPageClickzoneVisibility();
+}
+
 void AppListMainView::ActivateApp(AppListItem* item, int event_flags) {
   // TODO(jennyz): Activate the folder via AppListModel notification.
   if (item->GetItemType() == AppListFolderItem::kItemType)
@@ -345,16 +356,6 @@ void AppListMainView::OnResultInstalled(SearchResult* result) {
   // Clears the search to show the apps grid. The last installed app
   // should be highlighted and made visible already.
   search_box_view_->ClearSearch();
-}
-
-void AppListMainView::OnResultUninstalled(SearchResult* result) {
-  // Resubmit the query via a posted task so that all observers for the
-  // uninstall notification are notified.
-  base::MessageLoop::current()->PostTask(
-      FROM_HERE,
-      base::Bind(&AppListMainView::QueryChanged,
-                 weak_ptr_factory_.GetWeakPtr(),
-                 search_box_view_));
 }
 
 }  // namespace app_list

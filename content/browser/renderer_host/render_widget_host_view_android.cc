@@ -575,6 +575,9 @@ void RenderWidgetHostViewAndroid::Show() {
   if (layer_.get())
     layer_->SetHideLayerAndSubtree(false);
 
+  if (overscroll_controller_)
+    overscroll_controller_->Enable();
+
   frame_evictor_->SetVisible(true);
   WasShown();
 }
@@ -586,6 +589,9 @@ void RenderWidgetHostViewAndroid::Hide() {
   is_showing_ = false;
   if (layer_.get() && locks_on_frame_count_ == 0)
     layer_->SetHideLayerAndSubtree(true);
+
+  if (overscroll_controller_)
+    overscroll_controller_->Disable();
 
   frame_evictor_->SetVisible(false);
   // We don't know if we will ever get a frame if we are hiding the renderer, so
@@ -793,7 +799,7 @@ bool RenderWidgetHostViewAndroid::OnTouchEvent(
                                             CreateLatencyInfo(web_event));
   } else {
     const bool event_consumed = false;
-    gesture_provider_.OnTouchEventAck(event_consumed);
+    gesture_provider_.OnAsyncTouchEventAck(event_consumed);
   }
 
   // Send a proactive BeginFrame on the next vsync to reduce latency.
@@ -839,7 +845,7 @@ void RenderWidgetHostViewAndroid::ImeCancelComposition() {
 void RenderWidgetHostViewAndroid::ImeCompositionRangeChanged(
     const gfx::Range& range,
     const std::vector<gfx::Rect>& character_bounds) {
-  ime_adapter_android_.SetCharacterBounds(character_bounds);
+  // TODO(yukawa): Implement this.
 }
 
 void RenderWidgetHostViewAndroid::FocusedNodeChanged(bool is_editable_node) {
@@ -1479,7 +1485,7 @@ gfx::GLSurfaceHandle RenderWidgetHostViewAndroid::GetCompositingSurface() {
 void RenderWidgetHostViewAndroid::ProcessAckedTouchEvent(
     const TouchEventWithLatencyInfo& touch, InputEventAckState ack_result) {
   const bool event_consumed = ack_result == INPUT_EVENT_ACK_STATE_CONSUMED;
-  gesture_provider_.OnTouchEventAck(event_consumed);
+  gesture_provider_.OnAsyncTouchEventAck(event_consumed);
 }
 
 void RenderWidgetHostViewAndroid::GestureEventAck(

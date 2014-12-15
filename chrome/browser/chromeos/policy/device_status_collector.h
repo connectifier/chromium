@@ -17,8 +17,8 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
-#include "chrome/browser/chromeos/version_loader.h"
 #include "chrome/browser/idle.h"
+#include "chromeos/system/version_loader.h"
 #include "components/policy/core/common/cloud/cloud_policy_client.h"
 #include "content/public/browser/geolocation_provider.h"
 #include "content/public/common/geoposition.h"
@@ -152,9 +152,6 @@ class DeviceStatusCollector : public CloudPolicyClient::StatusProvider {
 
   base::RepeatingTimer<DeviceStatusCollector> idle_poll_timer_;
   base::OneShotTimer<DeviceStatusCollector> geolocation_update_timer_;
-
-  chromeos::VersionLoader version_loader_;
-  base::CancelableTaskTracker tracker_;
 
   std::string os_version_;
   std::string firmware_version_;

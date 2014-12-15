@@ -109,7 +109,8 @@ remoting.DesktopRemoting.prototype.getRequiredCapabilities = function() {
     remoting.ClientSession.Capability.VIDEO_RECORDER,
     // TODO(aiguha): Add this capability based on a gyp/command-line flag,
     // rather than by default.
-    remoting.ClientSession.Capability.CAST
+    remoting.ClientSession.Capability.CAST,
+    remoting.ClientSession.Capability.GNUBBY_AUTH
   ];
 };
 
@@ -184,9 +185,6 @@ remoting.DesktopRemoting.prototype.onVideoStreamingStarted = function() {
  * @return {boolean} Return true if the extension message was recognized.
  */
 remoting.DesktopRemoting.prototype.onExtensionMessage = function(type, data) {
-  if (remoting.clientSession) {
-    return remoting.clientSession.handleExtensionMessage(type, data);
-  }
   return false;
 };
 

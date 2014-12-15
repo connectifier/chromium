@@ -175,6 +175,10 @@ RenderFrameHostImpl::~RenderFrameHostImpl() {
   // Notify the FrameTree that this RFH is going away, allowing it to shut down
   // the corresponding RenderViewHost if it is no longer needed.
   frame_tree_->UnregisterRenderFrameHost(this);
+
+  // NULL out the swapout timer; in crash dumps this member will be null only if
+  // the dtor has run.
+  swapout_event_monitor_timeout_.reset();
 }
 
 int RenderFrameHostImpl::GetRoutingID() {
@@ -303,6 +307,7 @@ bool RenderFrameHostImpl::OnMessageReceived(const IPC::Message &msg) {
                         OnDidFailLoadWithError)
     IPC_MESSAGE_HANDLER_GENERIC(FrameHostMsg_DidCommitProvisionalLoad,
                                 OnDidCommitProvisionalLoad(msg))
+    IPC_MESSAGE_HANDLER(FrameHostMsg_DidDropNavigation, OnDidDropNavigation)
     IPC_MESSAGE_HANDLER(FrameHostMsg_OpenURL, OnOpenURL)
     IPC_MESSAGE_HANDLER(FrameHostMsg_DocumentOnLoadCompleted,
                         OnDocumentOnLoadCompleted)
@@ -593,7 +598,13 @@ void RenderFrameHostImpl::OnOpenURL(
       params.should_replace_current_entry, params.user_gesture);
 }
 
-void RenderFrameHostImpl::OnDocumentOnLoadCompleted() {
+void RenderFrameHostImpl::OnDocumentOnLoadCompleted(
+    FrameMsg_UILoadMetricsReportType::Value report_type,
+    base::TimeTicks ui_timestamp) {
+  if (report_type == FrameMsg_UILoadMetricsReportType::REPORT_LINK) {
+    UMA_HISTOGRAM_TIMES("Navigation.UI_OnLoadComplete.Link",
+                        base::TimeTicks::Now() - ui_timestamp);
+  }
   // This message is only sent for top-level frames. TODO(avi): when frame tree
   // mirroring works correctly, add a check here to enforce it.
   delegate_->DocumentOnLoadCompleted(this);
@@ -663,6 +674,12 @@ void RenderFrameHostImpl::OnDidCommitProvisionalLoad(const IPC::Message& msg) {
   if (IsWaitingForUnloadACK())
     return;
 
+  if (validated_params.report_type ==
+      FrameMsg_UILoadMetricsReportType::REPORT_LINK) {
+    UMA_HISTOGRAM_TIMES("Navigation.UI_OnCommitProvisionalLoad.Link",
+                        base::TimeTicks::Now() - validated_params.ui_timestamp);
+  }
+
   RenderProcessHost* process = GetProcess();
 
   // Attempts to commit certain off-limits URL should be caught more strictly
@@ -701,6 +718,14 @@ void RenderFrameHostImpl::OnDidCommitProvisionalLoad(const IPC::Message& msg) {
 
   accessibility_reset_count_ = 0;
   frame_tree_node()->navigator()->DidNavigate(this, validated_params);
+}
+
+void RenderFrameHostImpl::OnDidDropNavigation() {
+  // At the end of Navigate(), the delegate's DidStartLoading is called to force
+  // the spinner to start, even if the renderer didn't yet begin the load. If it
+  // turns out that the renderer dropped the navigation, we need to turn off the
+  // spinner.
+  delegate_->DidStopLoading(this);
 }
 
 RenderWidgetHostImpl* RenderFrameHostImpl::GetRenderWidgetHost() {
@@ -779,8 +804,6 @@ void RenderFrameHostImpl::OnBeforeUnloadACK(
   TRACE_EVENT_ASYNC_END0(
       "navigation", "RenderFrameHostImpl::BeforeUnload", this);
   DCHECK(!GetParent());
-  render_view_host_->decrement_in_flight_event_count();
-  render_view_host_->StopHangMonitorTimeout();
   // If this renderer navigated while the beforeunload request was in flight, we
   // may have cleared this state in OnDidCommitProvisionalLoad, in which case we
   // can ignore this message.
@@ -842,6 +865,8 @@ void RenderFrameHostImpl::OnBeforeUnloadACK(
   }
   // Resets beforeunload waiting state.
   is_waiting_for_beforeunload_ack_ = false;
+  render_view_host_->decrement_in_flight_event_count();
+  render_view_host_->StopHangMonitorTimeout();
   send_before_unload_start_time_ = base::TimeTicks();
 
   frame_tree_node_->render_manager()->OnBeforeUnloadACK(
@@ -1186,7 +1211,11 @@ void RenderFrameHostImpl::SetState(RenderFrameHostImplState rfh_state) {
       rfh_state == STATE_SWAPPED_OUT ||
       rfh_state_ == STATE_DEFAULT ||
       rfh_state_ == STATE_SWAPPED_OUT) {
-    is_waiting_for_beforeunload_ack_ = false;
+    if (is_waiting_for_beforeunload_ack_) {
+      is_waiting_for_beforeunload_ack_ = false;
+      render_view_host_->decrement_in_flight_event_count();
+      render_view_host_->StopHangMonitorTimeout();
+    }
     send_before_unload_start_time_ = base::TimeTicks();
     render_view_host_->is_waiting_for_close_ack_ = false;
   }
@@ -1248,7 +1277,7 @@ void RenderFrameHostImpl::Navigate(const FrameMsg_Navigate_Params& params) {
   // loading" message will be received asynchronously from the UI of the
   // browser. But we want to keep the throbber in sync with what's happening
   // in the UI. For example, we want to start throbbing immediately when the
-  // user naivgates even if the renderer is delayed. There is also an issue
+  // user navigates even if the renderer is delayed. There is also an issue
   // with the throbber starting because the WebUI (which controls whether the
   // favicon is displayed) happens synchronously. If the start loading
   // messages was asynchronous, then the default favicon would flash in.

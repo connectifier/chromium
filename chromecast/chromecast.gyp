@@ -111,6 +111,8 @@
         '../components/components.gyp:cdm_renderer',
         '../components/components.gyp:component_metrics_proto',
         '../components/components.gyp:crash_component',
+        '../components/components.gyp:dns_prefetch_browser',
+        '../components/components.gyp:dns_prefetch_renderer',
         '../components/components.gyp:metrics',
         '../components/components.gyp:metrics_gpu',
         '../components/components.gyp:metrics_net',
@@ -241,7 +243,7 @@
             '<(version_py_path)',
             '-e', 'VERSION_FULL="<(version_full)"',
             # Revision is taken from buildbot if available; otherwise, a dev string is used.
-            '-e', 'CAST_BUILD_REVISION="<!(echo ${BUILD_NUMBER:="local.${USER}"})"',
+            '-e', 'CAST_BUILD_REVISION="<!(echo ${CAST_BUILD_REVISION:="eng.${USER}.<!(date +%Y%m%d.%H%M%S)"})"',
             '-e', 'CAST_IS_DEBUG_BUILD=1 if "<(CONFIGURATION_NAME)" == "Debug" else 0',
             'common/version.h.in',
             '<@(_outputs)',

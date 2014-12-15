@@ -572,10 +572,6 @@ class NotificationBridge : public WrenchMenuBadgeController::Delegate {
   [wrenchButton_ setAttachedMenu:[wrenchMenuController_ menu]];
 }
 
-- (WrenchMenuController*)wrenchMenuController {
-  return wrenchMenuController_;
-}
-
 - (void)updateWrenchButtonSeverity:(WrenchIconPainter::Severity)severity
                            animate:(BOOL)animate {
   WrenchToolbarButtonCell* cell =
@@ -593,7 +589,8 @@ class NotificationBridge : public WrenchMenuBadgeController::Delegate {
   if (!browserActionsController_.get()) {
     browserActionsController_.reset([[BrowserActionsController alloc]
             initWithBrowser:browser_
-              containerView:browserActionsContainerView_]);
+              containerView:browserActionsContainerView_
+                 isOverflow:NO]);
     [[NSNotificationCenter defaultCenter]
         addObserver:self
            selector:@selector(browserActionsContainerWillDrag:)
@@ -672,11 +669,8 @@ class NotificationBridge : public WrenchMenuBadgeController::Delegate {
     CGFloat edgeXPos = [wrenchButton_ frame].origin.x;
     leftDistance = edgeXPos - locationBarXPos - kWrenchMenuLeftPadding;
   } else {
-    NSRect containerFrame = animate ?
-        [browserActionsContainerView_ animationEndFrame] :
-        [browserActionsContainerView_ frame];
-
-    leftDistance = containerFrame.origin.x - locationBarXPos;
+    leftDistance = NSMinX([browserActionsContainerView_ animationEndFrame]) -
+        locationBarXPos;
   }
   if (leftDistance != 0.0)
     [self adjustLocationSizeBy:leftDistance animate:animate];
@@ -719,7 +713,8 @@ class NotificationBridge : public WrenchMenuBadgeController::Delegate {
     NSRect containerFrame = [browserActionsContainerView_ frame];
     containerFrame = NSOffsetRect(containerFrame, -dX, 0);
     containerFrame.size.width += dX;
-    CGFloat savedContainerWidth = [browserActionsController_ savedWidth];
+    CGFloat savedContainerWidth =
+        [browserActionsController_ preferredSize].width();
     if (NSWidth(containerFrame) >= savedContainerWidth) {
       containerFrame = NSOffsetRect(containerFrame,
           NSWidth(containerFrame) - savedContainerWidth, 0);
@@ -795,6 +790,10 @@ class NotificationBridge : public WrenchMenuBadgeController::Delegate {
 
 - (NSView*)wrenchButton {
   return wrenchButton_;
+}
+
+- (WrenchMenuController*)wrenchMenuController {
+  return wrenchMenuController_.get();
 }
 
 // (URLDropTargetController protocol)

@@ -645,6 +645,7 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermission::kCastStreaming);
   skip.insert(APIPermission::kCommandsAccessibility);
   skip.insert(APIPermission::kContextMenus);
+  skip.insert(APIPermission::kCryptotokenPrivate);
   skip.insert(APIPermission::kCopresencePrivate);
   skip.insert(APIPermission::kDiagnostics);
   skip.insert(APIPermission::kDns);
@@ -749,7 +750,6 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermission::kReadingListPrivate);
   skip.insert(APIPermission::kRtcPrivate);
   skip.insert(APIPermission::kStreamsPrivate);
-  skip.insert(APIPermission::kSyncedNotificationsPrivate);
   skip.insert(APIPermission::kSystemPrivate);
   skip.insert(APIPermission::kTabCaptureForTab);
   skip.insert(APIPermission::kTerminalPrivate);

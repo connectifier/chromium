@@ -4,6 +4,9 @@
 
 #include "ui/app_list/views/app_list_view.h"
 
+#include <string>
+#include <vector>
+
 #include "base/command_line.h"
 #include "base/run_loop.h"
 #include "base/strings/string_util.h"
@@ -72,13 +75,13 @@ void SimulateClick(views::View* view) {
 // Choose a set that is 3 regular app list pages and 2 landscape app list pages.
 const int kInitialItems = 34;
 
-class TestTileSearchResult : public TestSearchResult {
+class TestStartPageSearchResult : public TestSearchResult {
  public:
-  TestTileSearchResult() { set_display_type(DISPLAY_TILE); }
-  ~TestTileSearchResult() override {}
+  TestStartPageSearchResult() { set_display_type(DISPLAY_RECOMMENDATION); }
+  ~TestStartPageSearchResult() override {}
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(TestTileSearchResult);
+  DISALLOW_COPY_AND_ASSIGN(TestStartPageSearchResult);
 };
 
 // Allows the same tests to run with different contexts: either an Ash-style
@@ -463,7 +466,7 @@ void AppListViewTestContext::RunStartPageTest() {
     EXPECT_EQ(view_size.ToString(), view_->GetPreferredSize().ToString());
 
     // Check tiles hide and show on deletion and addition.
-    model->results()->Add(new TestTileSearchResult());
+    model->results()->Add(new TestStartPageSearchResult());
     start_page_view->UpdateForTesting();
     EXPECT_EQ(1u, GetVisibleViews(start_page_view->tile_views()));
     model->results()->DeleteAll();
@@ -552,15 +555,15 @@ void AppListViewTestContext::RunProfileChangeTest() {
     EXPECT_EQ(NULL, start_page_view);
 
   // New model updates should be processed by the start page view.
-  delegate_->GetTestModel()->results()->Add(new TestTileSearchResult());
+  delegate_->GetTestModel()->results()->Add(new TestStartPageSearchResult());
   if (test_type_ == EXPERIMENTAL) {
     start_page_view->UpdateForTesting();
     EXPECT_EQ(1u, GetVisibleViews(start_page_view->tile_views()));
   }
 
   // Old model updates should be ignored.
-  original_test_model->results()->Add(new TestTileSearchResult());
-  original_test_model->results()->Add(new TestTileSearchResult());
+  original_test_model->results()->Add(new TestStartPageSearchResult());
+  original_test_model->results()->Add(new TestStartPageSearchResult());
   if (test_type_ == EXPERIMENTAL) {
     start_page_view->UpdateForTesting();
     EXPECT_EQ(1u, GetVisibleViews(start_page_view->tile_views()));
@@ -623,7 +626,7 @@ void AppListViewTestContext::RunSearchResultsTest() {
     // Check that the current search is using |search_text|.
     EXPECT_EQ(search_text, delegate_->GetTestModel()->search_box()->text());
     EXPECT_EQ(search_text, main_view->search_box_view()->search_box()->text());
-    view_->Layout();
+    contents_view->Layout();
     EXPECT_TRUE(
         contents_view->IsStateActive(AppListModel::STATE_SEARCH_RESULTS));
     EXPECT_TRUE(
@@ -631,7 +634,7 @@ void AppListViewTestContext::RunSearchResultsTest() {
 
     // Check that typing into the search box triggers the search page.
     EXPECT_TRUE(SetAppListState(AppListModel::STATE_APPS));
-    view_->Layout();
+    contents_view->Layout();
     EXPECT_EQ(default_contents_bounds,
               contents_view->apps_container_view()->bounds());
     EXPECT_TRUE(
@@ -644,7 +647,7 @@ void AppListViewTestContext::RunSearchResultsTest() {
     EXPECT_EQ(new_search_text, delegate_->GetTestModel()->search_box()->text());
     EXPECT_EQ(new_search_text,
               main_view->search_box_view()->search_box()->text());
-    view_->Layout();
+    contents_view->Layout();
     EXPECT_TRUE(
         contents_view->IsStateActive(AppListModel::STATE_SEARCH_RESULTS));
     EXPECT_TRUE(

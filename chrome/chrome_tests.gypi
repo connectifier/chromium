@@ -357,6 +357,7 @@
       'browser/extensions/browsertest_util_browsertest.cc',
       'browser/extensions/chrome_app_api_browsertest.cc',
       'browser/extensions/chrome_ui_overrides_browsertest.cc',
+      'browser/extensions/content_capabilities_browsertest.cc',
       'browser/extensions/content_verifier_browsertest.cc',
       'browser/extensions/content_script_apitest.cc',
       'browser/extensions/content_security_policy_apitest.cc',
@@ -1478,6 +1479,7 @@
               # cross-platform panels).
               'sources': [
                 'browser/notifications/notification_browsertest.cc',
+                'browser/notifications/platform_notification_service_browsertest.cc',
               ],
             }],
           ],
@@ -1489,6 +1491,7 @@
 
             # TODO(peter): Enable the Notification browser tests.
             'browser/notifications/notification_browsertest.cc',
+            'browser/notifications/platform_notification_service_browsertest.cc',
           ]
         }],
         ['toolkit_views==1', {

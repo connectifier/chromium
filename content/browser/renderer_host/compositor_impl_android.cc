@@ -319,16 +319,12 @@ void CompositorImpl::Composite(CompositingTrigger trigger) {
   root_window_->RequestVSyncUpdate();
 }
 
-UIResourceProvider& CompositorImpl::GetUIResourceProvider() {
+ui::UIResourceProvider& CompositorImpl::GetUIResourceProvider() {
   return ui_resource_provider_;
 }
 
 ui::ResourceManager& CompositorImpl::GetResourceManager() {
   return resource_manager_;
-}
-
-ui::SystemUIResourceManager& CompositorImpl::GetSystemUIResourceManager() {
-  return ui_resource_provider_.GetSystemUIResourceManager();
 }
 
 void CompositorImpl::SetRootLayer(scoped_refptr<cc::Layer> root_layer) {
@@ -425,6 +421,9 @@ void CompositorImpl::CreateLayerTreeHost() {
   host_->SetViewportSize(size_);
   host_->set_has_transparent_background(has_transparent_background_);
   host_->SetDeviceScaleFactor(device_scale_factor_);
+
+  if (needs_animate_)
+    host_->SetNeedsAnimate();
 }
 
 void CompositorImpl::SetVisible(bool visible) {
@@ -528,7 +527,13 @@ void CompositorImpl::Layout() {
   ignore_schedule_composite_ = false;
 }
 
-void CompositorImpl::RequestNewOutputSurface(bool fallback) {
+void CompositorImpl::RequestNewOutputSurface() {
+  // SetVisible(false) can happen (destroying the host_) between when this
+  // function is posted and when it is handled.  An output surface will get
+  // re-requested when the host is recreated.
+  if (!host_.get())
+    return;
+
   BrowserGpuChannelHostFactory* factory =
       BrowserGpuChannelHostFactory::instance();
   if (!factory->GetGpuChannel() || factory->GetGpuChannel()->IsLost()) {
@@ -537,15 +542,18 @@ void CompositorImpl::RequestNewOutputSurface(bool fallback) {
     factory->EstablishGpuChannel(
         cause,
         base::Bind(&CompositorImpl::CreateOutputSurface,
-                   weak_factory_.GetWeakPtr(),
-                   fallback));
+                   weak_factory_.GetWeakPtr()));
     return;
   }
 
-  CreateOutputSurface(fallback);
+  CreateOutputSurface();
 }
 
-void CompositorImpl::CreateOutputSurface(bool fallback) {
+void CompositorImpl::DidFailToInitializeOutputSurface() {
+  RequestNewOutputSurface();
+}
+
+void CompositorImpl::CreateOutputSurface() {
   blink::WebGraphicsContext3D::Attributes attrs;
   attrs.shareResources = true;
   attrs.noAutomaticFlushes = true;
@@ -565,7 +573,9 @@ void CompositorImpl::CreateOutputSurface(bool fallback) {
   }
   if (!context_provider.get()) {
     LOG(ERROR) << "Failed to create 3D context for compositor.";
-    host_->SetOutputSurface(scoped_ptr<cc::OutputSurface>());
+    base::MessageLoopProxy::current()->PostTask(
+        FROM_HERE, base::Bind(&CompositorImpl::RequestNewOutputSurface,
+                              weak_factory_.GetWeakPtr()));
     return;
   }
 
@@ -680,6 +690,7 @@ void CompositorImpl::OnVSync(base::TimeTicks frame_time,
 }
 
 void CompositorImpl::SetNeedsAnimate() {
+  needs_animate_ = true;
   if (!host_)
     return;
 

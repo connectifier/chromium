@@ -64,6 +64,8 @@ bool PushMessagingMessageFilter::OnMessageReceived(
     const IPC::Message& message) {
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(PushMessagingMessageFilter, message)
+    IPC_MESSAGE_HANDLER(PushMessagingHostMsg_RegisterFromDocumentOld,
+                        OnRegisterFromDocumentOld)
     IPC_MESSAGE_HANDLER(PushMessagingHostMsg_RegisterFromDocument,
                         OnRegisterFromDocument)
     IPC_MESSAGE_HANDLER(PushMessagingHostMsg_RegisterFromWorker,
@@ -77,7 +79,7 @@ bool PushMessagingMessageFilter::OnMessageReceived(
   return handled;
 }
 
-void PushMessagingMessageFilter::OnRegisterFromDocument(
+void PushMessagingMessageFilter::OnRegisterFromDocumentOld(
     int render_frame_id,
     int request_id,
     const std::string& sender_id,
@@ -96,6 +98,31 @@ void PushMessagingMessageFilter::OnRegisterFromDocument(
     RecordRegistrationStatus(status);
     return;
   }
+  OnRegisterFromDocument(
+      render_frame_id, request_id, sender_id, user_visible_only,
+      service_worker_host->active_version()->registration_id());
+}
+
+void PushMessagingMessageFilter::OnRegisterFromDocument(
+    int render_frame_id,
+    int request_id,
+    const std::string& sender_id,
+    bool user_visible_only,
+    int64 service_worker_registration_id) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  // TODO(mvanouwerkerk): Validate arguments?
+  ServiceWorkerRegistration* service_worker_registration =
+      service_worker_context_->context()->GetLiveRegistration(
+          service_worker_registration_id);
+  DCHECK(service_worker_registration);
+  if (!service_worker_registration ||
+      !service_worker_registration->active_version()) {
+    PushRegistrationStatus status = PUSH_REGISTRATION_STATUS_NO_SERVICE_WORKER;
+    Send(new PushMessagingMsg_RegisterFromDocumentError(render_frame_id,
+                                                        request_id, status));
+    RecordRegistrationStatus(status);
+    return;
+  }
 
   // TODO(mvanouwerkerk): Persist sender id in Service Worker storage.
   // https://crbug.com/437298
@@ -104,17 +131,12 @@ void PushMessagingMessageFilter::OnRegisterFromDocument(
 
   RegisterData data;
   data.request_id = request_id;
-  data.requesting_origin =
-      service_worker_host->active_version()->scope().GetOrigin();
-  data.service_worker_registration_id =
-      service_worker_host->active_version()->registration_id();
+  data.requesting_origin = service_worker_registration->pattern().GetOrigin();
+  data.service_worker_registration_id = service_worker_registration_id;
   data.render_frame_id = render_frame_id;
   data.user_visible_only = user_visible_only;
 
-  BrowserThread::PostTask(
-      BrowserThread::UI, FROM_HERE,
-      base::Bind(&PushMessagingMessageFilter::RegisterOnUI,
-                 this, data, sender_id));
+  CheckForExistingRegistration(data, sender_id);
 }
 
 void PushMessagingMessageFilter::OnRegisterFromWorker(
@@ -137,10 +159,7 @@ void PushMessagingMessageFilter::OnRegisterFromWorker(
   data.requesting_origin = service_worker_registration->pattern().GetOrigin();
   data.service_worker_registration_id = service_worker_registration_id;
 
-  BrowserThread::PostTask(
-      BrowserThread::UI, FROM_HERE,
-      base::Bind(&PushMessagingMessageFilter::RegisterOnUI,
-                 this, data, sender_id));
+  CheckForExistingRegistration(data, sender_id);
 }
 
 void PushMessagingMessageFilter::OnPermissionStatusRequest(
@@ -184,6 +203,43 @@ void PushMessagingMessageFilter::OnGetPermissionStatus(
                  this,
                  service_worker_registration->pattern().GetOrigin(),
                  request_id));
+}
+
+void PushMessagingMessageFilter::CheckForExistingRegistration(
+    const RegisterData& data,
+    const std::string& sender_id) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  service_worker_context_->context()->storage()->GetUserData(
+      data.service_worker_registration_id,
+      kPushRegistrationIdServiceWorkerKey,
+      base::Bind(&PushMessagingMessageFilter::DidCheckForExistingRegistration,
+                 weak_factory_io_to_io_.GetWeakPtr(),
+                 data, sender_id));
+}
+
+void PushMessagingMessageFilter::DidCheckForExistingRegistration(
+    const RegisterData& data,
+    const std::string& sender_id,
+    const std::string& push_registration_id,
+    ServiceWorkerStatusCode service_worker_status) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  if (service_worker_status == SERVICE_WORKER_OK) {
+    BrowserThread::PostTask(
+        BrowserThread::UI, FROM_HERE,
+        base::Bind(&PushMessagingMessageFilter::SendRegisterSuccessOnUI,
+                   this, data, PUSH_REGISTRATION_STATUS_SUCCESS_FROM_CACHE,
+                   push_registration_id));
+    return;
+  }
+  // TODO(johnme): The spec allows the register algorithm to reject with an
+  // AbortError when accessing storage fails. Perhaps we should do that if
+  // service_worker_status != SERVICE_WORKER_ERROR_NOT_FOUND instead of
+  // attempting to do a fresh registration?
+  // https://w3c.github.io/push-api/#widl-PushRegistrationManager-register-Promise-PushRegistration
+  BrowserThread::PostTask(
+      BrowserThread::UI, FROM_HERE,
+      base::Bind(&PushMessagingMessageFilter::RegisterOnUI,
+                 this, data, sender_id));
 }
 
 void PushMessagingMessageFilter::RegisterOnUI(
@@ -247,7 +303,7 @@ void PushMessagingMessageFilter::DidRegister(
     const std::string& push_registration_id,
     PushRegistrationStatus status) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  if (status == PUSH_REGISTRATION_STATUS_SUCCESS) {
+  if (status == PUSH_REGISTRATION_STATUS_SUCCESS_FROM_PUSH_SERVICE) {
     GURL push_endpoint(service()->GetPushEndpoint());
     BrowserThread::PostTask(
         BrowserThread::IO, FROM_HERE,
@@ -279,10 +335,14 @@ void PushMessagingMessageFilter::DidPersistRegistrationOnIO(
     const std::string& push_registration_id,
     ServiceWorkerStatusCode service_worker_status) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  if (service_worker_status == SERVICE_WORKER_OK)
-    SendRegisterSuccess(data, push_endpoint, push_registration_id);
-  else
+  if (service_worker_status == SERVICE_WORKER_OK) {
+    SendRegisterSuccess(data,
+                        PUSH_REGISTRATION_STATUS_SUCCESS_FROM_PUSH_SERVICE,
+                        push_endpoint, push_registration_id);
+  } else {
+    // TODO(johnme): Unregister, so PushMessagingServiceImpl can decrease count.
     SendRegisterError(data, PUSH_REGISTRATION_STATUS_STORAGE_ERROR);
+  }
 }
 
 void PushMessagingMessageFilter::SendRegisterError(
@@ -300,9 +360,10 @@ void PushMessagingMessageFilter::SendRegisterError(
 
 void PushMessagingMessageFilter::SendRegisterSuccess(
     const RegisterData& data,
+    PushRegistrationStatus status,
     const GURL& push_endpoint,
     const std::string& push_registration_id) {
-  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  // May be called from both IO and UI threads.
   if (data.FromDocument()) {
     Send(new PushMessagingMsg_RegisterFromDocumentSuccess(
         data.render_frame_id,
@@ -311,7 +372,16 @@ void PushMessagingMessageFilter::SendRegisterSuccess(
     Send(new PushMessagingMsg_RegisterFromWorkerSuccess(
         data.request_id, push_endpoint, push_registration_id));
   }
-  RecordRegistrationStatus(PUSH_REGISTRATION_STATUS_SUCCESS);
+  RecordRegistrationStatus(status);
+}
+
+void PushMessagingMessageFilter::SendRegisterSuccessOnUI(
+    const RegisterData& data,
+    PushRegistrationStatus status,
+    const std::string& push_registration_id) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  GURL push_endpoint(service()->GetPushEndpoint());
+  SendRegisterSuccess(data, status, push_endpoint, push_registration_id);
 }
 
 PushMessagingService* PushMessagingMessageFilter::service() {

@@ -549,6 +549,7 @@
             '../chrome/chrome.gyp:load_library_perf_tests',
             '../chrome/chrome.gyp:performance_browser_tests',
             '../chrome/chrome.gyp:sync_performance_tests',
+            '../content/content_shell_and_tests.gyp:content_shell',
             '../media/media.gyp:media_perftests',
             '../tools/perf/clear_system_cache/clear_system_cache.gyp:*',
             '../tools/telemetry/telemetry.gyp:*',
@@ -845,6 +846,7 @@
             '../tools/android/android_tools.gyp:android_tools',
             '../tools/android/android_tools.gyp:memconsumer',
             '../tools/android/findbugs_plugin/findbugs_plugin.gyp:findbugs_plugin_test',
+            '../ui/android/ui_android.gyp:ui_android_unittests',
             '../ui/base/ui_base_tests.gyp:ui_base_unittests',
             '../ui/events/events.gyp:events_unittests',
             '../ui/touch_selection/ui_touch_selection.gyp:ui_touch_selection_unittests',
@@ -873,6 +875,7 @@
             '../sql/sql.gyp:sql_unittests_apk',
             '../sync/sync.gyp:sync_unit_tests_apk',
             '../tools/android/heap_profiler/heap_profiler.gyp:heap_profiler_unittests_apk',
+            '../ui/android/ui_android.gyp:ui_android_unittests_apk',
             '../ui/base/ui_base_tests.gyp:ui_base_unittests_apk',
             '../ui/events/events.gyp:events_unittests_apk',
             '../ui/gfx/gfx_tests.gyp:gfx_unittests_apk',
@@ -882,7 +885,6 @@
             ['enable_webrtc==1 and "<(libpeer_target_type)"=="static_library"', {
               'dependencies': [
                 '../components/devtools_bridge.gyp:devtools_bridge_tests_apk',
-                '../components/devtools_bridge.gyp:libdevtools_bridge_browsertests',
               ],
             }],
           ],
@@ -898,7 +900,6 @@
             '../tools/android/android_tools.gyp:memconsumer',
             # Unit test bundles packaged as an apk.
             '../components/devtools_bridge.gyp:devtools_bridge_tests_apk',
-            '../components/devtools_bridge.gyp:libdevtools_bridge_browsertests',
             '../content/content_shell_and_tests.gyp:content_browsertests_apk',
           ],
         },  # target_name: android_builder_chromium_webrtc

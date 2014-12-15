@@ -42,6 +42,19 @@ ChildAccountService::ChildAccountService(Profile* profile)
 
 ChildAccountService::~ChildAccountService() {}
 
+void ChildAccountService::SetIsChildAccount(bool is_child_account) {
+  if (profile_->IsChild() == is_child_account)
+    return;
+
+  if (is_child_account) {
+    profile_->GetPrefs()->SetString(prefs::kSupervisedUserId,
+                                    supervised_users::kChildAccountSUID);
+  } else {
+    profile_->GetPrefs()->ClearPref(prefs::kSupervisedUserId);
+  }
+  PropagateChildStatusToUser(is_child_account);
+}
+
 void ChildAccountService::Init() {
   SigninManagerFactory::GetForProfile(profile_)->AddObserver(this);
   SupervisedUserServiceFactory::GetForProfile(profile_)->SetDelegate(this);
@@ -236,31 +249,16 @@ void ChildAccountService::OnFlagsFetched(
   SetIsChildAccount(is_child_account);
 }
 
-void ChildAccountService::SetIsChildAccount(bool is_child_account) {
-  if (profile_->IsChild() == is_child_account)
-    return;
-
-  if (is_child_account) {
-    profile_->GetPrefs()->SetString(prefs::kSupervisedUserId,
-                                    supervised_users::kChildAccountSUID);
-  } else {
-    profile_->GetPrefs()->ClearPref(prefs::kSupervisedUserId);
-  }
-  PropagateChildStatusToUser(is_child_account);
-}
-
 void ChildAccountService::PropagateChildStatusToUser(bool is_child) {
 #if defined(OS_CHROMEOS)
-  // TODO(merkulova,treib): Figure out why this causes tests to fail.
-//  user_manager::User* user =
-//      chromeos::ProfileHelper::Get()->GetUserByProfile(profile_);
-//  if (user) {
-//    user_manager::UserManager::Get()->ChangeUserSupervisedStatus(
-//        user, is_child);
-//  } else {
-//    LOG(WARNING) <<
-//        "User instance wasn't found while setting child account flag.";
-//  }
+  user_manager::User* user =
+      chromeos::ProfileHelper::Get()->GetUserByProfile(profile_);
+  if (user) {
+    user_manager::UserManager::Get()->ChangeUserChildStatus(user, is_child);
+  } else {
+    LOG(WARNING) <<
+        "User instance wasn't found while setting child account flag.";
+  }
 #endif
 }
 

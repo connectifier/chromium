@@ -901,8 +901,8 @@ TEST_F(RenderFrameHostManagerTest, Navigate) {
   EXPECT_FALSE(manager->pending_frame_host());
 
   // Commit.
-  manager->DidNavigateFrame(host);
-  // Commit to SiteInstance should be delayed until RenderView commit.
+  manager->DidNavigateFrame(host, true);
+  // Commit to SiteInstance should be delayed until RenderFrame commit.
   EXPECT_TRUE(host == manager->current_frame_host());
   ASSERT_TRUE(host);
   EXPECT_FALSE(host->GetSiteInstance()->HasSite());
@@ -922,7 +922,7 @@ TEST_F(RenderFrameHostManagerTest, Navigate) {
   EXPECT_FALSE(manager->pending_frame_host());
 
   // Commit.
-  manager->DidNavigateFrame(host);
+  manager->DidNavigateFrame(host, true);
   EXPECT_TRUE(host == manager->current_frame_host());
   ASSERT_TRUE(host);
   EXPECT_TRUE(host->GetSiteInstance()->HasSite());
@@ -943,7 +943,7 @@ TEST_F(RenderFrameHostManagerTest, Navigate) {
   notifications.Reset();
 
   // Commit.
-  manager->DidNavigateFrame(manager->pending_frame_host());
+  manager->DidNavigateFrame(manager->pending_frame_host(), true);
   EXPECT_TRUE(host == manager->current_frame_host());
   ASSERT_TRUE(host);
   EXPECT_TRUE(host->GetSiteInstance()->HasSite());
@@ -993,7 +993,7 @@ TEST_F(RenderFrameHostManagerTest, WebUI) {
   EXPECT_TRUE(manager->web_ui());
 
   // Commit.
-  manager->DidNavigateFrame(host);
+  manager->DidNavigateFrame(host, true);
   EXPECT_TRUE(
       host->render_view_host()->GetEnabledBindings() & BINDINGS_POLICY_WEB_UI);
 }
@@ -1031,7 +1031,7 @@ TEST_F(RenderFrameHostManagerTest, WebUIInNewTab) {
       host1->render_view_host()->GetEnabledBindings() & BINDINGS_POLICY_WEB_UI);
 
   // Commit and ensure we still have bindings.
-  manager1->DidNavigateFrame(host1);
+  manager1->DidNavigateFrame(host1, true);
   SiteInstance* webui_instance = host1->GetSiteInstance();
   EXPECT_EQ(host1, manager1->current_frame_host());
   EXPECT_TRUE(
@@ -1060,11 +1060,13 @@ TEST_F(RenderFrameHostManagerTest, WebUIInNewTab) {
   EXPECT_TRUE(
       host2->render_view_host()->GetEnabledBindings() & BINDINGS_POLICY_WEB_UI);
 
-  manager2->DidNavigateFrame(host2);
+  manager2->DidNavigateFrame(host2, true);
 }
 
 // Tests that we don't end up in an inconsistent state if a page does a back and
 // then reload. http://crbug.com/51680
+// Also tests that only user-gesture navigations can interrupt cross-process
+// navigations. http://crbug.com/75195
 TEST_F(RenderFrameHostManagerTest, PageDoesBackAndReload) {
   const GURL kUrl1("http://www.google.com/");
   const GURL kUrl2("http://www.evil-site.com/");
@@ -1100,8 +1102,30 @@ TEST_F(RenderFrameHostManagerTest, PageDoesBackAndReload) {
   contents()->GetFrameTree()->root()->navigator()->DidNavigate(evil_rfh,
                                                                params);
 
-  // That should have cancelled the pending RFH, and the evil RFH should be the
-  // current one.
+  // That should NOT have cancelled the pending RFH, because the reload did
+  // not have a user gesture. Thus, the pending back navigation will still
+  // eventually commit.
+  EXPECT_TRUE(contents()->GetRenderManagerForTesting()->
+      pending_render_view_host() != NULL);
+  EXPECT_TRUE(contents()->GetRenderManagerForTesting()->pending_frame_host() !=
+              NULL);
+  EXPECT_EQ(evil_rfh,
+            contents()->GetRenderManagerForTesting()->current_frame_host());
+  EXPECT_EQ(evil_rfh->GetRenderViewHost(),
+            contents()->GetRenderManagerForTesting()->current_host());
+
+  // Also we should not have a pending navigation entry.
+  EXPECT_TRUE(contents()->GetController().GetPendingEntry() == NULL);
+  NavigationEntry* entry = contents()->GetController().GetVisibleEntry();
+  ASSERT_TRUE(entry != NULL);
+  EXPECT_EQ(kUrl2, entry->GetURL());
+
+  // Now do the same but as a user gesture.
+  params.gesture = NavigationGestureUser;
+  contents()->GetFrameTree()->root()->navigator()->DidNavigate(evil_rfh,
+                                                               params);
+
+  // User navigation should have cancelled the pending RFH.
   EXPECT_TRUE(contents()->GetRenderManagerForTesting()->
       pending_render_view_host() == NULL);
   EXPECT_TRUE(contents()->GetRenderManagerForTesting()->pending_frame_host() ==
@@ -1113,7 +1137,7 @@ TEST_F(RenderFrameHostManagerTest, PageDoesBackAndReload) {
 
   // Also we should not have a pending navigation entry.
   EXPECT_TRUE(contents()->GetController().GetPendingEntry() == NULL);
-  NavigationEntry* entry = contents()->GetController().GetVisibleEntry();
+  entry = contents()->GetController().GetVisibleEntry();
   ASSERT_TRUE(entry != NULL);
   EXPECT_EQ(kUrl2, entry->GetURL());
 }
@@ -1499,8 +1523,8 @@ TEST_F(RenderFrameHostManagerTest, NoSwapOnGuestNavigations) {
   EXPECT_EQ(manager->current_frame_host()->GetSiteInstance(), instance);
 
   // Commit.
-  manager->DidNavigateFrame(host);
-  // Commit to SiteInstance should be delayed until RenderView commit.
+  manager->DidNavigateFrame(host, true);
+  // Commit to SiteInstance should be delayed until RenderFrame commit.
   EXPECT_EQ(host, manager->current_frame_host());
   ASSERT_TRUE(host);
   EXPECT_TRUE(host->GetSiteInstance()->HasSite());
@@ -1520,7 +1544,7 @@ TEST_F(RenderFrameHostManagerTest, NoSwapOnGuestNavigations) {
   EXPECT_FALSE(manager->pending_frame_host());
 
   // Commit.
-  manager->DidNavigateFrame(host);
+  manager->DidNavigateFrame(host, true);
   EXPECT_EQ(host, manager->current_frame_host());
   ASSERT_TRUE(host);
   EXPECT_EQ(host->GetSiteInstance(), instance);
@@ -1560,7 +1584,7 @@ TEST_F(RenderFrameHostManagerTest, NavigateWithEarlyClose) {
   notifications.Reset();
 
   // Commit.
-  manager->DidNavigateFrame(host);
+  manager->DidNavigateFrame(host, true);
 
   // Commit to SiteInstance should be delayed until RenderFrame commits.
   EXPECT_EQ(host, manager->current_frame_host());
@@ -1794,13 +1818,94 @@ TEST_F(RenderFrameHostManagerTest,
 
     // Increment the number of active frames in the new SiteInstance, which will
     // cause the pending RFH to be swapped out instead of deleted.
-   pending_rfh->GetSiteInstance()->increment_active_frame_count();
+    pending_rfh->GetSiteInstance()->increment_active_frame_count();
 
     contents()->GetMainFrame()->OnMessageReceived(
         FrameHostMsg_BeforeUnload_ACK(0, false, now, now));
     EXPECT_FALSE(contents()->cross_navigation_pending());
     EXPECT_FALSE(rfh_deleted_observer.deleted());
   }
+}
+
+// Test that a pending RenderFrameHost in a non-root frame tree node is properly
+// deleted when the node is detached. Motivated by http://crbug.com/441357
+TEST_F(RenderFrameHostManagerTest, DetachPendingChild) {
+  CommandLine::ForCurrentProcess()->AppendSwitch(switches::kSitePerProcess);
+
+  const GURL kUrl1("http://www.google.com/");
+  const GURL kUrl2("http://webkit.org/");
+
+  RenderFrameHostImpl* host = NULL;
+
+  contents()->NavigateAndCommit(kUrl1);
+  contents()->GetMainFrame()->OnCreateChildFrame(
+      contents()->GetMainFrame()->GetProcess()->GetNextRoutingID(),
+      std::string("frame_name"));
+  RenderFrameHostManager* manager =
+      contents()->GetFrameTree()->root()->child_at(0)->render_manager();
+
+  // 1) The first navigation. --------------------------
+  NavigationEntryImpl entry1(NULL /* instance */, -1 /* page_id */, kUrl1,
+                             Referrer(), base::string16() /* title */,
+                             ui::PAGE_TRANSITION_TYPED,
+                             false /* is_renderer_init */);
+  host = manager->Navigate(entry1);
+
+  // The RenderFrameHost created in Init will be reused.
+  EXPECT_TRUE(host == manager->current_frame_host());
+  EXPECT_FALSE(manager->pending_frame_host());
+
+  // Commit.
+  manager->DidNavigateFrame(host, true);
+  // Commit to SiteInstance should be delayed until RenderFrame commit.
+  EXPECT_TRUE(host == manager->current_frame_host());
+  ASSERT_TRUE(host);
+  EXPECT_TRUE(host->GetSiteInstance()->HasSite());
+
+  // 2) Cross-site navigate to next site. --------------
+  NavigationEntryImpl entry2(NULL /* instance */, -1 /* page_id */, kUrl2,
+                             Referrer(kUrl1, blink::WebReferrerPolicyDefault),
+                             base::string16() /* title */,
+                             ui::PAGE_TRANSITION_LINK,
+                             false /* is_renderer_init */);
+  host = manager->Navigate(entry2);
+
+  // A new RenderFrameHost should be created.
+  EXPECT_TRUE(manager->pending_frame_host());
+  ASSERT_EQ(host, manager->pending_frame_host());
+  ASSERT_NE(manager->current_frame_host(), manager->pending_frame_host());
+  EXPECT_FALSE(contents()->cross_navigation_pending())
+      << "There should be no top-level pending navigation.";
+
+  RenderFrameHostDeletedObserver delete_watcher(manager->pending_frame_host());
+  EXPECT_FALSE(delete_watcher.deleted());
+
+  // Extend the lifetime of the child frame's SiteInstance, pretending
+  // that there is another reference to it.
+  scoped_refptr<SiteInstanceImpl> site_instance =
+      manager->pending_frame_host()->GetSiteInstance();
+  EXPECT_TRUE(site_instance->HasSite());
+  EXPECT_NE(site_instance, contents()->GetSiteInstance());
+  EXPECT_EQ(1U, site_instance->active_frame_count());
+  site_instance->increment_active_frame_count();
+  EXPECT_EQ(2U, site_instance->active_frame_count());
+
+  // Now detach the child FrameTreeNode. This should kill the pending host.
+  manager->current_frame_host()->OnMessageReceived(
+      FrameHostMsg_Detach(manager->current_frame_host()->GetRoutingID()));
+
+  EXPECT_TRUE(delete_watcher.deleted());
+
+  EXPECT_EQ(1U, site_instance->active_frame_count());
+  site_instance->decrement_active_frame_count();
+
+#if 0
+  // TODO(nick): Currently a proxy to the removed frame lingers in the parent.
+  // Enable this assert below once the proxies to the subframe are correctly
+  // cleaned up after detach.
+  ASSERT_TRUE(site_instance->HasOneRef())
+      << "This SiteInstance should be destroyable now.";
+#endif
 }
 
 }  // namespace content

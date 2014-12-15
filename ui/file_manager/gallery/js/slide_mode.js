@@ -20,6 +20,7 @@
  *     function.
  * @constructor
  * @struct
+ * @extends {cr.EventTarget}
  */
 function SlideMode(container, content, toolbar, prompt, errorBanner, dataModel,
     selectionModel, context, volumeManager, toggleMode, displayStringFunction) {
@@ -504,7 +505,7 @@ SlideMode.prototype.getViewport = function() { return this.viewport_; };
 
 /**
  * Load items, display the selected item.
- * @param {!ImageRect} zoomFromRect Rectangle for zoom effect.
+ * @param {ImageRect} zoomFromRect Rectangle for zoom effect.
  * @param {function()} displayCallback Called when the image is displayed.
  * @param {function()} loadCallback Called when the image is displayed.
  */
@@ -561,7 +562,9 @@ SlideMode.prototype.enter = function(
     // Load the image of the item.
     this.loadItem_(
         selectedItem,
-        zoomFromRect && this.imageView_.createZoomEffect(zoomFromRect),
+        zoomFromRect ?
+            this.imageView_.createZoomEffect(zoomFromRect) :
+            new ImageView.Effect.None(),
         displayCallback,
         function(loadType, delay) {
           fulfill(delay);
@@ -590,7 +593,7 @@ SlideMode.prototype.enter = function(
 
 /**
  * Leave the mode.
- * @param {!ImageRect} zoomToRect Rectangle for zoom effect.
+ * @param {ImageRect} zoomToRect Rectangle for zoom effect.
  * @param {function()} callback Called when the image is committed and
  *   the zoom-out animation has started.
  */
@@ -781,7 +784,7 @@ SlideMode.prototype.loadSelectedItem_ = function() {
       return false;
 
     // Always prefetch if the previous load was from cache.
-    if (loadType === ImageView.LOAD_TYPE_CACHED_FULL)
+    if (loadType === ImageView.LoadType.CACHED_FULL)
       return true;
 
     // Prefetch if we have been going in the same direction for long enough.
@@ -939,7 +942,7 @@ SlideMode.prototype.selectLast = function() {
  * Load and display an item.
  *
  * @param {!Gallery.Item} item Item.
- * @param {!Object} effect Transition effect object.
+ * @param {!ImageView.Effect} effect Transition effect object.
  * @param {function()} displayCallback Called when the image is displayed
  *     (which can happen before the image load due to caching).
  * @param {function(number, number)} loadCallback Called when the image is fully
@@ -981,7 +984,7 @@ SlideMode.prototype.itemLoaded_ = function(
   var metadata = item.getMetadata();
 
   this.showSpinner_(false);
-  if (loadType === ImageView.LOAD_TYPE_ERROR) {
+  if (loadType === ImageView.LoadType.ERROR) {
     // if we have a specific error, then display it
     if (opt_error) {
       this.errorBanner_.show(/** @type {string} */ (opt_error));
@@ -989,7 +992,7 @@ SlideMode.prototype.itemLoaded_ = function(
       // otherwise try to infer general error
       this.errorBanner_.show('GALLERY_IMAGE_ERROR');
     }
-  } else if (loadType === ImageView.LOAD_TYPE_OFFLINE) {
+  } else if (loadType === ImageView.LoadType.OFFLINE) {
     this.errorBanner_.show('GALLERY_IMAGE_OFFLINE');
   }
 
@@ -1070,13 +1073,6 @@ SlideMode.prototype.requestPrefetch = function(direction, delay) {
 };
 
 // Event handlers.
-
-/**
- * Unload handler, to be called from the top frame.
- * @param {boolean} exiting True if the app is exiting.
- */
-SlideMode.prototype.onUnload = function(exiting) {
-};
 
 /**
  * Click handler for the image container.

@@ -812,6 +812,7 @@ public class ContentViewCore
 
             mContainerView = containerView;
             mPositionObserver = new ViewPositionObserver(mContainerView);
+            mContainerView.setWillNotDraw(false); // TODO(epenner): Remove (http://crbug.com/436689)
             mContainerView.setClickable(true);
             mViewAndroidDelegate.updateCurrentContainerView();
         } finally {
@@ -1674,7 +1675,8 @@ public class ContentViewCore
 
                     nativeSendMouseWheelEvent(mNativeContentViewCore, event.getEventTime(),
                             event.getX(), event.getY(),
-                            event.getAxisValue(MotionEvent.AXIS_VSCROLL));
+                            event.getAxisValue(MotionEvent.AXIS_VSCROLL),
+                            event.getAxisValue(MotionEvent.AXIS_HSCROLL));
 
                     mContainerView.removeCallbacks(mFakeMouseMoveRunnable);
                     // Send a delayed onMouseMove event so that we end
@@ -3036,7 +3038,8 @@ public class ContentViewCore
             long nativeContentViewCoreImpl, long timeMs, float x, float y);
 
     private native int nativeSendMouseWheelEvent(
-            long nativeContentViewCoreImpl, long timeMs, float x, float y, float verticalAxis);
+            long nativeContentViewCoreImpl, long timeMs, float x, float y, float verticalAxis,
+            float horizontalAxis);
 
     private native void nativeScrollBegin(
             long nativeContentViewCoreImpl, long timeMs, float x, float y, float hintX,

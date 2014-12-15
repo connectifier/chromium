@@ -21,6 +21,12 @@
 namespace gfx {
 namespace win {
 
+namespace {
+
+static bool dwrite_enabled = false;
+
+}
+
 bool ShouldUseDirectWrite() {
   // If the flag is currently on, and we're on Win7 or above, we enable
   // DirectWrite. Skia does not require the additions to DirectWrite in QFE
@@ -44,20 +50,6 @@ bool ShouldUseDirectWrite() {
   // Can't use GDI on HiDPI.
   if (gfx::GetDPIScale() > 1.0f)
     return true;
-
-  // We have logic in renderer_font_platform_win.cc for falling back to safe
-  // font list if machine has more than 1750 fonts installed. Users have
-  // complained about this as safe font list is usually not sufficient.
-  // We now disable direct write (gdi) if we encounter more number
-  // of fonts than a threshold (currently 1750).
-  // Refer: crbug.com/421305
-  const wchar_t kWindowsFontsRegistryKey[] =
-      L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
-  base::win::RegistryValueIterator reg_iterator(HKEY_LOCAL_MACHINE,
-                                                kWindowsFontsRegistryKey);
-  const DWORD kMaxAllowedFontsBeforeFallbackToGDI = 1750;
-  if (reg_iterator.ValueCount() >= kMaxAllowedFontsBeforeFallbackToGDI)
-    return false;
 
   // Otherwise, check the field trial.
   const std::string group_name =
@@ -103,10 +95,15 @@ void MaybeInitializeDirectWrite() {
   // interface fails with E_INVALIDARG on certain Windows 7 gold versions
   // (6.1.7600.*). We should just use GDI in these cases.
   SkFontMgr* direct_write_font_mgr = SkFontMgr_New_DirectWrite(factory.get());
-  if (direct_write_font_mgr) {
-    SetDefaultSkiaFactory(direct_write_font_mgr);
-    gfx::PlatformFontWin::SetDirectWriteFactory(factory.get());
-  }
+  if (!direct_write_font_mgr)
+    return;
+  dwrite_enabled = true;
+  SetDefaultSkiaFactory(direct_write_font_mgr);
+  gfx::PlatformFontWin::SetDirectWriteFactory(factory.get());
+}
+
+bool IsDirectWriteEnabled() {
+  return dwrite_enabled;
 }
 
 }  // namespace win

@@ -1839,18 +1839,8 @@ void RenderWidgetHostViewAura::OnKeyEvent(ui::KeyEvent* event) {
     }
 
     // We don't have to communicate with an input method here.
-    if (!event->HasNativeEvent()) {
-      NativeWebKeyboardEvent webkit_event(
-          event->type(),
-          event->is_char(),
-          event->is_char() ? event->GetCharacter() : event->key_code(),
-          event->flags(),
-          ui::EventTimeForNow().InSecondsF());
-      ForwardKeyboardEvent(webkit_event);
-    } else {
-      NativeWebKeyboardEvent webkit_event(*event);
-      ForwardKeyboardEvent(webkit_event);
-    }
+    NativeWebKeyboardEvent webkit_event(*event);
+    ForwardKeyboardEvent(webkit_event);
   }
   event->SetHandled();
 }
@@ -2033,23 +2023,27 @@ void RenderWidgetHostViewAura::OnTouchEvent(ui::TouchEvent* event) {
     return;
 
   // Update the touch event first.
-  blink::WebTouchPoint* point = UpdateWebTouchEventFromUIEvent(*event,
-                                                                &touch_event_);
+  blink::WebTouchPoint* point =
+      UpdateWebTouchEventFromUIEvent(*event, &touch_event_);
 
-  // Forward the touch event only if a touch point was updated, and there's a
-  // touch-event handler in the page, and no other touch-event is in the queue.
-  // It is important to always consume the event if there is a touch-event
-  // handler in the page, or some touch-event is already in the queue, even if
-  // no point has been updated, to make sure that this event does not get
-  // processed by the gesture recognizer before the events in the queue.
-  if (host_->ShouldForwardTouchEvent())
+  if (!point) {
     event->StopPropagation();
-
-  if (point) {
-    if (host_->ShouldForwardTouchEvent())
-      host_->ForwardTouchEventWithLatencyInfo(touch_event_, *event->latency());
-    UpdateWebTouchEventAfterDispatch(&touch_event_, point);
+    return;
   }
+
+  // Forward the touch event only if a touch point was updated, and
+  // there's a touch-event handler in the page, and no other
+  // touch-event is in the queue. It is important to always mark
+  // events as being handled asynchronously if there is a touch-event
+  // handler in the page, or some touch-event is already in the queue,
+  // even if no point has been updated. This ensures that this event
+  // does not get processed by the gesture recognizer before events
+  // currently awaiting dispatch in the touch queue.
+  if (host_->ShouldForwardTouchEvent()) {
+    event->DisableSynchronousHandling();
+    host_->ForwardTouchEventWithLatencyInfo(touch_event_, *event->latency());
+  }
+  UpdateWebTouchEventAfterDispatch(&touch_event_, point);
 }
 
 void RenderWidgetHostViewAura::OnGestureEvent(ui::GestureEvent* event) {

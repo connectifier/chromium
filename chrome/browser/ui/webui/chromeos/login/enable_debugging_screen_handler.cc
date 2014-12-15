@@ -53,11 +53,12 @@ void EnableDebuggingScreenHandler::ShowWithParams() {
 #endif
   ShowScreen(kEnableDebuggingScreen, &debugging_screen_params);
 
-  // Check the status of debugging features.
+  UpdateUIState(UI_STATE_WAIT);
+
   chromeos::DebugDaemonClient* client =
       chromeos::DBusThreadManager::Get()->GetDebugDaemonClient();
-  client->QueryDebuggingFeatures(
-      base::Bind(&EnableDebuggingScreenHandler::OnQueryDebuggingFeatures,
+  client->WaitForServiceToBeAvailable(
+      base::Bind(&EnableDebuggingScreenHandler::OnServiceAvailabilityChecked,
                  weak_ptr_factory_.GetWeakPtr()));
 }
 
@@ -174,6 +175,22 @@ void EnableDebuggingScreenHandler::HandleOnSetup(
                  weak_ptr_factory_.GetWeakPtr()));
 }
 
+void EnableDebuggingScreenHandler::OnServiceAvailabilityChecked(
+    bool service_is_available) {
+  if (!service_is_available) {
+    LOG(ERROR) << "Debug daemon is not available.";
+    UpdateUIState(UI_STATE_ERROR);
+    return;
+  }
+
+  // Check the status of debugging features.
+  chromeos::DebugDaemonClient* client =
+      chromeos::DBusThreadManager::Get()->GetDebugDaemonClient();
+  client->QueryDebuggingFeatures(
+      base::Bind(&EnableDebuggingScreenHandler::OnQueryDebuggingFeatures,
+                 weak_ptr_factory_.GetWeakPtr()));
+}
+
 // Removes rootfs verification, add flag to start with enable debugging features
 // screen and reboots the machine.
 void EnableDebuggingScreenHandler::OnRemoveRootfsVerification(bool success) {
@@ -206,20 +223,17 @@ void EnableDebuggingScreenHandler::OnQueryDebuggingFeatures(bool success,
     return;
   }
 
-  if (features_flag == DebugDaemonClient::DEV_FEATURE_NONE) {
+  if ((features_flag &
+       DebugDaemonClient::DEV_FEATURE_ROOTFS_VERIFICATION_REMOVED) == 0) {
     UpdateUIState(UI_STATE_REMOVE_PROTECTION);
     return;
   }
 
-  if ((features_flag & DebugDaemonClient::DEV_FEATURE_ALL_ENABLED) ==
-         DebugDaemonClient::DEV_FEATURE_ALL_ENABLED) {
-    UpdateUIState(UI_STATE_DONE);
-  } else if (features_flag &
-               DebugDaemonClient::DEV_FEATURE_ROOTFS_VERIFICATION_REMOVED) {
+  if ((features_flag & DebugDaemonClient::DEV_FEATURE_ALL_ENABLED) !=
+      DebugDaemonClient::DEV_FEATURE_ALL_ENABLED) {
     UpdateUIState(UI_STATE_SETUP);
   } else {
-    LOG(WARNING) << "Unexpected status of debugging features:" << features_flag;
-    UpdateUIState(UI_STATE_ERROR);
+    UpdateUIState(UI_STATE_DONE);
   }
 }
 

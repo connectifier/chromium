@@ -251,11 +251,7 @@ void LocationBarView::Init() {
 
   // Initialize the Omnibox view.
   omnibox_view_ = new OmniboxViewViews(
-      this, profile(), command_updater(),
-      is_popup_mode_ ||
-          (browser_->is_app() &&
-           extensions::util::IsStreamlinedHostedAppsEnabled()),
-      this, font_list);
+      this, profile(), command_updater(), is_popup_mode_, this, font_list);
   omnibox_view_->Init();
   omnibox_view_->SetFocusable(true);
   AddChildView(omnibox_view_);
@@ -338,7 +334,7 @@ void LocationBarView::Init() {
   translate_icon_view_->SetVisible(false);
   AddChildView(translate_icon_view_);
 
-  star_view_ = new StarView(command_updater());
+  star_view_ = new StarView(command_updater(), browser_);
   star_view_->SetVisible(false);
   AddChildView(star_view_);
 

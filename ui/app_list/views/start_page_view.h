@@ -5,6 +5,8 @@
 #ifndef UI_APP_LIST_VIEWS_START_PAGE_VIEW_H_
 #define UI_APP_LIST_VIEWS_START_PAGE_VIEW_H_
 
+#include <vector>
+
 #include "base/basictypes.h"
 #include "ui/app_list/app_list_export.h"
 #include "ui/app_list/views/search_result_container_view.h"
@@ -42,12 +44,16 @@ class APP_LIST_EXPORT StartPageView : public SearchResultContainerView {
 
   // Overridden from views::View:
   void Layout() override;
+  bool OnKeyPressed(const ui::KeyEvent& event) override;
 
   // Overridden from SearchResultContainerView:
   void OnContainerSelected(bool from_bottom) override;
 
   // Returns search box bounds to use when the start page is active.
   gfx::Rect GetSearchBoxBounds() const;
+
+  // Updates whether the custom page clickzone is visible.
+  void UpdateCustomPageClickzoneVisibility();
 
  private:
   // Overridden from SearchResultContainerView:

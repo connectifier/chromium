@@ -11,6 +11,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/timer/timer.h"
 #include "ui/app_list/app_list_export.h"
+#include "ui/app_list/app_list_model_observer.h"
 #include "ui/app_list/views/apps_grid_view_delegate.h"
 #include "ui/app_list/views/search_box_view_delegate.h"
 #include "ui/app_list/views/search_result_list_view_delegate.h"
@@ -34,6 +35,7 @@ class SearchBoxView;
 // when the user is signed in.
 class APP_LIST_EXPORT AppListMainView : public views::View,
                                         public AppsGridViewDelegate,
+                                        public AppListModelObserver,
                                         public SearchBoxViewDelegate,
                                         public SearchResultListViewDelegate {
  public:
@@ -79,6 +81,9 @@ class APP_LIST_EXPORT AppListMainView : public views::View,
   // Initialize widgets that live inside the app list's main widget.
   void InitWidgets();
 
+  // Overridden from AppListModelObserver:
+  void OnCustomLauncherPageEnabledStateChanged(bool enabled) override;
+
  private:
   class IconLoader;
 
@@ -111,7 +116,6 @@ class APP_LIST_EXPORT AppListMainView : public views::View,
 
   // Overridden from SearchResultListViewDelegate:
   void OnResultInstalled(SearchResult* result) override;
-  void OnResultUninstalled(SearchResult* result) override;
 
   AppListViewDelegate* delegate_;  // Owned by parent view (AppListView).
   AppListModel* model_;  // Unowned; ownership is handled by |delegate_|.

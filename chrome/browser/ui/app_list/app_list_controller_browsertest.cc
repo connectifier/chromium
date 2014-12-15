@@ -98,7 +98,6 @@ class AppListControllerSearchResultsBrowserTest
  public:
   AppListControllerSearchResultsBrowserTest()
       : observed_result_(NULL),
-        item_uninstall_count_(0),
         observed_results_list_(NULL) {}
 
   void WatchResultsLookingForItem(
@@ -141,10 +140,6 @@ class AppListControllerSearchResultsBrowserTest
   void OnIsInstallingChanged() override {}
   void OnPercentDownloadedChanged() override {}
   void OnItemInstalled() override {}
-  void OnItemUninstalled() override {
-    ++item_uninstall_count_;
-    EXPECT_TRUE(observed_result_);
-  }
 
   // Overridden from ui::ListModelObserver:
   void ListItemsAdded(size_t start, size_t count) override {
@@ -157,7 +152,6 @@ class AppListControllerSearchResultsBrowserTest
   void ListItemsChanged(size_t start, size_t count) override {}
 
   app_list::SearchResult* observed_result_;
-  int item_uninstall_count_;
 
  private:
   base::string16 item_to_observe_;
@@ -209,14 +203,8 @@ IN_PROC_BROWSER_TEST_F(AppListControllerSearchResultsBrowserTest,
   base::RunLoop().RunUntilIdle();
 
   // Now uninstall and ensure this browser test observes it.
-  EXPECT_EQ(0, item_uninstall_count_);
   UninstallExtension(extension->id());
-  EXPECT_EQ(1, item_uninstall_count_);
 
-  // Results should not be immediately refreshed. When they are, the item should
-  // be removed from the model.
-  EXPECT_TRUE(observed_result_);
-  base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(observed_result_);
   StopWatchingResults();
   service->DismissAppList();

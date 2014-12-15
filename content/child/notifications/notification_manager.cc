@@ -7,13 +7,14 @@
 #include "base/lazy_instance.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread_local.h"
+#include "content/child/notifications/notification_data_conversions.h"
 #include "content/child/notifications/notification_dispatcher.h"
 #include "content/child/notifications/notification_image_loader.h"
 #include "content/child/service_worker/web_service_worker_registration_impl.h"
 #include "content/child/thread_safe_sender.h"
 #include "content/child/worker_task_runner.h"
 #include "content/common/platform_notification_messages.h"
-#include "content/public/common/show_desktop_notification_params.h"
+#include "content/public/common/platform_notification_data.h"
 #include "third_party/WebKit/public/platform/WebNotificationData.h"
 #include "third_party/WebKit/public/platform/WebNotificationDelegate.h"
 #include "third_party/WebKit/public/platform/WebSerializedOrigin.h"
@@ -172,8 +173,6 @@ WebNotificationPermission NotificationManager::checkPermission(
 bool NotificationManager::OnMessageReceived(const IPC::Message& message) {
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(NotificationManager, message)
-    IPC_MESSAGE_HANDLER(PlatformNotificationMsg_DidShowPersistent,
-                        OnDidShowPersistent)
     IPC_MESSAGE_HANDLER(PlatformNotificationMsg_DidShow, OnDidShow);
     IPC_MESSAGE_HANDLER(PlatformNotificationMsg_DidClose, OnDidClose);
     IPC_MESSAGE_HANDLER(PlatformNotificationMsg_DidClick, OnDidClick);
@@ -181,18 +180,6 @@ bool NotificationManager::OnMessageReceived(const IPC::Message& message) {
   IPC_END_MESSAGE_MAP()
 
   return handled;
-}
-
-void NotificationManager::OnDidShowPersistent(int request_id) {
-  blink::WebNotificationShowCallbacks* callbacks =
-      persistent_notification_requests_.Lookup(request_id);
-  DCHECK(callbacks);
-
-  // There currently isn't a case in which the promise would be rejected per
-  // our implementation, so always resolve it here.
-  callbacks->onSuccess();
-
-  persistent_notification_requests_.Remove(request_id);
 }
 
 void NotificationManager::OnDidShow(int notification_id) {
@@ -246,21 +233,16 @@ void NotificationManager::DisplayNotification(
 
   active_notifications_[notification_id] = delegate;
 
-  ShowDesktopNotificationHostMsgParams params;
-  params.origin = GURL(origin.string());
-  params.title = notification_data.title;
-  params.body = notification_data.body;
-
+  SkBitmap icon;
   if (image_loader)
-    params.icon = image_loader->GetDecodedImage();
+    icon = image_loader->GetDecodedImage();
 
-  // TODO(peter): Remove the usage of the Blink WebTextDirection enumeration for
-  // the text direction of notifications throughout Chrome.
-  params.direction = blink::WebTextDirectionLeftToRight;
-  params.replace_id = notification_data.tag;
-
-  thread_safe_sender_->Send(new PlatformNotificationHostMsg_Show(
-      notification_id, params));
+  thread_safe_sender_->Send(
+      new PlatformNotificationHostMsg_Show(
+          notification_id,
+          GURL(origin.string()),
+          icon,
+          ToPlatformNotificationData(notification_data)));
 
   // If this Notification contained an icon, it can be safely deleted now.
   RemovePendingPageNotification(delegate);
@@ -272,23 +254,28 @@ void NotificationManager::DisplayPersistentNotification(
     int64 service_worker_registration_id,
     int request_id,
     scoped_refptr<NotificationImageLoader> image_loader) {
-  ShowDesktopNotificationHostMsgParams params;
-  params.origin = GURL(origin.string());
-  params.title = notification_data.title;
-  params.body = notification_data.body;
+  blink::WebNotificationShowCallbacks* callbacks =
+      persistent_notification_requests_.Lookup(request_id);
+  DCHECK(callbacks);
 
-  // TODO(peter): Remove the usage of the Blink WebTextDirection enumeration for
-  // the text direction of notifications throughout Chrome.
-  params.direction = blink::WebTextDirectionLeftToRight;
-  params.replace_id = notification_data.tag;
-
+  SkBitmap icon;
   if (image_loader) {
     pending_persistent_notifications_.erase(image_loader);
-    params.icon = image_loader->GetDecodedImage();
+    icon = image_loader->GetDecodedImage();
   }
 
-  thread_safe_sender_->Send(new PlatformNotificationHostMsg_ShowPersistent(
-      request_id, service_worker_registration_id, params));
+  thread_safe_sender_->Send(
+      new PlatformNotificationHostMsg_ShowPersistent(
+          service_worker_registration_id,
+          GURL(origin.string()),
+          icon,
+          ToPlatformNotificationData(notification_data)));
+
+  // There currently isn't a case in which the promise would be rejected per
+  // our implementation, so always resolve it here.
+  callbacks->onSuccess();
+
+  persistent_notification_requests_.Remove(request_id);
 }
 
 bool NotificationManager::RemovePendingPageNotification(
