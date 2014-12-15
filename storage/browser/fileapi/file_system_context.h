@@ -84,8 +84,8 @@ typedef base::Callback<bool(
 // This class keeps and provides a file system context for FileSystem API.
 // An instance of this class is created and owned by profile.
 class STORAGE_EXPORT FileSystemContext
-    : public base::RefCountedThreadSafe<
-        FileSystemContext, DeleteOnCorrectThreadRefCountedThreadSafeTraits> {
+    : public base::RefCountedThreadSafeDeleteOnCorrectThread<
+          FileSystemContext> {
  public:
   // Returns file permission policy we should apply for the given |type|.
   // The return value must be bitwise-or'd of FilePermissionPolicy.
@@ -322,10 +322,9 @@ class STORAGE_EXPORT FileSystemContext
   friend class content::PluginPrivateFileSystemBackendTest;
 
   // Deleters.
-  friend struct DeleteOnCorrectThreadRefCountedThreadSafeTraits;
   friend class base::DeleteHelper<FileSystemContext>;
-  friend class base::RefCountedThreadSafe<
-      FileSystemContext, DeleteOnCorrectThreadRefCountedThreadSafeTraits>;
+  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<
+      FileSystemContext>;
   ~FileSystemContext();
 
   void DeleteOnCorrectThread() const;

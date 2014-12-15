@@ -141,8 +141,10 @@ class RefCounted : public subtle::RefCountedBase {
   DISALLOW_COPY_AND_ASSIGN(RefCounted<T>);
 };
 
-// Forward declaration.
+// Forward declarations.
 template <class T, typename Traits> class RefCountedThreadSafe;
+template <class T>
+class RefCountedThreadSafeDeleteOnCorrectThread;
 
 // Default traits for RefCountedThreadSafe<T>.  Deletes the object when its ref
 // count reaches 0.  Overload to delete it on a different thread etc.
@@ -159,9 +161,14 @@ struct DefaultRefCountedThreadSafeTraits {
 
 // Convenience traits for RefCountedThreadSafe<T>.
 // Calls DeleteOnCorrectThread() on an object when its ref count reaches 0.
-template<typename T>
+template <typename T>
 struct DeleteOnCorrectThreadRefCountedThreadSafeTraits {
-  static void Destruct(const T* x) { x->DeleteOnCorrectThread(); }
+  static void Destruct(const T* x) {
+    // Delete through RefCountedThreadSafe to make child classes only need to be
+    // friend with RefCountedThreadSafe instead of this struct, which is an
+    // implementation detail.
+    RefCountedThreadSafeDeleteOnCorrectThread<T>::DeleteOnCorrectThread(x);
+  }
 };
 
 //
@@ -202,12 +209,35 @@ class RefCountedThreadSafe : public subtle::RefCountedThreadSafeBase {
 };
 
 //
+// A variant of RefCountedThreadSafe<T> which calls T::DeleteOnCorrectThread()
+// upon destruction, to be used for classes that control which thread
+// destruction occurs on.
+//
+// Use is the same as RefCountedThreadSafe, though the type T must implement
+// TODO
+// TODO
+// TODO
+// TODO
+// TODO
+// TODO
+// TODO
+template <class T>
+class RefCountedThreadSafeDeleteOnCorrectThread
+    : public RefCountedThreadSafe<
+          T,
+          DeleteOnCorrectThreadRefCountedThreadSafeTraits<T>> {
+ private:
+  friend struct DeleteOnCorrectThreadRefCountedThreadSafeTraits<T>;
+  static void DeleteOnCorrectThread(const T* x) { x->DeleteOnCorrectThread(); }
+};
+
+//
 // A thread-safe wrapper for some piece of data so we can place other
 // things in scoped_refptrs<>.
 //
-template<typename T>
+template <typename T>
 class RefCountedData
-    : public base::RefCountedThreadSafe< base::RefCountedData<T> > {
+    : public base::RefCountedThreadSafe<base::RefCountedData<T>> {
  public:
   RefCountedData() : data() {}
   RefCountedData(const T& in_value) : data(in_value) {}
