@@ -36,6 +36,7 @@ class StreamContext
   virtual ~StreamContext();
 
  private:
+  friend class base::DeleteHelper<StreamContext>;
   friend class base::RefCountedThreadSafeDeleteOnCorrectThread<StreamContext>;
   friend struct StreamContextDeleter;
 
