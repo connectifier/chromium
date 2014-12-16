@@ -23,14 +23,16 @@ class QuotaReservation;
 
 namespace content {
 
+struct QuotaReservationDeleter;
+
 // This class holds a QuotaReservation and manages OpenFileHandles for checking
 // quota. It should be created, used, and destroyed on a FileSystemContext's
 // default_file_task_runner() instance. This is a RefCountedThreadSafe object
 // because it needs to be passed to the file thread and kept alive during
 // potentially long-running quota operations.
 class CONTENT_EXPORT QuotaReservation
-    : public base::RefCountedThreadSafeDeleteOnCorrectThread<
-        QuotaReservation> {
+    : public base::RefCountedThreadSafe<QuotaReservation,
+                                        QuotaReservationDeleter> {
  public:
   // Static method to facilitate construction on the file task runner.
   static scoped_refptr<QuotaReservation> Create(
@@ -56,9 +58,10 @@ class CONTENT_EXPORT QuotaReservation
   void OnClientCrash();
 
  private:
-  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<
-      QuotaReservation>;
+  friend class base::RefCountedThreadSafe<QuotaReservation,
+                                          QuotaReservationDeleter>;
   friend class base::DeleteHelper<QuotaReservation>;
+  friend struct QuotaReservationDeleter;
   friend class QuotaReservationTest;
 
   QuotaReservation(
@@ -85,6 +88,12 @@ class CONTENT_EXPORT QuotaReservation
   FileMap files_;
 
   DISALLOW_COPY_AND_ASSIGN(QuotaReservation);
+};
+
+struct QuotaReservationDeleter {
+  static void Destruct(const QuotaReservation* quota_reservation) {
+    quota_reservation->DeleteOnCorrectThread();
+  }
 };
 
 }  // namespace content

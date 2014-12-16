@@ -13,6 +13,7 @@
 namespace content {
 class BrowserContext;
 class StreamRegistry;
+struct StreamContextDeleter;
 
 // A context class that keeps track of StreamRegistry used by the chrome.
 // There is an instance associated with each BrowserContext. There could be
@@ -22,7 +23,8 @@ class StreamRegistry;
 // All methods, except the ctor, are expected to be called on
 // the IO thread (unless specifically called out in doc comments).
 class StreamContext
-    : public base::RefCountedThreadSafeDeleteOnCorrectThread<StreamContext> {
+    : public base::RefCountedThreadSafe<StreamContext,
+                                        StreamContextDeleter> {
  public:
   StreamContext();
 
@@ -37,12 +39,19 @@ class StreamContext
 
  private:
   friend class base::DeleteHelper<StreamContext>;
-  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<StreamContext>;
+  friend class base::RefCountedThreadSafe<StreamContext,
+                                          StreamContextDeleter>;
   friend struct StreamContextDeleter;
 
   void DeleteOnCorrectThread() const;
 
   scoped_ptr<StreamRegistry> registry_;
+};
+
+struct StreamContextDeleter {
+  static void Destruct(const StreamContext* context) {
+    context->DeleteOnCorrectThread();
+  }
 };
 
 }  // namespace content
