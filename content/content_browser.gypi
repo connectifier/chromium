@@ -1656,6 +1656,7 @@
         'browser/devtools/devtools.gyp:devtools_protocol_handler',
         '../cc/cc.gyp:cc',
         '../cc/cc.gyp:cc_surfaces',
+        '../device/bluetooth/bluetooth.gyp:device_bluetooth',
         '../mojo/public/mojo_public.gyp:mojo_cpp_bindings',
         '../mojo/public/mojo_public.gyp:mojo_js_bindings',
         '../net/net.gyp:http_server',

@@ -883,8 +883,11 @@ void RenderProcessHostImpl::CreateMessageFilters() {
       storage_partition_impl_->GetGeofencingManager()));
   AddFilter(new NavigatorConnectDispatcherHost());
   if (browser_command_line.HasSwitch(
-          switches::kEnableExperimentalWebPlatformFeatures))
-    AddFilter(new BluetoothDispatcherHost());
+          switches::kEnableExperimentalWebPlatformFeatures)) {
+    scoped_refptr<BluetoothDispatcherHost> bluetooth_dispatcher_host(
+        BluetoothDispatcherHost::Create());
+    AddFilter(bluetooth_dispatcher_host.get());
+  }
 }
 
 void RenderProcessHostImpl::RegisterMojoServices() {
