@@ -100,7 +100,6 @@ source_set("browser") {
       "//content/browser/devtools:resources",
       "//content/common:mojo_bindings",
       "//content/public/common:mojo_bindings",
-      "//device/bluetooth",
       "//mojo/public/cpp/bindings",
       "//mojo/public/interfaces/application",
       "//mojo/public/js",
