@@ -33,7 +33,7 @@ class BluetoothUUID;
 // known to the adapter, discovering new devices, and providing notification of
 // updates to device information.
 class DEVICE_BLUETOOTH_EXPORT BluetoothAdapter
-    : public base::RefCounted<BluetoothAdapter> {
+    : public base::RefCountedThreadSafeDeleteOnCorrectThread<BluetoothAdapter> {
  public:
   // Interface for observing changes from bluetooth adapters.
   class Observer {
@@ -334,10 +334,13 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapter
       const CreateServiceErrorCallback& error_callback) = 0;
 
  protected:
-  friend class base::RefCounted<BluetoothAdapter>;
+  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<
+      BluetoothAdapter>;
   friend class BluetoothDiscoverySession;
   BluetoothAdapter();
   virtual ~BluetoothAdapter();
+  // Called by RefCountedThreadSafeDeleteOnCorrectThread to destroy this.
+  virtual void DeleteOnCorrectThread() const = 0;
 
   // Internal methods for initiating and terminating device discovery sessions.
   // An implementation of BluetoothAdapter keeps an internal reference count to
