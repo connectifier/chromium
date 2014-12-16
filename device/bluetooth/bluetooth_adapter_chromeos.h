@@ -44,7 +44,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
   static base::WeakPtr<BluetoothAdapter> CreateAdapter();
 
   // BluetoothAdapter:
-  virtual void DeleteOnCorrectThread() const override;
+  void DeleteOnCorrectThread() const override;
   virtual void AddObserver(
       device::BluetoothAdapter::Observer* observer) override;
   virtual void RemoveObserver(

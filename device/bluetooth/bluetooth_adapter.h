@@ -342,6 +342,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapter
   friend class BluetoothDiscoverySession;
   BluetoothAdapter();
   virtual ~BluetoothAdapter();
+
   // Called by RefCountedThreadSafeDeleteOnCorrectThread to destroy this.
   virtual void DeleteOnCorrectThread() const = 0;
 
