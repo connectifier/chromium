@@ -36,7 +36,6 @@
 #include "chrome/renderer/media/cast_ipc_dispatcher.h"
 #include "chrome/renderer/media/chrome_key_systems.h"
 #include "chrome/renderer/net/net_error_helper.h"
-#include "chrome/renderer/net/prescient_networking_dispatcher.h"
 #include "chrome/renderer/net_benchmarking_extension.h"
 #include "chrome/renderer/page_load_histograms.h"
 #include "chrome/renderer/pepper/pepper_helper.h"
@@ -62,7 +61,7 @@
 #include "components/autofill/content/renderer/password_autofill_agent.h"
 #include "components/autofill/content/renderer/password_generation_agent.h"
 #include "components/content_settings/core/common/content_settings_pattern.h"
-#include "components/dns_prefetch/renderer/renderer_net_predictor.h"
+#include "components/dns_prefetch/renderer/prescient_networking_dispatcher.h"
 #include "components/dom_distiller/core/url_constants.h"
 #include "components/nacl/renderer/ppb_nacl_private_impl.h"
 #include "components/password_manager/content/renderer/credential_manager_client.h"
@@ -72,7 +71,6 @@
 #include "components/visitedlink/renderer/visitedlink_slave.h"
 #include "components/web_cache/renderer/web_cache_render_process_observer.h"
 #include "content/public/common/content_constants.h"
-#include "content/public/renderer/plugin_power_saver_helper.h"
 #include "content/public/renderer/render_frame.h"
 #include "content/public/renderer/render_thread.h"
 #include "content/public/renderer/render_view.h"
@@ -149,6 +147,7 @@ using autofill::PasswordAutofillAgent;
 using autofill::PasswordGenerationAgent;
 using base::ASCIIToUTF16;
 using base::UserMetricsAction;
+using content::RenderFrame;
 using content::RenderThread;
 using content::WebPluginInfo;
 using extensions::Extension;
@@ -310,8 +309,8 @@ void ChromeContentRendererClient::RenderThreadStarted() {
           extension_dispatcher_.get()));
 #endif
 
-  prescient_networking_dispatcher_.reset(new PrescientNetworkingDispatcher());
-  net_predictor_.reset(new dns_prefetch::RendererNetPredictor());
+  prescient_networking_dispatcher_.reset(
+      new dns_prefetch::PrescientNetworkingDispatcher());
 #if defined(ENABLE_SPELLCHECK)
   // ChromeRenderViewTest::SetUp() creates a Spellcheck and injects it using
   // SetSpellcheck(). Don't overwrite it.
@@ -445,12 +444,14 @@ void ChromeContentRendererClient::RenderFrameCreated(
     content::RenderFrame* render_frame) {
   new ChromeRenderFrameObserver(render_frame);
 
+  bool should_whitelist_for_content_settings =
+      CommandLine::ForCurrentProcess()->HasSwitch(switches::kInstantProcess);
   extensions::Dispatcher* ext_dispatcher = NULL;
 #if defined(ENABLE_EXTENSIONS)
   ext_dispatcher = extension_dispatcher_.get();
 #endif
-  ContentSettingsObserver* content_settings =
-      new ContentSettingsObserver(render_frame, ext_dispatcher);
+  ContentSettingsObserver* content_settings = new ContentSettingsObserver(
+      render_frame, ext_dispatcher, should_whitelist_for_content_settings);
   if (chrome_observer_.get()) {
     content_settings->SetContentSettingRules(
         chrome_observer_->content_setting_rules());
@@ -785,18 +786,25 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
         }
 #endif  // !defined(DISABLE_NACL) && defined(ENABLE_EXTENSIONS)
 
+        RenderFrame::PluginPowerSaverMode power_saver_mode =
+            RenderFrame::POWER_SAVER_MODE_ESSENTIAL;
+#if defined(ENABLE_PLUGINS)
         bool show_poster = false;
         GURL poster_url;
-
-#if defined(ENABLE_PLUGINS)
-        content::PluginPowerSaverHelper* power_saver_helper =
-            render_frame->GetPluginPowerSaverHelper();
-        poster_url = power_saver_helper->GetPluginInstancePosterImage(
-            params, frame->document().url());
-        show_poster = poster_url.is_valid() &&
-                      base::CommandLine::ForCurrentProcess()->HasSwitch(
-                          switches::kEnablePluginPowerSaver);
-#endif
+        bool cross_origin_main_content = false;
+        if (render_frame->ShouldThrottleContent(params, frame->document().url(),
+                                                &poster_url,
+                                                &cross_origin_main_content)) {
+          if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+                  switches::kEnablePluginPowerSaver)) {
+            power_saver_mode =
+                RenderFrame::POWER_SAVER_MODE_PERIPHERAL_THROTTLED;
+            show_poster = poster_url.is_valid();
+          } else {
+            power_saver_mode =
+                RenderFrame::POWER_SAVER_MODE_PERIPHERAL_UNTHROTTLED;
+          }
+        }
 
         // Delay loading plugins if prerendering.
         // TODO(mmenke):  In the case of prerendering, feed into
@@ -811,13 +819,17 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
               l10n_util::GetStringFUTF16(IDS_PLUGIN_LOAD, group_name),
               poster_url);
           placeholder->set_blocked_for_prerendering(is_prerendering);
+          placeholder->set_power_saver_mode(power_saver_mode);
           placeholder->set_allow_loading(true);
           break;
+        } else if (cross_origin_main_content) {
+          GURL content_origin = GURL(params.url).GetOrigin();
+          render_frame->WhitelistContentOrigin(content_origin);
         }
+#endif  // defined(ENABLE_PLUGINS)
 
-        return render_frame->CreatePlugin(
-            frame, plugin, params,
-            content::RenderFrame::CREATE_PLUGIN_GESTURE_NO_USER_GESTURE);
+        return render_frame->CreatePlugin(frame, plugin, params,
+                                          power_saver_mode);
       }
       case ChromeViewHostMsg_GetPluginInfo_Status::kNPAPINotSupported: {
         RenderThread::Get()->RecordAction(
@@ -877,7 +889,7 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
               identifier));
         } else {
           // Send IPC for showing blocked plugins page action.
-          observer->DidBlockContentType(content_type);
+          observer->DidBlockContentType(content_type, group_name);
         }
         break;
       }
@@ -888,7 +900,7 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
         placeholder->set_allow_loading(true);
         RenderThread::Get()->RecordAction(
             UserMetricsAction("Plugin_ClickToPlay"));
-        observer->DidBlockContentType(content_type);
+        observer->DidBlockContentType(content_type, group_name);
         break;
       }
       case ChromeViewHostMsg_GetPluginInfo_Status::kBlocked: {
@@ -897,7 +909,7 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
             l10n_util::GetStringFUTF16(IDS_PLUGIN_BLOCKED, group_name), GURL());
         placeholder->set_allow_loading(true);
         RenderThread::Get()->RecordAction(UserMetricsAction("Plugin_Blocked"));
-        observer->DidBlockContentType(content_type);
+        observer->DidBlockContentType(content_type, group_name);
         break;
       }
       case ChromeViewHostMsg_GetPluginInfo_Status::kBlockedByPolicy: {
@@ -907,7 +919,7 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
         placeholder->set_allow_loading(false);
         RenderThread::Get()->RecordAction(
             UserMetricsAction("Plugin_BlockedByPolicy"));
-        observer->DidBlockContentType(content_type);
+        observer->DidBlockContentType(content_type, group_name);
         break;
       }
     }

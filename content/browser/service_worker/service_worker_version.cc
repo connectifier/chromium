@@ -5,6 +5,7 @@
 #include "content/browser/service_worker/service_worker_version.h"
 
 #include "base/command_line.h"
+#include "base/memory/ref_counted.h"
 #include "base/stl_util.h"
 #include "base/strings/string16.h"
 #include "content/browser/message_port_message_filter.h"
@@ -22,6 +23,61 @@ namespace content {
 
 typedef ServiceWorkerVersion::StatusCallback StatusCallback;
 typedef ServiceWorkerVersion::MessageCallback MessageCallback;
+
+class ServiceWorkerVersion::GetClientDocumentsCallback
+    : public base::RefCounted<GetClientDocumentsCallback> {
+ public:
+  GetClientDocumentsCallback(int request_id, int pending_requests)
+      : request_id_(request_id),
+        pending_requests_(pending_requests) {}
+  void AddClientInfo(int client_id, const ServiceWorkerClientInfo& info) {
+    clients_.push_back(info);
+    clients_.back().client_id = client_id;
+  }
+  void DecrementPendingRequests(ServiceWorkerVersion* version) {
+    if (--pending_requests_ > 0)
+      return;
+    // Don't bother if it's no longer running.
+    if (version->running_status() == RUNNING) {
+      version->embedded_worker_->SendMessage(
+          ServiceWorkerMsg_DidGetClientDocuments(request_id_, clients_));
+    }
+  }
+
+ private:
+  friend class base::RefCounted<GetClientDocumentsCallback>;
+  virtual ~GetClientDocumentsCallback() {}
+
+  std::vector<ServiceWorkerClientInfo> clients_;
+  int request_id_;
+  size_t pending_requests_;
+
+  DISALLOW_COPY_AND_ASSIGN(GetClientDocumentsCallback);
+};
+
+class ServiceWorkerVersion::GetClientInfoCallback {
+ public:
+  GetClientInfoCallback(
+      int client_id,
+      const scoped_refptr<GetClientDocumentsCallback>& callback)
+      : client_id_(client_id),
+        callback_(callback) {}
+
+  void OnSuccess(ServiceWorkerVersion* version,
+                 const ServiceWorkerClientInfo& info) {
+    callback_->AddClientInfo(client_id_, info);
+    callback_->DecrementPendingRequests(version);
+  }
+  void OnError(ServiceWorkerVersion* version) {
+    callback_->DecrementPendingRequests(version);
+  }
+
+ private:
+  int client_id_;
+  scoped_refptr<GetClientDocumentsCallback> callback_;
+
+  DISALLOW_COPY_AND_ASSIGN(GetClientInfoCallback);
+};
 
 namespace {
 
@@ -113,6 +169,7 @@ ServiceWorkerVersion::ServiceWorkerVersion(
       context_(context),
       script_cache_map_(this, context),
       is_doomed_(false),
+      skip_waiting_(false),
       weak_factory_(this) {
   DCHECK(context_);
   DCHECK(registration);
@@ -136,11 +193,13 @@ void ServiceWorkerVersion::SetStatus(Status status) {
   if (status_ == status)
     return;
 
-  // Schedule to stop worker after registration successfully completed.
-  if (status_ == ACTIVATING && status == ACTIVATED && !HasControllee())
-    ScheduleStopWorker();
-
   status_ = status;
+
+  if (skip_waiting_ && status_ == ACTIVATED) {
+    for (int request_id : pending_skip_waiting_requests_)
+      DidSkipWaiting(request_id);
+    pending_skip_waiting_requests_.clear();
+  }
 
   std::vector<base::Closure> callbacks;
   callbacks.swap(status_change_callbacks_);
@@ -396,7 +455,8 @@ void ServiceWorkerVersion::DispatchSyncEvent(const StatusCallback& callback) {
 
 void ServiceWorkerVersion::DispatchNotificationClickEvent(
     const StatusCallback& callback,
-    const std::string& notification_id) {
+    const std::string& notification_id,
+    const PlatformNotificationData& notification_data) {
   DCHECK_EQ(ACTIVATED, status()) << status();
 
   if (!CommandLine::ForCurrentProcess()->HasSwitch(
@@ -411,14 +471,17 @@ void ServiceWorkerVersion::DispatchNotificationClickEvent(
                            weak_factory_.GetWeakPtr(), callback,
                            base::Bind(&self::DispatchNotificationClickEvent,
                                       weak_factory_.GetWeakPtr(),
-                                      callback, notification_id)));
+                                      callback, notification_id,
+                                      notification_data)));
     return;
   }
 
   int request_id =
       notification_click_callbacks_.Add(new StatusCallback(callback));
   ServiceWorkerStatusCode status = embedded_worker_->SendMessage(
-      ServiceWorkerMsg_NotificationClickEvent(request_id, notification_id));
+      ServiceWorkerMsg_NotificationClickEvent(request_id,
+                                              notification_id,
+                                              notification_data));
   if (status != SERVICE_WORKER_OK) {
     notification_click_callbacks_.Remove(request_id);
     RunSoon(base::Bind(callback, status));
@@ -532,11 +595,19 @@ void ServiceWorkerVersion::Doom() {
     DoomInternal();
 }
 
+void ServiceWorkerVersion::SetDevToolsAttached(bool attached) {
+  embedded_worker()->set_devtools_attached(attached);
+  if (!attached && !stop_worker_timer_.IsRunning()) {
+    // If devtools is detached from this version and stop-worker-timer is not
+    // running, try scheduling stop-worker-timer now.
+    ScheduleStopWorker();
+  }
+}
+
 void ServiceWorkerVersion::OnStarted() {
   DCHECK_EQ(RUNNING, running_status());
   DCHECK(cache_listener_.get());
-  if (status() == ACTIVATED && !HasControllee())
-    ScheduleStopWorker();
+  ScheduleStopWorker();
   // Fire all start callbacks.
   RunCallbacks(this, &start_callbacks_, SERVICE_WORKER_OK);
   FOR_EACH_OBSERVER(Listener, listeners_, OnWorkerStarted(this));
@@ -576,6 +647,8 @@ void ServiceWorkerVersion::OnStopped(
                     SERVICE_WORKER_ERROR_FAILED);
   RunIDMapCallbacks(&geofencing_callbacks_,
                     SERVICE_WORKER_ERROR_FAILED);
+
+  get_client_info_callbacks_.Clear();
 
   FOR_EACH_OBSERVER(Listener, listeners_, OnWorkerStopped(this));
 
@@ -644,6 +717,12 @@ bool ServiceWorkerVersion::OnMessageReceived(const IPC::Message& message) {
                         OnPostMessageToDocument)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_FocusClient,
                         OnFocusClient)
+    IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_GetClientInfoSuccess,
+                        OnGetClientInfoSuccess)
+    IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_GetClientInfoError,
+                        OnGetClientInfoError)
+    IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_SkipWaiting,
+                        OnSkipWaiting)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   return handled;
@@ -685,19 +764,50 @@ void ServiceWorkerVersion::DispatchActivateEventAfterStartWorker(
 }
 
 void ServiceWorkerVersion::OnGetClientDocuments(int request_id) {
-  std::vector<int> client_ids;
+  if (controllee_by_id_.IsEmpty()) {
+    if (running_status() == RUNNING) {
+      embedded_worker_->SendMessage(
+          ServiceWorkerMsg_DidGetClientDocuments(request_id,
+              std::vector<ServiceWorkerClientInfo>()));
+    }
+    return;
+  }
+  scoped_refptr<GetClientDocumentsCallback> callback(
+      new GetClientDocumentsCallback(request_id, controllee_by_id_.size()));
   ControlleeByIDMap::iterator it(&controllee_by_id_);
   TRACE_EVENT0("ServiceWorker",
                "ServiceWorkerVersion::OnGetClientDocuments");
   while (!it.IsAtEnd()) {
-    client_ids.push_back(it.GetCurrentKey());
+    int client_request_id = get_client_info_callbacks_.Add(
+        new GetClientInfoCallback(it.GetCurrentKey(), callback));
+    it.GetCurrentValue()->GetClientInfo(embedded_worker_->embedded_worker_id(),
+                                        client_request_id);
     it.Advance();
   }
-  // Don't bother if it's no longer running.
-  if (running_status() == RUNNING) {
-    embedded_worker_->SendMessage(
-        ServiceWorkerMsg_DidGetClientDocuments(request_id, client_ids));
+}
+
+void ServiceWorkerVersion::OnGetClientInfoSuccess(
+    int request_id,
+    const ServiceWorkerClientInfo& info) {
+  GetClientInfoCallback* callback =
+      get_client_info_callbacks_.Lookup(request_id);
+  if (!callback) {
+    // The callback may already have been cleared by OnStopped, just ignore.
+    return;
   }
+  callback->OnSuccess(this, info);
+  get_client_info_callbacks_.Remove(request_id);
+}
+
+void ServiceWorkerVersion::OnGetClientInfoError(int request_id) {
+  GetClientInfoCallback* callback =
+      get_client_info_callbacks_.Lookup(request_id);
+  if (!callback) {
+    // The callback may already have been cleared by OnStopped, just ignore.
+    return;
+  }
+  callback->OnError(this);
+  get_client_info_callbacks_.Remove(request_id);
 }
 
 void ServiceWorkerVersion::OnActivateEventFinished(
@@ -875,8 +985,31 @@ void ServiceWorkerVersion::OnFocusClientFinished(int request_id, bool result) {
       request_id, result));
 }
 
+void ServiceWorkerVersion::OnSkipWaiting(int request_id) {
+  skip_waiting_ = true;
+  if (status_ != INSTALLED)
+    return DidSkipWaiting(request_id);
+
+  if (!context_)
+    return;
+  ServiceWorkerRegistration* registration =
+      context_->GetLiveRegistration(registration_id_);
+  if (!registration)
+    return;
+  pending_skip_waiting_requests_.push_back(request_id);
+  if (pending_skip_waiting_requests_.size() == 1)
+    registration->ActivateWaitingVersionWhenReady();
+}
+
+void ServiceWorkerVersion::DidSkipWaiting(int request_id) {
+  if (running_status() == STARTING || running_status() == RUNNING)
+    embedded_worker_->SendMessage(ServiceWorkerMsg_DidSkipWaiting(request_id));
+}
+
 void ServiceWorkerVersion::ScheduleStopWorker() {
-  if (running_status() != RUNNING)
+  // TODO(kinuko): Currently we don't schedule stop-time-worker when the SW has
+  // controllee, but we should change this default behavior (crbug.com/440259)
+  if (running_status() != RUNNING || HasControllee())
     return;
   if (stop_worker_timer_.IsRunning()) {
     stop_worker_timer_.Reset();
@@ -884,9 +1017,32 @@ void ServiceWorkerVersion::ScheduleStopWorker() {
   }
   stop_worker_timer_.Start(
       FROM_HERE, base::TimeDelta::FromSeconds(kStopWorkerDelay),
-      base::Bind(&ServiceWorkerVersion::StopWorker,
-                 weak_factory_.GetWeakPtr(),
-                 base::Bind(&ServiceWorkerUtils::NoOpStatusCallback)));
+      base::Bind(&ServiceWorkerVersion::StopWorkerIfIdle,
+                 weak_factory_.GetWeakPtr()));
+}
+
+void ServiceWorkerVersion::StopWorkerIfIdle() {
+  // Reschedule the stop the worker while there're inflight requests.
+  // (Note: we'll probably need to revisit this so that we can kill 'bad' SW.
+  // See https://github.com/slightlyoff/ServiceWorker/issues/527)
+  if (HasInflightRequests()) {
+    ScheduleStopWorker();
+    return;
+  }
+  if (running_status() == STOPPED || !stop_callbacks_.empty())
+    return;
+  embedded_worker_->StopIfIdle();
+}
+
+bool ServiceWorkerVersion::HasInflightRequests() const {
+  return
+    !activate_callbacks_.IsEmpty() ||
+    !install_callbacks_.IsEmpty() ||
+    !fetch_callbacks_.IsEmpty() ||
+    !sync_callbacks_.IsEmpty() ||
+    !notification_click_callbacks_.IsEmpty() ||
+    !push_callbacks_.IsEmpty() ||
+    !geofencing_callbacks_.IsEmpty();
 }
 
 void ServiceWorkerVersion::DoomInternal() {

@@ -191,6 +191,10 @@ class GFX_EXPORT RenderText {
 
   // Creates a platform-specific or cross-platform RenderText instance.
   static RenderText* CreateInstance();
+  static RenderText* CreateInstanceForEditing();
+
+  // Creates another instance of the same concrete class.
+  virtual scoped_ptr<RenderText> CreateInstanceOfSameType() const = 0;
 
   const base::string16& text() const { return text_; }
   void SetText(const base::string16& text);
@@ -359,7 +363,10 @@ class GFX_EXPORT RenderText {
 
   // Returns the width of the content (which is the wrapped width in multiline
   // mode). Reserves room for the cursor if |cursor_enabled_| is true.
-  float GetContentWidth();
+  float GetContentWidthF();
+
+  // Same as GetContentWidthF with the width rounded up.
+  int GetContentWidth();
 
   // Returns the common baseline of the text. The return value is the vertical
   // offset from the top of |display_rect_| to the text baseline, in pixels.

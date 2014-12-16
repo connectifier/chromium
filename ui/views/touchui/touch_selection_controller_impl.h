@@ -7,6 +7,7 @@
 
 #include "base/timer/timer.h"
 #include "ui/aura/window_observer.h"
+#include "ui/base/touch/selection_bound.h"
 #include "ui/base/touch/touch_editing_controller.h"
 #include "ui/gfx/point.h"
 #include "ui/views/touchui/touch_editing_menu.h"
@@ -19,10 +20,11 @@ namespace test {
 class WidgetTestInteractive;
 }
 
-// Touch specific implementation of TouchSelectionController. Responsible for
-// displaying selection handles and menu elements relevant in a touch interface.
+// Touch specific implementation of TouchEditingControllerDeprecated.
+// Responsible for displaying selection handles and menu elements relevant in a
+// touch interface.
 class VIEWS_EXPORT TouchSelectionControllerImpl
-    : public ui::TouchSelectionController,
+    : public ui::TouchEditingControllerDeprecated,
       public TouchEditingMenuController,
       public aura::WindowObserver,
       public WidgetObserver,

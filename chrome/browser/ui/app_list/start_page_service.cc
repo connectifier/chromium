@@ -18,6 +18,7 @@
 #include "chrome/browser/search/hotword_service.h"
 #include "chrome/browser/search/hotword_service_factory.h"
 #include "chrome/browser/ui/app_list/recommended_apps.h"
+#include "chrome/browser/ui/app_list/speech_auth_helper.h"
 #include "chrome/browser/ui/app_list/speech_recognizer.h"
 #include "chrome/browser/ui/app_list/start_page_observer.h"
 #include "chrome/browser/ui/app_list/start_page_service_factory.h"
@@ -161,6 +162,7 @@ StartPageService::StartPageService(Profile* profile)
       speech_button_toggled_manually_(false),
       speech_result_obtained_(false),
       webui_finished_loading_(false),
+      speech_auth_helper_(new SpeechAuthHelper(profile, &clock_)),
       weak_factory_(this) {
   // If experimental hotwording is enabled, then we're always "ready".
   // Transitioning into the "hotword recognizing" state is handled by the
@@ -222,16 +224,11 @@ void StartPageService::AppListHidden() {
 void StartPageService::ToggleSpeechRecognition() {
   DCHECK(contents_);
   speech_button_toggled_manually_ = true;
-  if (!contents_->GetWebUI())
-    return;
 
-  if (!webui_finished_loading_) {
-    pending_webui_callbacks_.push_back(
-        base::Bind(&StartPageService::ToggleSpeechRecognition,
-                   base::Unretained(this)));
-    return;
-  }
-
+  // Speech recognition under V2 hotwording does not depend in any way on the
+  // start page web contents. Do this code path first to make this explicit and
+  // easier to identify what code needs to be deleted when V2 hotwording is
+  // stable.
   if (HotwordService::IsExperimentalHotwordingEnabled()) {
     if (!speech_recognizer_) {
       std::string profile_locale;
@@ -249,6 +246,16 @@ void StartPageService::ToggleSpeechRecognition() {
     }
 
     speech_recognizer_->Start();
+    return;
+  }
+
+  if (!contents_->GetWebUI())
+    return;
+
+  if (!webui_finished_loading_) {
+    pending_webui_callbacks_.push_back(
+        base::Bind(&StartPageService::ToggleSpeechRecognition,
+                   base::Unretained(this)));
     return;
   }
 
@@ -340,8 +347,18 @@ void StartPageService::OnSpeechRecognitionStateChanged(
                     OnSpeechRecognitionStateChanged(new_state));
 }
 
-content::WebContents* StartPageService::GetSpeechContents() {
-  return GetSpeechRecognitionContents();
+void StartPageService::GetSpeechAuthParameters(std::string* auth_scope,
+                                               std::string* auth_token) {
+  if (HotwordService::IsExperimentalHotwordingEnabled()) {
+    HotwordService* service = HotwordServiceFactory::GetForProfile(profile_);
+    if (service &&
+        service->IsOptedIntoAudioLogging() &&
+        service->IsAlwaysOnEnabled() &&
+        !speech_auth_helper_->GetToken().empty()) {
+      *auth_scope = speech_auth_helper_->GetScope();
+      *auth_token = speech_auth_helper_->GetToken();
+    }
+  }
 }
 
 void StartPageService::Shutdown() {
@@ -349,6 +366,8 @@ void StartPageService::Shutdown() {
 #if defined(OS_CHROMEOS)
   audio_status_.reset();
 #endif
+
+  speech_auth_helper_.reset();
 }
 
 void StartPageService::WebUILoaded() {

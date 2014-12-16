@@ -117,6 +117,23 @@ void NativeWidgetMac::InitNativeWidget(const Widget::InitParams& params) {
 
   DCHECK(GetWidget()->GetRootView());
   bridge_->SetRootView(GetWidget()->GetRootView());
+
+  // "Infer" must be handled by ViewsDelegate::OnBeforeWidgetInit().
+  DCHECK_NE(Widget::InitParams::INFER_OPACITY, params.opacity);
+  bool translucent = params.opacity == Widget::InitParams::TRANSLUCENT_WINDOW;
+  switch (params.layer_type) {
+    case aura::WINDOW_LAYER_NONE:
+      break;
+    case aura::WINDOW_LAYER_TEXTURED:
+      bridge_->CreateLayer(ui::LAYER_TEXTURED, translucent);
+      break;
+    case aura::WINDOW_LAYER_NOT_DRAWN:
+      bridge_->CreateLayer(ui::LAYER_NOT_DRAWN, translucent);
+      break;
+    case aura::WINDOW_LAYER_SOLID_COLOR:
+      bridge_->CreateLayer(ui::LAYER_SOLID_COLOR, translucent);
+      break;
+  }
 }
 
 NonClientFrameView* NativeWidgetMac::CreateNonClientFrameView() {
@@ -128,8 +145,9 @@ bool NativeWidgetMac::ShouldUseNativeFrame() const {
 }
 
 bool NativeWidgetMac::ShouldWindowContentsBeTransparent() const {
-  NOTIMPLEMENTED();
-  return false;
+  // On Windows, this returns false when DWM is unavailable (e.g. XP, RDP or
+  // classic mode). OSX always has a compositing window manager.
+  return true;
 }
 
 void NativeWidgetMac::FrameTypeChanged() {
@@ -159,13 +177,12 @@ Widget* NativeWidgetMac::GetTopLevelWidget() {
 }
 
 const ui::Compositor* NativeWidgetMac::GetCompositor() const {
-  NOTIMPLEMENTED();
-  return NULL;
+  return bridge_ && bridge_->layer() ? bridge_->layer()->GetCompositor()
+                                     : nullptr;
 }
 
 const ui::Layer* NativeWidgetMac::GetLayer() const {
-  NOTIMPLEMENTED();
-  return NULL;
+  return bridge_ ? bridge_->layer() : nullptr;
 }
 
 void NativeWidgetMac::ReorderNativeViews() {
@@ -351,7 +368,7 @@ void NativeWidgetMac::ShowWithWindowState(ui::WindowShowState state) {
 }
 
 bool NativeWidgetMac::IsVisible() const {
-  return [GetNativeWindow() isVisible];
+  return bridge_ && bridge_->window_visible();
 }
 
 void NativeWidgetMac::Activate() {
@@ -409,7 +426,13 @@ void NativeWidgetMac::Maximize() {
 }
 
 void NativeWidgetMac::Minimize() {
-  NOTIMPLEMENTED();
+  NSWindow* window = GetNativeWindow();
+  // Calling performMiniaturize: will momentarily highlight the button, but
+  // AppKit will reject it if there is no miniaturize button.
+  if ([window styleMask] & NSMiniaturizableWindowMask)
+    [window performMiniaturize:nil];
+  else
+    [window miniaturize:nil];
 }
 
 bool NativeWidgetMac::IsMaximized() const {
@@ -419,12 +442,11 @@ bool NativeWidgetMac::IsMaximized() const {
 }
 
 bool NativeWidgetMac::IsMinimized() const {
-  NOTIMPLEMENTED();
-  return false;
+  return [GetNativeWindow() isMiniaturized];
 }
 
 void NativeWidgetMac::Restore() {
-  NOTIMPLEMENTED();
+  [GetNativeWindow() deminiaturize:nil];
 }
 
 void NativeWidgetMac::SetFullscreen(bool fullscreen) {
@@ -462,6 +484,8 @@ void NativeWidgetMac::SchedulePaintInRect(const gfx::Rect& rect) {
   // TODO(tapted): This should use setNeedsDisplayInRect:, once the coordinate
   // system of |rect| has been converted.
   [GetNativeView() setNeedsDisplay:YES];
+  if (bridge_ && bridge_->layer())
+    bridge_->layer()->SchedulePaint(rect);
 }
 
 void NativeWidgetMac::SetCursor(gfx::NativeCursor cursor) {

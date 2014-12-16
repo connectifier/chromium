@@ -157,18 +157,14 @@ Status RsaHashedAlgorithm::GenerateKey(
     bool extractable,
     blink::WebCryptoKeyUsageMask combined_usages,
     GenerateKeyResult* result) const {
-  Status status = CheckKeyCreationUsages(
-      all_public_key_usages_ | all_private_key_usages_, combined_usages);
+  blink::WebCryptoKeyUsageMask public_usages = 0;
+  blink::WebCryptoKeyUsageMask private_usages = 0;
+
+  Status status = GetUsagesForGenerateAsymmetricKey(
+      combined_usages, all_public_key_usages_, all_private_key_usages_,
+      &public_usages, &private_usages);
   if (status.IsError())
     return status;
-
-  const blink::WebCryptoKeyUsageMask public_usages =
-      combined_usages & all_public_key_usages_;
-  const blink::WebCryptoKeyUsageMask private_usages =
-      combined_usages & all_private_key_usages_;
-
-  if (private_usages == 0)
-    return Status::ErrorCreateKeyEmptyUsages();
 
   const blink::WebCryptoRsaHashedKeyGenParams* params =
       algorithm.rsaHashedKeyGenParams();
@@ -234,23 +230,8 @@ Status RsaHashedAlgorithm::GenerateKey(
 Status RsaHashedAlgorithm::VerifyKeyUsagesBeforeImportKey(
     blink::WebCryptoKeyFormat format,
     blink::WebCryptoKeyUsageMask usages) const {
-  switch (format) {
-    case blink::WebCryptoKeyFormatSpki:
-      return CheckKeyCreationUsages(all_public_key_usages_, usages);
-    case blink::WebCryptoKeyFormatPkcs8:
-      return CheckKeyCreationUsages(all_private_key_usages_, usages);
-    case blink::WebCryptoKeyFormatJwk:
-      // The JWK could represent either a public key or private key. The usages
-      // must make sense for one of the two. The usages will be checked again by
-      // ImportKeyJwk() once the key type has been determined.
-      if (CheckKeyCreationUsages(all_private_key_usages_, usages).IsSuccess() ||
-          CheckKeyCreationUsages(all_public_key_usages_, usages).IsSuccess()) {
-        return Status::Success();
-      }
-      return Status::ErrorCreateKeyBadUsages();
-    default:
-      return Status::ErrorUnsupportedImportKeyFormat();
-  }
+  return VerifyUsagesBeforeImportAsymmetricKey(format, all_public_key_usages_,
+                                               all_private_key_usages_, usages);
 }
 
 Status RsaHashedAlgorithm::ImportKeyPkcs8(

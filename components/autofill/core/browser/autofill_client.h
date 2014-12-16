@@ -76,10 +76,13 @@ class AutofillClient {
   // Causes the Autofill settings UI to be shown.
   virtual void ShowAutofillSettings() = 0;
 
+  // A user has attempted to use a masked card. Prompt them for further
+  // information to proceed.
+  virtual void ShowUnmaskPrompt() = 0;
+
   // Run |save_card_callback| if the credit card should be imported as personal
   // data. |metric_logger| can be used to log user actions.
   virtual void ConfirmSaveCreditCard(
-      const AutofillMetrics& metric_logger,
       const base::Closure& save_card_callback) = 0;
 
   // Returns true if both the platform and the device support scanning credit

@@ -25,6 +25,9 @@ extern const char kPasswordManagerGroupsForDomains[];
 extern const char kLocalProfileId[];
 #endif
 
+extern const char kAllowToCollectURLBubbleWasShown[];
+extern const char kAllowToCollectURLBubbleActivePeriodStartFactor[];
+
 }  // namespace prefs
 
 }  // namespace password_manager

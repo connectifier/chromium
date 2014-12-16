@@ -15,7 +15,7 @@
 #include "content/public/browser/speech_recognition_event_listener.h"
 #include "content/public/browser/speech_recognition_manager.h"
 #include "content/public/browser/speech_recognition_session_config.h"
-#include "content/public/browser/web_contents.h"
+#include "content/public/common/child_process_host.h"
 #include "content/public/common/speech_recognition_error.h"
 #include "net/url_request/url_request_context_getter.h"
 #include "ui/app_list/speech_ui_model_observer.h"
@@ -43,7 +43,8 @@ class SpeechRecognizer::EventListener
                 net::URLRequestContextGetter* url_request_context_getter,
                 const std::string& locale);
 
-  void StartOnIOThread(int render_process_id);
+  void StartOnIOThread(const std::string& auth_scope,
+                       const std::string& auth_token);
   void StopOnIOThread();
 
  private:
@@ -104,7 +105,9 @@ SpeechRecognizer::EventListener::~EventListener() {
   DCHECK(!speech_timeout_.IsRunning());
 }
 
-void SpeechRecognizer::EventListener::StartOnIOThread(int render_process_id) {
+void SpeechRecognizer::EventListener::StartOnIOThread(
+    const std::string& auth_scope,
+    const std::string& auth_token) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
   if (session_ != kInvalidSessionId)
     StopOnIOThread();
@@ -118,7 +121,12 @@ void SpeechRecognizer::EventListener::StartOnIOThread(int render_process_id) {
   config.filter_profanities = true;
   config.url_request_context_getter = url_request_context_getter_;
   config.event_listener = weak_factory_.GetWeakPtr();
-  config.initial_context.render_process_id = render_process_id;
+  // kInvalidUniqueID is not a valid render process, so the speech permission
+  // check allows the request through.
+  config.initial_context.render_process_id =
+      content::ChildProcessHost::kInvalidUniqueID;
+  config.auth_scope = auth_scope;
+  config.auth_token = auth_token;
 
   auto speech_instance = content::SpeechRecognitionManager::GetInstance();
   session_ = speech_instance->CreateSession(config);
@@ -251,7 +259,7 @@ SpeechRecognizer::SpeechRecognizer(
     const std::string& locale)
     : delegate_(delegate),
       speech_event_listener_(new EventListener(
-          delegate, url_request_context_getter, locale)){
+          delegate, url_request_context_getter, locale)) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 }
 
@@ -262,21 +270,17 @@ SpeechRecognizer::~SpeechRecognizer() {
 
 void SpeechRecognizer::Start() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  // The speech recognizer checks to see if the request is allowed by looking
-  // up the renderer process. A renderer containing the app-list is hard-coded
-  // to be allowed.
-  if (!delegate_)
-    return;
-  content::WebContents* contents = delegate_->GetSpeechContents();
-  if (!contents)
-    return;
+  std::string auth_scope;
+  std::string auth_token;
+  delegate_->GetSpeechAuthParameters(&auth_scope, &auth_token);
 
   content::BrowserThread::PostTask(
       content::BrowserThread::IO,
       FROM_HERE,
       base::Bind(&SpeechRecognizer::EventListener::StartOnIOThread,
                  speech_event_listener_,
-                 contents->GetRenderProcessHost()->GetID()));
+                 auth_scope,
+                 auth_token));
 }
 
 void SpeechRecognizer::Stop() {

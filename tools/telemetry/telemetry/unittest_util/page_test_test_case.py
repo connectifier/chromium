@@ -40,7 +40,7 @@ class PageTestTestCase(unittest.TestCase):
   def CreatePageSetFromFileInUnittestDataDir(self, test_filename):
     ps = self.CreateEmptyPageSet()
     page = BasicTestPage('file://' + test_filename, ps, base_dir=ps.base_dir)
-    ps.AddPage(page)
+    ps.AddUserStory(page)
     return ps
 
   def CreateEmptyPageSet(self):
@@ -103,7 +103,7 @@ class PageTestTestCase(unittest.TestCase):
     measurement = BuggyMeasurement()
     try:
       self.RunMeasurement(measurement, ps, options=options)
-    except page_test.TestNotSupportedOnPlatformFailure:
+    except page_test.TestNotSupportedOnPlatformError:
       pass
     if start_tracing_called[0]:
       self.assertTrue(stop_tracing_called[0])

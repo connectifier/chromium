@@ -2092,7 +2092,6 @@ TEST(LayerTreeHostTest, LimitPartialUpdates) {
     settings.max_partial_texture_updates = 10;
 
     LayerTreeHostWithProxy host(&client, settings, proxy.Pass());
-    host.OnCreateAndInitializeOutputSurfaceAttempted(true);
 
     EXPECT_EQ(0u, host.MaxPartialTextureUpdates());
   }
@@ -2110,7 +2109,6 @@ TEST(LayerTreeHostTest, LimitPartialUpdates) {
     settings.max_partial_texture_updates = 10;
 
     LayerTreeHostWithProxy host(&client, settings, proxy.Pass());
-    host.OnCreateAndInitializeOutputSurfaceAttempted(true);
 
     EXPECT_EQ(5u, host.MaxPartialTextureUpdates());
   }
@@ -2128,7 +2126,6 @@ TEST(LayerTreeHostTest, LimitPartialUpdates) {
     settings.max_partial_texture_updates = 10;
 
     LayerTreeHostWithProxy host(&client, settings, proxy.Pass());
-    host.OnCreateAndInitializeOutputSurfaceAttempted(true);
 
     EXPECT_EQ(10u, host.MaxPartialTextureUpdates());
   }
@@ -2690,8 +2687,7 @@ class MockIOSurfaceWebGraphicsContext3D : public TestWebGraphicsContext3D {
 
 class LayerTreeHostTestIOSurfaceDrawing : public LayerTreeHostTest {
  protected:
-  scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface(
-      bool fallback) override {
+  scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface() override {
     scoped_ptr<MockIOSurfaceWebGraphicsContext3D> mock_context_owned(
         new MockIOSurfaceWebGraphicsContext3D);
     mock_context_ = mock_context_owned.get();
@@ -2885,8 +2881,7 @@ class LayerTreeHostTestDeferredInitialize : public LayerTreeHostTest {
     PostSetNeedsCommitToMainThread();
   }
 
-  scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface(
-      bool fallback) override {
+  scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface() override {
     scoped_ptr<TestWebGraphicsContext3D> context3d(
         TestWebGraphicsContext3D::Create());
 
@@ -4404,8 +4399,7 @@ class LayerTreeHostTestMaxTransferBufferUsageBytes : public LayerTreeHostTest {
     settings->use_one_copy = false;
   }
 
-  scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface(
-      bool fallback) override {
+  scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface() override {
     scoped_refptr<TestContextProvider> context_provider =
         TestContextProvider::Create();
     context_provider->SetMaxTransferBufferUsageBytes(512 * 512);
@@ -4546,8 +4540,7 @@ class LayerTreeHostTestSetMemoryPolicyOnLostOutputSurface
       : first_output_surface_memory_limit_(4321234),
         second_output_surface_memory_limit_(1234321) {}
 
-  scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface(
-      bool fallback) override {
+  scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface() override {
     if (!first_context_provider_.get()) {
       first_context_provider_ = TestContextProvider::Create();
     } else {
@@ -4859,17 +4852,9 @@ class LayerTreeHostTestBreakSwapPromiseForContextAbortedCommit
 
   void BeginMainFrameAbortedOnThread(LayerTreeHostImpl* host_impl,
                                      bool did_handle) override {
+    // This is needed so that the impl-thread state matches main-thread state.
+    host_impl->DidLoseOutputSurface();
     EndTest();
-    // This lets the test finally commit and exit.
-    MainThreadTaskRunner()->PostTask(
-        FROM_HERE,
-        base::Bind(&LayerTreeHostTestBreakSwapPromiseForContextAbortedCommit::
-                       FindOutputSurface,
-                   base::Unretained(this)));
-  }
-
-  void FindOutputSurface() {
-    layer_tree_host()->OnCreateAndInitializeOutputSurfaceAttempted(true);
   }
 
   void AfterTest() override {
@@ -5140,7 +5125,7 @@ MULTI_THREAD_TEST_F(LayerTreeHostTestGpuRasterizationEnabled);
 class LayerTreeHostTestGpuRasterizationForced : public LayerTreeHostTest {
  protected:
   void InitializeSettings(LayerTreeSettings* settings) override {
-    settings->impl_side_painting = true;
+    ASSERT_TRUE(settings->impl_side_painting);
 
     EXPECT_FALSE(settings->gpu_rasterization_forced);
     settings->gpu_rasterization_forced = true;
@@ -5201,7 +5186,7 @@ class LayerTreeHostTestGpuRasterizationForced : public LayerTreeHostTest {
   FakeContentLayerClient layer_client_;
 };
 
-MULTI_THREAD_TEST_F(LayerTreeHostTestGpuRasterizationForced);
+SINGLE_AND_MULTI_THREAD_IMPL_TEST_F(LayerTreeHostTestGpuRasterizationForced);
 
 class LayerTreeHostTestContinuousPainting : public LayerTreeHostTest {
  public:
@@ -5528,11 +5513,11 @@ class LayerTreeHostAcceptsDeltasFromImplWithoutRootLayer
     EndTest();
   }
 
-  void ApplyViewportDeltas(
-      const gfx::Vector2d& inner,
-      const gfx::Vector2d& outer,
-      float scale_delta,
-      float top_controls_delta) override {
+  void ApplyViewportDeltas(const gfx::Vector2d& inner,
+                           const gfx::Vector2d& outer,
+                           const gfx::Vector2dF& elastic_overscroll_delta,
+                           float scale_delta,
+                           float top_controls_delta) override {
     EXPECT_EQ(info_.page_scale_delta, scale_delta);
     EXPECT_EQ(info_.top_controls_delta, top_controls_delta);
     deltas_sent_to_client_ = true;
@@ -5746,8 +5731,7 @@ class LayerTreeHostTestCrispUpAfterPinchEndsWithOneCopy
     settings->use_one_copy = true;
   }
 
-  scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface(
-      bool fallback) override {
+  scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface() override {
     scoped_ptr<TestWebGraphicsContext3D> context3d =
         TestWebGraphicsContext3D::Create();
     context3d->set_support_image(true);
@@ -5942,10 +5926,11 @@ class LayerTreeHostTestContinuousDrawWhenCreatingVisibleTiles
 
 MULTI_THREAD_TEST_F(LayerTreeHostTestContinuousDrawWhenCreatingVisibleTiles);
 
-class LayerTreeHostTestOneActivatePerManageTiles : public LayerTreeHostTest {
+class LayerTreeHostTestOneActivatePerPrepareTiles : public LayerTreeHostTest {
  public:
-  LayerTreeHostTestOneActivatePerManageTiles()
-      : notify_ready_to_activate_count_(0u), scheduled_manage_tiles_count_(0) {}
+  LayerTreeHostTestOneActivatePerPrepareTiles()
+      : notify_ready_to_activate_count_(0u),
+        scheduled_prepare_tiles_count_(0) {}
 
   void SetupTree() override {
     client_.set_fill_with_nonsolid_color(true);
@@ -5974,27 +5959,27 @@ class LayerTreeHostTestOneActivatePerManageTiles : public LayerTreeHostTest {
     EndTestAfterDelayMs(100);
   }
 
-  void ScheduledActionManageTiles() override {
-    ++scheduled_manage_tiles_count_;
+  void ScheduledActionPrepareTiles() override {
+    ++scheduled_prepare_tiles_count_;
   }
 
   void AfterTest() override {
-    // Expect at most a notification for each scheduled manage tiles, plus one
+    // Expect at most a notification for each scheduled prepare tiles, plus one
     // for the initial commit (which doesn't go through scheduled actions).
     // The reason this is not an equality is because depending on timing, we
-    // might get a manage tiles but not yet get a notification that we're
+    // might get a prepare tiles but not yet get a notification that we're
     // ready to activate. The intent of a test is to ensure that we don't
-    // get more than one notification per manage tiles, so this is OK.
+    // get more than one notification per prepare tiles, so this is OK.
     EXPECT_LE(notify_ready_to_activate_count_,
-              1u + scheduled_manage_tiles_count_);
+              1u + scheduled_prepare_tiles_count_);
   }
 
  protected:
   FakeContentLayerClient client_;
   size_t notify_ready_to_activate_count_;
-  size_t scheduled_manage_tiles_count_;
+  size_t scheduled_prepare_tiles_count_;
 };
 
-MULTI_THREAD_IMPL_TEST_F(LayerTreeHostTestOneActivatePerManageTiles);
+MULTI_THREAD_IMPL_TEST_F(LayerTreeHostTestOneActivatePerPrepareTiles);
 
 }  // namespace cc

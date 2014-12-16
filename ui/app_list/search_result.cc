@@ -72,10 +72,13 @@ void SearchResult::SetPercentDownloaded(int percent_downloaded) {
 
 int SearchResult::GetPreferredIconDimension() const {
   switch (display_type_) {
+    case DISPLAY_RECOMMENDATION:  // Falls through.
     case DISPLAY_TILE:
       return kTileIconSize;
     case DISPLAY_LIST:
       return kListIconSize;
+    case DISPLAY_NONE:
+      return 0;
   }
   NOTREACHED();
   return 0;
@@ -83,10 +86,6 @@ int SearchResult::GetPreferredIconDimension() const {
 
 void SearchResult::NotifyItemInstalled() {
   FOR_EACH_OBSERVER(SearchResultObserver, observers_, OnItemInstalled());
-}
-
-void SearchResult::NotifyItemUninstalled() {
-  FOR_EACH_OBSERVER(SearchResultObserver, observers_, OnItemUninstalled());
 }
 
 void SearchResult::AddObserver(SearchResultObserver* observer) {

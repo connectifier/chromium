@@ -51,12 +51,14 @@ class WebLayerTreeViewImpl : public blink::WebLayerTreeView,
   void Layout() override;
   void ApplyViewportDeltas(const gfx::Vector2d& inner_delta,
                            const gfx::Vector2d& outer_delta,
+                           const gfx::Vector2dF& elastic_overscroll_delta,
                            float page_scale,
                            float top_controls_delta) override;
   void ApplyViewportDeltas(const gfx::Vector2d& scroll_delta,
                            float page_scale,
                            float top_controls_delta) override;
-  void RequestNewOutputSurface(bool fallback) override;
+  void RequestNewOutputSurface() override;
+  void DidFailToInitializeOutputSurface() override;
   void DidInitializeOutputSurface() override;
   void WillCommit() override;
   void DidCommit() override;

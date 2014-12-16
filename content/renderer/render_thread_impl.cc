@@ -33,7 +33,7 @@
 #include "cc/base/switches.h"
 #include "cc/blink/web_external_bitmap_impl.h"
 #include "cc/blink/web_layer_impl.h"
-#include "cc/resources/raster_worker_pool.h"
+#include "cc/resources/tile_task_worker_pool.h"
 #include "content/child/appcache/appcache_dispatcher.h"
 #include "content/child/appcache/appcache_frontend_impl.h"
 #include "content/child/child_discardable_shared_memory_manager.h"
@@ -273,8 +273,10 @@ void AddHistogramSample(void* hist, int sample) {
   histogram->Add(sample);
 }
 
-scoped_ptr<base::SharedMemory> AllocateSharedMemoryFunction(size_t size) {
-  return RenderThreadImpl::Get()->HostAllocateSharedMemoryBuffer(size);
+scoped_ptr<cc::SharedBitmap> AllocateSharedBitmapFunction(
+    const gfx::Size& size) {
+  return ChildThread::current()->shared_bitmap_manager()->AllocateSharedBitmap(
+      size);
 }
 
 void EnableBlinkPlatformLogChannels(const std::string& channels) {
@@ -605,7 +607,7 @@ void RenderThreadImpl::Init() {
         base::StringToInt(string_value, &num_raster_threads);
     DCHECK(parsed_num_raster_threads) << string_value;
     DCHECK_GT(num_raster_threads, 0);
-    cc::RasterWorkerPool::SetNumRasterThreads(num_raster_threads);
+    cc::TileTaskWorkerPool::SetNumWorkerThreads(num_raster_threads);
   }
 
   base::DiscardableMemoryShmemAllocator::SetInstance(
@@ -1004,7 +1006,7 @@ const CommandLine& command_line = *CommandLine::ForCurrentProcess();
   if (GetContentClient()->renderer()->RunIdleHandlerWhenWidgetsHidden())
     ScheduleIdleHandler(kLongIdleHandlerDelayMs);
 
-  cc_blink::SetSharedMemoryAllocationFunction(AllocateSharedMemoryFunction);
+  cc_blink::SetSharedBitmapAllocationFunction(AllocateSharedBitmapFunction);
 
   // Limit use of the scaled image cache to when deferred image decoding is
   // enabled.

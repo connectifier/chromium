@@ -9,7 +9,11 @@
 #include "base/task/cancelable_task_tracker.h"
 #include "chrome/browser/chrome_browser_main_linux.h"
 #include "chrome/browser/chromeos/external_metrics.h"
-#include "chrome/browser/chromeos/version_loader.h"
+#include "chromeos/system/version_loader.h"
+
+namespace base {
+class MemoryPressureObserverChromeOS;
+}
 
 namespace content {
 class PowerSaveBlocker;
@@ -86,8 +90,8 @@ class ChromeBrowserMainPartsChromeos : public ChromeBrowserMainPartsLinux {
 
   scoped_refptr<chromeos::ExternalMetrics> external_metrics_;
 
-  VersionLoader cros_version_loader_;
-  base::CancelableTaskTracker tracker_;
+  scoped_ptr<base::MemoryPressureObserverChromeOS> memory_pressure_observer_;
+
   bool use_new_network_change_notifier_;
 
   DISALLOW_COPY_AND_ASSIGN(ChromeBrowserMainPartsChromeos);

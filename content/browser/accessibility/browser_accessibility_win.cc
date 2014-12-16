@@ -696,10 +696,9 @@ STDMETHODIMP BrowserAccessibilityWin::get_attributes(BSTR* attributes) {
   // The iaccessible2 attributes are a set of key-value pairs
   // separated by semicolons, with a colon between the key and the value.
   base::string16 str;
-  for (unsigned int i = 0; i < ia2_attributes_.size(); ++i) {
-    if (i != 0)
-      str += L';';
-    str += ia2_attributes_[i];
+  const std::vector<base::string16>& attributes_list = ia2_attributes();
+  for (unsigned int i = 0; i < attributes_list.size(); ++i) {
+    str += attributes_list[i] + L';';
   }
 
   if (str.empty())
@@ -3413,14 +3412,6 @@ void BrowserAccessibilityWin::InitRoleAndState() {
       break;
     case ui::AX_ROLE_BUTTON:
       ia_role_ = ROLE_SYSTEM_PUSHBUTTON;
-      bool is_aria_pressed_defined;
-      bool is_mixed;
-      if (GetAriaTristate("aria-pressed", &is_aria_pressed_defined, &is_mixed))
-        ia_state_ |= STATE_SYSTEM_PRESSED;
-      if (is_aria_pressed_defined)
-        ia2_role_ = IA2_ROLE_TOGGLE_BUTTON;
-      if (is_mixed)
-        ia_state_ |= STATE_SYSTEM_MIXED;
       break;
     case ui::AX_ROLE_CANVAS:
       if (GetBoolAttribute(ui::AX_ATTR_CANVAS_HAS_FALLBACK)) {

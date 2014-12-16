@@ -67,7 +67,7 @@ RenderFrameHostManager::RenderFrameHostManager(
 
 RenderFrameHostManager::~RenderFrameHostManager() {
   if (pending_render_frame_host_)
-    CancelPending();
+    UnsetPendingRenderFrameHost();
 
   // We should always have a current RenderFrameHost except in some tests.
   SetRenderFrameHost(scoped_ptr<RenderFrameHostImpl>());
@@ -418,7 +418,8 @@ void RenderFrameHostManager::ClearNavigationTransitionData() {
 }
 
 void RenderFrameHostManager::DidNavigateFrame(
-    RenderFrameHostImpl* render_frame_host) {
+    RenderFrameHostImpl* render_frame_host,
+    bool was_caused_by_user_gesture) {
   if (!cross_navigation_pending_) {
     DCHECK(!pending_render_frame_host_);
 
@@ -436,10 +437,14 @@ void RenderFrameHostManager::DidNavigateFrame(
     CommitPending();
     cross_navigation_pending_ = false;
   } else if (render_frame_host == render_frame_host_) {
-    // A navigation in the original page has taken place.  Cancel the pending
-    // one.
-    CancelPending();
-    cross_navigation_pending_ = false;
+    if (was_caused_by_user_gesture) {
+      // A navigation in the original page has taken place.  Cancel the pending
+      // one. Only do it for user gesture originated navigations to prevent
+      // page doing any shenanigans to prevent user from navigating.
+      // See https://code.google.com/p/chromium/issues/detail?id=75195
+      CancelPending();
+      cross_navigation_pending_ = false;
+    }
   } else {
     // No one else should be sending us DidNavigate in this state.
     DCHECK(false);
@@ -1586,6 +1591,11 @@ RenderFrameHostImpl* RenderFrameHostManager::UpdateStateForNavigate(
 void RenderFrameHostManager::CancelPending() {
   TRACE_EVENT1("navigation", "RenderFrameHostManager::CancelPending",
                "FrameTreeNode id", frame_tree_node_->frame_tree_node_id());
+  DiscardUnusedFrame(UnsetPendingRenderFrameHost());
+}
+
+scoped_ptr<RenderFrameHostImpl>
+RenderFrameHostManager::UnsetPendingRenderFrameHost() {
   scoped_ptr<RenderFrameHostImpl> pending_render_frame_host =
       pending_render_frame_host_.Pass();
 
@@ -1596,10 +1606,10 @@ void RenderFrameHostManager::CancelPending() {
   // We no longer need to prevent the process from exiting.
   pending_render_frame_host->GetProcess()->RemovePendingView();
 
-  DiscardUnusedFrame(pending_render_frame_host.Pass());
-
   pending_web_ui_.reset();
   pending_and_current_web_ui_.reset();
+
+  return pending_render_frame_host.Pass();
 }
 
 scoped_ptr<RenderFrameHostImpl> RenderFrameHostManager::SetRenderFrameHost(

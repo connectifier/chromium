@@ -35,6 +35,7 @@ struct WebCircularGeofencingRegion;
 namespace content {
 
 class EmbeddedWorkerRegistry;
+struct PlatformNotificationData;
 class ServiceWorkerContextCore;
 class ServiceWorkerProviderHost;
 class ServiceWorkerRegistration;
@@ -204,8 +205,10 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // from the worker to notify completion.
   //
   // This must be called when the status() is ACTIVATED.
-  void DispatchNotificationClickEvent(const StatusCallback& callback,
-                                      const std::string& notification_id);
+  void DispatchNotificationClickEvent(
+      const StatusCallback& callback,
+      const std::string& notification_id,
+      const PlatformNotificationData& notification_data);
 
   // Sends push event to the associated embedded worker and asynchronously calls
   // |callback| when it errors out or it gets a response from the worker to
@@ -248,11 +251,19 @@ class CONTENT_EXPORT ServiceWorkerVersion
   void Doom();
   bool is_doomed() const { return is_doomed_; }
 
+  bool skip_waiting() const { return skip_waiting_; }
+
+  void SetDevToolsAttached(bool attached);
+
  private:
+  class GetClientDocumentsCallback;
+  class GetClientInfoCallback;
+
   friend class base::RefCounted<ServiceWorkerVersion>;
   FRIEND_TEST_ALL_PREFIXES(ServiceWorkerControlleeRequestHandlerTest,
                            ActivateWaitingVersion);
   FRIEND_TEST_ALL_PREFIXES(ServiceWorkerVersionTest, ScheduleStopWorker);
+  FRIEND_TEST_ALL_PREFIXES(ServiceWorkerVersionTest, KeepAlive);
   FRIEND_TEST_ALL_PREFIXES(ServiceWorkerVersionTest, ListenerAvailability);
   typedef ServiceWorkerVersion self;
   typedef std::map<ServiceWorkerProviderHost*, int> ControlleeMap;
@@ -287,6 +298,9 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   // Message handlers.
   void OnGetClientDocuments(int request_id);
+  void OnGetClientInfoSuccess(int request_id,
+                              const ServiceWorkerClientInfo& info);
+  void OnGetClientInfoError(int request_id);
   void OnActivateEventFinished(int request_id,
                                blink::WebServiceWorkerEventResult result);
   void OnInstallEventFinished(int request_id,
@@ -303,9 +317,14 @@ class CONTENT_EXPORT ServiceWorkerVersion
                                const base::string16& message,
                                const std::vector<int>& sent_message_port_ids);
   void OnFocusClient(int request_id, int client_id);
+  void OnSkipWaiting(int request_id);
 
   void OnFocusClientFinished(int request_id, bool result);
+  void DidSkipWaiting(int request_id);
   void ScheduleStopWorker();
+  void StopWorkerIfIdle();
+  bool HasInflightRequests() const;
+
   void DoomInternal();
 
   const int64 version_id_;
@@ -319,7 +338,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
   std::vector<StatusCallback> stop_callbacks_;
   std::vector<base::Closure> status_change_callbacks_;
 
-  // Message callbacks.
+  // Message callbacks. (Update HasInflightRequests() too when you update this
+  // list.)
   IDMap<StatusCallback, IDMapOwnPointer> activate_callbacks_;
   IDMap<StatusCallback, IDMapOwnPointer> install_callbacks_;
   IDMap<FetchCallback, IDMapOwnPointer> fetch_callbacks_;
@@ -327,6 +347,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
   IDMap<StatusCallback, IDMapOwnPointer> notification_click_callbacks_;
   IDMap<StatusCallback, IDMapOwnPointer> push_callbacks_;
   IDMap<StatusCallback, IDMapOwnPointer> geofencing_callbacks_;
+  IDMap<GetClientInfoCallback, IDMapOwnPointer> get_client_info_callbacks_;
 
   ControlleeMap controllee_map_;
   ControlleeByIDMap controllee_by_id_;
@@ -336,6 +357,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
   base::OneShotTimer<ServiceWorkerVersion> stop_worker_timer_;
   base::OneShotTimer<ServiceWorkerVersion> update_timer_;
   bool is_doomed_;
+  std::vector<int> pending_skip_waiting_requests_;
+  bool skip_waiting_;
 
   base::WeakPtrFactory<ServiceWorkerVersion> weak_factory_;
 

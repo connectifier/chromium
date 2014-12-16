@@ -715,6 +715,11 @@ const char kPowerBatteryIdleWarningDelayMs[] =
 const char kPowerBatteryIdleDelayMs[] =
     "power.battery_idle_delay_ms";
 
+// Inactivity delays used to dim the screen or turn it off while the screen is
+// locked.
+const char kPowerLockScreenDimDelayMs[] = "power.lock_screen_dim_delay_ms";
+const char kPowerLockScreenOffDelayMs[] = "power.lock_screen_off_delay_ms";
+
 // Action that should be performed when the idle delay is reached while the
 // system is on AC power or battery power.
 // Values are from the chromeos::PowerPolicyController::Action enum.
@@ -1796,14 +1801,10 @@ const char kHotwordAlwaysOnNotificationSeen[] =
     "hotword.always_on_notification_seen";
 
 // A boolean pref that controls whether the sound of "Ok, Google" plus a few
-// seconds of audio data before is sent back to improve voice search.
+// seconds of audio data before and the spoken query are sent back to be stored
+// in a user's Voice & Audio Activity. Updated whenever the user opens
+// chrome://settings and also polled for every 24 hours.
 const char kHotwordAudioLoggingEnabled[] = "hotword.audio_logging_enabled";
-
-// A boolean pref that controls the user's global account preference for
-// audio history is enabled. Updated whenever the user changes it in
-// chrome://settings and also polled for every 24 hours and on first voice
-// search action after profile startup.
-const char kHotwordAudioHistoryEnabled[] = "hotword.audio_history_enabled";
 
 // A string holding the locale information under which Hotword was installed.
 // It is used for comparison since the hotword voice search trigger must be
@@ -1945,6 +1946,9 @@ const char kLogoutStartedLast[] = "chromeos.logout-started";
 // value is defined in:
 //   chrome/browser/chromeos/policy/consumer_management_stage.h
 const char kConsumerManagementStage[] = "consumer_management.stage";
+
+// A boolean pref. If set to true, new experimental OOBE UI is displayed.
+const char kNewOobe[] = "NewOobe";
 #endif  // defined(OS_CHROMEOS)
 
 // Whether there is a Flash version installed that supports clearing LSO data.

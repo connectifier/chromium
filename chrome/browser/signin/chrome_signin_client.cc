@@ -130,9 +130,9 @@ bool ChromeSigninClient::CanRevokeCredentials() {
     return false;
   }
 #else
-  // Don't allow revoking credentials for supervised users.
+  // Don't allow revoking credentials for legacy supervised users.
   // See http://crbug.com/332032
-  if (profile_->IsSupervised()) {
+  if (profile_->IsLegacySupervised()) {
     LOG(ERROR) << "Attempt to revoke supervised user refresh "
                << "token detected, ignoring.";
     return false;
@@ -165,6 +165,7 @@ void ChromeSigninClient::OnSignedOut() {
       g_browser_process->profile_manager()->GetProfileInfoCache();
   size_t index = cache.GetIndexOfProfileWithPath(profile_->GetPath());
   cache.SetLocalAuthCredentialsOfProfileAtIndex(index, std::string());
+  cache.SetUserNameOfProfileAtIndex(index, base::string16());
   cache.SetProfileSigninRequiredAtIndex(index, false);
 }
 

@@ -78,7 +78,7 @@
         'test/test_clipboard_unittest.cc',
         'test/data/resource.h',
         'text/bytes_formatting_unittest.cc',
-        'touch/touch_editing_controller_unittest.cc',
+        'touch/selection_bound_unittest.cc',
         'view_prop_unittest.cc',
         'webui/web_ui_util_unittest.cc',
         'x/selection_requestor_unittest.cc',
@@ -142,7 +142,7 @@
             '../../testing/android/native_test.gyp:native_test_native_code',
           ],
           'sources!': [
-            'touch/touch_editing_controller_unittest.cc',
+            'touch/selection_bound_unittest.cc',
           ],
         }],
         ['use_pango == 1', {
@@ -270,6 +270,30 @@
             'test_suite_name': 'ui_base_unittests',
           },
           'includes': [ '../../build/apk_test.gypi' ],
+        },
+      ],
+    }],
+    ['test_isolation_mode != "noop"', {
+      'targets': [
+        {
+          'target_name': 'ui_base_unittests_run',
+          'type': 'none',
+          'dependencies': [
+            'ui_base_unittests',
+          ],
+          'includes': [
+            '../../build/isolate.gypi',
+          ],
+          'sources': [
+            'ui_base_unittests.isolate',
+          ],
+          'conditions': [
+            ['use_x11 == 1', {
+              'dependencies': [
+                '../../tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',
+              ],
+            }],
+          ],
         },
       ],
     }],

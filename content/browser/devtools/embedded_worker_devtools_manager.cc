@@ -5,7 +5,6 @@
 #include "content/browser/devtools/embedded_worker_devtools_manager.h"
 
 #include "content/browser/devtools/devtools_manager.h"
-#include "content/browser/devtools/devtools_protocol.h"
 #include "content/browser/devtools/embedded_worker_devtools_agent_host.h"
 #include "content/browser/devtools/ipc_devtools_agent_host.h"
 #include "content/browser/shared_worker/shared_worker_instance.h"
@@ -138,6 +137,13 @@ void EmbeddedWorkerDevToolsManager::WorkerDestroyed(int worker_process_id,
   scoped_refptr<EmbeddedWorkerDevToolsAgentHost> agent_host(it->second);
   agent_host->WorkerDestroyed();
   DevToolsManager::GetInstance()->AgentHostChanged(agent_host);
+}
+
+void EmbeddedWorkerDevToolsManager::WorkerStopIgnored(int worker_process_id,
+                                                      int worker_route_id) {
+  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  // TODO(pfeldman): Show a console message to tell the user that UA didn't
+  // terminate the worker because devtools is attached.
 }
 
 void EmbeddedWorkerDevToolsManager::WorkerReadyForInspection(

@@ -11,7 +11,6 @@
 #include "content/shell/common/test_runner/test_preferences.h"
 #include "content/shell/renderer/binding_helpers.h"
 #include "content/shell/renderer/test_runner/mock_credential_manager_client.h"
-#include "content/shell/renderer/test_runner/mock_web_push_client.h"
 #include "content/shell/renderer/test_runner/mock_web_speech_recognizer.h"
 #include "content/shell/renderer/test_runner/test_interfaces.h"
 #include "content/shell/renderer/test_runner/web_permissions.h"
@@ -29,6 +28,7 @@
 #include "third_party/WebKit/public/platform/WebDeviceOrientationData.h"
 #include "third_party/WebKit/public/platform/WebLocalCredential.h"
 #include "third_party/WebKit/public/platform/WebPoint.h"
+#include "third_party/WebKit/public/platform/WebServiceWorkerRegistration.h"
 #include "third_party/WebKit/public/platform/WebURLResponse.h"
 #include "third_party/WebKit/public/web/WebArrayBuffer.h"
 #include "third_party/WebKit/public/web/WebArrayBufferConverter.h"
@@ -293,12 +293,12 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
                                             v8::Handle<v8::Function> callback);
   void SetCustomTextOutput(std::string output);
   void SetViewSourceForFrame(const std::string& name, bool enabled);
-  void SetMockPushClientSuccess(const std::string& endpoint,
-                                const std::string& registration_id);
-  void SetMockPushClientError(const std::string& message);
   void SetPushMessagingPermission(const std::string& origin, bool allowed);
   void ClearPushMessagingPermissions();
   void SetBluetoothMockDataSet(const std::string& dataset_name);
+  void SetGeofencingMockProvider(bool service_available);
+  void ClearGeofencingMockProvider();
+  void SetGeofencingMockPosition(double latitude, double longitude);
 
   std::string PlatformName();
   std::string TooltipText();
@@ -541,10 +541,6 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::SetCustomTextOutput)
       .SetMethod("setViewSourceForFrame",
                  &TestRunnerBindings::SetViewSourceForFrame)
-      .SetMethod("setMockPushClientSuccess",
-                 &TestRunnerBindings::SetMockPushClientSuccess)
-      .SetMethod("setMockPushClientError",
-                 &TestRunnerBindings::SetMockPushClientError)
       .SetMethod("setPushMessagingPermission",
                  &TestRunnerBindings::SetPushMessagingPermission)
       .SetMethod("clearPushMessagingPermissions",
@@ -553,6 +549,12 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::SetBluetoothMockDataSet)
       .SetMethod("forceNextWebGLContextCreationToFail",
                  &TestRunnerBindings::ForceNextWebGLContextCreationToFail)
+      .SetMethod("setGeofencingMockProvider",
+                 &TestRunnerBindings::SetGeofencingMockProvider)
+      .SetMethod("clearGeofencingMockProvider",
+                 &TestRunnerBindings::ClearGeofencingMockProvider)
+      .SetMethod("setGeofencingMockPosition",
+                 &TestRunnerBindings::SetGeofencingMockPosition)
 
       // Properties.
       .SetProperty("platformName", &TestRunnerBindings::PlatformName)
@@ -1408,20 +1410,6 @@ void TestRunnerBindings::SetViewSourceForFrame(const std::string& name,
   }
 }
 
-void TestRunnerBindings::SetMockPushClientSuccess(
-    const std::string& endpoint,
-    const std::string& registration_id) {
-  if (!runner_)
-    return;
-  runner_->SetMockPushClientSuccess(endpoint, registration_id);
-}
-
-void TestRunnerBindings::SetMockPushClientError(const std::string& message) {
-  if (!runner_)
-    return;
-  runner_->SetMockPushClientError(message);
-}
-
 void TestRunnerBindings::SetPushMessagingPermission(const std::string& origin,
                                                     bool allowed) {
   if (runner_)
@@ -1431,6 +1419,22 @@ void TestRunnerBindings::SetPushMessagingPermission(const std::string& origin,
 void TestRunnerBindings::ClearPushMessagingPermissions() {
   if (runner_)
     runner_->ClearPushMessagingPermissions();
+}
+
+void TestRunnerBindings::SetGeofencingMockProvider(bool service_available) {
+  if (runner_)
+    runner_->SetGeofencingMockProvider(service_available);
+}
+
+void TestRunnerBindings::ClearGeofencingMockProvider() {
+  if (runner_)
+    runner_->ClearGeofencingMockProvider();
+}
+
+void TestRunnerBindings::SetGeofencingMockPosition(double latitude,
+                                                   double longitude) {
+  if (runner_)
+    runner_->SetGeofencingMockPosition(latitude, longitude);
 }
 
 std::string TestRunnerBindings::PlatformName() {
@@ -1627,6 +1631,7 @@ void TestRunner::Reset() {
     delegate_->DeleteAllCookies();
     delegate_->ResetScreenOrientation();
     delegate_->SetBluetoothMockDataSet("");
+    delegate_->ClearGeofencingMockProvider();
     ResetBatteryStatus();
     ResetDeviceLight();
   }
@@ -2763,6 +2768,18 @@ void TestRunner::SetBluetoothMockDataSet(const std::string& name) {
   delegate_->SetBluetoothMockDataSet(name);
 }
 
+void TestRunner::SetGeofencingMockProvider(bool service_available) {
+  delegate_->SetGeofencingMockProvider(service_available);
+}
+
+void TestRunner::ClearGeofencingMockProvider() {
+  delegate_->ClearGeofencingMockProvider();
+}
+
+void TestRunner::SetGeofencingMockPosition(double latitude, double longitude) {
+  delegate_->SetGeofencingMockPosition(latitude, longitude);
+}
+
 void TestRunner::SetPOSIXLocale(const std::string& locale) {
   delegate_->SetLocale(locale);
 }
@@ -2924,15 +2941,6 @@ void TestRunner::CapturePixelsCallback(scoped_ptr<InvokeCallbackTask> task,
 
   task->SetArguments(3, argv);
   InvokeCallback(task.Pass());
-}
-
-void TestRunner::SetMockPushClientSuccess(const std::string& endpoint,
-                                          const std::string& registration_id) {
-  proxy_->GetPushClientMock()->SetMockSuccessValues(endpoint, registration_id);
-}
-
-void TestRunner::SetMockPushClientError(const std::string& message) {
-  proxy_->GetPushClientMock()->SetMockErrorValues(message);
 }
 
 void TestRunner::SetPushMessagingPermission(const GURL& origin, bool allowed) {

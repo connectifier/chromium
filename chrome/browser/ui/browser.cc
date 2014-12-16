@@ -29,6 +29,7 @@
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/app_mode/app_mode_utils.h"
 #include "chrome/browser/autofill/personal_data_manager_factory.h"
+#include "chrome/browser/background/background_contents.h"
 #include "chrome/browser/background/background_contents_service.h"
 #include "chrome/browser/background/background_contents_service_factory.h"
 #include "chrome/browser/browser_process.h"
@@ -77,7 +78,6 @@
 #include "chrome/browser/sync/profile_sync_service.h"
 #include "chrome/browser/sync/profile_sync_service_factory.h"
 #include "chrome/browser/sync/sync_ui_util.h"
-#include "chrome/browser/tab_contents/background_contents.h"
 #include "chrome/browser/tab_contents/retargeting_details.h"
 #include "chrome/browser/tab_contents/tab_util.h"
 #include "chrome/browser/themes/theme_service.h"
@@ -136,7 +136,6 @@
 #include "chrome/browser/ui/webui/signin/login_ui_service.h"
 #include "chrome/browser/ui/webui/signin/login_ui_service_factory.h"
 #include "chrome/browser/ui/window_sizer/window_sizer.h"
-#include "chrome/browser/ui/zoom/zoom_controller.h"
 #include "chrome/browser/upgrade_detector.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/common/chrome_constants.h"
@@ -157,6 +156,7 @@
 #include "components/search/search.h"
 #include "components/sessions/session_types.h"
 #include "components/startup_metric_utils/startup_metric_utils.h"
+#include "components/ui/zoom/zoom_controller.h"
 #include "components/web_modal/popup_manager.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "content/public/browser/devtools_agent_host.h"
@@ -201,6 +201,7 @@
 #include "chrome/browser/task_manager/task_manager.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "components/autofill/core/browser/autofill_ie_toolbar_import_win.h"
+#include "components/browser_watcher/exit_funnel_win.h"
 #include "ui/base/touch/touch_device.h"
 #include "ui/base/win/shell.h"
 #endif  // OS_WIN
@@ -352,9 +353,9 @@ Browser::Browser(const CreateParams& params)
       bookmark_bar_state_(BookmarkBar::HIDDEN),
       command_controller_(new chrome::BrowserCommandController(this)),
       window_has_shown_(false),
-      chrome_updater_factory_(this),
       translate_driver_observer_(
           new BrowserContentTranslateDriverObserver(this)),
+      chrome_updater_factory_(this),
       weak_factory_(this) {
   // If this causes a crash then a window is being opened using a profile type
   // that is disallowed by policy. The crash prevents the disabled window type
@@ -532,7 +533,7 @@ FindBarController* Browser::GetFindBarController() {
     find_bar->SetFindBarController(find_bar_controller_.get());
     find_bar_controller_->ChangeWebContents(
         tab_strip_model_->GetActiveWebContents());
-    find_bar_controller_->find_bar()->MoveWindowIfNecessary(gfx::Rect(), true);
+    find_bar_controller_->find_bar()->MoveWindowIfNecessary(gfx::Rect());
   }
   return find_bar_controller_.get();
 }
@@ -658,8 +659,13 @@ void Browser::OnWindowClosing() {
   bool should_quit_if_last_browser =
       browser_shutdown::IsTryingToQuit() || !chrome::WillKeepAlive();
 
-  if (should_quit_if_last_browser && chrome::ShouldStartShutdown(this))
+  if (should_quit_if_last_browser && chrome::ShouldStartShutdown(this)) {
+#if defined(OS_WIN)
+    browser_watcher::ExitFunnel::RecordSingleEvent(
+          chrome::kBrowserExitCodesRegistryPath, L"LastWindowClose");
+#endif
     browser_shutdown::OnShutdownStarting(browser_shutdown::WINDOW_CLOSE);
+  }
 
   // Don't use GetForProfileIfExisting here, we want to force creation of the
   // session service so that user can restore what was open.
@@ -1037,7 +1043,7 @@ void Browser::ActiveTabChanged(WebContents* old_contents,
 
   if (HasFindBarController()) {
     find_bar_controller_->ChangeWebContents(new_contents);
-    find_bar_controller_->find_bar()->MoveWindowIfNecessary(gfx::Rect(), true);
+    find_bar_controller_->find_bar()->MoveWindowIfNecessary(gfx::Rect());
   }
 
   // Update sessions. Don't force creation of sessions. If sessions doesn't
@@ -1549,6 +1555,7 @@ void Browser::ShowRepostFormWarningDialog(WebContents* source) {
 bool Browser::ShouldCreateWebContents(
     WebContents* web_contents,
     int route_id,
+    int main_frame_route_id,
     WindowContainerType window_container_type,
     const base::string16& frame_name,
     const GURL& target_url,
@@ -1557,6 +1564,7 @@ bool Browser::ShouldCreateWebContents(
   if (window_container_type == WINDOW_CONTAINER_TYPE_BACKGROUND) {
     // If a BackgroundContents is created, suppress the normal WebContents.
     return !MaybeCreateBackgroundContents(route_id,
+                                          main_frame_route_id,
                                           web_contents,
                                           frame_name,
                                           target_url,
@@ -1908,7 +1916,8 @@ void Browser::URLStarredChanged(content::WebContents* web_contents,
 ///////////////////////////////////////////////////////////////////////////////
 // Browser, ZoomObserver implementation:
 
-void Browser::OnZoomChanged(const ZoomController::ZoomChangedEventData& data) {
+void Browser::OnZoomChanged(
+    const ui_zoom::ZoomController::ZoomChangedEventData& data) {
   if (data.web_contents == tab_strip_model_->GetActiveWebContents()) {
     // Only show the zoom bubble for zoom changes in the active window.
     window_->ZoomChangedForActiveTab(data.can_show_bubble &&
@@ -2276,10 +2285,11 @@ void Browser::SetAsDelegate(WebContents* web_contents, bool set_delegate) {
   translate::ContentTranslateDriver& content_translate_driver =
       ChromeTranslateClient::FromWebContents(web_contents)->translate_driver();
   if (delegate) {
-    ZoomController::FromWebContents(web_contents)->AddObserver(this);
+    ui_zoom::ZoomController::FromWebContents(web_contents)->AddObserver(this);
     content_translate_driver.AddObserver(translate_driver_observer_.get());
   } else {
-    ZoomController::FromWebContents(web_contents)->RemoveObserver(this);
+    ui_zoom::ZoomController::FromWebContents(web_contents)
+        ->RemoveObserver(this);
     content_translate_driver.RemoveObserver(translate_driver_observer_.get());
   }
 }
@@ -2331,27 +2341,8 @@ bool Browser::ShouldShowLocationBar() const {
   if (is_type_tabbed())
     return true;
 
-  if (is_app()) {
-    if (extensions::util::IsStreamlinedHostedAppsEnabled() &&
-        host_desktop_type() != chrome::HOST_DESKTOP_TYPE_ASH) {
-      // If streamlined hosted apps are enabled, show the location bar for
-      // bookmark apps, except on ash which has the toolbar merged into the
-      // frame.
-      ExtensionService* service =
-          extensions::ExtensionSystem::Get(profile_)->extension_service();
-      const extensions::Extension* extension =
-          service ? service->GetInstalledExtension(
-                        web_app::GetExtensionIdFromApplicationName(app_name()))
-                  : NULL;
-      return (!extension || extension->from_bookmark()) &&
-             app_name() != DevToolsWindow::kDevToolsApp;
-    } else {
-      return false;
-    }
-  }
-
   // Trusted app windows and system windows never show a location bar.
-  return !is_trusted_source();
+  return !is_app() && !is_trusted_source();
 }
 
 bool Browser::ShouldUseWebAppFrame() const {
@@ -2448,6 +2439,7 @@ bool Browser::ShouldHideUIForFullscreen() const {
 
 bool Browser::MaybeCreateBackgroundContents(
     int route_id,
+    int main_frame_route_id,
     WebContents* opener_web_contents,
     const base::string16& frame_name,
     const GURL& target_url,
@@ -2513,6 +2505,7 @@ bool Browser::MaybeCreateBackgroundContents(
   BackgroundContents* contents =
       service->CreateBackgroundContents(site_instance.get(),
                                         route_id,
+                                        main_frame_route_id,
                                         profile_,
                                         frame_name,
                                         base::ASCIIToUTF16(extension->id()),

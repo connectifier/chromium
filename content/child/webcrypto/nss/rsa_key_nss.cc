@@ -503,18 +503,14 @@ Status RsaHashedAlgorithm::GenerateKey(
     bool extractable,
     blink::WebCryptoKeyUsageMask combined_usages,
     GenerateKeyResult* result) const {
-  Status status = CheckKeyCreationUsages(
-      all_public_key_usages_ | all_private_key_usages_, combined_usages);
+  blink::WebCryptoKeyUsageMask public_usages = 0;
+  blink::WebCryptoKeyUsageMask private_usages = 0;
+
+  Status status = GetUsagesForGenerateAsymmetricKey(
+      combined_usages, all_public_key_usages_, all_private_key_usages_,
+      &public_usages, &private_usages);
   if (status.IsError())
     return status;
-
-  const blink::WebCryptoKeyUsageMask public_usages =
-      combined_usages & all_public_key_usages_;
-  const blink::WebCryptoKeyUsageMask private_usages =
-      combined_usages & all_private_key_usages_;
-
-  if (private_usages == 0)
-    return Status::ErrorCreateKeyEmptyUsages();
 
   unsigned int public_exponent = 0;
   unsigned int modulus_length_bits = 0;
@@ -531,8 +527,9 @@ Status RsaHashedAlgorithm::GenerateKey(
   rsa_gen_params.keySizeInBits = modulus_length_bits;
   rsa_gen_params.pe = public_exponent;
 
-  const CK_FLAGS operation_flags_mask =
-      CKF_ENCRYPT | CKF_DECRYPT | CKF_SIGN | CKF_VERIFY | CKF_WRAP | CKF_UNWRAP;
+  // The usages are enforced at the WebCrypto layer, so it isn't necessary to
+  // create keys with limited usages.
+  const CK_FLAGS operation_flags_mask = kAllOperationFlags;
 
   // The private key must be marked as insensitive and extractable, otherwise it
   // cannot later be exported in unencrypted form or structured-cloned.
@@ -588,23 +585,8 @@ Status RsaHashedAlgorithm::GenerateKey(
 Status RsaHashedAlgorithm::VerifyKeyUsagesBeforeImportKey(
     blink::WebCryptoKeyFormat format,
     blink::WebCryptoKeyUsageMask usages) const {
-  switch (format) {
-    case blink::WebCryptoKeyFormatSpki:
-      return CheckKeyCreationUsages(all_public_key_usages_, usages);
-    case blink::WebCryptoKeyFormatPkcs8:
-      return CheckKeyCreationUsages(all_private_key_usages_, usages);
-    case blink::WebCryptoKeyFormatJwk:
-      // The JWK could represent either a public key or private key. The usages
-      // must make sense for one of the two. The usages will be checked again by
-      // ImportKeyJwk() once the key type has been determined.
-      if (CheckKeyCreationUsages(all_private_key_usages_, usages).IsSuccess() ||
-          CheckKeyCreationUsages(all_public_key_usages_, usages).IsSuccess()) {
-        return Status::Success();
-      }
-      return Status::ErrorCreateKeyBadUsages();
-    default:
-      return Status::ErrorUnsupportedImportKeyFormat();
-  }
+  return VerifyUsagesBeforeImportAsymmetricKey(format, all_public_key_usages_,
+                                               all_private_key_usages_, usages);
 }
 
 Status RsaHashedAlgorithm::ImportKeyPkcs8(

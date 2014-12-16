@@ -14,7 +14,6 @@ namespace ui {
 
 class DeviceManager;
 class DisplaySnapshotDri;
-class DriConsoleBuffer;
 class DriWrapper;
 class ScreenManager;
 
@@ -28,6 +27,11 @@ class NativeDisplayDelegateDri : public NativeDisplayDelegate {
                                      bool is_interlaced,
                                      float refresh_rate);
 
+  std::vector<DisplaySnapshot*> GetDisplays();
+  bool Configure(const DisplaySnapshot& output,
+                 const DisplayMode* mode,
+                 const gfx::Point& origin);
+
   // NativeDisplayDelegate overrides:
   void Initialize() override;
   void GrabServer() override;
@@ -37,11 +41,12 @@ class NativeDisplayDelegateDri : public NativeDisplayDelegate {
   void SyncWithServer() override;
   void SetBackgroundColor(uint32_t color_argb) override;
   void ForceDPMSOn() override;
-  std::vector<DisplaySnapshot*> GetDisplays() override;
+  void GetDisplays(const GetDisplaysCallback& callback) override;
   void AddMode(const DisplaySnapshot& output, const DisplayMode* mode) override;
-  bool Configure(const DisplaySnapshot& output,
+  void Configure(const DisplaySnapshot& output,
                  const DisplayMode* mode,
-                 const gfx::Point& origin) override;
+                 const gfx::Point& origin,
+                 const ConfigureCallback& callback) override;
   void CreateFrameBuffer(const gfx::Size& size) override;
   bool GetHDCPState(const DisplaySnapshot& output, HDCPState* state) override;
   bool SetHDCPState(const DisplaySnapshot& output, HDCPState state) override;
@@ -62,7 +67,6 @@ class NativeDisplayDelegateDri : public NativeDisplayDelegate {
 
   DriWrapper* dri_;                // Not owned.
   ScreenManager* screen_manager_;  // Not owned.
-  scoped_ptr<DriConsoleBuffer> console_buffer_;
   // Modes can be shared between different displays, so we need to keep track
   // of them independently for cleanup.
   ScopedVector<const DisplayMode> cached_modes_;

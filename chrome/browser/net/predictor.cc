@@ -125,6 +125,11 @@ class Predictor::LookupRequest {
 
  private:
   void OnLookupFinished(int result) {
+    // TODO(vadimt): Remove ScopedTracker below once crbug.com/436634 is fixed.
+    tracked_objects::ScopedTracker tracking_profile(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "436634 Predictor::LookupRequest::OnLookupFinished"));
+
     predictor_->OnLookupFinished(this, url_, result == net::OK);
   }
 
@@ -1086,6 +1091,11 @@ bool Predictor::WouldLikelyProxyURL(const GURL& url) {
 UrlInfo* Predictor::AppendToResolutionQueue(
     const GURL& url,
     UrlInfo::ResolutionMotivation motivation) {
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/436671 is fixed.
+  tracked_objects::ScopedTracker tracking_profile1(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "436671 Predictor::AppendToResolutionQueue1"));
+
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
   DCHECK(url.has_host());
 
@@ -1104,6 +1114,11 @@ UrlInfo* Predictor::AppendToResolutionQueue(
     return NULL;
   }
 
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/436671 is fixed.
+  tracked_objects::ScopedTracker tracking_profile2(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "436671 Predictor::AppendToResolutionQueue2"));
+
   AdviseProxy(url, motivation, false /* is_preconnect */);
   if ((proxy_advisor_ && proxy_advisor_->WouldProxyURL(url)) ||
       WouldLikelyProxyURL(url)) {
@@ -1111,8 +1126,19 @@ UrlInfo* Predictor::AppendToResolutionQueue(
     return NULL;
   }
 
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/436671 is fixed.
+  tracked_objects::ScopedTracker tracking_profile3(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "436671 Predictor::AppendToResolutionQueue3"));
+
   info->SetQueuedState(motivation);
   work_queue_.Push(url, motivation);
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/436671 is fixed.
+  tracked_objects::ScopedTracker tracking_profile4(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "436671 Predictor::AppendToResolutionQueue4"));
+
   StartSomeQueuedResolutions();
   return info;
 }
@@ -1140,6 +1166,11 @@ void Predictor::StartSomeQueuedResolutions() {
 
   while (!work_queue_.IsEmpty() &&
          pending_lookups_.size() < max_concurrent_dns_lookups_) {
+    // TODO(vadimt): Remove ScopedTracker below once crbug.com/436671 is fixed.
+    tracked_objects::ScopedTracker tracking_profile1(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "436671 Predictor::StartSomeQueuedResolutions1"));
+
     const GURL url(work_queue_.Pop());
     UrlInfo* info = &results_[url];
     DCHECK(info->HasUrl(url));
@@ -1151,7 +1182,19 @@ void Predictor::StartSomeQueuedResolutions() {
     }
 
     LookupRequest* request = new LookupRequest(this, host_resolver_, url);
+
+    // TODO(vadimt): Remove ScopedTracker below once crbug.com/436671 is fixed.
+    tracked_objects::ScopedTracker tracking_profile2(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "436671 Predictor::StartSomeQueuedResolutions2"));
+
     int status = request->Start();
+
+    // TODO(vadimt): Remove ScopedTracker below once crbug.com/436671 is fixed.
+    tracked_objects::ScopedTracker tracking_profile3(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "436671 Predictor::StartSomeQueuedResolutions3"));
+
     if (status == net::ERR_IO_PENDING) {
       // Will complete asynchronously.
       pending_lookups_.insert(request);

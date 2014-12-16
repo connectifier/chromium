@@ -20,6 +20,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "base/version.h"
+#include "chrome/browser/background/background_contents.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/devtools/devtools_window.h"
@@ -44,7 +45,6 @@
 #include "chrome/browser/platform_util.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/tab_contents/background_contents.h"
 #include "chrome/browser/ui/apps/app_info_dialog.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
@@ -352,12 +352,7 @@ base::DictionaryValue* ExtensionSettingsHandler::CreateExtensionDetailValue(
           extension_service_->GetBrowserContext()));
 
   base::string16 location_text;
-  if (Manifest::IsPolicyLocation(extension->location()) ||
-      (extension->location() == Manifest::EXTERNAL_PREF_DOWNLOAD &&
-       recommended_install)) {
-    location_text = l10n_util::GetStringUTF16(
-        IDS_OPTIONS_INSTALL_LOCATION_ENTERPRISE);
-  } else if (extension->location() == Manifest::INTERNAL &&
+  if (extension->location() == Manifest::INTERNAL &&
       !ManifestURL::UpdatesFromGallery(extension)) {
     location_text = l10n_util::GetStringUTF16(
         IDS_OPTIONS_INSTALL_LOCATION_UNKNOWN);
@@ -369,6 +364,13 @@ base::DictionaryValue* ExtensionSettingsHandler::CreateExtensionDetailValue(
         IDS_OPTIONS_INSTALL_LOCATION_SHARED_MODULE);
   }
   extension_data->SetString("locationText", location_text);
+
+  base::string16 policy_text;
+  if (Manifest::IsPolicyLocation(extension->location())) {
+    policy_text = l10n_util::GetStringUTF16(
+        IDS_OPTIONS_INSTALL_LOCATION_ENTERPRISE);
+  }
+  extension_data->SetString("policyText", policy_text);
 
   base::string16 blacklist_text;
   switch (prefs->GetExtensionBlacklistState(extension->id())) {

@@ -310,8 +310,8 @@ int AutofillManager::AccessAddressBookPromptCount() {
 
 bool AutofillManager::ShouldShowScanCreditCard(const FormData& form,
                                                const FormFieldData& field) {
-  if (!CommandLine::ForCurrentProcess()->HasSwitch(
-          autofill::switches::kEnableCreditCardScan)) {
+  if (CommandLine::ForCurrentProcess()->HasSwitch(
+          autofill::switches::kDisableCreditCardScan)) {
     return false;
   }
 
@@ -707,7 +707,6 @@ void AutofillManager::ImportFormData(const FormStructure& submitted_form) {
   // save it.
   if (imported_credit_card) {
     client_->ConfirmSaveCreditCard(
-        *metric_logger_,
         base::Bind(
             base::IgnoreResult(&PersonalDataManager::SaveImportedCreditCard),
             base::Unretained(personal_data_),

@@ -144,9 +144,27 @@
         "chrome://chrome-signin/*",
         "chrome://oobe/*"
       ]
+    },
+    // This allows GuestViews to be created on regular web pages for the Worker
+    // Thread Frame prototype: http://crbug.com/434226.
+    {
+      "internal": true,
+      "channel": "trunk",
+      "contexts": "all",
+      "matches": ["<all_urls>"]
     }
   ],
   "hid": {
+    "dependencies": ["permission:hid"],
+    "contexts": ["blessed_extension"]
+  },
+  "hid.onDeviceAdded": {
+    "channel": "dev",
+    "dependencies": ["permission:hid"],
+    "contexts": ["blessed_extension"]
+  },
+  "hid.onDeviceRemoved": {
+    "channel": "dev",
     "dependencies": ["permission:hid"],
     "contexts": ["blessed_extension"]
   },
@@ -358,5 +376,11 @@
     "channel": "stable",
     "contexts": ["webui"],
     "matches": ["chrome://chrome-signin/*", "chrome://oobe/*"]
-  }]
+  }],
+  "workerFrameInternal": {
+    "internal": true,
+    "channel": "trunk",
+    "contexts": "all",
+    "matches": ["<all_urls>"]
+  }
 }

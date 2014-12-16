@@ -6,7 +6,6 @@ package org.chromium.content.browser.webcontents;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
-import org.chromium.base.VisibleForTesting;
 import org.chromium.content_public.browser.JavaScriptCallback;
 import org.chromium.content_public.browser.NavigationController;
 import org.chromium.content_public.browser.NavigationTransitionDelegate;
@@ -110,7 +109,6 @@ import org.chromium.content_public.browser.WebContents;
         nativeAddStyleSheetByURL(mNativeWebContentsAndroid, url);
     }
 
-    @VisibleForTesting
     @Override
     public void showInterstitialPage(
             String url, long interstitialPageDelegateAndroid) {
@@ -197,6 +195,14 @@ import org.chromium.content_public.browser.WebContents;
     @Override
     public void beginExitTransition(String cssSelector, boolean exitToNativeApp) {
         nativeBeginExitTransition(mNativeWebContentsAndroid, cssSelector, exitToNativeApp);
+    }
+
+    /**
+     * Revert the effect of exit transition.
+     */
+    @Override
+    public void revertExitTransition() {
+        nativeRevertExitTransition(mNativeWebContentsAndroid);
     }
 
     /**
@@ -315,6 +321,7 @@ import org.chromium.content_public.browser.WebContents;
             String markup);
     private native void nativeBeginExitTransition(long nativeWebContentsAndroid,
             String cssSelector, boolean exitToNativeApp);
+    private native void nativeRevertExitTransition(long nativeWebContentsAndroid);
     private native void nativeHideTransitionElements(long nativeWebContentsAndroid,
             String cssSelector);
     private native void nativeShowTransitionElements(long nativeWebContentsAndroid,

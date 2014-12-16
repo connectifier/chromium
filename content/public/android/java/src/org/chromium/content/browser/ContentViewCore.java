@@ -73,7 +73,6 @@ import org.chromium.content.browser.input.SelectPopup;
 import org.chromium.content.browser.input.SelectPopupDialog;
 import org.chromium.content.browser.input.SelectPopupDropdown;
 import org.chromium.content.browser.input.SelectPopupItem;
-import org.chromium.content.browser.input.SelectionEventType;
 import org.chromium.content.common.ContentSwitches;
 import org.chromium.content_public.browser.GestureStateListener;
 import org.chromium.content_public.browser.WebContents;
@@ -82,6 +81,7 @@ import org.chromium.ui.base.ViewAndroid;
 import org.chromium.ui.base.ViewAndroidDelegate;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.gfx.DeviceDisplayInfo;
+import org.chromium.ui.touch_selection.SelectionEventType;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -802,18 +802,22 @@ public class ContentViewCore
      * </ul>
      */
     public void setContainerView(ViewGroup containerView) {
-        TraceEvent.begin();
-        if (mContainerView != null) {
-            mPastePopupMenu = null;
-            mInputConnection = null;
-            hidePopupsAndClearSelection();
-        }
+        try {
+            TraceEvent.begin("ContentViewCore.setContainerView");
+            if (mContainerView != null) {
+                mPastePopupMenu = null;
+                mInputConnection = null;
+                hidePopupsAndClearSelection();
+            }
 
-        mContainerView = containerView;
-        mPositionObserver = new ViewPositionObserver(mContainerView);
-        mContainerView.setClickable(true);
-        mViewAndroidDelegate.updateCurrentContainerView();
-        TraceEvent.end();
+            mContainerView = containerView;
+            mPositionObserver = new ViewPositionObserver(mContainerView);
+            mContainerView.setWillNotDraw(false); // TODO(epenner): Remove (http://crbug.com/436689)
+            mContainerView.setClickable(true);
+            mViewAndroidDelegate.updateCurrentContainerView();
+        } finally {
+            TraceEvent.end("ContentViewCore.setContainerView");
+        }
     }
 
     @CalledByNative
@@ -1478,21 +1482,24 @@ public class ContentViewCore
      */
     @SuppressWarnings("javadoc")
     public void onConfigurationChanged(Configuration newConfig) {
-        TraceEvent.begin();
+        try {
+            TraceEvent.begin("ContentViewCore.onConfigurationChanged");
 
-        if (newConfig.keyboard != Configuration.KEYBOARD_NOKEYS) {
-            if (mNativeContentViewCore != 0) {
-                mImeAdapter.attach(nativeGetNativeImeAdapter(mNativeContentViewCore),
-                        ImeAdapter.getTextInputTypeNone(), 0 /* no flags */);
+            if (newConfig.keyboard != Configuration.KEYBOARD_NOKEYS) {
+                if (mNativeContentViewCore != 0) {
+                    mImeAdapter.attach(nativeGetNativeImeAdapter(mNativeContentViewCore),
+                            ImeAdapter.getTextInputTypeNone(), 0 /* no flags */);
+                }
+                mInputMethodManagerWrapper.restartInput(mContainerView);
             }
-            mInputMethodManagerWrapper.restartInput(mContainerView);
-        }
-        mContainerViewInternals.super_onConfigurationChanged(newConfig);
+            mContainerViewInternals.super_onConfigurationChanged(newConfig);
 
-        // To request layout has side effect, but it seems OK as it only happen in
-        // onConfigurationChange and layout has to be changed in most case.
-        mContainerView.requestLayout();
-        TraceEvent.end();
+            // To request layout has side effect, but it seems OK as it only happen in
+            // onConfigurationChange and layout has to be changed in most case.
+            mContainerView.requestLayout();
+        } finally {
+            TraceEvent.end("ContentViewCore.onConfigurationChanged");
+        }
     }
 
     /**
@@ -1594,10 +1601,10 @@ public class ContentViewCore
      */
     public boolean dispatchKeyEventPreIme(KeyEvent event) {
         try {
-            TraceEvent.begin();
+            TraceEvent.begin("ContentViewCore.dispatchKeyEventPreIme");
             return mContainerViewInternals.super_dispatchKeyEventPreIme(event);
         } finally {
-            TraceEvent.end();
+            TraceEvent.end("ContentViewCore.dispatchKeyEventPreIme");
         }
     }
 
@@ -1668,7 +1675,8 @@ public class ContentViewCore
 
                     nativeSendMouseWheelEvent(mNativeContentViewCore, event.getEventTime(),
                             event.getX(), event.getY(),
-                            event.getAxisValue(MotionEvent.AXIS_VSCROLL));
+                            event.getAxisValue(MotionEvent.AXIS_VSCROLL),
+                            event.getAxisValue(MotionEvent.AXIS_HSCROLL));
 
                     mContainerView.removeCallbacks(mFakeMouseMoveRunnable);
                     // Send a delayed onMouseMove event so that we end
@@ -2244,20 +2252,23 @@ public class ContentViewCore
             int textInputFlags, String text, int selectionStart, int selectionEnd,
             int compositionStart, int compositionEnd, boolean showImeIfNeeded,
             boolean isNonImeChange) {
-        TraceEvent.begin();
-        mFocusedNodeEditable = (textInputType != ImeAdapter.getTextInputTypeNone());
-        if (!mFocusedNodeEditable) hidePastePopup();
+        try {
+            TraceEvent.begin("ContentViewCore.updateImeAdapter");
+            mFocusedNodeEditable = (textInputType != ImeAdapter.getTextInputTypeNone());
+            if (!mFocusedNodeEditable) hidePastePopup();
 
-        mImeAdapter.updateKeyboardVisibility(
-                nativeImeAdapterAndroid, textInputType, textInputFlags, showImeIfNeeded);
+            mImeAdapter.updateKeyboardVisibility(
+                    nativeImeAdapterAndroid, textInputType, textInputFlags, showImeIfNeeded);
 
-        if (mInputConnection != null) {
-            mInputConnection.updateState(text, selectionStart, selectionEnd, compositionStart,
-                    compositionEnd, isNonImeChange);
+            if (mInputConnection != null) {
+                mInputConnection.updateState(text, selectionStart, selectionEnd, compositionStart,
+                        compositionEnd, isNonImeChange);
+            }
+
+            if (mActionMode != null) mActionMode.invalidate();
+        } finally {
+            TraceEvent.end("ContentViewCore.updateImeAdapter");
         }
-
-        if (mActionMode != null) mActionMode.invalidate();
-        TraceEvent.end();
     }
 
     @SuppressWarnings("unused")
@@ -3027,7 +3038,8 @@ public class ContentViewCore
             long nativeContentViewCoreImpl, long timeMs, float x, float y);
 
     private native int nativeSendMouseWheelEvent(
-            long nativeContentViewCoreImpl, long timeMs, float x, float y, float verticalAxis);
+            long nativeContentViewCoreImpl, long timeMs, float x, float y, float verticalAxis,
+            float horizontalAxis);
 
     private native void nativeScrollBegin(
             long nativeContentViewCoreImpl, long timeMs, float x, float y, float hintX,

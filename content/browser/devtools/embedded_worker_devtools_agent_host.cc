@@ -5,7 +5,7 @@
 #include "content/browser/devtools/embedded_worker_devtools_agent_host.h"
 
 #include "base/strings/utf_string_conversions.h"
-#include "content/browser/devtools/protocol/devtools_protocol_handler_impl.h"
+#include "content/browser/devtools/protocol/devtools_protocol_handler.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/browser/service_worker/service_worker_version.h"
 #include "content/browser/shared_worker/shared_worker_service_impl.h"
@@ -35,7 +35,17 @@ void TerminateServiceWorkerOnIO(
   }
 }
 
+void SetDevToolsAttachedOnIO(
+    base::WeakPtr<ServiceWorkerContextCore> context_weak,
+    int64 version_id,
+    bool attached) {
+  if (ServiceWorkerContextCore* context = context_weak.get()) {
+    if (ServiceWorkerVersion* version = context->GetLiveVersion(version_id))
+      version->SetDevToolsAttached(attached);
+  }
 }
+
+}  // namespace
 
 EmbeddedWorkerDevToolsAgentHost::EmbeddedWorkerDevToolsAgentHost(
     WorkerId worker_id,
@@ -125,6 +135,13 @@ void EmbeddedWorkerDevToolsAgentHost::Attach() {
 
 void EmbeddedWorkerDevToolsAgentHost::OnClientAttached() {
   DevToolsAgentHostImpl::NotifyCallbacks(this, true);
+  if (service_worker_) {
+    BrowserThread::PostTask(BrowserThread::IO, FROM_HERE,
+        base::Bind(&SetDevToolsAttachedOnIO,
+                   service_worker_->context_weak(),
+                   service_worker_->version_id(),
+                   true));
+  }
 }
 
 void EmbeddedWorkerDevToolsAgentHost::OnClientDetached() {
@@ -135,6 +152,13 @@ void EmbeddedWorkerDevToolsAgentHost::OnClientDetached() {
     state_ = WORKER_UNINSPECTED;
   }
   DevToolsAgentHostImpl::NotifyCallbacks(this, false);
+  if (service_worker_) {
+    BrowserThread::PostTask(BrowserThread::IO, FROM_HERE,
+        base::Bind(&SetDevToolsAttachedOnIO,
+                   service_worker_->context_weak(),
+                   service_worker_->version_id(),
+                   false));
+  }
 }
 
 bool EmbeddedWorkerDevToolsAgentHost::OnMessageReceived(

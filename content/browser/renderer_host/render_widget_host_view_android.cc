@@ -45,7 +45,6 @@
 #include "content/browser/renderer_host/compositor_impl_android.h"
 #include "content/browser/renderer_host/dip_util.h"
 #include "content/browser/renderer_host/input/synthetic_gesture_target_android.h"
-#include "content/browser/renderer_host/input/touch_selection_controller.h"
 #include "content/browser/renderer_host/input/web_input_event_builders_android.h"
 #include "content/browser/renderer_host/input/web_input_event_util.h"
 #include "content/browser/renderer_host/render_process_host_impl.h"
@@ -81,6 +80,7 @@
 #include "ui/gfx/geometry/dip_util.h"
 #include "ui/gfx/screen.h"
 #include "ui/gfx/size_conversions.h"
+#include "ui/touch_selection/touch_selection_controller.h"
 
 namespace content {
 
@@ -118,8 +118,8 @@ class GLHelperHolder
   GLHelperHolder();
   static scoped_ptr<WebGraphicsContext3DCommandBufferImpl> CreateContext3D();
 
-  scoped_ptr<GLHelper> gl_helper_;
   scoped_ptr<WebGraphicsContext3DCommandBufferImpl> context_;
+  scoped_ptr<GLHelper> gl_helper_;
 
   DISALLOW_COPY_AND_ASSIGN(GLHelperHolder);
 };
@@ -257,14 +257,14 @@ ui::LatencyInfo CreateLatencyInfo(const blink::WebInputEvent& event) {
   return latency_info;
 }
 
-scoped_ptr<TouchSelectionController> CreateSelectionController(
-    TouchSelectionControllerClient* client,
+scoped_ptr<ui::TouchSelectionController> CreateSelectionController(
+    ui::TouchSelectionControllerClient* client,
     ContentViewCore* content_view_core) {
   DCHECK(client);
   DCHECK(content_view_core);
   int tap_timeout_ms = gfx::ViewConfiguration::GetTapTimeoutInMs();
   int touch_slop_pixels = gfx::ViewConfiguration::GetTouchSlopInPixels();
-  return make_scoped_ptr(new TouchSelectionController(
+  return make_scoped_ptr(new ui::TouchSelectionController(
       client,
       base::TimeDelta::FromMilliseconds(tap_timeout_ms),
       touch_slop_pixels / content_view_core->GetDpiScale()));
@@ -575,6 +575,9 @@ void RenderWidgetHostViewAndroid::Show() {
   if (layer_.get())
     layer_->SetHideLayerAndSubtree(false);
 
+  if (overscroll_controller_)
+    overscroll_controller_->Enable();
+
   frame_evictor_->SetVisible(true);
   WasShown();
 }
@@ -586,6 +589,9 @@ void RenderWidgetHostViewAndroid::Hide() {
   is_showing_ = false;
   if (layer_.get() && locks_on_frame_count_ == 0)
     layer_->SetHideLayerAndSubtree(true);
+
+  if (overscroll_controller_)
+    overscroll_controller_->Disable();
 
   frame_evictor_->SetVisible(false);
   // We don't know if we will ever get a frame if we are hiding the renderer, so
@@ -793,7 +799,7 @@ bool RenderWidgetHostViewAndroid::OnTouchEvent(
                                             CreateLatencyInfo(web_event));
   } else {
     const bool event_consumed = false;
-    gesture_provider_.OnTouchEventAck(event_consumed);
+    gesture_provider_.OnAsyncTouchEventAck(event_consumed);
   }
 
   // Send a proactive BeginFrame on the next vsync to reduce latency.
@@ -839,7 +845,7 @@ void RenderWidgetHostViewAndroid::ImeCancelComposition() {
 void RenderWidgetHostViewAndroid::ImeCompositionRangeChanged(
     const gfx::Range& range,
     const std::vector<gfx::Rect>& character_bounds) {
-  ime_adapter_android_.SetCharacterBounds(character_bounds);
+  // TODO(yukawa): Implement this.
 }
 
 void RenderWidgetHostViewAndroid::FocusedNodeChanged(bool is_editable_node) {
@@ -1245,24 +1251,25 @@ void RenderWidgetHostViewAndroid::SelectBetweenCoordinates(
 }
 
 void RenderWidgetHostViewAndroid::OnSelectionEvent(
-    SelectionEventType event,
+    ui::SelectionEventType event,
     const gfx::PointF& position) {
   DCHECK(content_view_core_);
   // Showing the selection action bar can alter the current View coordinates in
   // such a way that the current MotionEvent stream is suddenly shifted in
   // space. Avoid the associated scroll jump by pre-emptively cancelling gesture
   // detection; scrolling after the selection is activated is unnecessary.
-  if (event == SelectionEventType::SELECTION_SHOWN)
+  if (event == ui::SelectionEventType::SELECTION_SHOWN)
     ResetGestureDetection();
   content_view_core_->OnSelectionEvent(event, position);
 }
 
-scoped_ptr<TouchHandleDrawable> RenderWidgetHostViewAndroid::CreateDrawable() {
+scoped_ptr<ui::TouchHandleDrawable>
+RenderWidgetHostViewAndroid::CreateDrawable() {
   DCHECK(content_view_core_);
   if (!using_browser_compositor_)
     return content_view_core_->CreatePopupTouchHandleDrawable();
 
-  return scoped_ptr<TouchHandleDrawable>(new CompositedTouchHandleDrawable(
+  return scoped_ptr<ui::TouchHandleDrawable>(new CompositedTouchHandleDrawable(
       content_view_core_->GetLayer().get(),
       content_view_core_->GetDpiScale(),
       // Use the activity context (instead of the application context) to ensure
@@ -1316,7 +1323,8 @@ void RenderWidgetHostViewAndroid::OnFrameMetadataUpdated(
 
   if (selection_controller_) {
     selection_controller_->OnSelectionBoundsChanged(
-        frame_metadata.selection_start, frame_metadata.selection_end);
+        ui::SelectionBound(frame_metadata.selection_start),
+        ui::SelectionBound(frame_metadata.selection_end));
   }
 
   // All offsets and sizes are in CSS pixels.
@@ -1477,7 +1485,7 @@ gfx::GLSurfaceHandle RenderWidgetHostViewAndroid::GetCompositingSurface() {
 void RenderWidgetHostViewAndroid::ProcessAckedTouchEvent(
     const TouchEventWithLatencyInfo& touch, InputEventAckState ack_result) {
   const bool event_consumed = ack_result == INPUT_EVENT_ACK_STATE_CONSUMED;
-  gesture_provider_.OnTouchEventAck(event_consumed);
+  gesture_provider_.OnAsyncTouchEventAck(event_consumed);
 }
 
 void RenderWidgetHostViewAndroid::GestureEventAck(
@@ -1627,11 +1635,10 @@ void RenderWidgetHostViewAndroid::OnShowingPastePopup(
   // of the region have been updated, explicitly set the properties now.
   // TODO(jdduke): Remove this workaround when auxiliary paste popup
   // notifications are no longer required, crbug.com/398170.
-  cc::ViewportSelectionBound insertion_bound;
-  insertion_bound.type = cc::SELECTION_BOUND_CENTER;
-  insertion_bound.visible = true;
-  insertion_bound.edge_top = point;
-  insertion_bound.edge_bottom = point;
+  ui::SelectionBound insertion_bound;
+  insertion_bound.set_type(ui::SelectionBound::CENTER);
+  insertion_bound.set_visible(true);
+  insertion_bound.SetEdge(point, point);
   selection_controller_->HideAndDisallowShowingAutomatically();
   selection_controller_->OnSelectionEditable(true);
   selection_controller_->OnSelectionEmpty(true);

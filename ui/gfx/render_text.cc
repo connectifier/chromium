@@ -398,13 +398,19 @@ RenderText::~RenderText() {
 }
 
 RenderText* RenderText::CreateInstance() {
-#if defined(OS_MACOSX) && !defined(TOOLKIT_VIEWS)
+#if defined(OS_MACOSX)
   static const bool use_harfbuzz = CommandLine::ForCurrentProcess()->
       HasSwitch(switches::kEnableHarfBuzzRenderText);
 #else
   static const bool use_harfbuzz = !CommandLine::ForCurrentProcess()->
       HasSwitch(switches::kDisableHarfBuzzRenderText);
 #endif
+  return use_harfbuzz ? new RenderTextHarfBuzz : CreateNativeInstance();
+}
+
+RenderText* RenderText::CreateInstanceForEditing() {
+  static const bool use_harfbuzz = !CommandLine::ForCurrentProcess()->
+      HasSwitch(switches::kDisableHarfBuzzRenderText);
   return use_harfbuzz ? new RenderTextHarfBuzz : CreateNativeInstance();
 }
 
@@ -721,10 +727,14 @@ SizeF RenderText::GetStringSizeF() {
   return GetStringSize();
 }
 
-float RenderText::GetContentWidth() {
+float RenderText::GetContentWidthF() {
+  const float string_size = GetStringSizeF().width();
   // The cursor is drawn one pixel beyond the int-enclosed text bounds.
-  return cursor_enabled_ ?
-      std::ceil(GetStringSizeF().width()) + 1 : GetStringSizeF().width();
+  return cursor_enabled_ ? std::ceil(string_size) + 1 : string_size;
+}
+
+int RenderText::GetContentWidth() {
+  return ToCeiledInt(GetContentWidthF());
 }
 
 int RenderText::GetBaseline() {
@@ -856,8 +866,7 @@ const Vector2d& RenderText::GetUpdatedDisplayOffset() {
 }
 
 void RenderText::SetDisplayOffset(int horizontal_offset) {
-  const int extra_content =
-      ToFlooredInt(GetContentWidth()) - display_rect_.width();
+  const int extra_content = GetContentWidth() - display_rect_.width();
   const int cursor_width = cursor_enabled_ ? 1 : 0;
 
   int min_offset = 0;
@@ -1098,8 +1107,7 @@ Vector2d RenderText::GetAlignmentOffset(size_t line_number) {
 
 void RenderText::ApplyFadeEffects(internal::SkiaTextRenderer* renderer) {
   const int width = display_rect().width();
-  if (multiline() || elide_behavior_ != FADE_TAIL ||
-      static_cast<int>(GetContentWidth()) <= width)
+  if (multiline() || elide_behavior_ != FADE_TAIL || GetContentWidth() <= width)
     return;
 
   const int gradient_width = CalculateFadeGradientWidth(font_list(), width);
@@ -1207,7 +1215,7 @@ void RenderText::UpdateLayoutText() {
   if (elide_behavior_ != NO_ELIDE &&
       elide_behavior_ != FADE_TAIL &&
       !layout_text_.empty() &&
-      static_cast<int>(GetContentWidth()) > display_rect_.width()) {
+      GetContentWidth() > display_rect_.width()) {
     // This doesn't trim styles so ellipsis may get rendered as a different
     // style than the preceding text. See crbug.com/327850.
     layout_text_.assign(Elide(layout_text_,
@@ -1233,7 +1241,7 @@ base::string16 RenderText::Elide(const base::string16& text,
     return ElideEmail(text, available_width);
 
   // Create a RenderText copy with attributes that affect the rendering width.
-  scoped_ptr<RenderText> render_text(CreateInstance());
+  scoped_ptr<RenderText> render_text = CreateInstanceOfSameType();
   render_text->SetFontList(font_list_);
   render_text->SetDirectionalityMode(directionality_mode_);
   render_text->SetCursorEnabled(cursor_enabled_);
@@ -1241,7 +1249,7 @@ base::string16 RenderText::Elide(const base::string16& text,
   render_text->styles_ = styles_;
   render_text->colors_ = colors_;
   render_text->SetText(text);
-  if (render_text->GetContentWidth() <= available_width)
+  if (render_text->GetContentWidthF() <= available_width)
     return text;
 
   const base::string16 ellipsis = base::string16(kEllipsisUTF16);
@@ -1251,7 +1259,7 @@ base::string16 RenderText::Elide(const base::string16& text,
   StringSlicer slicer(text, ellipsis, elide_in_middle, elide_at_beginning);
 
   render_text->SetText(ellipsis);
-  const float ellipsis_width = render_text->GetContentWidth();
+  const float ellipsis_width = render_text->GetContentWidthF();
 
   if (insert_ellipsis && (ellipsis_width > available_width))
     return base::string16();
@@ -1308,7 +1316,7 @@ base::string16 RenderText::Elide(const base::string16& text,
 
     // We check the width of the whole desired string at once to ensure we
     // handle kerning/ligatures/etc. correctly.
-    const float guess_width = render_text->GetContentWidth();
+    const float guess_width = render_text->GetContentWidthF();
     if (guess_width == available_width)
       break;
     if (guess_width > available_width) {

@@ -7,9 +7,11 @@
 
 #include "base/files/file_path.h"
 #include "base/message_loop/message_pump_libevent.h"
+#include "ui/events/devices/input_device.h"
 #include "ui/events/event.h"
 #include "ui/events/ozone/evdev/cursor_delegate_evdev.h"
 #include "ui/events/ozone/evdev/event_converter_evdev.h"
+#include "ui/events/ozone/evdev/event_device_info.h"
 #include "ui/events/ozone/evdev/event_modifiers_evdev.h"
 #include "ui/events/ozone/evdev/events_ozone_evdev_export.h"
 #include "ui/events/ozone/evdev/keyboard_evdev.h"
@@ -25,6 +27,8 @@ class EVENTS_OZONE_EVDEV_EXPORT EventConverterEvdevImpl
   EventConverterEvdevImpl(int fd,
                           base::FilePath path,
                           int id,
+                          InputDeviceType type,
+                          const EventDeviceInfo& info,
                           EventModifiersEvdev* modifiers,
                           MouseButtonMapEvdev* button_map,
                           CursorDelegateEvdev* cursor,
@@ -34,6 +38,7 @@ class EVENTS_OZONE_EVDEV_EXPORT EventConverterEvdevImpl
 
   // EventConverterEvdev:
   void OnFileCanReadWithoutBlocking(int fd) override;
+  bool HasKeyboard() const override;
 
   void ProcessEvents(const struct input_event* inputs, int count);
 
@@ -47,6 +52,9 @@ class EVENTS_OZONE_EVDEV_EXPORT EventConverterEvdevImpl
   // Flush events delimited by EV_SYN. This is useful for handling
   // non-axis-aligned movement properly.
   void FlushEvents();
+
+  // Input modalities for this device.
+  bool has_keyboard_;
 
   // Save x-axis events of relative devices to be flushed at EV_SYN time.
   int x_offset_;

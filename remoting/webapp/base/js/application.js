@@ -95,7 +95,15 @@ remoting.Application.prototype.onVideoStreamingStarted = function() {
  * @return {boolean} Return true if the extension message was recognized.
  */
 remoting.Application.prototype.onExtensionMessage = function(type, data) {
-  return this.delegate_.onExtensionMessage(type, data);
+  // Give the delegate a chance to handle this extension message first.
+  if (this.delegate_.onExtensionMessage(type, data)) {
+    return true;
+  }
+
+  if (remoting.clientSession) {
+    return remoting.clientSession.handleExtensionMessage(type, data);
+  }
+  return false;
 };
 
 /**
@@ -119,7 +127,9 @@ remoting.Application.prototype.getSessionConnector = function() {
         document.getElementById('video-container'),
         this.onConnected.bind(this),
         this.onError.bind(this),
-        this.onExtensionMessage.bind(this));
+        this.onExtensionMessage.bind(this),
+        this.delegate_.getRequiredCapabilities(),
+        this.delegate_.getDefaultRemapKeys());
   }
   return this.session_connector_;
 };
@@ -137,6 +147,17 @@ remoting.Application.Delegate = function() {};
  * @return {void} Nothing.
  */
 remoting.Application.Delegate.prototype.init = function() {};
+
+/**
+ * @return {string} The default remap keys for the current platform.
+ */
+remoting.Application.Delegate.prototype.getDefaultRemapKeys = function() {};
+
+/**
+ * @return {Array.<string>} A list of |ClientSession.Capability|s required
+ *     by this application.
+ */
+remoting.Application.Delegate.prototype.getRequiredCapabilities = function() {};
 
 /**
  * Called when a new session has been connected.

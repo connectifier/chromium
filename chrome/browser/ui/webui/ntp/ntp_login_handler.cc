@@ -121,45 +121,26 @@ void NTPLoginHandler::HandleInitializeSyncLogin(const base::ListValue* args) {
 
 void NTPLoginHandler::HandleShowSyncLoginUI(const base::ListValue* args) {
   Profile* profile = Profile::FromWebUI(web_ui());
+  if (!signin::ShouldShowPromo(profile))
+    return;
+
   std::string username =
       SigninManagerFactory::GetForProfile(profile)->GetAuthenticatedUsername();
+  if (!username.empty())
+    return;
+
   content::WebContents* web_contents = web_ui()->GetWebContents();
   Browser* browser = chrome::FindBrowserWithWebContents(web_contents);
   if (!browser)
     return;
 
-  if (username.empty()) {
-    // The user isn't signed in, show the sign in promo.
-    if (signin::ShouldShowPromo(profile)) {
-      signin::Source source =
-          (web_contents->GetURL().spec() == chrome::kChromeUIAppsURL) ?
-              signin::SOURCE_APPS_PAGE_LINK :
-              signin::SOURCE_NTP_LINK;
-      chrome::ShowBrowserSignin(browser, source);
-      RecordInHistogram(NTP_SIGN_IN_PROMO_CLICKED);
-    }
-  } else if (args->GetSize() == 4) {
-    // The user is signed in, show the profiles menu.
-    double x = 0;
-    double y = 0;
-    double width = 0;
-    double height = 0;
-    bool success = args->GetDouble(0, &x);
-    DCHECK(success);
-    success = args->GetDouble(1, &y);
-    DCHECK(success);
-    success = args->GetDouble(2, &width);
-    DCHECK(success);
-    success = args->GetDouble(3, &height);
-    DCHECK(success);
-
-    double zoom = content::ZoomLevelToZoomFactor(
-        ZoomController::FromWebContents(web_contents)->GetZoomLevel());
-    gfx::Rect rect(x * zoom, y * zoom, width * zoom, height * zoom);
-
-    browser->window()->ShowAvatarBubble(web_ui()->GetWebContents(), rect);
-    ProfileMetrics::LogProfileOpenMethod(ProfileMetrics::NTP_AVATAR_BUBBLE);
-  }
+  // The user isn't signed in, show the sign in promo.
+  signin::Source source =
+      web_contents->GetURL().spec() == chrome::kChromeUIAppsURL ?
+          signin::SOURCE_APPS_PAGE_LINK :
+          signin::SOURCE_NTP_LINK;
+  chrome::ShowBrowserSignin(browser, source);
+  RecordInHistogram(NTP_SIGN_IN_PROMO_CLICKED);
 }
 
 void NTPLoginHandler::RecordInHistogram(int type) {
@@ -223,7 +204,7 @@ void NTPLoginHandler::UpdateLogin() {
     // Chromeos does not show this status header.
     SigninManager* signin = SigninManagerFactory::GetForProfile(
         profile->GetOriginalProfile());
-    if (!profile->IsSupervised() && signin->IsSigninAllowed()) {
+    if (!profile->IsLegacySupervised() && signin->IsSigninAllowed()) {
       base::string16 signed_in_link = l10n_util::GetStringUTF16(
           IDS_SYNC_PROMO_NOT_SIGNED_IN_STATUS_LINK);
       signed_in_link = CreateSpanWithClass(signed_in_link, "link-span");

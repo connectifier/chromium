@@ -145,23 +145,15 @@ TileItemView* StartPageView::all_apps_button() const {
 }
 
 void StartPageView::OnShow() {
-  // This can get called before InitWidgets(), so we cannot guarantee that
-  // custom_page_clickzone_ will not be null.
-  views::Widget* custom_page_clickzone =
-      app_list_main_view_->GetCustomPageClickzone();
-  if (!custom_page_clickzone)
-    return;
-
-  custom_page_clickzone->ShowInactive();
+  DCHECK(app_list_main_view_->contents_view()->ShouldShowCustomPageClickzone());
+  UpdateCustomPageClickzoneVisibility();
+  ClearSelectedIndex();
 }
 
 void StartPageView::OnHide() {
-  views::Widget* custom_page_clickzone =
-      app_list_main_view_->GetCustomPageClickzone();
-  if (!custom_page_clickzone)
-    return;
-
-  custom_page_clickzone->Hide();
+  DCHECK(
+      !app_list_main_view_->contents_view()->ShouldShowCustomPageClickzone());
+  UpdateCustomPageClickzoneVisibility();
 }
 
 void StartPageView::Layout() {
@@ -175,6 +167,48 @@ void StartPageView::Layout() {
   tiles_container_->SetBoundsRect(bounds);
 }
 
+bool StartPageView::OnKeyPressed(const ui::KeyEvent& event) {
+  if (selected_index() >= 0 &&
+      tiles_container_->child_at(selected_index())->OnKeyPressed(event))
+    return true;
+
+  int dir = 0;
+  switch (event.key_code()) {
+    case ui::VKEY_LEFT:
+      dir = -1;
+      break;
+    case ui::VKEY_RIGHT:
+      dir = 1;
+      break;
+    case ui::VKEY_DOWN:
+      // Down selects the first tile if nothing is selected.
+      if (!IsValidSelectionIndex(selected_index()))
+        dir = 1;
+      break;
+    case ui::VKEY_TAB:
+      dir = event.IsShiftDown() ? -1 : 1;
+      break;
+    default:
+      break;
+  }
+
+  if (dir == 0)
+    return false;
+
+  if (!IsValidSelectionIndex(selected_index())) {
+    SetSelectedIndex(dir == -1 ? num_results() - 1 : 0);
+    return true;
+  }
+
+  int selection_index = selected_index() + dir;
+  if (IsValidSelectionIndex(selection_index)) {
+    SetSelectedIndex(selection_index);
+    return true;
+  }
+
+  return false;
+}
+
 void StartPageView::OnContainerSelected(bool from_bottom) {
 }
 
@@ -182,10 +216,26 @@ gfx::Rect StartPageView::GetSearchBoxBounds() const {
   return search_box_spacer_view_->bounds();
 }
 
+void StartPageView::UpdateCustomPageClickzoneVisibility() {
+  // This can get called before InitWidgets(), so we cannot guarantee that
+  // custom_page_clickzone_ will not be null.
+  views::Widget* custom_page_clickzone =
+      app_list_main_view_->GetCustomPageClickzone();
+  if (!custom_page_clickzone)
+    return;
+
+  if (app_list_main_view_->contents_view()->ShouldShowCustomPageClickzone()) {
+    custom_page_clickzone->ShowInactive();
+    return;
+  }
+
+  custom_page_clickzone->Hide();
+}
+
 int StartPageView::Update() {
   std::vector<SearchResult*> display_results =
       AppListModel::FilterSearchResultsByDisplayType(
-          results(), SearchResult::DISPLAY_TILE, kNumStartPageTiles);
+          results(), SearchResult::DISPLAY_RECOMMENDATION, kNumStartPageTiles);
 
   // Update the tile item results.
   for (size_t i = 0; i < search_result_tile_views_.size(); ++i) {
@@ -197,10 +247,22 @@ int StartPageView::Update() {
 
   tiles_container_->Layout();
   Layout();
-  return display_results.size();
+  // Add 1 to the results size to account for the all apps button.
+  return display_results.size() + 1;
 }
 
 void StartPageView::UpdateSelectedIndex(int old_selected, int new_selected) {
+  if (old_selected >= 0) {
+    tiles_container_->child_at(old_selected)->set_background(nullptr);
+    tiles_container_->child_at(old_selected)->SchedulePaint();
+  }
+
+  if (new_selected >= 0) {
+    tiles_container_->child_at(new_selected)
+        ->set_background(
+            views::Background::CreateSolidBackground(kSelectedColor));
+    tiles_container_->child_at(new_selected)->SchedulePaint();
+  }
 }
 
 }  // namespace app_list

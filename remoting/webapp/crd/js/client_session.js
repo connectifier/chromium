@@ -23,6 +23,15 @@
 var remoting = remoting || {};
 
 /**
+ * Interval that determines how often the web-app should send a new access token
+ * to the host.
+ *
+ * @const
+ * @type {number}
+ */
+remoting.ACCESS_TOKEN_RESEND_INTERVAL_MS = 15 * 60 * 1000;
+
+/**
  * True if Cast capability is supported.
  *
  * @type {boolean}
@@ -40,6 +49,15 @@ remoting.enableCast = false;
  * @type {boolean}
  */
 remoting.enableMouseLock = false;
+
+/**
+ * True to enable MediaSource rendering, if available.
+ * The plugin also needs to support MediaSource rendering.
+ * TODO(garykac): Remove this once mediaSource is stable for VP9 streams.
+ *
+ * @type {boolean}
+ */
+remoting.enableMediaSourceRendering = true;
 
 /**
  * @param {remoting.SignalStrategy} signalStrategy Signal strategy.
@@ -65,6 +83,8 @@ remoting.enableMouseLock = false;
  *     pairing id for this client, as issued by the host.
  * @param {string} clientPairedSecret For paired Me2Me connections, the
  *     paired secret for this client, as issued by the host.
+ * @param {string} defaultRemapKeys The default set of remap keys, to use
+ *     when the client doesn't define any.
  * @constructor
  * @extends {base.EventSource}
  */
@@ -72,7 +92,7 @@ remoting.ClientSession = function(signalStrategy, container, hostDisplayName,
                                   accessCode, fetchPin, fetchThirdPartyToken,
                                   authenticationMethods, hostId, hostJid,
                                   hostPublicKey, mode, clientPairingId,
-                                  clientPairedSecret) {
+                                  clientPairedSecret, defaultRemapKeys) {
   /** @private */
   this.state_ = remoting.ClientSession.State.CREATED;
 
@@ -105,6 +125,9 @@ remoting.ClientSession = function(signalStrategy, container, hostDisplayName,
   this.clientPairingId_ = clientPairingId;
   /** @private */
   this.clientPairedSecret_ = clientPairedSecret;
+  /** @private */
+  this.defaultRemapKeys_ = defaultRemapKeys;
+
   /** @private */
   this.sessionId_ = '';
   /** @type {remoting.ClientPlugin}
@@ -210,6 +233,11 @@ remoting.ClientSession.prototype.getHostDisplayName = function() {
  * fixed.
  */
 remoting.ClientSession.prototype.updateScrollbarVisibility = function() {
+  var scroller = document.getElementById('scroller');
+  if (!scroller) {
+    return;
+  }
+
   var needsVerticalScroll = false;
   var needsHorizontalScroll = false;
   if (!this.shrinkToFit_) {
@@ -228,7 +256,6 @@ remoting.ClientSession.prototype.updateScrollbarVisibility = function() {
     }
   }
 
-  var scroller = document.getElementById('scroller');
   if (needsHorizontalScroll) {
     scroller.classList.remove('no-horizontal-scroll');
   } else {
@@ -370,9 +397,26 @@ remoting.ClientSession.Capability = {
   // resolution to the host once connection has been established. See
   // this.plugin_.notifyClientResolution().
   SEND_INITIAL_RESOLUTION: 'sendInitialResolution',
+
+  // Let the host know that we're interested in knowing whether or not it
+  // rate limits desktop-resize requests.
   RATE_LIMIT_RESIZE_REQUESTS: 'rateLimitResizeRequests',
+
+  // Indicates that host/client supports Google Drive integration, and that the
+  // client should send to the host the OAuth tokens to be used by Google Drive
+  // on the host.
+  GOOGLE_DRIVE: "googleDrive",
+
+  // Indicates that the client supports the video frame-recording extension.
   VIDEO_RECORDER: 'videoRecorder',
-  CAST: 'casting'
+
+  // Indicates that the client supports 'cast'ing the video stream to a
+  // cast-enabled device.
+  CAST: 'casting',
+
+  // When enabled, this capability results in the client informing the host
+  // that it supports Gnubby-based authentication.
+  GNUBBY_AUTH: 'gnubbyAuth'
 };
 
 /**
@@ -426,12 +470,14 @@ remoting.ClientSession.prototype.pluginLostFocus_ = function() {
  * @param {function(string, string):boolean} onExtensionMessage The handler for
  *     protocol extension messages. Returns true if a message is recognized;
  *     false otherwise.
+ * @param {Array.<string>} requiredCapabilities A list of capabilities
+ *     required by this application.
  */
 remoting.ClientSession.prototype.createPluginAndConnect =
-    function(onExtensionMessage) {
+    function(onExtensionMessage, requiredCapabilities) {
   this.plugin_ = remoting.ClientPlugin.factory.createPlugin(
       this.container_.querySelector('.client-plugin-container'),
-      onExtensionMessage);
+      onExtensionMessage, requiredCapabilities);
   remoting.HostSettings.load(this.hostId_,
                              this.onHostSettingsLoaded_.bind(this));
 };
@@ -526,10 +572,11 @@ remoting.ClientSession.prototype.onPluginInitialized_ = function(initialized) {
     this.plugin_.allowMouseLock();
   }
 
-  // Enable MediaSource-based rendering on Chrome 37 and above.
+  // MediaSource-based rendering is only supported on Chrome 37 and above.
   var chromeVersionMajor =
       parseInt((remoting.getChromeVersion() || '0').split('.')[0], 10);
   if (chromeVersionMajor >= 37 &&
+      remoting.enableMediaSourceRendering &&
       this.plugin_.hasFeature(
           remoting.ClientPlugin.Feature.MEDIA_SOURCE_RENDERING)) {
     this.video_ = /** @type {HTMLMediaElement} */(
@@ -749,15 +796,12 @@ remoting.ClientSession.prototype.setRemapKeys = function(remappings) {
  * @param {boolean} apply True to apply remappings, false to cancel them.
  */
 remoting.ClientSession.prototype.applyRemapKeys_ = function(apply) {
-  // By default, under ChromeOS, remap the right Control key to the right
-  // Win / Cmd key.
   var remapKeys = this.remapKeys_;
-  if (remapKeys == '' && remoting.platformIsChromeOS()) {
-    remapKeys = '0x0700e4>0x0700e7';
-  }
-
   if (remapKeys == '') {
-    return;
+    remapKeys = this.defaultRemapKeys_;
+    if (remapKeys == '') {
+      return;
+    }
   }
 
   var remappings = remapKeys.split(',');
@@ -1066,6 +1110,9 @@ remoting.ClientSession.prototype.onSetCapabilities_ = function(capabilities) {
     this.plugin_.notifyClientResolution(clientArea.width,
                                         clientArea.height,
                                         window.devicePixelRatio);
+  }
+  if (this.hasCapability_(remoting.ClientSession.Capability.GOOGLE_DRIVE)) {
+    this.sendGoogleDriveAccessToken_();
   }
   if (this.hasCapability_(
       remoting.ClientSession.Capability.VIDEO_RECORDER)) {
@@ -1498,6 +1545,18 @@ remoting.ClientSession.prototype.sendClipboardItem = function(mimeType, item) {
 };
 
 /**
+ * Sends an extension message to the host.
+ *
+ * @param {string} type The message type.
+ * @param {string} message The message payload.
+ */
+remoting.ClientSession.prototype.sendClientMessage = function(type, message) {
+  if (!this.plugin_)
+    return;
+  this.plugin_.sendClientMessage(type, message);
+};
+
+/**
  * Send a gnubby-auth extension message to the host.
  * @param {Object} data The gnubby-auth message data.
  */
@@ -1531,11 +1590,36 @@ remoting.ClientSession.prototype.processGnubbyAuthMessage_ = function(data) {
  * @private
  */
 remoting.ClientSession.prototype.createGnubbyAuthHandler_ = function() {
-  if (this.mode_ == remoting.ClientSession.Mode.ME2ME) {
+  if (this.hasCapability_(remoting.ClientSession.Capability.GNUBBY_AUTH) &&
+      this.mode_ == remoting.ClientSession.Mode.ME2ME) {
     this.gnubbyAuthHandler_ = new remoting.GnubbyAuthHandler(this);
     // TODO(psj): Move to more generic capabilities mechanism.
     this.sendGnubbyAuthMessage({'type': 'control', 'option': 'auth-v1'});
   }
+};
+
+/**
+ * Timer callback to send the access token to the host.
+ * @private
+ */
+remoting.ClientSession.prototype.sendGoogleDriveAccessToken_ = function() {
+  if (this.state_ != remoting.ClientSession.State.CONNECTED) {
+    return;
+  }
+  /** @type {remoting.ClientSession} */
+  var that = this;
+
+  /** @param {string} token */
+  var sendToken = function(token) {
+    remoting.clientSession.sendClientMessage('accessToken', token);
+  };
+  /** @param {remoting.Error} error */
+  var sendError = function(error) {
+    console.log('Failed to refresh access token: ' + error);
+  }
+  remoting.identity.callWithNewToken(sendToken, sendError);
+  window.setTimeout(this.sendGoogleDriveAccessToken_.bind(this),
+                    remoting.ACCESS_TOKEN_RESEND_INTERVAL_MS);
 };
 
 /**

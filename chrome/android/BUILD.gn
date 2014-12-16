@@ -76,6 +76,7 @@ java_strings_grd("chrome_strings_grd") {
 android_library("chrome_java") {
   deps = [
     ":chrome_java_resources",
+    ":document_tab_model_info_proto_java",
     "//base:base_java",
     "//net/android:net_java",
     "//components/bookmarks/common/android:bookmarks_java",
@@ -93,6 +94,8 @@ android_library("chrome_java") {
     "//third_party/cacheinvalidation:cacheinvalidation_javalib",
     "//third_party/cacheinvalidation:cacheinvalidation_proto_java",
     "//third_party/jsr-305:jsr_305_javalib",
+    "//third_party/libaddressinput:android_addressinput_widget_java",
+    "//third_party/libaddressinput:android_addressinput_widget_resources",
     "//ui/android:ui_java",
     "//ui/android:ui_java_resources",
   ]
@@ -140,6 +143,14 @@ java_cpp_template("app_banner_metrics_ids_javagen") {
   package_name = "org/chromium/chrome/browser/banners"
   inputs = [
     "../browser/android/banners/app_banner_metrics_id_list.h",
+  ]
+}
+
+# GYP: //chrome/chrome_browser.gypi:document_tab_model_info_proto_java
+proto_java_library("document_tab_model_info_proto_java") {
+  proto_path = "java/src/org/chromium/chrome/browser/tabmodel/document"
+  sources = [
+    "$proto_path/document_tab_model_info.proto",
   ]
 }
 
@@ -248,6 +259,8 @@ android_library("chrome_shell_java") {
     "//printing:printing_java",
     "//net/android:net_java",
     "//sync/android:sync_java",
+    "//third_party/android_tools:android_support_v13_java",
+    "//third_party/android_tools:android_support_v7_appcompat_java",
     "//ui/android:ui_java",
   ]
   DEPRECATED_java_in_dir = "shell/java/src"
@@ -405,6 +418,8 @@ android_library("chrome_javatests") {
     "//printing:printing_java",
     "//sync/android:sync_java",
     "//sync:sync_java_test_support",
+    "//third_party/android_tools:android_support_v13_java",
+    "//third_party/android_tools:android_support_v7_appcompat_java",
     "//third_party/cacheinvalidation:cacheinvalidation_javalib",
     "//third_party/cacheinvalidation:cacheinvalidation_proto_java",
     "//third_party/jsr-305:jsr_305_javalib",

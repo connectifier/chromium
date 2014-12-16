@@ -4,6 +4,7 @@
 
 #include "content/browser/speech/google_streaming_remote_engine.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "base/bind.h"
@@ -342,7 +343,12 @@ GoogleStreamingRemoteEngine::ConnectBothStreams(const FSMEventArgs&) {
     upstream_args.push_back("continuous");
   if (config_.interim_results)
     upstream_args.push_back("interim");
-
+  if (!config_.auth_token.empty() && !config_.auth_scope.empty()) {
+    upstream_args.push_back(
+        "authScope=" + net::EscapeQueryParamValue(config_.auth_scope, true));
+    upstream_args.push_back(
+        "authToken=" + net::EscapeQueryParamValue(config_.auth_token, true));
+  }
   GURL upstream_url(std::string(kWebServiceBaseUrl) +
                     std::string(kUpstreamUrl) +
                     JoinString(upstream_args, '&'));
@@ -471,12 +477,10 @@ GoogleStreamingRemoteEngine::CloseUpstreamAndWaitForResults(
 
   // The encoder requires a non-empty final buffer. So we encode a packet
   // of silence in case encoder had no data already.
-  std::vector<short> samples(
-      config_.audio_sample_rate * kAudioPacketIntervalMs / 1000);
-  scoped_refptr<AudioChunk> dummy_chunk =
-      new AudioChunk(reinterpret_cast<uint8*>(&samples[0]),
-                     samples.size() * sizeof(short),
-                     encoder_->bits_per_sample() / 8);
+  size_t sample_count =
+      config_.audio_sample_rate * kAudioPacketIntervalMs / 1000;
+  scoped_refptr<AudioChunk> dummy_chunk = new AudioChunk(
+      sample_count * sizeof(int16), encoder_->bits_per_sample() / 8);
   encoder_->Encode(*dummy_chunk.get());
   encoder_->Flush();
   scoped_refptr<AudioChunk> encoded_dummy_data =

@@ -15,6 +15,7 @@ import android.os.Bundle;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceFragment.OnPreferenceStartFragmentCallback;
+import android.support.v4.view.ViewCompat;
 import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.MenuItem;
@@ -24,7 +25,6 @@ import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.base.library_loader.ProcessInitException;
 import org.chromium.chrome.R;
-import org.chromium.content.browser.BrowserStartupController;
 
 /**
  * The Chrome settings activity.
@@ -34,7 +34,7 @@ import org.chromium.content.browser.BrowserStartupController;
  * may freely modify its activity's action bar or title. This mimics the behavior of
  * android.preference.PreferenceActivity.
  */
-public class Preferences extends ActionBarActivity implements
+public abstract class Preferences extends ActionBarActivity implements
         OnPreferenceStartFragmentCallback {
 
     public static final String EXTRA_SHOW_FRAGMENT = "show_fragment";
@@ -54,25 +54,19 @@ public class Preferences extends ActionBarActivity implements
     /**
      * Starts the browser process, if it's not already started.
      */
-    protected void startBrowserProcessSync() throws ProcessInitException {
-        BrowserStartupController.get(this).startBrowserProcessesSync(false);
-    }
+    protected abstract void startBrowserProcessSync() throws ProcessInitException;
 
     /**
      * Returns the name of the fragment to show if the intent doesn't request a specific fragment.
      */
-    protected String getTopLevelFragmentName() {
-        return AboutChromePreferences.class.getName();
-    }
+    protected abstract String getTopLevelFragmentName();
 
     /**
      * Opens a URL in a new activity.
      * @param titleResId The resource ID of the title to show above the web page.
      * @param urlResId The resource ID of the URL to load.
      */
-    public void showUrl(int titleResId, int urlResId) {
-        // Not implemented.
-    }
+    public abstract void showUrl(int titleResId, int urlResId);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,9 +98,8 @@ public class Preferences extends ActionBarActivity implements
 
         if (displayHomeAsUp) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
-        // Workaround for an Android bug. This must be called before the fragment transaction below,
-        // or else the fragment's view may not be attached to the view hierarchy. http://b/18525402
-        setContentView(new View(this));
+        // This must be called before the fragment transaction below.
+        workAroundPlatformBugs();
 
         // Display the fragment as the main content.
         if (initialFragment == null) initialFragment = getTopLevelFragmentName();
@@ -205,5 +198,21 @@ public class Preferences extends ActionBarActivity implements
             // Something terribly wrong has happened.
             throw new RuntimeException(ex);
         }
+    }
+
+    private void workAroundPlatformBugs() {
+        // Workaround for an Android bug where the fragment's view may not be attached to the view
+        // hierarchy. http://b/18525402
+        setContentView(new View(this));
+
+        // Workaround for HTC One S bug which causes all the text in settings to turn white.
+        // This must be called after setContentView().
+        // https://code.google.com/p/android/issues/detail?id=78819
+        ViewCompat.postOnAnimation(getWindow().getDecorView(), new Runnable() {
+            @Override
+            public void run() {
+                setTheme(R.style.PreferencesTheme);
+            }
+        });
     }
 }

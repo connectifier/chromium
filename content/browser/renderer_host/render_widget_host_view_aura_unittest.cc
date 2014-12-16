@@ -55,6 +55,8 @@
 #include "ui/events/event.h"
 #include "ui/events/event_utils.h"
 #include "ui/events/gesture_detection/gesture_configuration.h"
+#include "ui/events/keycodes/dom3/dom_code.h"
+#include "ui/events/keycodes/dom4/keycode_converter.h"
 #include "ui/events/test/event_generator.h"
 #include "ui/wm/core/default_activation_client.h"
 #include "ui/wm/core/default_screen_position_client.h"
@@ -132,6 +134,17 @@ class MockRenderWidgetHostDelegate : public RenderWidgetHostDelegate {
  public:
   MockRenderWidgetHostDelegate() {}
   ~MockRenderWidgetHostDelegate() override {}
+  const NativeWebKeyboardEvent* last_event() const { return last_event_.get(); }
+ protected:
+  // RenderWidgetHostDelegate:
+  bool PreHandleKeyboardEvent(const NativeWebKeyboardEvent& event,
+                              bool* is_keyboard_shortcut) override {
+    last_event_.reset(new NativeWebKeyboardEvent(event));
+    return true;
+  }
+ private:
+  scoped_ptr<NativeWebKeyboardEvent> last_event_;
+  DISALLOW_COPY_AND_ASSIGN(MockRenderWidgetHostDelegate);
 };
 
 // Simple observer that keeps track of changes to a window for tests.
@@ -991,7 +1004,7 @@ TEST_F(RenderWidgetHostViewAuraTest, TouchEventState) {
   EXPECT_TRUE(widget_host_->ShouldForwardTouchEvent());
 
   view_->OnTouchEvent(&press);
-  EXPECT_TRUE(press.stopped_propagation());
+  EXPECT_TRUE(press.synchronous_handling_disabled());
   EXPECT_EQ(blink::WebInputEvent::TouchStart, view_->touch_event_.type);
   EXPECT_TRUE(view_->touch_event_.cancelable);
   EXPECT_EQ(1U, view_->touch_event_.touchesLength);
@@ -999,7 +1012,7 @@ TEST_F(RenderWidgetHostViewAuraTest, TouchEventState) {
             view_->touch_event_.touches[0].state);
 
   view_->OnTouchEvent(&move);
-  EXPECT_TRUE(move.stopped_propagation());
+  EXPECT_TRUE(move.synchronous_handling_disabled());
   EXPECT_EQ(blink::WebInputEvent::TouchMove, view_->touch_event_.type);
   EXPECT_TRUE(view_->touch_event_.cancelable);
   EXPECT_EQ(1U, view_->touch_event_.touchesLength);
@@ -1007,14 +1020,14 @@ TEST_F(RenderWidgetHostViewAuraTest, TouchEventState) {
             view_->touch_event_.touches[0].state);
 
   view_->OnTouchEvent(&release);
-  EXPECT_TRUE(release.stopped_propagation());
+  EXPECT_TRUE(release.synchronous_handling_disabled());
   EXPECT_EQ(blink::WebInputEvent::TouchEnd, view_->touch_event_.type);
   EXPECT_TRUE(view_->touch_event_.cancelable);
   EXPECT_EQ(0U, view_->touch_event_.touchesLength);
 
   // Now start a touch event, and remove the event-handlers before the release.
   view_->OnTouchEvent(&press);
-  EXPECT_TRUE(press.stopped_propagation());
+  EXPECT_TRUE(press.synchronous_handling_disabled());
   EXPECT_EQ(blink::WebInputEvent::TouchStart, view_->touch_event_.type);
   EXPECT_EQ(1U, view_->touch_event_.touchesLength);
   EXPECT_EQ(blink::WebTouchPoint::StatePressed,
@@ -1070,14 +1083,14 @@ TEST_F(RenderWidgetHostViewAuraTest, TouchEventSyncAsync) {
                          ui::EventTimeForNow());
 
   view_->OnTouchEvent(&press);
-  EXPECT_TRUE(press.stopped_propagation());
+  EXPECT_TRUE(press.synchronous_handling_disabled());
   EXPECT_EQ(blink::WebInputEvent::TouchStart, view_->touch_event_.type);
   EXPECT_EQ(1U, view_->touch_event_.touchesLength);
   EXPECT_EQ(blink::WebTouchPoint::StatePressed,
             view_->touch_event_.touches[0].state);
 
   view_->OnTouchEvent(&move);
-  EXPECT_TRUE(move.stopped_propagation());
+  EXPECT_TRUE(move.synchronous_handling_disabled());
   EXPECT_EQ(blink::WebInputEvent::TouchMove, view_->touch_event_.type);
   EXPECT_EQ(1U, view_->touch_event_.touchesLength);
   EXPECT_EQ(blink::WebTouchPoint::StateMoved,
@@ -1086,14 +1099,14 @@ TEST_F(RenderWidgetHostViewAuraTest, TouchEventSyncAsync) {
   // Send the same move event. Since the point hasn't moved, it won't affect the
   // queue. However, the view should consume the event.
   view_->OnTouchEvent(&move);
-  EXPECT_TRUE(move.stopped_propagation());
+  EXPECT_TRUE(move.synchronous_handling_disabled());
   EXPECT_EQ(blink::WebInputEvent::TouchMove, view_->touch_event_.type);
   EXPECT_EQ(1U, view_->touch_event_.touchesLength);
   EXPECT_EQ(blink::WebTouchPoint::StateMoved,
             view_->touch_event_.touches[0].state);
 
   view_->OnTouchEvent(&release);
-  EXPECT_TRUE(release.stopped_propagation());
+  EXPECT_TRUE(release.synchronous_handling_disabled());
   EXPECT_EQ(blink::WebInputEvent::TouchEnd, view_->touch_event_.type);
   EXPECT_EQ(0U, view_->touch_event_.touchesLength);
 }
@@ -2941,6 +2954,50 @@ TEST_F(RenderWidgetHostViewAuraOverscrollTest, OverscrollResetsOnBlur) {
 TEST_F(RenderWidgetHostViewGuestAuraTest, GuestViewDoesNotLeak) {
   TearDownEnvironment();
   ASSERT_FALSE(guest_view_weak_.get());
+}
+
+// Tests that invalid touch events are consumed and handled
+// synchronously.
+TEST_F(RenderWidgetHostViewAuraTest,
+       InvalidEventsHaveSyncHandlingDisabled) {
+  view_->InitAsChild(NULL);
+  view_->Show();
+
+  widget_host_->OnMessageReceived(ViewHostMsg_HasTouchEventHandlers(0, true));
+  EXPECT_TRUE(widget_host_->ShouldForwardTouchEvent());
+
+  ui::TouchEvent press(ui::ET_TOUCH_PRESSED, gfx::Point(30, 30), 0,
+                       ui::EventTimeForNow());
+
+  // Construct a move with a touch id which doesn't exist.
+  ui::TouchEvent invalid_move(ui::ET_TOUCH_MOVED, gfx::Point(30, 30), 1,
+                              ui::EventTimeForNow());
+
+  view_->OnTouchEvent(&press);
+  view_->OnTouchEvent(&invalid_move);
+  // Valid press is handled asynchronously.
+  EXPECT_TRUE(press.synchronous_handling_disabled());
+  // Invalid move is handled synchronously, but is consumed.
+  EXPECT_FALSE(invalid_move.synchronous_handling_disabled());
+  EXPECT_TRUE(invalid_move.stopped_propagation());
+}
+
+// Checks key event codes.
+TEST_F(RenderWidgetHostViewAuraTest, KeyEvent) {
+  view_->InitAsChild(NULL);
+  view_->Show();
+
+  ui::KeyEvent key_event(ui::ET_KEY_PRESSED, ui::VKEY_A, ui::DomCode::KEY_A,
+                         ui::EF_NONE);
+  view_->OnKeyEvent(&key_event);
+
+  const NativeWebKeyboardEvent* event = delegate_.last_event();
+  EXPECT_NE(nullptr, event);
+  if (event) {
+    EXPECT_EQ(key_event.key_code(), event->windowsKeyCode);
+    EXPECT_EQ(ui::KeycodeConverter::DomCodeToNativeKeycode(key_event.code()),
+              event->nativeKeyCode);
+  }
 }
 
 }  // namespace content

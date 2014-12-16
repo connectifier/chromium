@@ -10,6 +10,7 @@
 #include "base/callback_helpers.h"
 #include "base/logging.h"
 #include "base/numerics/safe_conversions.h"
+#include "base/sys_info.h"
 // Auto-generated for dlopen libva libraries
 #include "content/common/gpu/media/va_stubs.h"
 #include "third_party/libyuv/include/libyuv.h"
@@ -135,7 +136,8 @@ VASurface::~VASurface() {
 VaapiWrapper::VaapiWrapper()
     : va_display_(NULL),
       va_config_id_(VA_INVALID_ID),
-      va_context_id_(VA_INVALID_ID) {
+      va_context_id_(VA_INVALID_ID),
+      va_initialized_(false) {
 }
 
 VaapiWrapper::~VaapiWrapper() {
@@ -204,7 +206,17 @@ bool VaapiWrapper::VaInitialize(Display* x_display,
                                 const base::Closure& report_error_to_uma_cb) {
   static bool vaapi_functions_initialized = PostSandboxInitialization();
   if (!vaapi_functions_initialized) {
-    LOG(ERROR) << "Failed to initialize VAAPI libs";
+    bool running_on_chromeos = false;
+#if defined(OS_CHROMEOS)
+    // When chrome runs on linux with chromeos=1, do not log error message
+    // without VAAPI libraries.
+    running_on_chromeos = base::SysInfo::IsRunningOnChromeOS();
+#endif
+    static const char kErrorMsg[] = "Failed to initialize VAAPI libs";
+    if (running_on_chromeos)
+      LOG(ERROR) << kErrorMsg;
+    else
+      DVLOG(1) << kErrorMsg;
     return false;
   }
 
@@ -220,6 +232,7 @@ bool VaapiWrapper::VaInitialize(Display* x_display,
 
   VAStatus va_res = vaInitialize(va_display_, &major_version_, &minor_version_);
   VA_SUCCESS_OR_RETURN(va_res, "vaInitialize failed", false);
+  va_initialized_ = true;
   DVLOG(1) << "VAAPI version: " << major_version_ << "." << minor_version_;
 
   if (VAAPIVersionLessThan(0, 34)) {
@@ -350,13 +363,19 @@ void VaapiWrapper::Deinitialize() {
     VA_LOG_ON_ERROR(va_res, "vaDestroyConfig failed");
   }
 
-  if (va_display_) {
+  // Must check if vaInitialize completed successfully, to work around a bug in
+  // libva. The bug was fixed upstream:
+  // http://lists.freedesktop.org/archives/libva/2013-July/001807.html
+  // TODO(mgiuca): Remove this check, and the |va_initialized_| variable, once
+  // the fix has rolled out sufficiently.
+  if (va_initialized_ && va_display_) {
     VAStatus va_res = vaTerminate(va_display_);
     VA_LOG_ON_ERROR(va_res, "vaTerminate failed");
   }
 
   va_config_id_ = VA_INVALID_ID;
   va_display_ = NULL;
+  va_initialized_ = false;
 }
 
 bool VaapiWrapper::VAAPIVersionLessThan(int major, int minor) {

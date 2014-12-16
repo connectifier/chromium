@@ -430,13 +430,6 @@ const Experiment kExperiments[] = {
     kOsAll,
     SINGLE_VALUE_TYPE(switches::kIgnoreGpuBlacklist)
   },
-  {
-    "disable_layer_squashing",
-    IDS_FLAGS_DISABLE_LAYER_SQUASHING_NAME,
-    IDS_FLAGS_DISABLE_LAYER_SQUASHING_DESCRIPTION,
-    kOsAll,
-    SINGLE_VALUE_TYPE(switches::kDisableLayerSquashing)
-  },
 #if defined(OS_WIN)
   {
     "disable-direct-write",
@@ -444,6 +437,14 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_DISABLE_DIRECT_WRITE_DESCRIPTION,
     kOsWin,
     SINGLE_VALUE_TYPE(switches::kDisableDirectWrite)
+  },
+  {
+    "enable-win32k-renderer-lockdown",
+    IDS_FLAGS_ENABLE_WIN32K_RENDERER_LOCKDOWN_NAME,
+    IDS_FLAGS_ENABLE_WIN32K_RENDERER_LOCKDOWN_DESCRIPTION,
+    kOsWin,
+    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableWin32kRendererLockDown,
+                              switches::kDisableWin32kRendererLockDown)
   },
 #endif
   {
@@ -525,14 +526,6 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kDisableWebAudio)
   },
 #endif
-  {
-    "enable-compositing-for-transition",
-    IDS_FLAGS_COMPOSITING_FOR_TRANSITION_NAME,
-    IDS_FLAGS_COMPOSITING_FOR_TRANSITION_DESCRIPTION,
-    kOsAll,
-    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableCompositingForTransition,
-                              switches::kDisableCompositingForTransition)
-  },
   // Native client is compiled out when DISABLE_NACL is defined.
 #if !defined(DISABLE_NACL)
   {
@@ -612,15 +605,6 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_SHOW_AUTOFILL_TYPE_PREDICTIONS_DESCRIPTION,
     kOsAll,
     SINGLE_VALUE_TYPE(autofill::switches::kShowAutofillTypePredictions)
-  },
-  {
-    "disambiguate-autofill-server-name-types",
-    IDS_FLAGS_DISAMBIGUATE_SERVER_NAME_TYPES_NAME,
-    IDS_FLAGS_DISAMBIGUATE_SERVER_NAME_TYPES_DESCRIPTION,
-    kOsAll,
-    ENABLE_DISABLE_VALUE_TYPE(
-        autofill::switches::kDisambiguateAutofillServerNameTypes,
-        autofill::switches::kTrustAutofillServerNameTypes)
   },
   {
     "enable-smooth-scrolling",  // FLAGS:RECORD_UMA
@@ -765,14 +749,6 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kDisableNTPOtherSessionsMenu)
   },
   {
-    "enable-material-design-ntp",
-    IDS_FLAGS_ENABLE_MATERIAL_DESIGN_NTP_NAME,
-    IDS_FLAGS_ENABLE_MATERIAL_DESIGN_NTP_DESCRIPTION,
-    kOsDesktop,
-    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableMaterialDesignNTP,
-                              switches::kDisableMaterialDesignNTP)
-  },
-  {
     "enable-devtools-experiments",
     IDS_FLAGS_ENABLE_DEVTOOLS_EXPERIMENTS_NAME,
     IDS_FLAGS_ENABLE_DEVTOOLS_EXPERIMENTS_DESCRIPTION,
@@ -852,20 +828,11 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(chromeos::switches::kEnableTouchpadThreeFingerClick)
   },
   {
-    "easy-unlock",
-    IDS_FLAGS_EASY_UNLOCK_NAME,
-    IDS_FLAGS_EASY_UNLOCK_DESCRIPTION,
+    "disable-easy-unlock",
+    IDS_FLAGS_DISABLE_EASY_UNLOCK_NAME,
+    IDS_FLAGS_DISABLE_EASY_UNLOCK_DESCRIPTION,
     kOsCrOS,
-    ENABLE_DISABLE_VALUE_TYPE(proximity_auth::switches::kEnableEasyUnlock,
-                              proximity_auth::switches::kDisableEasyUnlock)
-  },
-  {
-    "easy-signin",
-    IDS_FLAGS_EASY_SIGNIN_NAME,
-    IDS_FLAGS_EASY_SIGNIN_DESCRIPTION,
-    kOsCrOSOwnerOnly,
-    ENABLE_DISABLE_VALUE_TYPE(proximity_auth::switches::kEnableEasySignin,
-                              proximity_auth::switches::kDisableEasySignin)
+    SINGLE_VALUE_TYPE(proximity_auth::switches::kDisableEasyUnlock)
   },
   {
     "enable-easy-unlock-proximity-detection",
@@ -1133,14 +1100,6 @@ const Experiment kExperiments[] = {
     kOsAndroid | kOsMac | kOsWin | kOsLinux | kOsCrOS,
     ENABLE_DISABLE_VALUE_TYPE(switches::kEnableSupervisedUserSafeSites,
                               switches::kDisableSupervisedUserSafeSites)
-  },
-  {
-    "enable-sync-synced-notifications",
-    IDS_FLAGS_ENABLE_SYNCED_NOTIFICATIONS_NAME,
-    IDS_FLAGS_ENABLE_SYNCED_NOTIFICATIONS_DESCRIPTION,
-    kOsDesktop,
-    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableSyncSyncedNotifications,
-                              switches::kDisableSyncSyncedNotifications)
   },
 #if defined(ENABLE_APP_LIST)
   {
@@ -1477,6 +1436,15 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnableAppList)
   },
 #endif
+#if defined(ENABLE_EXTENSIONS)
+  {
+    "enable-worker-frame",
+    IDS_FLAGS_ENABLE_WORKER_FRAME_NAME,
+    IDS_FLAGS_ENABLE_WORKER_FRAME_DESCRIPTION,
+    kOsDesktop,
+    SINGLE_VALUE_TYPE(extensions::switches::kEnableWorkerFrame)
+  },
+#endif
   {
     "disable-app-list-app-info",
     IDS_FLAGS_DISABLE_APP_INFO_IN_APP_LIST,
@@ -1536,18 +1504,18 @@ const Experiment kExperiments[] = {
   },
 #endif
   {
-    "enable-streamlined-hosted-apps",
-    IDS_FLAGS_ENABLE_STREAMLINED_HOSTED_APPS_NAME,
-    IDS_FLAGS_ENABLE_STREAMLINED_HOSTED_APPS_DESCRIPTION,
+    "disable-new-bookmark-apps",
+    IDS_FLAGS_DISABLE_NEW_BOOKMARK_APPS_NAME,
+    IDS_FLAGS_DISABLE_NEW_BOOKMARK_APPS_DESCRIPTION,
     kOsWin | kOsCrOS | kOsLinux | kOsMac,
-    SINGLE_VALUE_TYPE(switches::kEnableStreamlinedHostedApps)
+    SINGLE_VALUE_TYPE(switches::kDisableNewBookmarkApps)
   },
   {
-    "enable-ephemeral-apps",
-    IDS_FLAGS_ENABLE_EPHEMERAL_APPS_NAME,
-    IDS_FLAGS_ENABLE_EPHEMERAL_APPS_DESCRIPTION,
+    "enable-ephemeral-apps-in-webstore",
+    IDS_FLAGS_ENABLE_EPHEMERAL_APPS_IN_WEBSTORE_NAME,
+    IDS_FLAGS_ENABLE_EPHEMERAL_APPS_IN_WEBSTORE_DESCRIPTION,
     kOsAll,
-    SINGLE_VALUE_TYPE(switches::kEnableEphemeralApps)
+    SINGLE_VALUE_TYPE(switches::kEnableEphemeralAppsInWebstore)
   },
   {
     "enable-linkable-ephemeral-apps",
@@ -1691,6 +1659,13 @@ const Experiment kExperiments[] = {
     ENABLE_DISABLE_VALUE_TYPE(
         autofill::switches::kEnableSingleClickAutofill,
         autofill::switches::kDisableSingleClickAutofill)
+  },
+  {
+    "enable-wallet-card-import",
+    IDS_FLAGS_ENABLE_WALLET_CARD_IMPORT_NAME,
+    IDS_FLAGS_ENABLE_WALLET_CARD_IMPORT_DESCRIPTION,
+    kOsCrOS | kOsWin | kOsLinux | kOsAndroid,
+    SINGLE_VALUE_TYPE(autofill::switches::kEnableWalletCardImport)
   },
   {
     "enable-permissions-bubbles",
@@ -1979,6 +1954,13 @@ const Experiment kExperiments[] = {
 #endif
 #if defined(OS_CHROMEOS)
   {
+    "use-memory-pressure-chromeos",
+    IDS_FLAGS_USE_MEMORY_PRESSURE_NAME,
+    IDS_FLAGS_USE_MEMORY_PRESSURE_DESCRIPTION,
+    kOsCrOS,
+    SINGLE_VALUE_TYPE(chromeos::switches::kUseMemoryPressureSystemChromeOS)
+  },
+  {
     "wake-on-packets",
     IDS_FLAGS_WAKE_ON_PACKETS_NAME,
     IDS_FLAGS_WAKE_ON_PACKETS_DESCRIPTION,
@@ -2037,7 +2019,8 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_CREDIT_CARD_SCAN_NAME,
     IDS_FLAGS_ENABLE_CREDIT_CARD_SCAN_DESCRIPTION,
     kOsAndroid,
-    SINGLE_VALUE_TYPE(autofill::switches::kEnableCreditCardScan)
+    ENABLE_DISABLE_VALUE_TYPE(autofill::switches::kEnableCreditCardScan,
+                              autofill::switches::kDisableCreditCardScan)
   },
 #if defined(OS_CHROMEOS)
   {
@@ -2046,6 +2029,13 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_CAPTIVE_PORTAL_BYPASS_PROXY_DESCRIPTION,
     kOsCrOS,
     SINGLE_VALUE_TYPE(chromeos::switches::kEnableCaptivePortalBypassProxy)
+  },
+  {
+    "enable-roboto-font-ui",
+    IDS_FLAGS_ENABLE_ROBOTO_FONT_UI_NAME,
+    IDS_FLAGS_ENABLE_ROBOTO_FONT_UI_DESCRIPTION,
+    kOsCrOS,
+    SINGLE_VALUE_TYPE(switches::kEnableRobotoFontUI)
   },
 #endif  // defined(OS_CHROMEOS)
 #if defined(OS_ANDROID)
@@ -2063,6 +2053,14 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_TOUCH_HOVER_DESCRIPTION,
     kOsAndroid,
     SINGLE_VALUE_TYPE("enable-touch-hover")
+  },
+  {
+    "enable-fill-on-account-select",
+    IDS_FILL_ON_ACCOUNT_SELECT_NAME,
+    IDS_FILL_ON_ACCOUNT_SELECT_DESCRIPTION,
+    kOsAll,
+    ENABLE_DISABLE_VALUE_TYPE(autofill::switches::kEnableFillOnAccountSelect,
+                              autofill::switches::kDisableFillOnAccountSelect)
   },
 
   // NOTE: Adding new command-line switches requires adding corresponding

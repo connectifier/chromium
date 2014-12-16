@@ -449,6 +449,13 @@ void AutofillAgent::openTextDataListChooser(const WebInputElement& element) {
   ShowSuggestions(element, options);
 }
 
+void AutofillAgent::dataListOptionsChanged(const WebInputElement& element) {
+  if (!is_popup_possibly_visible_ || !element.focused())
+    return;
+
+  TextFieldDidChangeImpl(element);
+}
+
 void AutofillAgent::firstUserGestureObserved() {
   password_autofill_agent_->FirstUserGestureObserved();
   Send(new AutofillHostMsg_FirstUserGestureObserved(routing_id()));
@@ -610,7 +617,7 @@ void AutofillAgent::ShowSuggestions(const WebFormControlElement& element,
 
   const WebInputElement* input_element = toWebInputElement(&element);
   if (input_element) {
-    if (!input_element->isTextField() || input_element->isPasswordField())
+    if (!input_element->isTextField())
       return;
     if (!options.datalist_only && !input_element->suggestedValue().isEmpty())
       return;
@@ -642,6 +649,11 @@ void AutofillAgent::ShowSuggestions(const WebFormControlElement& element,
     is_popup_possibly_visible_ = true;
     return;
   }
+
+  // Password field elements should only have suggestions shown by the password
+  // autofill agent.
+  if (input_element && input_element->isPasswordField())
+    return;
 
   // If autocomplete is disabled at the field level, ensure that the native
   // UI won't try to show a warning, since that may conflict with a custom

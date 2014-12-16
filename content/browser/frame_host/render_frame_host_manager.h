@@ -288,7 +288,8 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
   void ClearNavigationTransitionData();
 
   // Called when a renderer's frame navigates.
-  void DidNavigateFrame(RenderFrameHostImpl* render_frame_host);
+  void DidNavigateFrame(RenderFrameHostImpl* render_frame_host,
+                        bool was_caused_by_user_gesture);
 
   // Called when a renderer sets its opener to null.
   void DidDisownOpener(RenderFrameHost* render_frame_host);
@@ -506,8 +507,12 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
   // swapped out.
   void ShutdownRenderFrameProxyHostsInSiteInstance(int32 site_instance_id);
 
-  // Helper method to terminate the pending RenderViewHost.
+  // Helper method to terminate the pending RenderFrameHost. The frame may be
+  // deleted immediately, or it may be kept around in hopes of later reuse.
   void CancelPending();
+
+  // Clears pending_render_frame_host_, returning it to the caller for disposal.
+  scoped_ptr<RenderFrameHostImpl> UnsetPendingRenderFrameHost();
 
   // Helper method to set the active RenderFrameHost. Returns the old
   // RenderFrameHost and updates counts.

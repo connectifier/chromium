@@ -537,7 +537,7 @@
       'controls/textfield/textfield_unittest.cc',
       'controls/textfield/textfield_model_unittest.cc',
       'controls/tree/tree_view_unittest.cc',
-      'event_monitor_mac_unittest.mm',
+      'event_monitor_unittest.cc',
       'focus/focus_manager_unittest.cc',
       'focus/focus_traversal_unittest.cc',
       'ime/input_method_bridge_unittest.cc',
@@ -695,6 +695,11 @@
             ['use_ozone==1', {
               'sources': [ '<@(views_desktop_aura_ozone_sources)' ],
             }],
+          ],
+        }],
+        ['OS=="mac"', {
+          'dependencies': [
+            '../accelerated_widget_mac/accelerated_widget_mac.gyp:accelerated_widget_mac',
           ],
         }],
       ],
@@ -880,6 +885,7 @@
             'views_test_support',
           ],
           'sources': [
+            'cocoa/bridged_native_widget_interactive_uitest.mm',
             'run_all_unittests.cc',
             'widget/native_widget_mac_interactive_uitest.mm',
           ],

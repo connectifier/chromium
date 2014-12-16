@@ -276,6 +276,16 @@ void AppListView::SetAppListOverlayVisible(bool visible) {
 
   const float kOverlayOpacity = 0.75f;
   overlay_view_->layer()->SetOpacity(visible ? kOverlayOpacity : 0.0f);
+  // Create the illusion that the search box is hidden behind the app list
+  // overlay mask by setting its opacity to the same value, and disabling it.
+  {
+    ui::ScopedLayerAnimationSettings settings(
+        search_box_widget_->GetLayer()->GetAnimator());
+    const float kSearchBoxWidgetOpacity = 0.5f;
+    search_box_widget_->GetLayer()->SetOpacity(visible ? kSearchBoxWidgetOpacity
+                                                       : 1.0f);
+    search_box_view_->SetEnabled(!visible);
+  }
 }
 
 bool AppListView::ShouldCenterWindow() const {
@@ -351,6 +361,12 @@ PaginationModel* AppListView::GetAppsPaginationModel() {
 }
 
 void AppListView::InitContents(gfx::NativeView parent, int initial_apps_page) {
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/440224 and
+  // crbug.com/441028 are fixed.
+  tracked_objects::ScopedTracker tracking_profile(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "440224, 441028 AppListView::InitContents"));
+
   app_list_main_view_ = new AppListMainView(delegate_);
   AddChildView(app_list_main_view_);
   app_list_main_view_->SetPaintToLayer(true);
@@ -364,7 +380,19 @@ void AppListView::InitContents(gfx::NativeView parent, int initial_apps_page) {
   search_box_view_->SetFillsBoundsOpaquely(false);
   search_box_view_->layer()->SetMasksToBounds(true);
 
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/440224 and
+  // crbug.com/441028 are fixed.
+  tracked_objects::ScopedTracker tracking_profile1(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "440224, 441028 AppListView::InitContents1"));
+
   app_list_main_view_->Init(parent, initial_apps_page, search_box_view_);
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/440224 and
+  // crbug.com/441028 are fixed.
+  tracked_objects::ScopedTracker tracking_profile2(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "440224, 441028 AppListView::InitContents2"));
 
   // Speech recognition is available only when the start page exists.
   if (delegate_ && delegate_->IsSpeechRecognitionEnabled()) {
@@ -398,7 +426,7 @@ void AppListView::InitChildWidgets() {
   search_box_widget_->Init(search_box_widget_params);
   search_box_widget_->SetContentsView(search_box_view_);
 
-  Layout();
+  app_list_main_view_->contents_view()->Layout();
 }
 
 void AppListView::InitAsBubbleInternal(gfx::NativeView parent,
@@ -432,10 +460,21 @@ void AppListView::InitAsBubbleInternal(gfx::NativeView parent,
   set_border_accepts_events(border_accepts_events);
   set_shadow(SupportsShadow() ? views::BubbleBorder::BIG_SHADOW
                               : views::BubbleBorder::NO_SHADOW_OPAQUE_BORDER);
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/431326 is fixed.
+  tracked_objects::ScopedTracker tracking_profile2_1(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "431326 AppListView::InitAsBubbleInternal2_1"));
+
   // This creates the app list widget. (Before this, child widgets cannot be
   // created.)
   views::BubbleDelegateView::CreateBubble(this);
   SetBubbleArrow(arrow);
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/431326 is fixed.
+  tracked_objects::ScopedTracker tracking_profile2_2(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "431326 AppListView::InitAsBubbleInternal2_2"));
 
   // We can now create the internal widgets.
   InitChildWidgets();
@@ -582,16 +621,6 @@ void AppListView::Layout() {
 
   app_list_main_view_->SetBoundsRect(centered_bounds);
 
-  // GetDefaultSearchBoxBounds() returns the bounds in |contents_view|'s
-  // coordinate, therefore convert it to this coordinate.
-  ContentsView* contents_view = app_list_main_view_->contents_view();
-  gfx::Rect search_box_bounds = contents_view->GetSearchBoxBoundsForState(
-      contents_view->GetActiveState());
-  if (search_box_widget_) {
-    search_box_widget_->SetBounds(
-        contents_view->ConvertRectToWidget(search_box_bounds));
-  }
-
   if (speech_view_) {
     gfx::Rect speech_bounds = centered_bounds;
     int preferred_height = speech_view_->GetPreferredSize().height();
@@ -668,6 +697,12 @@ void AppListView::OnSpeechRecognitionStateChanged(
   }
 
   {
+    ui::ScopedLayerAnimationSettings search_box_settings(
+        search_box_widget_->GetLayer()->GetAnimator());
+    search_box_widget_->GetLayer()->SetOpacity(will_appear ? 0.0f : 1.0f);
+  }
+
+  {
     ui::ScopedLayerAnimationSettings speech_settings(
         speech_view_->layer()->GetAnimator());
     if (!will_appear) {
@@ -682,10 +717,15 @@ void AppListView::OnSpeechRecognitionStateChanged(
       speech_view_->layer()->SetTransform(speech_transform);
   }
 
-  if (will_appear)
+  // Prevent the search box from receiving events when hidden.
+  search_box_view_->SetEnabled(!will_appear);
+
+  if (will_appear) {
     speech_view_->SetVisible(true);
-  else
+  } else {
     app_list_main_view_->SetVisible(true);
+    search_box_view_->search_box()->RequestFocus();
+  }
 }
 
 }  // namespace app_list

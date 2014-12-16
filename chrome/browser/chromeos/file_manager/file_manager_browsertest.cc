@@ -17,6 +17,7 @@
 #include "base/json/json_reader.h"
 #include "base/json/json_value_converter.h"
 #include "base/json/json_writer.h"
+#include "base/path_service.h"
 #include "base/prefs/pref_service.h"
 #include "base/strings/string_piece.h"
 #include "base/strings/utf_string_conversions.h"
@@ -615,9 +616,12 @@ void FileManagerBrowserTestBase::SetUpCommandLine(CommandLine* command_line) {
 }
 
 void FileManagerBrowserTestBase::StartTest() {
+  base::FilePath root_path;
+  ASSERT_TRUE(PathService::Get(base::DIR_SOURCE_ROOT, &root_path));
+
   // Launch the extension.
   const base::FilePath path =
-      test_data_dir_.AppendASCII("file_manager_browsertest");
+      root_path.Append(FILE_PATH_LITERAL("ui/file_manager/integration_tests"));
   const extensions::Extension* const extension =
       LoadExtensionAsComponentWithManifest(path, GetTestManifestName());
   ASSERT_TRUE(extension);
@@ -862,9 +866,14 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
         TestParameter(NOT_IN_GUEST_MODE, "audioRepeatMultipleFileDrive"),
         TestParameter(NOT_IN_GUEST_MODE, "audioNoRepeatMultipleFileDrive")));
 
-// Flaky http://crbug.com/327719
+// Slow tests are disabled on debug build. http://crbug.com/327719
+#if !defined(NDEBUG) || defined(OFFICIAL_BUILD)
+#define MAYBE_CreateNewFolder DISABLED_CreateNewFolder
+#else
+#define MAYBE_CreateNewFolder CreateNewFolder
+#endif
 WRAPPED_INSTANTIATE_TEST_CASE_P(
-    DISABLED_CreateNewFolder,
+    MAYBE_CreateNewFolder,
     FileManagerBrowserTest,
     ::testing::Values(TestParameter(NOT_IN_GUEST_MODE,
                                     "createNewFolderAfterSelectFile"),
@@ -1135,8 +1144,7 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
     FileManagerBrowserTest,
     ::testing::Values(TestParameter(NOT_IN_GUEST_MODE, "showGridViewDownloads"),
                       TestParameter(IN_GUEST_MODE, "showGridViewDownloads"),
-                      TestParameter(NOT_IN_GUEST_MODE, "showGridViewDrive"),
-                      TestParameter(IN_GUEST_MODE, "checkFilesSorted")));
+                      TestParameter(NOT_IN_GUEST_MODE, "showGridViewDrive")));
 
 // Structure to describe an account info.
 struct TestAccountInfo {

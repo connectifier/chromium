@@ -181,7 +181,7 @@ Status ReadPaddedBIGNUM(const JwkReader& jwk,
 
 int GetGroupDegreeInBytes(EC_KEY* ec) {
   const EC_GROUP* group = EC_KEY_get0_group(ec);
-  return (EC_GROUP_get_degree(group) + 7) / 8;
+  return NumBitsToBytes(EC_GROUP_get_degree(group));
 }
 
 // Extracts the public key as affine coordinates (x,y).
@@ -208,18 +208,14 @@ Status EcAlgorithm::GenerateKey(const blink::WebCryptoAlgorithm& algorithm,
                                 bool extractable,
                                 blink::WebCryptoKeyUsageMask combined_usages,
                                 GenerateKeyResult* result) const {
-  Status status = CheckKeyCreationUsages(
-      all_public_key_usages_ | all_private_key_usages_, combined_usages);
+  blink::WebCryptoKeyUsageMask public_usages = 0;
+  blink::WebCryptoKeyUsageMask private_usages = 0;
+
+  Status status = GetUsagesForGenerateAsymmetricKey(
+      combined_usages, all_public_key_usages_, all_private_key_usages_,
+      &public_usages, &private_usages);
   if (status.IsError())
     return status;
-
-  const blink::WebCryptoKeyUsageMask public_usages =
-      combined_usages & all_public_key_usages_;
-  const blink::WebCryptoKeyUsageMask private_usages =
-      combined_usages & all_private_key_usages_;
-
-  if (private_usages == 0)
-    return Status::ErrorCreateKeyEmptyUsages();
 
   const blink::WebCryptoEcKeyGenParams* params = algorithm.ecKeyGenParams();
 
@@ -279,27 +275,11 @@ Status EcAlgorithm::GenerateKey(const blink::WebCryptoAlgorithm& algorithm,
   return Status::Success();
 }
 
-// TODO(eroman): This is identical to RSA.
 Status EcAlgorithm::VerifyKeyUsagesBeforeImportKey(
     blink::WebCryptoKeyFormat format,
     blink::WebCryptoKeyUsageMask usages) const {
-  switch (format) {
-    case blink::WebCryptoKeyFormatSpki:
-      return CheckKeyCreationUsages(all_public_key_usages_, usages);
-    case blink::WebCryptoKeyFormatPkcs8:
-      return CheckKeyCreationUsages(all_private_key_usages_, usages);
-    case blink::WebCryptoKeyFormatJwk:
-      // The JWK could represent either a public key or private key. The usages
-      // must make sense for one of the two. The usages will be checked again by
-      // ImportKeyJwk() once the key type has been determined.
-      if (CheckKeyCreationUsages(all_private_key_usages_, usages).IsSuccess() ||
-          CheckKeyCreationUsages(all_public_key_usages_, usages).IsSuccess()) {
-        return Status::Success();
-      }
-      return Status::ErrorCreateKeyBadUsages();
-    default:
-      return Status::ErrorUnsupportedImportKeyFormat();
-  }
+  return VerifyUsagesBeforeImportAsymmetricKey(format, all_public_key_usages_,
+                                               all_private_key_usages_, usages);
 }
 
 Status EcAlgorithm::ImportKeyPkcs8(const CryptoData& key_data,
