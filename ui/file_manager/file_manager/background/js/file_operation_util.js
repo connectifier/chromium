@@ -117,8 +117,9 @@ fileOperationUtil.deduplicatePath = function(
  *     is successfully done with the array of the entries.
  * @param {function(DOMError)} errorCallback Called on error with the first
  *     occurred error (i.e. following errors will just be discarded).
+ * @private
  */
-fileOperationUtil.resolveRecursively = function(
+fileOperationUtil.resolveRecursively_ = function(
     entry, successCallback, errorCallback) {
   var result = [];
   var error = null;
@@ -183,6 +184,136 @@ fileOperationUtil.resolveRecursively = function(
   };
 
   process(entry);
+};
+
+/**
+ * Recursively gathers files from the given entry, resolving with
+ * the complete list of files when traversal is complete.
+ *
+ * <p>For real-time (as you scan) results use {@code findFilesRecursively}.
+ *
+ * @param {!DirectoryEntry} entry The DirectoryEntry to scan.
+ * @return {!Promise.<!Array.<!Entry>>} Resolves when scanning is complete.
+ */
+fileOperationUtil.gatherEntriesRecursively = function(entry) {
+  /** @type {!Array.<!Entry>} */
+  var gatheredFiles = [];
+
+  return fileOperationUtil.findEntriesRecursively(
+      entry,
+      /** @param {!Entry} entry */
+      function(entry) {
+        gatheredFiles.push(entry);
+      })
+      .then(
+          function() {
+            return gatheredFiles;
+          });
+}
+
+/**
+ * Recursively discovers files from the given entry, emitting individual
+ * results as they are found to {@code onResultCallback}.
+ *
+ * <p>For results gathered up in a tidy bundle, use
+ * {@code gatherFilesRecursively}.
+ *
+ * @param {!DirectoryEntry} entry The DirectoryEntry to scan.
+ * @param {function(!FileEntry)} onResultCallback called when
+ *     a {@code FileEntry} is discovered.
+ * @return {!Promise} Resolves when scanning is complete.
+ */
+fileOperationUtil.findFilesRecursively = function(entry, onResultCallback) {
+  return fileOperationUtil.findEntriesRecursively(
+      entry,
+      /** @param {!Entry} entry */
+      function(entry) {
+        if (entry.isFile)
+          onResultCallback(/** @type {!FileEntry} */ (entry));
+      });
+};
+
+/**
+ * Recursively discovers files and directories beneath the given entry,
+ * emitting individual results as they are found to {@code onResultCallback}.
+ *
+ * <p>For results gathered up in a tidy bundle, use
+ * {@code gatherEntriesRecursively}.
+ *
+ * @param {!DirectoryEntry} entry The DirectoryEntry to scan.
+ * @param {function(!Entry)} onResultCallback called when
+ *     an {@code Entry} is discovered.
+ * @return {!Promise} Resolves when scanning is complete.
+ */
+fileOperationUtil.findEntriesRecursively = function(entry, onResultCallback) {
+  return new Promise(
+      function(resolve, reject) {
+        var numRunningTasks = 0;
+        var scanError = null;
+
+        /**
+         * @param  {*=} opt_error If defined immediately
+         *     terminates scanning.
+         */
+        var maybeSettlePromise = function(opt_error) {
+          scanError = opt_error;
+
+          if (scanError) {
+            // Closure compiler currently requires an argument to reject.
+            reject(undefined);
+            return;
+          }
+
+          // If there still remain some running tasks, wait their finishing.
+          if (numRunningTasks === 0)
+            // Closure compiler currently requires an argument to resolve.
+            resolve(undefined);
+        };
+
+        /** @param {!Entry} entry */
+        var processEntry = function(entry) {
+          // All scanning stops when an error is encountered.
+          if (scanError)
+            return;
+
+          onResultCallback(entry);
+          if (entry.isDirectory) {
+            processDirectory(/** @type {!DirectoryEntry} */ (entry));
+          }
+        };
+
+        /** @param {!DirectoryEntry} directory */
+        var processDirectory = function(directory) {
+          // All scanning stops when an error is encountered.
+          if (scanError)
+            return;
+
+          numRunningTasks++;
+
+          // Recursively traverse children.
+          // reader.readEntries chunksResults resulting in the need
+          // for us to call it multiple times.
+          var reader = directory.createReader();
+          reader.readEntries(
+              function processSubEntries(subEntries) {
+                if (subEntries.length === 0) {
+                  // If an error is found already, or this is the completion
+                  // callback, then finish the process.
+                  --numRunningTasks;
+                  maybeSettlePromise();
+                  return;
+                }
+
+                subEntries.forEach(processEntry);
+
+                // Continue to read remaining children.
+                reader.readEntries(processSubEntries, maybeSettlePromise);
+              },
+              maybeSettlePromise);
+        }
+
+        processEntry(entry);
+      });
 };
 
 /**
@@ -550,7 +681,7 @@ fileOperationUtil.CopyTask.prototype.initialize = function(callback) {
   this.processingEntries = [];
   for (var i = 0; i < this.sourceEntries.length; i++) {
     group.add(function(index, callback) {
-      fileOperationUtil.resolveRecursively(
+      fileOperationUtil.resolveRecursively_(
           this.sourceEntries[index],
           function(resolvedEntries) {
             var resolvedEntryMap = {};
@@ -916,7 +1047,7 @@ fileOperationUtil.ZipTask.prototype.initialize = function(callback) {
   var group = new AsyncUtil.Group();
   for (var i = 0; i < this.sourceEntries.length; i++) {
     group.add(function(index, callback) {
-      fileOperationUtil.resolveRecursively(
+      fileOperationUtil.resolveRecursively_(
           this.sourceEntries[index],
           function(entries) {
             for (var j = 0; j < entries.length; j++)
@@ -1005,4 +1136,121 @@ fileOperationUtil.ZipTask.prototype.run = function(
 fileOperationUtil.Error = function(code, data) {
   this.code = code;
   this.data = data;
+};
+
+/**
+ * Manages Event dispatching.
+ * Currently this can send three types of events: "copy-progress",
+ * "copy-operation-completed" and "delete".
+ *
+ * TODO(hidehiko): Reorganize the event dispatching mechanism.
+ * @constructor
+ * @extends {cr.EventTarget}
+ */
+fileOperationUtil.EventRouter = function() {
+  this.pendingDeletedEntries_ = [];
+  this.pendingCreatedEntries_ = [];
+  this.entryChangedEventRateLimiter_ = new AsyncUtil.RateLimiter(
+      this.dispatchEntryChangedEvent_.bind(this), 500);
+};
+
+/**
+ * Types of events emitted by the EventRouter.
+ * @enum {string}
+ */
+fileOperationUtil.EventRouter.EventType = {
+  BEGIN: 'BEGIN',
+  CANCELED: 'CANCELED',
+  ERROR: 'ERROR',
+  PROGRESS: 'PROGRESS',
+  SUCCESS: 'SUCCESS'
+};
+
+/**
+ * Extends cr.EventTarget.
+ */
+fileOperationUtil.EventRouter.prototype.__proto__ = cr.EventTarget.prototype;
+
+/**
+ * Dispatches a simple "copy-progress" event with reason and current
+ * FileOperationManager status. If it is an ERROR event, error should be set.
+ *
+ * @param {fileOperationUtil.EventRouter.EventType} type Event type.
+ * @param {Object} status Current FileOperationManager's status. See also
+ *     FileOperationManager.Task.getStatus().
+ * @param {string} taskId ID of task related with the event.
+ * @param {fileOperationUtil.Error=} opt_error The info for the error. This
+ *     should be set iff the reason is "ERROR".
+ */
+fileOperationUtil.EventRouter.prototype.sendProgressEvent = function(
+    type, status, taskId, opt_error) {
+  var EventType = fileOperationUtil.EventRouter.EventType;
+  // Before finishing operation, dispatch pending entries-changed events.
+  if (type === EventType.SUCCESS || type === EventType.CANCELED)
+    this.entryChangedEventRateLimiter_.runImmediately();
+
+  var event = /** @type {FileOperationProgressEvent} */
+      (new Event('copy-progress'));
+  event.reason = type;
+  event.status = status;
+  event.taskId = taskId;
+  if (opt_error)
+    event.error = opt_error;
+  this.dispatchEvent(event);
+};
+
+/**
+ * Stores changed (created or deleted) entry temporarily, and maybe dispatch
+ * entries-changed event with stored entries.
+ * @param {util.EntryChangedKind} kind The enum to represent if the entry is
+ *     created or deleted.
+ * @param {Entry} entry The changed entry.
+ */
+fileOperationUtil.EventRouter.prototype.sendEntryChangedEvent = function(
+    kind, entry) {
+  if (kind === util.EntryChangedKind.DELETED)
+    this.pendingDeletedEntries_.push(entry);
+  if (kind === util.EntryChangedKind.CREATED)
+    this.pendingCreatedEntries_.push(entry);
+
+  this.entryChangedEventRateLimiter_.run();
+};
+
+/**
+ * Dispatches an event to notify that entries are changed (created or deleted).
+ * @private
+ */
+fileOperationUtil.EventRouter.prototype.dispatchEntryChangedEvent_ =
+    function() {
+  if (this.pendingDeletedEntries_.length > 0) {
+    var event = new Event('entries-changed');
+    event.kind = util.EntryChangedKind.DELETED;
+    event.entries = this.pendingDeletedEntries_;
+    this.dispatchEvent(event);
+    this.pendingDeletedEntries_ = [];
+  }
+  if (this.pendingCreatedEntries_.length > 0) {
+    var event = new Event('entries-changed');
+    event.kind = util.EntryChangedKind.CREATED;
+    event.entries = this.pendingCreatedEntries_;
+    this.dispatchEvent(event);
+    this.pendingCreatedEntries_ = [];
+  }
+};
+
+/**
+ * Dispatches an event to notify entries are changed for delete task.
+ *
+ * @param {fileOperationUtil.EventRouter.EventType} reason Event type.
+ * @param {!Object} task Delete task related with the event.
+ */
+fileOperationUtil.EventRouter.prototype.sendDeleteEvent = function(
+    reason, task) {
+  var event = /** @type {FileOperationProgressEvent} */ (new Event('delete'));
+  event.reason = reason;
+  event.taskId = task.taskId;
+  event.entries = task.entries;
+  event.totalBytes = task.totalBytes;
+  event.processedBytes = task.processedBytes;
+  this.dispatchEvent(event);
 };

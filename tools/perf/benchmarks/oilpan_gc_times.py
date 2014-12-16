@@ -8,7 +8,6 @@ import page_sets
 from benchmarks import blink_perf
 from benchmarks import silk_flags
 from measurements import oilpan_gc_times
-from measurements import smoothness
 from telemetry import benchmark
 from telemetry.core import util
 from telemetry import page
@@ -23,10 +22,31 @@ class OilpanGCTimesBlinkPerfAnimation(benchmark.Benchmark):
     return blink_perf.CreatePageSetFromPath(path, blink_perf.SKIPPED_FILE)
 
 
+@benchmark.Enabled('content-shell')
+class OilpanGCTimesBlinkPerfStress(benchmark.Benchmark):
+  tag = 'blink_perf_stress'
+  test = oilpan_gc_times.OilpanGCTimesForInternals
+
+  def CreatePageSet(self, options):
+    path = os.path.join(blink_perf.BLINK_PERF_BASE_DIR, 'BlinkGC')
+    return blink_perf.CreatePageSetFromPath(path, blink_perf.SKIPPED_FILE)
+
+
 class OilpanGCTimesSmoothnessAnimation(benchmark.Benchmark):
   test = oilpan_gc_times.OilpanGCTimesForSmoothness
   page_set = page_sets.ToughAnimationCasesPageSet
 
 
-# TODO(peria): Add more page sets.  'key_silk_cases' and
-# 'smoothness.sync_scroll.key_mobile_sites' are wanted for now.
+@benchmark.Enabled('android')
+class OilpanGCTimesKeySilkCases(benchmark.Benchmark):
+  test = oilpan_gc_times.OilpanGCTimesForSmoothness
+  page_set = page_sets.KeySilkCasesPageSet
+
+
+@benchmark.Enabled('android')
+class OilpanGCTimesSyncScrollKeyMobileSites(benchmark.Benchmark):
+  tag = 'sync_scroll'
+  test = oilpan_gc_times.OilpanGCTimesForSmoothness
+  page_set = page_sets.KeyMobileSitesPageSet
+  def CustomizeBrowserOptions(self, options):
+    silk_flags.CustomizeBrowserOptionsForSyncScrolling(options)

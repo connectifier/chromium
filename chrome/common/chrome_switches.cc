@@ -280,11 +280,11 @@ const char kDisableIPv6[]                   = "disable-ipv6";
 const char kDisableMinimizeOnSecondLauncherItemClick[] =
     "disable-minimize-on-second-launcher-item-click";
 
+// Disables the new bookmark app system.
+const char kDisableNewBookmarkApps[]   = "disable-new-bookmark-apps";
+
 // Disables the menu on the NTP for accessing sessions from other devices.
 const char kDisableNTPOtherSessionsMenu[]   = "disable-ntp-other-sessions-menu";
-
-// Disables the Material Design NTP.
-const char kDisableMaterialDesignNTP[]      = "disable-material-design-ntp";
 
 // Disable auto-reload of error pages if offline.
 const char kDisableOfflineAutoReload[]       = "disable-offline-auto-reload";
@@ -363,10 +363,6 @@ const char kDisableSupervisedUserSafeSites[] =
 // Disables syncing browser data to a Google Account.
 const char kDisableSync[]                   = "disable-sync";
 
-// Disable synced notifications.
-const char kDisableSyncSyncedNotifications[] =
-    "disable-sync-synced-notifications";
-
 // Disables syncing one or more sync data types that are on by default.
 // See sync/internal_api/public/base/model_type.h for possible types. Types
 // should be comma separated, and follow the naming convention for string
@@ -402,7 +398,7 @@ const char kDnsPrefetchDisable[]            = "dns-prefetch-disable";
 const char kDumpBrowserHistograms[]         = "dump-browser-histograms";
 
 // Overrides the path of Easy Unlock component app.
-extern const char kEasyUnlockAppPath[]      = "easy-unlock-app-path";
+const char kEasyUnlockAppPath[]             = "easy-unlock-app-path";
 
 // If set, the app list will be enabled as if enabled from CWS.
 const char kEnableAppList[]                 = "enable-app-list";
@@ -447,9 +443,9 @@ const char kEnableDomainReliability[]          = "enable-domain-reliability";
 // Enable Enhanced Bookmarks.
 const char kEnhancedBookmarksExperiment[] = "enhanced-bookmarks-experiment";
 
-// Enables experimentation with ephemeral apps, which are launched without
-// installing in Chrome.
-const char kEnableEphemeralApps[]           = "enable-ephemeral-apps";
+// Enables experimentation with ephemeral apps to be launched from the webstore.
+const char kEnableEphemeralAppsInWebstore[] =
+    "enable-ephemeral-apps-in-webstore";
 
 // Disables v2 hotword detection features. These features include
 // using a new component extension for performing hotword detection, new UI
@@ -486,9 +482,6 @@ const char kEnableNaCl[]                    = "enable-nacl";
 
 // Enables the network-related benchmarking extensions.
 const char kEnableNetBenchmarking[]         = "enable-net-benchmarking";
-
-// Enables the Material Design NTP.
-const char kEnableMaterialDesignNTP[]       = "enable-material-design-ntp";
 
 // Enables NPN with HTTP. It means NPN is enabled but SPDY won't be used.
 // HTTP is still used for all requests.
@@ -607,9 +600,6 @@ const char kEnableSSLConnectJobWaiting[] = "enable-ssl-connect-job-waiting";
 // proceeds in the background.
 const char kEnableStaleWhileRevalidate[]    = "enable-stale-while-revalidate";
 
-// Enables an experimental hosted app experience.
-const char kEnableStreamlinedHostedApps[]   = "enable-streamlined-hosted-apps";
-
 // Enables the suggestions service.
 const char kEnableSuggestionsService[]      = "enable-suggestions-service";
 
@@ -620,10 +610,6 @@ const char kEnableSupervisedUserBlacklist[] =
 // Enables SafeSites filtering for supervised users.
 const char kEnableSupervisedUserSafeSites[] =
     "enable-supervised-user-safesites";
-
-// Enables synced notifications.
-const char kEnableSyncSyncedNotifications[] =
-    "enable-sync-synced-notifications";
 
 // Enables synced articles.
 const char kEnableSyncArticles[]            = "enable-sync-articles";

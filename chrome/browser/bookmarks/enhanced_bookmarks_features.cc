@@ -21,11 +21,14 @@
 #include "components/variations/variations_associated_data.h"
 #include "extensions/common/features/feature.h"
 #include "extensions/common/features/feature_provider.h"
-#include "ui/base/device_form_factor.h"
 
 namespace {
 
 const char kFieldTrialName[] = "EnhancedBookmarks";
+
+#if defined(OS_WIN) || defined(OS_LINUX) || defined(OS_MACOSX)
+const char kExtensionId[] = "gmlllbghnfkpflemihljekbapjopfjik";
+#endif
 
 // Get extension id from Finch EnhancedBookmarks group parameters.
 std::string GetEnhancedBookmarksExtensionIdFromFinch() {
@@ -49,6 +52,14 @@ bool IsEnhancedBookmarksExperimentEnabledFromFinch() {
 
 bool GetBookmarksExperimentExtensionID(const PrefService* user_prefs,
                                        std::string* extension_id) {
+#if defined(OS_WIN) || defined(OS_LINUX) || defined(OS_MACOSX)
+  // Enable bookmarks experiment by default for en-US, except on CrOS
+  std::string locale = g_browser_process->GetApplicationLocale();
+  if (locale == "en-US") {
+    *extension_id = kExtensionId;
+    return true;
+  }
+#endif
   BookmarksExperimentState bookmarks_experiment_state =
       static_cast<BookmarksExperimentState>(user_prefs->GetInteger(
           sync_driver::prefs::kEnhancedBookmarksExperimentEnabled));
@@ -76,67 +87,35 @@ void UpdateBookmarksExperimentState(
   flags_storage = user_prefs;
 #endif
 
-  BookmarksExperimentState bookmarks_experiment_state_before =
-      static_cast<BookmarksExperimentState>(user_prefs->GetInteger(
-          sync_driver::prefs::kEnhancedBookmarksExperimentEnabled));
-  // If user signed out, clear possible previous state.
-  if (!user_signed_in) {
-    bookmarks_experiment_state_before = BOOKMARKS_EXPERIMENT_NONE;
-    ForceFinchBookmarkExperimentIfNeeded(flags_storage,
-        BOOKMARKS_EXPERIMENT_NONE);
-  }
-
   // kEnhancedBookmarksExperiment flag could have values "", "1" and "0".
   // "0" - user opted out.
   bool opt_out = CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
                      switches::kEnhancedBookmarksExperiment) == "0";
-#if defined(OS_ANDROID)
-  // Tablets automagically do opt out.
-  opt_out =
-      opt_out || ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET;
-#endif  // defined(OS_ANDROID)
 
   BookmarksExperimentState bookmarks_experiment_new_state =
       BOOKMARKS_EXPERIMENT_NONE;
 
-  if (IsEnhancedBookmarksExperimentEnabledFromFinch() && !user_signed_in) {
+  // Enable bookmarks experiment by default for en-US, except on CrOS
+  std::string locale;
+#if defined(OS_WIN) || defined(OS_LINUX) || defined(OS_MACOSX)
+  locale = g_browser_process->GetApplicationLocale();
+#endif
+  if (locale == "en-US") {
+    if (opt_out) {
+      // Experiment enabled but user opted out.
+      bookmarks_experiment_new_state =
+          BOOKMARKS_EXPERIMENT_ENABLED_USER_OPT_OUT;
+    } else {
+      // Experiment enabled.
+      bookmarks_experiment_new_state = BOOKMARKS_EXPERIMENT_ENABLED;
+    }
+  } else if (IsEnhancedBookmarksExperimentEnabledFromFinch()) {
     if (opt_out) {
       // Experiment enabled but user opted out.
       bookmarks_experiment_new_state = BOOKMARKS_EXPERIMENT_OPT_OUT_FROM_FINCH;
     } else {
       // Experiment enabled.
       bookmarks_experiment_new_state = BOOKMARKS_EXPERIMENT_ENABLED_FROM_FINCH;
-    }
-  } else if (experiment_enabled_from_sync == BOOKMARKS_EXPERIMENT_ENABLED) {
-    // Experiment enabled from Chrome sync.
-    if (opt_out) {
-      // Experiment enabled but user opted out.
-      bookmarks_experiment_new_state =
-          BOOKMARKS_EXPERIMENT_ENABLED_USER_OPT_OUT;
-    } else {
-      // Experiment enabled.
-      bookmarks_experiment_new_state = BOOKMARKS_EXPERIMENT_ENABLED;
-    }
-  } else if (experiment_enabled_from_sync == BOOKMARKS_EXPERIMENT_NONE) {
-    // Experiment is not enabled from Chrome sync.
-    bookmarks_experiment_new_state = BOOKMARKS_EXPERIMENT_NONE;
-  } else if (bookmarks_experiment_state_before ==
-             BOOKMARKS_EXPERIMENT_ENABLED) {
-    if (opt_out) {
-      // Experiment enabled but user opted out.
-      bookmarks_experiment_new_state =
-          BOOKMARKS_EXPERIMENT_ENABLED_USER_OPT_OUT;
-    } else {
-      bookmarks_experiment_new_state = BOOKMARKS_EXPERIMENT_ENABLED;
-    }
-  } else if (bookmarks_experiment_state_before ==
-             BOOKMARKS_EXPERIMENT_ENABLED_USER_OPT_OUT) {
-    if (opt_out) {
-      bookmarks_experiment_new_state =
-          BOOKMARKS_EXPERIMENT_ENABLED_USER_OPT_OUT;
-    } else {
-      // User opted in again.
-      bookmarks_experiment_new_state = BOOKMARKS_EXPERIMENT_ENABLED;
     }
   }
 

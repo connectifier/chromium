@@ -7,6 +7,7 @@
 #include <set>
 
 #include "base/logging.h"
+#include "base/numerics/safe_math.h"
 #include "base/strings/stringprintf.h"
 #include "content/child/webcrypto/status.h"
 #include "third_party/WebKit/public/platform/WebCryptoAlgorithm.h"
@@ -37,6 +38,22 @@ bool BigIntegerToUint(const uint8_t* data,
     *result |= data[i] << 8 * reverse_i;
   }
   return true;
+}
+
+Status GetShaBlockSizeBits(const blink::WebCryptoAlgorithm& algorithm,
+                           unsigned int* block_size_bits) {
+  switch (algorithm.id()) {
+    case blink::WebCryptoAlgorithmIdSha1:
+    case blink::WebCryptoAlgorithmIdSha256:
+      *block_size_bits = 512;
+      return Status::Success();
+    case blink::WebCryptoAlgorithmIdSha384:
+    case blink::WebCryptoAlgorithmIdSha512:
+      *block_size_bits = 1024;
+      return Status::Success();
+    default:
+      return Status::ErrorUnsupported();
+  }
 }
 
 }  // namespace
@@ -122,11 +139,21 @@ blink::WebCryptoAlgorithm CreateAlgorithm(blink::WebCryptoAlgorithmId id) {
 }
 
 blink::WebCryptoAlgorithm CreateHmacImportAlgorithm(
+    blink::WebCryptoAlgorithmId hash_id,
+    unsigned int length_bits) {
+  DCHECK(blink::WebCryptoAlgorithm::isHash(hash_id));
+  return blink::WebCryptoAlgorithm::adoptParamsAndCreate(
+      blink::WebCryptoAlgorithmIdHmac,
+      new blink::WebCryptoHmacImportParams(CreateAlgorithm(hash_id), true,
+                                           length_bits));
+}
+
+blink::WebCryptoAlgorithm CreateHmacImportAlgorithmNoLength(
     blink::WebCryptoAlgorithmId hash_id) {
   DCHECK(blink::WebCryptoAlgorithm::isHash(hash_id));
   return blink::WebCryptoAlgorithm::adoptParamsAndCreate(
       blink::WebCryptoAlgorithmIdHmac,
-      new blink::WebCryptoHmacImportParams(CreateAlgorithm(hash_id)));
+      new blink::WebCryptoHmacImportParams(CreateAlgorithm(hash_id), false, 0));
 }
 
 blink::WebCryptoAlgorithm CreateRsaHashedImportAlgorithm(
@@ -188,31 +215,46 @@ Status GetAesKeyGenLengthInBits(const blink::WebCryptoAesKeyGenParams* params,
 
 Status GetHmacKeyGenLengthInBits(const blink::WebCryptoHmacKeyGenParams* params,
                                  unsigned int* keylen_bits) {
-  if (!params->hasLengthBits()) {
-    switch (params->hash().id()) {
-      case blink::WebCryptoAlgorithmIdSha1:
-      case blink::WebCryptoAlgorithmIdSha256:
-        *keylen_bits = 512;
-        return Status::Success();
-      case blink::WebCryptoAlgorithmIdSha384:
-      case blink::WebCryptoAlgorithmIdSha512:
-        *keylen_bits = 1024;
-        return Status::Success();
-      default:
-        return Status::ErrorUnsupported();
-    }
-  }
-
-  // TODO(eroman): Non multiple of 8 bit keylengths should be allowed:
-  // http://crbug.com/438469
-  if (params->optionalLengthBits() % 8)
-    return Status::ErrorGenerateHmacKeyLengthPartialByte();
+  if (!params->hasLengthBits())
+    return GetShaBlockSizeBits(params->hash(), keylen_bits);
 
   *keylen_bits = params->optionalLengthBits();
 
   // Zero-length HMAC keys are disallowed by the spec.
   if (*keylen_bits == 0)
     return Status::ErrorGenerateHmacKeyLengthZero();
+
+  return Status::Success();
+}
+
+Status GetHmacImportKeyLengthBits(
+    const blink::WebCryptoHmacImportParams* params,
+    unsigned int key_data_byte_length,
+    unsigned int* keylen_bits) {
+  // Make sure that the key data's length can be represented in bits without
+  // overflow.
+  unsigned int data_keylen_bits = 0;
+  {
+    base::CheckedNumeric<unsigned int> keylen_bits(key_data_byte_length);
+    keylen_bits *= 8;
+
+    if (!keylen_bits.IsValid())
+      return Status::ErrorDataTooLarge();
+
+    data_keylen_bits = keylen_bits.ValueOrDie();
+  }
+
+  // Determine how many bits of the input to use.
+  *keylen_bits = data_keylen_bits;
+  if (params->hasLengthBits()) {
+    // The requested bit length must be:
+    //   * No longer than the input data length
+    //   * At most 7 bits shorter.
+    if (NumBitsToBytes(params->optionalLengthBits()) != key_data_byte_length) {
+      return Status::ErrorHmacImportBadLength();
+    }
+    *keylen_bits = params->optionalLengthBits();
+  }
 
   return Status::Success();
 }
@@ -258,6 +300,103 @@ Status GetRsaKeyGenParameters(
   // avoid feeding OpenSSL data that will hang use a whitelist.
   if (*public_exponent != 3 && *public_exponent != 65537)
     return Status::ErrorGenerateKeyPublicExponent();
+
+  return Status::Success();
+}
+
+Status VerifyUsagesBeforeImportAsymmetricKey(
+    blink::WebCryptoKeyFormat format,
+    blink::WebCryptoKeyUsageMask all_public_key_usages,
+    blink::WebCryptoKeyUsageMask all_private_key_usages,
+    blink::WebCryptoKeyUsageMask usages) {
+  switch (format) {
+    case blink::WebCryptoKeyFormatSpki:
+      return CheckKeyCreationUsages(all_public_key_usages, usages);
+    case blink::WebCryptoKeyFormatPkcs8:
+      return CheckKeyCreationUsages(all_private_key_usages, usages);
+    case blink::WebCryptoKeyFormatJwk: {
+      // The JWK could represent either a public key or private key. The usages
+      // must make sense for one of the two. The usages will be checked again by
+      // ImportKeyJwk() once the key type has been determined.
+      if (CheckKeyCreationUsages(all_public_key_usages, usages).IsError() &&
+          CheckKeyCreationUsages(all_private_key_usages, usages).IsError()) {
+        return Status::ErrorCreateKeyBadUsages();
+      }
+      return Status::Success();
+    }
+    default:
+      return Status::ErrorUnsupportedImportKeyFormat();
+  }
+}
+
+void TruncateToBitLength(size_t length_bits, std::vector<uint8_t>* bytes) {
+  size_t length_bytes = NumBitsToBytes(length_bits);
+
+  if (bytes->size() != length_bytes) {
+    CHECK_LT(length_bytes, bytes->size());
+    bytes->resize(length_bytes);
+  }
+
+  size_t remainder_bits = length_bits % 8;
+
+  // Zero any "unused bits" in the final byte
+  if (remainder_bits)
+    (*bytes)[bytes->size() - 1] &= ~((0xFF) >> remainder_bits);
+}
+
+Status GetAesKeyLength(const blink::WebCryptoAlgorithm& key_length_algorithm,
+                       bool* has_length_bits,
+                       unsigned int* length_bits) {
+  const blink::WebCryptoAesDerivedKeyParams* params =
+      key_length_algorithm.aesDerivedKeyParams();
+
+  *has_length_bits = true;
+  *length_bits = params->lengthBits();
+
+  if (*length_bits == 128 || *length_bits == 256)
+    return Status::Success();
+
+  // BoringSSL does not support 192-bit AES.
+  if (*length_bits == 192)
+    return Status::ErrorAes192BitUnsupported();
+
+  return Status::ErrorGetAesKeyLength();
+}
+
+Status GetHmacKeyLength(const blink::WebCryptoAlgorithm& key_length_algorithm,
+                        bool* has_length_bits,
+                        unsigned int* length_bits) {
+  const blink::WebCryptoHmacImportParams* params =
+      key_length_algorithm.hmacImportParams();
+
+  if (params->hasLengthBits()) {
+    *has_length_bits = true;
+    *length_bits = params->optionalLengthBits();
+    if (*length_bits == 0)
+      return Status::ErrorGetHmacKeyLengthZero();
+    return Status::Success();
+  }
+
+  *has_length_bits = true;
+  return GetShaBlockSizeBits(params->hash(), length_bits);
+}
+
+Status GetUsagesForGenerateAsymmetricKey(
+    blink::WebCryptoKeyUsageMask combined_usages,
+    blink::WebCryptoKeyUsageMask all_public_usages,
+    blink::WebCryptoKeyUsageMask all_private_usages,
+    blink::WebCryptoKeyUsageMask* public_usages,
+    blink::WebCryptoKeyUsageMask* private_usages) {
+  Status status = CheckKeyCreationUsages(all_public_usages | all_private_usages,
+                                         combined_usages);
+  if (status.IsError())
+    return status;
+
+  *public_usages = combined_usages & all_public_usages;
+  *private_usages = combined_usages & all_private_usages;
+
+  if (*private_usages == 0)
+    return Status::ErrorCreateKeyEmptyUsages();
 
   return Status::Success();
 }

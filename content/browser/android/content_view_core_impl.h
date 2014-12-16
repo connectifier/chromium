@@ -119,7 +119,8 @@ class ContentViewCoreImpl : public ContentViewCore,
                                jlong time_ms,
                                jfloat x,
                                jfloat y,
-                               jfloat vertical_axis);
+                               jfloat vertical_axis,
+                               jfloat horizontal_axis);
   void ScrollBegin(JNIEnv* env, jobject obj, jlong time_ms,
                    jfloat x, jfloat y, jfloat hintx, jfloat hinty);
   void ScrollEnd(JNIEnv* env, jobject obj, jlong time_ms);
@@ -229,9 +230,9 @@ class ContentViewCoreImpl : public ContentViewCore,
                          InputEventAckState ack_result);
   bool FilterInputEvent(const blink::WebInputEvent& event);
   void OnSelectionChanged(const std::string& text);
-  void OnSelectionEvent(SelectionEventType event,
+  void OnSelectionEvent(ui::SelectionEventType event,
                         const gfx::PointF& anchor_position);
-  scoped_ptr<TouchHandleDrawable> CreatePopupTouchHandleDrawable();
+  scoped_ptr<ui::TouchHandleDrawable> CreatePopupTouchHandleDrawable();
 
   void StartContentIntent(const GURL& content_url);
 
@@ -341,8 +342,7 @@ class ContentViewCoreImpl : public ContentViewCore,
   bool accessibility_enabled_;
 
   // Manages injecting Java objects.
-  scoped_ptr<GinJavaBridgeDispatcherHost>
-      java_bridge_dispatcher_host_;
+  scoped_refptr<GinJavaBridgeDispatcherHost> java_bridge_dispatcher_host_;
 
   DISALLOW_COPY_AND_ASSIGN(ContentViewCoreImpl);
 };

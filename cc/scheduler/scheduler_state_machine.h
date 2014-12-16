@@ -62,6 +62,14 @@ class CC_EXPORT SchedulerStateMachine {
   };
   static const char* BeginImplFrameStateToString(BeginImplFrameState state);
 
+  enum BeginImplFrameDeadlineMode {
+    BEGIN_IMPL_FRAME_DEADLINE_MODE_IMMEDIATE,
+    BEGIN_IMPL_FRAME_DEADLINE_MODE_REGULAR,
+    BEGIN_IMPL_FRAME_DEADLINE_MODE_LATE,
+  };
+  static const char* BeginImplFrameDeadlineModeToString(
+      BeginImplFrameDeadlineMode mode);
+
   enum CommitState {
     COMMIT_STATE_IDLE,
     COMMIT_STATE_BEGIN_MAIN_FRAME_SENT,
@@ -89,7 +97,7 @@ class CC_EXPORT SchedulerStateMachine {
   CommitState commit_state() const { return commit_state_; }
 
   bool RedrawPending() const { return needs_redraw_; }
-  bool ManageTilesPending() const { return needs_manage_tiles_; }
+  bool PrepareTilesPending() const { return needs_prepare_tiles_; }
 
   enum Action {
     ACTION_NONE,
@@ -101,7 +109,7 @@ class CC_EXPORT SchedulerStateMachine {
     ACTION_DRAW_AND_SWAP_FORCED,
     ACTION_DRAW_AND_SWAP_ABORT,
     ACTION_BEGIN_OUTPUT_SURFACE_CREATION,
-    ACTION_MANAGE_TILES,
+    ACTION_PREPARE_TILES,
   };
   static const char* ActionToString(Action action);
 
@@ -128,10 +136,10 @@ class CC_EXPORT SchedulerStateMachine {
   void OnBeginImplFrameDeadlinePending();
   void OnBeginImplFrameDeadline();
   void OnBeginImplFrameIdle();
-  bool ShouldTriggerBeginImplFrameDeadlineEarly() const;
   BeginImplFrameState begin_impl_frame_state() const {
     return begin_impl_frame_state_;
   }
+  BeginImplFrameDeadlineMode CurrentBeginImplFrameDeadlineMode() const;
 
   // If the main thread didn't manage to produce a new frame in time for the
   // impl thread to draw, it is in a high latency mode.
@@ -157,9 +165,9 @@ class CC_EXPORT SchedulerStateMachine {
   void SetNeedsAnimate();
   bool needs_animate() const { return needs_animate_; }
 
-  // Indicates that manage-tiles is required. This guarantees another
-  // ManageTiles will occur shortly (even if no redraw is required).
-  void SetNeedsManageTiles();
+  // Indicates that prepare-tiles is required. This guarantees another
+  // PrepareTiles will occur shortly (even if no redraw is required).
+  void SetNeedsPrepareTiles();
 
   // Sets how many swaps can be pending to the OutputSurface.
   void SetMaxSwapsPending(int max);
@@ -222,7 +230,7 @@ class CC_EXPORT SchedulerStateMachine {
     return active_tree_needs_first_draw_;
   }
 
-  void DidManageTiles();
+  void DidPrepareTiles();
   void DidLoseOutputSurface();
   void DidCreateAndInitializeOutputSurface();
   bool HasInitializedOutputSurface() const;
@@ -258,6 +266,8 @@ class CC_EXPORT SchedulerStateMachine {
   bool BeginFrameNeededForChildren() const;
   bool ProactiveBeginFrameWanted() const;
 
+  bool ShouldTriggerBeginImplFrameDeadlineImmediately() const;
+
   // True if we need to force activations to make forward progress.
   bool PendingActivationsShouldBeForced() const;
 
@@ -268,7 +278,7 @@ class CC_EXPORT SchedulerStateMachine {
   bool ShouldActivatePendingTree() const;
   bool ShouldSendBeginMainFrame() const;
   bool ShouldCommit() const;
-  bool ShouldManageTiles() const;
+  bool ShouldPrepareTiles() const;
 
   void AdvanceCurrentFrameNumber();
   bool HasAnimatedThisFrame() const;
@@ -279,7 +289,7 @@ class CC_EXPORT SchedulerStateMachine {
   void UpdateStateOnCommit(bool commit_was_aborted);
   void UpdateStateOnActivation();
   void UpdateStateOnDraw(bool did_request_swap);
-  void UpdateStateOnManageTiles();
+  void UpdateStateOnPrepareTiles();
 
   const SchedulerSettings settings_;
 
@@ -297,17 +307,17 @@ class CC_EXPORT SchedulerStateMachine {
   int last_frame_number_swap_requested_;
   int last_frame_number_begin_main_frame_sent_;
 
-  // manage_tiles_funnel_ is "filled" each time ManageTiles is called
+  // prepare_tiles_funnel_ is "filled" each time PrepareTiles is called
   // and "drained" on each BeginImplFrame. If the funnel gets too full,
-  // we start throttling ACTION_MANAGE_TILES such that we average one
-  // ManageTile per BeginImplFrame.
-  int manage_tiles_funnel_;
+  // we start throttling ACTION_PREPARE_TILES such that we average one
+  // PrepareTiles per BeginImplFrame.
+  int prepare_tiles_funnel_;
   int consecutive_checkerboard_animations_;
   int max_pending_swaps_;
   int pending_swaps_;
   bool needs_redraw_;
   bool needs_animate_;
-  bool needs_manage_tiles_;
+  bool needs_prepare_tiles_;
   bool needs_commit_;
   bool inside_poll_for_anticipated_draw_triggers_;
   bool visible_;

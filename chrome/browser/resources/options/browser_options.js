@@ -568,7 +568,8 @@ cr.define('options', function() {
       // Web Content section.
       $('fontSettingsCustomizeFontsButton').onclick = function(event) {
         PageManager.showPageByName('fonts');
-        chrome.send('coreOptionsUserMetricsAction', ['Options_FontSettings']);
+        chrome.send('coreOptionsUserMetricsAction',
+                    ['Options_ShowFontSettings']);
       };
       $('defaultFontSize').onchange = function(event) {
         var value = event.target.options[event.target.selectedIndex].value;
@@ -642,19 +643,9 @@ cr.define('options', function() {
         $('accessibility-settings-button').onclick = function(unused_event) {
           window.open(loadTimeData.getString('accessibilitySettingsURL'));
         };
-        $('accessibility-spoken-feedback-check').onchange = function(
-            unused_event) {
-          chrome.send('spokenFeedbackChange',
-                      [$('accessibility-spoken-feedback-check').checked]);
-          updateAccessibilitySettingsButton();
-        };
+        $('accessibility-spoken-feedback-check').onchange =
+            updateAccessibilitySettingsButton;
         updateAccessibilitySettingsButton();
-
-        $('accessibility-high-contrast-check').onchange = function(
-            unused_event) {
-          chrome.send('highContrastChange',
-                      [$('accessibility-high-contrast-check').checked]);
-        };
 
         var updateDelayDropdown = function() {
           $('accessibility-autoclick-dropdown').disabled =
@@ -1202,7 +1193,7 @@ cr.define('options', function() {
      * @param {boolean} visible Whether to show hotword sections.
      * @private
      */
-    setHotwordSectionVisible_: function(visible) {
+    setAllHotwordSectionsVisible_: function(visible) {
       $('hotword-search').hidden = !visible;
       $('hotword-always-on-search').hidden = !visible;
       $('hotword-no-dsp-search').hidden = !visible;
@@ -1230,11 +1221,14 @@ cr.define('options', function() {
 
     /**
      * Activates the Audio History section of the Settings page.
+     * @param {boolean} visible Whether the audio history section is visible.
      * @param {boolean} alwaysOn Whether always-on hotwording is available.
+     * @param {string} labelText Text describing current audio history state.
      * @private
      */
-    showAudioHistorySection_: function(alwaysOn) {
-      $('audio-history').hidden = false;
+    setAudioHistorySectionVisible_: function(visible, alwaysOn, labelText) {
+      $('audio-history').hidden = !visible;
+      $('audio-history-label').textContent = labelText;
       $('audio-history-always-on-description').hidden = !alwaysOn;
     },
 
@@ -2127,7 +2121,7 @@ cr.define('options', function() {
     'setNativeThemeButtonEnabled',
     'setNetworkPredictionValue',
     'setHighContrastCheckboxState',
-    'setHotwordSectionVisible',
+    'setAllHotwordSectionsVisible',
     'setMetricsReportingCheckboxState',
     'setMetricsReportingSettingVisibility',
     'setProfilesInfo',
@@ -2136,7 +2130,7 @@ cr.define('options', function() {
     'setVirtualKeyboardCheckboxState',
     'setupPageZoomSelector',
     'setupProxySettingsButton',
-    'showAudioHistorySection',
+    'setAudioHistorySectionVisible',
     'showBluetoothSettings',
     'showCreateProfileError',
     'showCreateProfileSuccess',

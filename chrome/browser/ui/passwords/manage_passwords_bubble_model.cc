@@ -12,6 +12,7 @@
 #include "chrome/grit/generated_resources.h"
 #include "components/feedback/feedback_data.h"
 #include "components/feedback/feedback_util.h"
+#include "components/password_manager/core/browser/password_manager_url_collection_experiment.h"
 #include "components/password_manager/core/browser/password_store.h"
 #include "components/password_manager/core/common/password_manager_ui.h"
 #include "content/public/browser/browser_thread.h"
@@ -38,12 +39,17 @@ int GetFieldWidth(FieldType type) {
                                                    : kPasswordFieldSize);
 }
 
+Profile* GetProfileFromWebContents(content::WebContents* web_contents) {
+  if (!web_contents)
+    return nullptr;
+  return Profile::FromBrowserContext(web_contents->GetBrowserContext());
+}
+
 void RecordExperimentStatistics(content::WebContents* web_contents,
                                 metrics_util::UIDismissalReason reason) {
-  if (!web_contents)
+  Profile* profile = GetProfileFromWebContents(web_contents);
+  if (!profile)
     return;
-  Profile* profile =
-      Profile::FromBrowserContext(web_contents->GetBrowserContext());
   password_bubble_experiment::RecordBubbleClosed(profile->GetPrefs(), reason);
 }
 
@@ -89,6 +95,15 @@ void URLCollectionFeedbackSender::SendFeedback() {
   feedback_data->set_user_email("");
   feedback_data->set_context(context_);
   feedback_util::SendReport(feedback_data);
+}
+
+void RecordURLsCollectionExperimentStatistics(
+    content::WebContents* web_contents) {
+  Profile* profile = GetProfileFromWebContents(web_contents);
+  if (!profile)
+    return;
+  password_manager::urls_collection_experiment::RecordBubbleClosed(
+      profile->GetPrefs());
 }
 
 }  // namespace
@@ -189,6 +204,7 @@ void ManagePasswordsBubbleModel::OnBubbleHidden() {
 
   if (password_manager::ui::IsAskSubmitURLState(state_)) {
     state_ = password_manager::ui::ASK_USER_REPORT_URL_BUBBLE_SHOWN_STATE;
+    RecordURLsCollectionExperimentStatistics(web_contents());
   }
   metrics_util::LogUIDismissalReason(dismissal_reason_);
   // Other use cases have been reported in the callbacks like OnSaveClicked().
@@ -257,7 +273,12 @@ void ManagePasswordsBubbleModel::OnSaveClicked() {
   ManagePasswordsUIController* manage_passwords_ui_controller =
       ManagePasswordsUIController::FromWebContents(web_contents());
   manage_passwords_ui_controller->SavePassword();
-  state_ = password_manager::ui::MANAGE_STATE;
+  if (ShouldShowOSPasswordBubble()) {
+    state_ = password_manager::ui::SETUP_OS_PASSWORD_BUBBLE_STATE;
+    title_ = l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_OS_PASSWORD_TITLE);
+  } else {
+    state_ = password_manager::ui::MANAGE_STATE;
+  }
 }
 
 void ManagePasswordsBubbleModel::OnDoneClicked() {
@@ -303,6 +324,14 @@ void ManagePasswordsBubbleModel::OnChooseCredentials(
   state_ = password_manager::ui::INACTIVE_STATE;
 }
 
+void ManagePasswordsBubbleModel::OnShowOSPasswordHelpArticle() {
+  // TODO(vasilii): open the Help Article.
+}
+
+void ManagePasswordsBubbleModel::OnHideOSPasswordBubble(bool permanently) {
+  // TODO(vasilii): Save the decision to prefs.
+}
+
 // static
 int ManagePasswordsBubbleModel::UsernameFieldWidth() {
   return GetFieldWidth(USERNAME_FIELD);
@@ -311,4 +340,8 @@ int ManagePasswordsBubbleModel::UsernameFieldWidth() {
 // static
 int ManagePasswordsBubbleModel::PasswordFieldWidth() {
   return GetFieldWidth(PASSWORD_FIELD);
+}
+
+bool ManagePasswordsBubbleModel::ShouldShowOSPasswordBubble() {
+  return false;
 }

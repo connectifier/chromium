@@ -45,11 +45,18 @@ class PushMessagingMessageFilter : public BrowserMessageFilter {
   // BrowserMessageFilter implementation.
   bool OnMessageReceived(const IPC::Message& message) override;
 
+  // TODO(mvanouwerkerk): Delete once this is no longer called.
+  void OnRegisterFromDocumentOld(int render_frame_id,
+                                 int request_id,
+                                 const std::string& sender_id,
+                                 bool user_visible_only,
+                                 int service_worker_provider_id);
+
   void OnRegisterFromDocument(int render_frame_id,
                               int request_id,
                               const std::string& sender_id,
                               bool user_visible_only,
-                              int service_worker_provider_id);
+                              int64 service_worker_registration_id);
 
   void OnRegisterFromWorker(int request_id,
                             int64 service_worker_registration_id);
@@ -62,6 +69,15 @@ class PushMessagingMessageFilter : public BrowserMessageFilter {
 
   void OnGetPermissionStatus(int request_id,
                              int64 service_worker_registration_id);
+
+  void CheckForExistingRegistration(const RegisterData& data,
+                                    const std::string& sender_id);
+
+  void DidCheckForExistingRegistration(
+      const RegisterData& data,
+      const std::string& sender_id,
+      const std::string& push_registration_id,
+      ServiceWorkerStatusCode service_worker_status);
 
   void RegisterOnUI(const RegisterData& data,
                     const std::string& sender_id);
@@ -91,8 +107,12 @@ class PushMessagingMessageFilter : public BrowserMessageFilter {
   void SendRegisterError(const RegisterData& data,
                          PushRegistrationStatus status);
   void SendRegisterSuccess(const RegisterData& data,
+                           PushRegistrationStatus status,
                            const GURL& push_endpoint,
                            const std::string& push_registration_id);
+  void SendRegisterSuccessOnUI(const RegisterData& data,
+                               PushRegistrationStatus status,
+                               const std::string& push_registration_id);
 
   // Returns a push messaging service. The embedder owns the service, and is
   // responsible for ensuring that it outlives RenderProcessHost. It's valid to

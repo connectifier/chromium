@@ -115,7 +115,7 @@ class VideoCaptureControllerTest : public testing::Test {
 
   void SetUp() override {
     controller_.reset(new VideoCaptureController(kPoolSize));
-    device_ = controller_->CreateDeviceClient().Pass();
+    device_ = controller_->NewDeviceClient().Pass();
     client_a_.reset(new MockVideoCaptureControllerEventHandler(
         controller_.get()));
     client_b_.reset(new MockVideoCaptureControllerEventHandler(
@@ -630,6 +630,42 @@ TEST_F(VideoCaptureControllerTest, ErrorAfterDeviceCreation) {
   controller_->AddClient(
       route_id, client_b_.get(), base::kNullProcessHandle, 200, session_200);
   Mock::VerifyAndClearExpectations(client_b_.get());
+}
+
+TEST_F(VideoCaptureControllerTest, DataCaptureInEachVideoFormatInSequence) {
+  // This Test will skip PIXEL_FORMAT_TEXTURE and PIXEL_FORMAT_UNKNOWN
+  for (int format = 0; format < media::PIXEL_FORMAT_TEXTURE; ++format) {
+    media::VideoCaptureParams params;
+    params.requested_format = media::VideoCaptureFormat(
+        gfx::Size(320, 240), 30, media::VideoPixelFormat(format));
+
+    const gfx::Size capture_resolution(320, 240);
+
+    const VideoCaptureControllerID route(0x99);
+
+    // Start with one client.
+    controller_->AddClient(route,
+                           client_a_.get(),
+                           base::kNullProcessHandle,
+                           100,
+                           params);
+    ASSERT_EQ(1, controller_->GetClientCount());
+
+    // Now, simulate an incoming captured buffer from the capture device.
+    scoped_refptr<media::VideoCaptureDevice::Client::Buffer> buffer;
+    buffer =
+        device_->ReserveOutputBuffer(media::VideoFrame::I420,
+                                     capture_resolution);
+    ASSERT_TRUE(buffer.get());
+
+    // Captured a new video frame.
+    device_->OnIncomingCapturedData(
+              static_cast<unsigned char*>(buffer.get()->data()),
+              buffer.get()->size(),
+              params.requested_format,
+              0,
+              base::TimeTicks());
+  }
 }
 
 }  // namespace content

@@ -25,10 +25,6 @@ AppViewImpl.setupElement = function(proto) {
   GuestViewContainer.forwardApiMethods(proto, apiMethods);
 }
 
-AppViewImpl.prototype.onElementDetached = function() {
-  this.guest.destroy();
-};
-
 AppViewImpl.prototype.getErrorNode = function() {
   if (!this.errorNode) {
     this.errorNode = document.createElement('div');
@@ -55,6 +51,7 @@ AppViewImpl.prototype.connect = function(app, data, callback) {
     'data': data || {}
   };
 
+  this.guest.destroy();
   this.guest.create(createParams, function() {
     if (!this.guest.getId()) {
       var errorMsg = 'Unable to connect to app "' + app + '".';
@@ -70,13 +67,6 @@ AppViewImpl.prototype.connect = function(app, data, callback) {
       callback(true);
     }
   }.bind(this));
-};
-
-AppViewImpl.prototype.buildAttachParams = function() {
-  var params = {
-    'instanceId': this.viewInstanceId
-  };
-  return params;
 };
 
 GuestViewContainer.registerElement(AppViewImpl);

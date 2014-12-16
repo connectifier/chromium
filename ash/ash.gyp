@@ -63,9 +63,6 @@
       'desktop_background/desktop_background_widget_controller.cc',
       'desktop_background/desktop_background_widget_controller.h',
       'desktop_background/user_wallpaper_delegate.h',
-      'desktop_background/wallpaper_resizer.cc',
-      'desktop_background/wallpaper_resizer.h',
-      'desktop_background/wallpaper_resizer_observer.h',
       'display/cursor_window_controller.cc',
       'display/cursor_window_controller.h',
       'display/display_change_observer_chromeos.cc',
@@ -767,7 +764,6 @@
       'autoclick/autoclick_unittest.cc',
       'content/display/screen_orientation_delegate_chromeos_unittest.cc',
       'desktop_background/desktop_background_controller_unittest.cc',
-      'desktop_background/wallpaper_resizer_unittest.cc',
       'dip_unittest.cc',
       'display/display_change_observer_chromeos_unittest.cc',
       'display/display_controller_unittest.cc',
@@ -835,6 +831,7 @@
       'touch/touch_transformer_controller_unittest.cc',
       'touch/touchscreen_util_unittest.cc',
       'virtual_keyboard_controller_unittest.cc',
+      'wm/always_on_top_controller_unittest.cc',
       'wm/app_list_controller_unittest.cc',
       'wm/ash_native_cursor_manager_unittest.cc',
       'wm/dock/docked_window_layout_manager_unittest.cc',
@@ -890,6 +887,7 @@
         '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
         '../cc/cc.gyp:cc',
         '../components/components.gyp:user_manager',
+        '../components/components.gyp:wallpaper',
         '../content/content.gyp:content_browser',
         '../media/media.gyp:media',
         '../net/net.gyp:net',
@@ -936,17 +934,7 @@
           # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
           'msvs_disabled_warnings': [ 4267, ],
         }],
-        ['use_x11!=1', {
-          'sources!': [
-            # Note: sources list duplicated in GN build.
-            'accelerators/key_hold_detector.cc',
-            'accelerators/key_hold_detector.h',
-            'accelerators/magnifier_key_scroller.cc',
-            'accelerators/magnifier_key_scroller.h',
-            'accelerators/spoken_feedback_toggler.cc',
-            'accelerators/spoken_feedback_toggler.h',
-          ],
-        }, { # else: use_x11==1
+        ['use_x11==1', {
           'dependencies': [
             '../build/linux/system.gyp:xfixes',
            ],
@@ -965,6 +953,12 @@
           ],
         }, { # else: chromeos!=1
           'sources!': [
+            'accelerators/key_hold_detector.cc',
+            'accelerators/key_hold_detector.h',
+            'accelerators/magnifier_key_scroller.cc',
+            'accelerators/magnifier_key_scroller.h',
+            'accelerators/spoken_feedback_toggler.cc',
+            'accelerators/spoken_feedback_toggler.h',
             'display/display_configurator_animation.cc',
             'display/display_configurator_animation.h',
             'display/resolution_notification_controller.cc',
@@ -1135,12 +1129,6 @@
             '../base/allocator/allocator.gyp:allocator',
           ],
         }],
-        ['use_x11!=1', {
-          'sources!': [
-            'accelerators/magnifier_key_scroller_unittest.cc',
-            'accelerators/spoken_feedback_toggler_unittest.cc',
-          ],
-        }],
         ['chromeos==1', {
           'dependencies': [
             '../chromeos/chromeos.gyp:chromeos_test_support_without_gmock',
@@ -1155,6 +1143,8 @@
           ],
         }, { # else: chromeos!=1
           'sources!': [
+            'accelerators/magnifier_key_scroller_unittest.cc',
+            'accelerators/spoken_feedback_toggler_unittest.cc',
             'display/resolution_notification_controller_unittest.cc',
             'touch/touch_transformer_controller_unittest.cc',
             'touch/touchscreen_util_unittest.cc',

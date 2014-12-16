@@ -929,13 +929,14 @@ gfx::Size RenderWidgetHostViewAura::GetRequestedRendererSize() const {
 void RenderWidgetHostViewAura::SelectionBoundsChanged(
     const ViewHostMsg_SelectionBounds_Params& params) {
   ui::SelectionBound anchor_bound, focus_bound;
-  anchor_bound.edge_top = params.anchor_rect.origin();
-  anchor_bound.edge_bottom = params.anchor_rect.bottom_left();
-  focus_bound.edge_top = params.focus_rect.origin();
-  focus_bound.edge_bottom = params.focus_rect.bottom_left();
+  anchor_bound.SetEdge(params.anchor_rect.origin(),
+                       params.anchor_rect.bottom_left());
+  focus_bound.SetEdge(params.focus_rect.origin(),
+                      params.focus_rect.bottom_left());
 
   if (params.anchor_rect == params.focus_rect) {
-    anchor_bound.type = focus_bound.type = ui::SelectionBound::CENTER;
+    anchor_bound.set_type(ui::SelectionBound::CENTER);
+    focus_bound.set_type(ui::SelectionBound::CENTER);
   } else {
     // Whether text is LTR at the anchor handle.
     bool anchor_LTR = params.anchor_dir == blink::WebTextDirectionLeftToRight;
@@ -944,15 +945,15 @@ void RenderWidgetHostViewAura::SelectionBoundsChanged(
 
     if ((params.is_anchor_first && anchor_LTR) ||
         (!params.is_anchor_first && !anchor_LTR)) {
-      anchor_bound.type = ui::SelectionBound::LEFT;
+      anchor_bound.set_type(ui::SelectionBound::LEFT);
     } else {
-      anchor_bound.type = ui::SelectionBound::RIGHT;
+      anchor_bound.set_type(ui::SelectionBound::RIGHT);
     }
     if ((params.is_anchor_first && focus_LTR) ||
         (!params.is_anchor_first && !focus_LTR)) {
-      focus_bound.type = ui::SelectionBound::RIGHT;
+      focus_bound.set_type(ui::SelectionBound::RIGHT);
     } else {
-      focus_bound.type = ui::SelectionBound::LEFT;
+      focus_bound.set_type(ui::SelectionBound::LEFT);
     }
   }
 
@@ -1838,18 +1839,8 @@ void RenderWidgetHostViewAura::OnKeyEvent(ui::KeyEvent* event) {
     }
 
     // We don't have to communicate with an input method here.
-    if (!event->HasNativeEvent()) {
-      NativeWebKeyboardEvent webkit_event(
-          event->type(),
-          event->is_char(),
-          event->is_char() ? event->GetCharacter() : event->key_code(),
-          event->flags(),
-          ui::EventTimeForNow().InSecondsF());
-      ForwardKeyboardEvent(webkit_event);
-    } else {
-      NativeWebKeyboardEvent webkit_event(*event);
-      ForwardKeyboardEvent(webkit_event);
-    }
+    NativeWebKeyboardEvent webkit_event(*event);
+    ForwardKeyboardEvent(webkit_event);
   }
   event->SetHandled();
 }
@@ -2032,23 +2023,27 @@ void RenderWidgetHostViewAura::OnTouchEvent(ui::TouchEvent* event) {
     return;
 
   // Update the touch event first.
-  blink::WebTouchPoint* point = UpdateWebTouchEventFromUIEvent(*event,
-                                                                &touch_event_);
+  blink::WebTouchPoint* point =
+      UpdateWebTouchEventFromUIEvent(*event, &touch_event_);
 
-  // Forward the touch event only if a touch point was updated, and there's a
-  // touch-event handler in the page, and no other touch-event is in the queue.
-  // It is important to always consume the event if there is a touch-event
-  // handler in the page, or some touch-event is already in the queue, even if
-  // no point has been updated, to make sure that this event does not get
-  // processed by the gesture recognizer before the events in the queue.
-  if (host_->ShouldForwardTouchEvent())
+  if (!point) {
     event->StopPropagation();
-
-  if (point) {
-    if (host_->ShouldForwardTouchEvent())
-      host_->ForwardTouchEventWithLatencyInfo(touch_event_, *event->latency());
-    UpdateWebTouchEventAfterDispatch(&touch_event_, point);
+    return;
   }
+
+  // Forward the touch event only if a touch point was updated, and
+  // there's a touch-event handler in the page, and no other
+  // touch-event is in the queue. It is important to always mark
+  // events as being handled asynchronously if there is a touch-event
+  // handler in the page, or some touch-event is already in the queue,
+  // even if no point has been updated. This ensures that this event
+  // does not get processed by the gesture recognizer before events
+  // currently awaiting dispatch in the touch queue.
+  if (host_->ShouldForwardTouchEvent()) {
+    event->DisableSynchronousHandling();
+    host_->ForwardTouchEventWithLatencyInfo(touch_event_, *event->latency());
+  }
+  UpdateWebTouchEventAfterDispatch(&touch_event_, point);
 }
 
 void RenderWidgetHostViewAura::OnGestureEvent(ui::GestureEvent* event) {

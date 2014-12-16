@@ -1051,8 +1051,18 @@ TEST_F(WidgetTest, GetRestoredBounds) {
 }
 #endif
 
+// ExitFullscreenRestoreState doesn't use DesktopAura widgets. On Mac, there are
+// currently only Desktop widgets and fullscreen changes need to occur in an
+// interactive test to avoid flakes. Maximize on mac is also (intentionally) a
+// no-op.
+#if defined(OS_MACOSX) && !defined(USE_AURA)
+#define MAYBE_ExitFullscreenRestoreState DISABLED_ExitFullscreenRestoreState
+#else
+#define MAYBE_ExitFullscreenRestoreState ExitFullscreenRestoreState
+#endif
+
 // Test that window state is not changed after getting out of full screen.
-TEST_F(WidgetTest, ExitFullscreenRestoreState) {
+TEST_F(WidgetTest, MAYBE_ExitFullscreenRestoreState) {
   Widget* toplevel = CreateTopLevelPlatformWidget();
 
   toplevel->Show();
@@ -1069,9 +1079,6 @@ TEST_F(WidgetTest, ExitFullscreenRestoreState) {
   // And it should still be in normal state after getting out of full screen.
   EXPECT_EQ(ui::SHOW_STATE_NORMAL, GetWidgetShowState(toplevel));
 
-// On Mac, a "maximized" state is indistinguishable from a window that just
-// fills the screen, so nothing to check there.
-#if !defined(OS_MACOSX)
   // Now, make it maximized.
   toplevel->Maximize();
   EXPECT_EQ(ui::SHOW_STATE_MAXIMIZED, GetWidgetShowState(toplevel));
@@ -1083,7 +1090,6 @@ TEST_F(WidgetTest, ExitFullscreenRestoreState) {
 
   // And it stays maximized after getting out of full screen.
   EXPECT_EQ(ui::SHOW_STATE_MAXIMIZED, GetWidgetShowState(toplevel));
-#endif
 
   // Clean up.
   toplevel->Close();
@@ -1183,9 +1189,10 @@ TEST_F(WidgetTest, BubbleControlsResetOnInit) {
   anchor->CloseNow();
 }
 
-// Desktop native widget Aura tests are for non Chrome OS platforms.
-#if !defined(OS_CHROMEOS)
-// Test to ensure that after minimize, view width is set to zero.
+#if defined(OS_WIN)
+// Test to ensure that after minimize, view width is set to zero. This is only
+// the case for desktop widgets on Windows. Other platforms retain the window
+// size while minimized.
 TEST_F(WidgetTest, TestViewWidthAfterMinimizingWidget) {
   // Create a widget.
   Widget widget;
@@ -1200,11 +1207,17 @@ TEST_F(WidgetTest, TestViewWidthAfterMinimizingWidget) {
   NonClientView* non_client_view = widget.non_client_view();
   NonClientFrameView* frame_view = new MinimumSizeFrameView(&widget);
   non_client_view->SetFrameView(frame_view);
+  // Setting the frame view doesn't do a layout, so force one.
+  non_client_view->Layout();
   widget.Show();
+  EXPECT_NE(0, frame_view->width());
   widget.Minimize();
   EXPECT_EQ(0, frame_view->width());
 }
+#endif
 
+// Desktop native widget Aura tests are for non Chrome OS platforms.
+#if !defined(OS_CHROMEOS)
 // This class validates whether paints are received for a visible Widget.
 // To achieve this it overrides the Show and Close methods on the Widget class
 // and sets state whether subsequent paints are expected.
@@ -1989,6 +2002,31 @@ TEST_F(WidgetTest, CloseWidgetWhileAnimating) {
   }
   EXPECT_TRUE(animation_observer.animation_completed());
   EXPECT_EQ(widget_observer.bounds(), bounds);
+}
+
+// Tests that we do not crash when a Widget is destroyed by going out of
+// scope (as opposed to being explicitly deleted by its NativeWidget).
+TEST_F(WidgetTest, NoCrashOnWidgetDelete) {
+  scoped_ptr<Widget> widget(new Widget);
+  Widget::InitParams params = CreateParams(Widget::InitParams::TYPE_POPUP);
+  params.ownership = Widget::InitParams::WIDGET_OWNS_NATIVE_WIDGET;
+  widget->Init(params);
+}
+
+// Tests that we do not crash when a Widget is destroyed before it finishes
+// processing of pending input events in the message loop.
+TEST_F(WidgetTest, NoCrashOnWidgetDeleteWithPendingEvents) {
+  scoped_ptr<Widget> widget(new Widget);
+  Widget::InitParams params = CreateParams(Widget::InitParams::TYPE_WINDOW);
+  params.bounds = gfx::Rect(0, 0, 200, 200);
+  params.ownership = Widget::InitParams::WIDGET_OWNS_NATIVE_WIDGET;
+  widget->Init(params);
+  widget->Show();
+
+  ui::test::EventGenerator generator(GetContext(), widget->GetNativeWindow());
+  generator.MoveMouseTo(10, 10);
+  generator.PressTouch();
+  widget.reset();
 }
 
 // A view that consumes mouse-pressed event and gesture-tap-down events.

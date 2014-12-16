@@ -7,6 +7,7 @@
 #include "base/debug/trace_event.h"
 #include "base/logging.h"
 #include "base/metrics/histogram.h"
+#include "content/child/notifications/notification_data_conversions.h"
 #include "content/child/thread_safe_sender.h"
 #include "content/child/webmessageportchannel_impl.h"
 #include "content/common/service_worker/service_worker_messages.h"
@@ -77,6 +78,8 @@ void ServiceWorkerScriptContext::OnMessageReceived(
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_FetchEvent, OnFetchEvent)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_InstallEvent, OnInstallEvent)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_SyncEvent, OnSyncEvent)
+    IPC_MESSAGE_HANDLER(ServiceWorkerMsg_NotificationClickEvent,
+                        OnNotificationClickEvent)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_PushEvent, OnPushEvent)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_GeofencingEvent, OnGeofencingEvent)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_MessageToWorker, OnPostMessage)
@@ -84,6 +87,7 @@ void ServiceWorkerScriptContext::OnMessageReceived(
                         OnDidGetClientDocuments)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_FocusClientResponse,
                         OnFocusClientResponse)
+    IPC_MESSAGE_HANDLER(ServiceWorkerMsg_DidSkipWaiting, OnDidSkipWaiting)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
 
@@ -194,6 +198,13 @@ void ServiceWorkerScriptContext::FocusClient(
       GetRoutingID(), request_id, client_id));
 }
 
+void ServiceWorkerScriptContext::SkipWaiting(
+    blink::WebServiceWorkerSkipWaitingCallbacks* callbacks) {
+  DCHECK(callbacks);
+  int request_id = pending_skip_waiting_callbacks_.Add(callbacks);
+  Send(new ServiceWorkerHostMsg_SkipWaiting(GetRoutingID(), request_id));
+}
+
 void ServiceWorkerScriptContext::Send(IPC::Message* message) {
   embedded_context_->Send(message);
 }
@@ -255,18 +266,16 @@ void ServiceWorkerScriptContext::OnSyncEvent(int request_id) {
 }
 
 void ServiceWorkerScriptContext::OnNotificationClickEvent(
-    int request_id, const std::string& notification_id) {
+    int request_id,
+    const std::string& notification_id,
+    const PlatformNotificationData& notification_data) {
   TRACE_EVENT0("ServiceWorker",
                "ServiceWorkerScriptContext::OnNotificationClickEvent");
   notification_click_start_timings_[request_id] = base::TimeTicks::Now();
-
-  blink::WebNotificationData notification;
-  // TODO(peter): Initialize |notification| with the actual contents.
-
   proxy_->dispatchNotificationClickEvent(
       request_id,
       blink::WebString::fromUTF8(notification_id),
-      notification);
+      ToWebNotificationData(notification_data));
 }
 
 void ServiceWorkerScriptContext::OnPushEvent(int request_id,
@@ -316,7 +325,7 @@ void ServiceWorkerScriptContext::OnPostMessage(
 }
 
 void ServiceWorkerScriptContext::OnDidGetClientDocuments(
-    int request_id, const std::vector<int>& client_ids) {
+    int request_id, const std::vector<ServiceWorkerClientInfo>& clients) {
   TRACE_EVENT0("ServiceWorker",
                "ServiceWorkerScriptContext::OnDidGetClientDocuments");
   blink::WebServiceWorkerClientsCallbacks* callbacks =
@@ -327,7 +336,18 @@ void ServiceWorkerScriptContext::OnDidGetClientDocuments(
   }
   scoped_ptr<blink::WebServiceWorkerClientsInfo> info(
       new blink::WebServiceWorkerClientsInfo);
-  info->clientIDs = client_ids;
+  blink::WebVector<blink::WebServiceWorkerClientInfo> convertedClients(
+      clients.size());
+  for (size_t i = 0; i < clients.size(); ++i) {
+    convertedClients[i].clientID = clients[i].client_id;
+    convertedClients[i].visibilityState =
+        blink::WebString::fromUTF8(clients[i].visibility_state);
+    convertedClients[i].isFocused = clients[i].is_focused;
+    convertedClients[i].url = clients[i].url;
+    convertedClients[i].frameType =
+        static_cast<blink::WebURLRequest::FrameType>(clients[i].frame_type);
+  }
+  info->clients.swap(convertedClients);
   callbacks->onSuccess(info.release());
   pending_clients_callbacks_.Remove(request_id);
 }
@@ -344,6 +364,19 @@ void ServiceWorkerScriptContext::OnFocusClientResponse(int request_id,
   }
   callback->onSuccess(&result);
   pending_focus_client_callbacks_.Remove(request_id);
+}
+
+void ServiceWorkerScriptContext::OnDidSkipWaiting(int request_id) {
+  TRACE_EVENT0("ServiceWorker",
+               "ServiceWorkerScriptContext::OnDidSkipWaiting");
+  blink::WebServiceWorkerSkipWaitingCallbacks* callbacks =
+      pending_skip_waiting_callbacks_.Lookup(request_id);
+  if (!callbacks) {
+    NOTREACHED() << "Got stray response: " << request_id;
+    return;
+  }
+  callbacks->onSuccess();
+  pending_skip_waiting_callbacks_.Remove(request_id);
 }
 
 }  // namespace content

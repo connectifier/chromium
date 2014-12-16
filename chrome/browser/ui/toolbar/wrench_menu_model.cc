@@ -37,8 +37,6 @@
 #include "chrome/browser/ui/toolbar/bookmark_sub_menu_model.h"
 #include "chrome/browser/ui/toolbar/encoding_menu_controller.h"
 #include "chrome/browser/ui/toolbar/recent_tabs_sub_menu_model.h"
-#include "chrome/browser/ui/zoom/zoom_controller.h"
-#include "chrome/browser/ui/zoom/zoom_event_manager.h"
 #include "chrome/browser/upgrade_detector.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
@@ -48,6 +46,8 @@
 #include "chrome/grit/generated_resources.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/signin/core/common/profile_management_switches.h"
+#include "components/ui/zoom/zoom_controller.h"
+#include "components/ui/zoom/zoom_event_manager.h"
 #include "content/public/browser/host_zoom_map.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/notification_service.h"
@@ -285,10 +285,10 @@ WrenchMenuModel::WrenchMenuModel(ui::AcceleratorProvider* provider,
   Build();
   UpdateZoomControls();
 
-  browser_zoom_subscription_ = ZoomEventManager::GetForBrowserContext(
-      browser->profile())->AddZoomLevelChangedCallback(
-          base::Bind(&WrenchMenuModel::OnZoomLevelChanged,
-                     base::Unretained(this)));
+  browser_zoom_subscription_ =
+      ui_zoom::ZoomEventManager::GetForBrowserContext(browser->profile())
+          ->AddZoomLevelChangedCallback(base::Bind(
+              &WrenchMenuModel::OnZoomLevelChanged, base::Unretained(this)));
 
   tab_strip_model_->AddObserver(this);
 
@@ -1000,7 +1000,6 @@ void WrenchMenuModel::AddGlobalErrorMenuItems() {
 }
 
 void WrenchMenuModel::CreateExtensionToolbarOverflowMenu() {
-#if defined(TOOLKIT_VIEWS)
   AddItem(IDC_EXTENSIONS_OVERFLOW_MENU, base::string16());
   // We only add the separator if there are > 0 items to show in the overflow.
   extensions::ExtensionToolbarModel* toolbar_model =
@@ -1008,7 +1007,6 @@ void WrenchMenuModel::CreateExtensionToolbarOverflowMenu() {
   // A count of -1 means all actions are visible.
   if (!toolbar_model->all_icons_visible())
     AddSeparator(ui::UPPER_SEPARATOR);
-#endif  // defined(TOOLKIT_VIEWS)
 }
 
 void WrenchMenuModel::CreateCutCopyPasteMenu() {
@@ -1068,7 +1066,7 @@ void WrenchMenuModel::CreateZoomMenu() {
 void WrenchMenuModel::UpdateZoomControls() {
   int zoom_percent = 100;
   if (browser_->tab_strip_model()->GetActiveWebContents()) {
-    zoom_percent = ZoomController::FromWebContents(
+    zoom_percent = ui_zoom::ZoomController::FromWebContents(
                        browser_->tab_strip_model()->GetActiveWebContents())
                        ->GetZoomPercent();
   }

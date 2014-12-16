@@ -11,6 +11,7 @@
 #include "ash/shell.h"
 #include "base/bind.h"
 #include "base/callback.h"
+#include "base/chromeos/memory_pressure_observer_chromeos.h"
 #include "base/command_line.h"
 #include "base/files/file_util.h"
 #include "base/lazy_instance.h"
@@ -20,6 +21,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/sys_info.h"
+#include "base/task_runner_util.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browser_process_platform_part_chromeos.h"
 #include "chrome/browser/chrome_notification_types.h"
@@ -110,7 +112,7 @@
 #include "chromeos/network/network_change_notifier_factory_chromeos.h"
 #include "chromeos/network/network_handler.h"
 #include "chromeos/system/statistics_provider.h"
-#include "chromeos/tpm_token_loader.h"
+#include "chromeos/tpm/tpm_token_loader.h"
 #include "components/metrics/metrics_service.h"
 #include "components/ownership/owner_key_util.h"
 #include "components/session_manager/core/session_manager.h"
@@ -331,6 +333,12 @@ void ChromeBrowserMainPartsChromeos::PreMainMessageLoopStart() {
 }
 
 void ChromeBrowserMainPartsChromeos::PostMainMessageLoopStart() {
+  // Instantiate the MemoryPressureObserver.
+  if (CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kUseMemoryPressureSystemChromeOS)) {
+    memory_pressure_observer_.reset(new base::MemoryPressureObserverChromeOS);
+  }
+
   base::FilePath user_data_dir;
   if (!base::SysInfo::IsRunningOnChromeOS() &&
       PathService::Get(chrome::DIR_USER_DATA, &user_data_dir)) {
@@ -453,9 +461,12 @@ void ChromeBrowserMainPartsChromeos::PreProfileInit() {
   WallpaperManager::Get()->AddObservers();
 #endif
 
-  cros_version_loader_.GetVersion(VersionLoader::VERSION_FULL,
-                                  base::Bind(&ChromeOSVersionCallback),
-                                  &tracker_);
+  base::PostTaskAndReplyWithResult(
+      content::BrowserThread::GetBlockingPool(),
+      FROM_HERE,
+      base::Bind(&version_loader::GetVersion,
+                 version_loader::VERSION_FULL),
+      base::Bind(&ChromeOSVersionCallback));
 
   // Make sure that wallpaper boot transition and other delays in OOBE
   // are disabled for tests and kiosk app launch by default.
@@ -696,6 +707,9 @@ void ChromeBrowserMainPartsChromeos::PostBrowserStart() {
 // Shut down services before the browser process, etc are destroyed.
 void ChromeBrowserMainPartsChromeos::PostMainMessageLoopRun() {
   BootTimesLoader::Get()->AddLogoutTimeMarker("UIMessageLoopEnded", true);
+
+  // Remove the MemoryPressureObserver since it is not needed anymore.
+  memory_pressure_observer_.reset();
 
   g_browser_process->platform_part()->oom_priority_manager()->Stop();
 

@@ -7,6 +7,14 @@
 namespace autofill {
 namespace switches {
 
+// Disables using device's camera to scan a new credit card when filling out a
+// credit card form.
+const char kDisableCreditCardScan[]         = "disable-credit-card-scan";
+
+// Disables the experiment for the password manager to only fill on account
+// selection, rather than autofilling on page load.
+const char kDisableFillOnAccountSelect[]    = "disable-fill-on-account-select";
+
 // Disables password generation when we detect that the user is going through
 // account creation.
 const char kDisablePasswordGeneration[]     = "disable-password-generation";
@@ -14,13 +22,13 @@ const char kDisablePasswordGeneration[]     = "disable-password-generation";
 // The "disable" flag for kEnableSingleClickAutofill.
 const char kDisableSingleClickAutofill[]    = "disable-single-click-autofill";
 
-// Local heuristics override server predictions for name types.
-const char kDisambiguateAutofillServerNameTypes[] =
-    "disambiguate-autofill-server-name-types";
-
 // Enables using device's camera to scan a new credit card when filling out a
 // credit card form.
 const char kEnableCreditCardScan[]          = "enable-credit-card-scan";
+
+// Enables the experiment for the password manager to only fill on account
+// selection, rather than autofilling on page load.
+const char kEnableFillOnAccountSelect[]     = "enable-fill-on-account-select";
 
 // Enables password generation when we detect that the user is going through
 // account creation.
@@ -28,6 +36,9 @@ const char kEnablePasswordGeneration[]      = "enable-password-generation";
 
 // Enables/disables suggestions without typing anything (on first click).
 const char kEnableSingleClickAutofill[]     = "enable-single-click-autofill";
+
+// Enables the feature that imports Wallet cards for Chrome Autofill.
+const char kEnableWalletCardImport[] = "enable-wallet-card-import";
 
 // Ignores autocomplete="off" for Autofill data (profiles + credit cards).
 const char kIgnoreAutocompleteOffForAutofill[] =
@@ -44,9 +55,6 @@ const char kRespectAutocompleteOffForAutofill[] =
 
 // Annotates forms with Autofill field type predictions.
 const char kShowAutofillTypePredictions[]   = "show-autofill-type-predictions";
-
-// Always trust server predictions for name types.
-const char kTrustAutofillServerNameTypes[] = "trust-autofill-server-name-types";
 
 // Secure service URL for Online Wallet service. Used as the base url to escrow
 // credit card numbers.

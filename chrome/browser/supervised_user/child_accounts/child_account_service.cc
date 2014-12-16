@@ -16,6 +16,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
+#include "chrome/browser/supervised_user/permission_request_creator_apiary.h"
 #include "chrome/browser/supervised_user/supervised_user_constants.h"
 #include "chrome/browser/supervised_user/supervised_user_service.h"
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
@@ -41,11 +42,24 @@ ChildAccountService::ChildAccountService(Profile* profile)
 
 ChildAccountService::~ChildAccountService() {}
 
+void ChildAccountService::SetIsChildAccount(bool is_child_account) {
+  if (profile_->IsChild() == is_child_account)
+    return;
+
+  if (is_child_account) {
+    profile_->GetPrefs()->SetString(prefs::kSupervisedUserId,
+                                    supervised_users::kChildAccountSUID);
+  } else {
+    profile_->GetPrefs()->ClearPref(prefs::kSupervisedUserId);
+  }
+  PropagateChildStatusToUser(is_child_account);
+}
+
 void ChildAccountService::Init() {
   SigninManagerFactory::GetForProfile(profile_)->AddObserver(this);
   SupervisedUserServiceFactory::GetForProfile(profile_)->SetDelegate(this);
 
-  PropagateChildStatusToUser(IsChildAccount());
+  PropagateChildStatusToUser(profile_->IsChild());
 
   // If we're already signed in, fetch the flag again just to be sure.
   // (Previously, the browser might have been closed before we got the flag.
@@ -58,20 +72,13 @@ void ChildAccountService::Init() {
 
 void ChildAccountService::Shutdown() {
   CancelFetchingServiceFlags();
-  SupervisedUserService* service =
-      SupervisedUserServiceFactory::GetForProfile(profile_);
-  service->SetDelegate(NULL);
+  SupervisedUserServiceFactory::GetForProfile(profile_)->SetDelegate(NULL);
   DCHECK(!active_);
   SigninManagerFactory::GetForProfile(profile_)->RemoveObserver(this);
 }
 
-bool ChildAccountService::IsChildAccount() const {
-  return profile_->GetPrefs()->GetString(prefs::kSupervisedUserId) ==
-             supervised_users::kChildAccountSUID;
-}
-
 bool ChildAccountService::SetActive(bool active) {
-  if (!IsChildAccount() && !active_)
+  if (!profile_->IsChild() && !active_)
     return false;
   if (active_ == active)
     return true;
@@ -102,20 +109,10 @@ bool ChildAccountService::SetActive(bool active) {
         profile_->GetRequestContext()));
     family_fetcher_->StartGetFamilyMembers();
 
-    // Set the permission request API URL and scope, unless they have been
-    // explicitly specified on the command line.
-    CommandLine* command_line = CommandLine::ForCurrentProcess();
-    if (!command_line->HasSwitch(switches::kPermissionRequestApiUrl)) {
-      command_line->AppendSwitchASCII(
-          switches::kPermissionRequestApiUrl,
-          "https://www.googleapis.com/"
-              "kidsmanagement/v1/people/me/permissionRequests");
-    }
-    if (!command_line->HasSwitch(switches::kPermissionRequestApiScope)) {
-      command_line->AppendSwitchASCII(
-          switches::kPermissionRequestApiScope,
-          "https://www.googleapis.com/auth/kid.permission");
-    }
+    SupervisedUserService* service =
+        SupervisedUserServiceFactory::GetForProfile(profile_);
+    service->AddPermissionRequestCreator(
+        PermissionRequestCreatorApiary::CreateWithProfile(profile_));
 
     EnableExperimentalFiltering();
   } else {
@@ -173,7 +170,7 @@ void ChildAccountService::GoogleSigninSucceeded(const std::string& account_id,
 
 void ChildAccountService::GoogleSignedOut(const std::string& account_id,
                                           const std::string& username) {
-  DCHECK(!IsChildAccount());
+  DCHECK(!profile_->IsChild());
   CancelFetchingServiceFlags();
 }
 
@@ -252,31 +249,16 @@ void ChildAccountService::OnFlagsFetched(
   SetIsChildAccount(is_child_account);
 }
 
-void ChildAccountService::SetIsChildAccount(bool is_child_account) {
-  if (IsChildAccount() == is_child_account)
-    return;
-
-  if (is_child_account) {
-    profile_->GetPrefs()->SetString(prefs::kSupervisedUserId,
-                                    supervised_users::kChildAccountSUID);
-  } else {
-    profile_->GetPrefs()->ClearPref(prefs::kSupervisedUserId);
-  }
-  PropagateChildStatusToUser(is_child_account);
-}
-
 void ChildAccountService::PropagateChildStatusToUser(bool is_child) {
 #if defined(OS_CHROMEOS)
-  // TODO(merkulova,treib): Figure out why this causes tests to fail.
-//  user_manager::User* user =
-//      chromeos::ProfileHelper::Get()->GetUserByProfile(profile_);
-//  if (user) {
-//    user_manager::UserManager::Get()->ChangeUserSupervisedStatus(
-//        user, is_child);
-//  } else {
-//    LOG(WARNING) <<
-//        "User instance wasn't found while setting child account flag.";
-//  }
+  user_manager::User* user =
+      chromeos::ProfileHelper::Get()->GetUserByProfile(profile_);
+  if (user) {
+    user_manager::UserManager::Get()->ChangeUserChildStatus(user, is_child);
+  } else {
+    LOG(WARNING) <<
+        "User instance wasn't found while setting child account flag.";
+  }
 #endif
 }
 
@@ -325,7 +307,7 @@ void ChildAccountService::ClearSecondCustodianPrefs() {
 }
 
 void ChildAccountService::EnableExperimentalFiltering() {
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
 
   // Static blacklist defaults to enabled.
   bool has_enable_blacklist =

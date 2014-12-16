@@ -8,9 +8,10 @@
 #include "base/callback.h"
 #include "base/compiler_specific.h"
 #include "base/i18n/rtl.h"
+#include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "chrome/browser/ui/zoom/zoom_observer.h"
 #include "components/autofill/core/browser/autofill_client.h"
+#include "components/ui/zoom/zoom_observer.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/browser/web_contents_user_data.h"
 
@@ -33,7 +34,7 @@ class ChromeAutofillClient
     : public AutofillClient,
       public content::WebContentsUserData<ChromeAutofillClient>,
       public content::WebContentsObserver,
-      public ZoomObserver {
+      public ui_zoom::ZoomObserver {
  public:
   ~ChromeAutofillClient() override;
 
@@ -46,8 +47,8 @@ class ChromeAutofillClient
   PrefService* GetPrefs() override;
   void HideRequestAutocompleteDialog() override;
   void ShowAutofillSettings() override;
-  void ConfirmSaveCreditCard(const AutofillMetrics& metric_logger,
-                             const base::Closure& save_card_callback) override;
+  void ShowUnmaskPrompt() override;
+  void ConfirmSaveCreditCard(const base::Closure& save_card_callback) override;
   bool HasCreditCardScanFeature() override;
   void ScanCreditCard(const CreditCardScanCallback& callback) override;
   void ShowRequestAutocompleteDialog(const FormData& form,
@@ -77,7 +78,8 @@ class ChromeAutofillClient
   void WebContentsDestroyed() override;
 
   // ZoomObserver implementation.
-  void OnZoomChanged(const ZoomController::ZoomChangedEventData& data) override;
+  void OnZoomChanged(
+      const ui_zoom::ZoomController::ZoomChangedEventData& data) override;
 
   // Exposed for testing.
   AutofillDialogController* GetDialogControllerForTesting() {
@@ -98,10 +100,11 @@ class ChromeAutofillClient
   void UnregisterFromKeystoneNotifications();
 #endif  // defined(OS_MACOSX) && !defined(OS_IOS)
 
+  void OnUnmaskResponse(const base::string16& response);
+
   explicit ChromeAutofillClient(content::WebContents* web_contents);
   friend class content::WebContentsUserData<ChromeAutofillClient>;
 
-  content::WebContents* const web_contents_;
   base::WeakPtr<AutofillDialogController> dialog_controller_;
   base::WeakPtr<AutofillPopupControllerImpl> popup_controller_;
 
@@ -115,6 +118,8 @@ class ChromeAutofillClient
   // scoped_ptr.
   AutofillKeystoneBridgeWrapper* bridge_wrapper_;
 #endif  // defined(OS_MACOSX) && !defined(OS_IOS)
+
+  base::WeakPtrFactory<ChromeAutofillClient> weak_pointer_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(ChromeAutofillClient);
 };

@@ -352,6 +352,7 @@ class CONTENT_EXPORT WebContentsImpl
   void RenderFrameDeleted(RenderFrameHost* render_frame_host) override;
   void DidStartLoading(RenderFrameHost* render_frame_host,
                        bool to_different_document) override;
+  void DidStopLoading(RenderFrameHost* render_frame_host) override;
   void SwappedOut(RenderFrameHost* render_frame_host) override;
   void DidDeferAfterResponseStarted(
       const TransitionLayerData& transition_data) override;
@@ -610,13 +611,10 @@ class CONTENT_EXPORT WebContentsImpl
   bool NavigateToPendingEntry(
       NavigationController::ReloadType reload_type) override;
 
-  // Sets the history for this WebContentsImpl to |history_length| entries, and
-  // moves the current page_id to the last entry in the list if it's valid.
-  // This is mainly used when a prerendered page is swapped into the current
-  // tab. The method is virtual for testing.
-  void SetHistoryLengthAndPrune(const SiteInstance* site_instance,
-                                int merge_history_length,
-                                int32 minimum_page_id) override;
+  // Sets the history for this WebContentsImpl to |history_length| entries, with
+  // an offset of |history_offset|.
+  void SetHistoryOffsetAndLength(int history_offset,
+                                 int history_length) override;
 
   // Called by InterstitialPageImpl when it creates a RenderFrameHost.
   void RenderFrameForInterstitialPageCreated(
@@ -883,10 +881,13 @@ class CONTENT_EXPORT WebContentsImpl
   // Calculates the progress of the current load and notifies the delegate.
   void SendLoadProgressChanged();
 
-  // Called once when the last frame on the page has stopped loading.
-  void DidStopLoading(RenderFrameHost* render_frame_host);
-
   // Misc non-view stuff -------------------------------------------------------
+
+  // Sets the history for a specified RenderViewHost to |history_length|
+  // entries, with an offset of |history_offset|.
+  void SetHistoryOffsetAndLengthForView(RenderViewHost* render_view_host,
+                                        int history_offset,
+                                        int history_length);
 
   // Helper functions for sending notifications.
   void NotifyViewSwapped(RenderViewHost* old_host, RenderViewHost* new_host);

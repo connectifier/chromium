@@ -44,6 +44,7 @@
 #include "chrome/browser/net/chrome_net_log.h"
 #include "chrome/browser/notifications/desktop_notification_service.h"
 #include "chrome/browser/notifications/desktop_notification_service_factory.h"
+#include "chrome/browser/notifications/platform_notification_service_impl.h"
 #include "chrome/browser/platform_util.h"
 #include "chrome/browser/prerender/prerender_final_status.h"
 #include "chrome/browser/prerender/prerender_manager.h"
@@ -108,7 +109,6 @@
 #include "content/public/browser/browser_url_handler.h"
 #include "content/public/browser/child_process_data.h"
 #include "content/public/browser/child_process_security_policy.h"
-#include "content/public/browser/desktop_notification_delegate.h"
 #include "content/public/browser/permission_type.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
@@ -118,7 +118,6 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/child_process_host.h"
 #include "content/public/common/content_descriptors.h"
-#include "content/public/common/show_desktop_notification_params.h"
 #include "content/public/common/url_utils.h"
 #include "content/public/common/web_preferences.h"
 #include "net/base/mime_util.h"
@@ -599,6 +598,24 @@ void GetGuestViewDefaultContentSettingRules(
                                   incognito));
 }
 #endif  // defined(ENALBE_EXTENSIONS)
+
+content::PermissionStatus
+ContentSettingToPermissionStatus(ContentSetting setting) {
+  switch (setting) {
+    case CONTENT_SETTING_ALLOW:
+    case CONTENT_SETTING_SESSION_ONLY:
+      return content::PERMISSION_STATUS_GRANTED;
+    case CONTENT_SETTING_BLOCK:
+      return content::PERMISSION_STATUS_DENIED;
+    case CONTENT_SETTING_ASK:
+      return content::PERMISSION_STATUS_ASK;
+    case CONTENT_SETTING_DEFAULT:
+    case CONTENT_SETTING_NUM_SETTINGS:
+      break;
+  }
+  NOTREACHED();
+  return content::PERMISSION_STATUS_DENIED;
+}
 
 }  // namespace
 
@@ -1350,7 +1367,9 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
 
     // Please keep this in alphabetical order.
     static const char* const kSwitchNames[] = {
+      autofill::switches::kDisableFillOnAccountSelect,
       autofill::switches::kDisablePasswordGeneration,
+      autofill::switches::kEnableFillOnAccountSelect,
       autofill::switches::kEnablePasswordGeneration,
       autofill::switches::kEnableSingleClickAutofill,
       autofill::switches::kIgnoreAutocompleteOffForAutofill,
@@ -1359,6 +1378,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
 #if defined(ENABLE_EXTENSIONS)
       extensions::switches::kAllowHTTPBackgroundPage,
       extensions::switches::kAllowLegacyExtensionManifests,
+      extensions::switches::kEnableWorkerFrame,
       extensions::switches::kEnableAppWindowControls,
       extensions::switches::kEnableEmbeddedExtensionOptions,
       extensions::switches::kEnableExperimentalExtensionApis,
@@ -1373,6 +1393,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
       switches::kDisableBundledPpapiFlash,
       switches::kDisableCastStreamingHWEncoding,
       switches::kDisableJavaScriptHarmonyShipping,
+      switches::kDisableNewBookmarkApps,
       switches::kDisableOutOfProcessPdf,
       switches::kEnableBenchmarking,
       switches::kEnableNaCl,
@@ -1384,7 +1405,6 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
       switches::kEnableOutOfProcessPdf,
       switches::kEnablePluginPlaceholderShadowDom,
       switches::kEnableShowModalDialog,
-      switches::kEnableStreamlinedHostedApps,
       switches::kEnableWebBasedSignin,
       switches::kJavaScriptHarmony,
       switches::kMessageLoopHistogrammer,
@@ -1775,7 +1795,8 @@ void ChromeContentBrowserClient::SelectClientCertificate(
       render_process_id, render_frame_id);
   WebContents* tab = WebContents::FromRenderFrameHost(rfh);
   if (!tab) {
-    NOTREACHED();
+    // TODO(davidben): This makes the request hang, but returning no certificate
+    // also breaks. It should abort the request. See https://crbug.com/417092
     return;
   }
 
@@ -1838,74 +1859,13 @@ content::MediaObserver* ChromeContentBrowserClient::GetMediaObserver() {
   return MediaCaptureDevicesDispatcher::GetInstance();
 }
 
-blink::WebNotificationPermission
-ChromeContentBrowserClient::CheckDesktopNotificationPermission(
-    const GURL& source_origin,
-    content::ResourceContext* context,
-    int render_process_id) {
+content::PlatformNotificationService*
+ChromeContentBrowserClient::GetPlatformNotificationService() {
 #if defined(ENABLE_NOTIFICATIONS)
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
-
-  ProfileIOData* io_data = ProfileIOData::FromResourceContext(context);
-#if defined(ENABLE_EXTENSIONS)
-  InfoMap* extension_info_map = io_data->GetExtensionInfoMap();
-
-  // We want to see if there is an extension that hasn't been manually disabled
-  // that has the notifications permission and applies to this security origin.
-  // First, get the list of extensions with permission for the origin.
-  extensions::ExtensionSet extensions;
-  extension_info_map->GetExtensionsWithAPIPermissionForSecurityOrigin(
-      source_origin,
-      render_process_id,
-      extensions::APIPermission::kNotifications,
-      &extensions);
-  for (extensions::ExtensionSet::const_iterator iter = extensions.begin();
-       iter != extensions.end(); ++iter) {
-    // Then, check to see if it's been disabled by the user.
-    if (!extension_info_map->AreNotificationsDisabled((*iter)->id()))
-      return blink::WebNotificationPermissionAllowed;
-  }
-#endif
-
-  // No enabled extensions exist, so check the normal host content settings.
-  HostContentSettingsMap* host_content_settings_map =
-      io_data->GetHostContentSettingsMap();
-  ContentSetting setting = host_content_settings_map->GetContentSetting(
-      source_origin,
-      source_origin,
-      CONTENT_SETTINGS_TYPE_NOTIFICATIONS,
-      NO_RESOURCE_IDENTIFIER);
-
-  if (setting == CONTENT_SETTING_ALLOW)
-    return blink::WebNotificationPermissionAllowed;
-  if (setting == CONTENT_SETTING_BLOCK)
-    return blink::WebNotificationPermissionDenied;
-  return blink::WebNotificationPermissionDefault;
-#else
-  return blink::WebNotificationPermissionAllowed;
-#endif
-}
-
-void ChromeContentBrowserClient::ShowDesktopNotification(
-    const content::ShowDesktopNotificationHostMsgParams& params,
-    content::BrowserContext* browser_context,
-    int render_process_id,
-    scoped_ptr<content::DesktopNotificationDelegate> delegate,
-    base::Closure* cancel_callback) {
-#if defined(ENABLE_NOTIFICATIONS)
-  Profile* profile = Profile::FromBrowserContext(browser_context);
-  DCHECK(profile);
-
-  DesktopNotificationService* service =
-      DesktopNotificationServiceFactory::GetForProfile(profile);
-  DCHECK(service);
-
-  service->ShowDesktopNotification(
-      params, render_process_id, delegate.Pass(), cancel_callback);
-  profile->GetHostContentSettingsMap()->UpdateLastUsage(
-      params.origin, params.origin, CONTENT_SETTINGS_TYPE_NOTIFICATIONS);
+  return PlatformNotificationServiceImpl::GetInstance();
 #else
   NOTIMPLEMENTED();
+  return NULL;
 #endif
 }
 
@@ -1958,8 +1918,11 @@ void ChromeContentBrowserClient::RequestPermission(
     case content::PERMISSION_PROTECTED_MEDIA:
 #if defined(OS_ANDROID)
       ProtectedMediaIdentifierPermissionContextFactory::GetForProfile(profile)
-          ->RequestProtectedMediaIdentifierPermission(
-              web_contents, requesting_frame, result_callback);
+          ->RequestPermission(web_contents,
+                              request_id,
+                              requesting_frame.GetOrigin(),
+                              user_gesture,
+                              result_callback);
 #else
       NOTIMPLEMENTED();
 #endif
@@ -1976,6 +1939,49 @@ void ChromeContentBrowserClient::RequestPermission(
       NOTREACHED() << "Invalid RequestPermission for " << permission;
       break;
   }
+}
+
+content::PermissionStatus ChromeContentBrowserClient::GetPermissionStatus(
+    content::PermissionType permission,
+    content::BrowserContext* browser_context,
+    const GURL& requesting_origin,
+    const GURL& embedding_origin) {
+  DCHECK(browser_context);
+  Profile* profile = Profile::FromBrowserContext(browser_context);
+
+  PermissionContextBase* context = nullptr;
+  switch (permission) {
+    case content::PERMISSION_MIDI_SYSEX:
+      context = MidiPermissionContextFactory::GetForProfile(profile);
+      break;
+    case content::PERMISSION_NOTIFICATIONS:
+#if defined(ENABLE_NOTIFICATIONS)
+      context = DesktopNotificationServiceFactory::GetForProfile(profile);
+#else
+      NOTIMPLEMENTED();
+#endif
+      break;
+    case content::PERMISSION_GEOLOCATION:
+      context = GeolocationPermissionContextFactory::GetForProfile(profile);
+      break;
+    case content::PERMISSION_PROTECTED_MEDIA:
+      NOTIMPLEMENTED();
+      break;
+    case content::PERMISSION_PUSH_MESSAGING:
+      context = gcm::PushMessagingPermissionContextFactory::GetForProfile(
+          profile);
+      break;
+    case content::PERMISSION_NUM:
+      NOTREACHED() << "Invalid RequestPermission for " << permission;
+      break;
+  }
+
+  ContentSetting result = context
+      ? context->GetPermissionStatus(requesting_origin.GetOrigin(),
+                                     embedding_origin.GetOrigin())
+      : CONTENT_SETTING_DEFAULT;
+
+  return ContentSettingToPermissionStatus(result);
 }
 
 void ChromeContentBrowserClient::CancelPermissionRequest(
@@ -2012,8 +2018,7 @@ void ChromeContentBrowserClient::CancelPermissionRequest(
     case content::PERMISSION_PROTECTED_MEDIA:
 #if defined(OS_ANDROID)
       ProtectedMediaIdentifierPermissionContextFactory::GetForProfile(profile)
-          ->CancelProtectedMediaIdentifierPermissionRequests(
-              render_process_id, render_view_id, requesting_frame);
+          ->CancelPermissionRequest(web_contents, request_id);
 #else
       NOTIMPLEMENTED();
 #endif
@@ -2039,7 +2044,7 @@ static ContentSettingsType PermissionToContentSetting(
       return CONTENT_SETTINGS_TYPE_NOTIFICATIONS;
     case content::PERMISSION_GEOLOCATION:
       return CONTENT_SETTINGS_TYPE_GEOLOCATION;
-#if defined(OS_ANDROID)
+#if defined(OS_ANDROID) || defined(OS_CHROMEOS)
     case content::PERMISSION_PROTECTED_MEDIA:
       return CONTENT_SETTINGS_TYPE_PROTECTED_MEDIA_IDENTIFIER;
 #endif

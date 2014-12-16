@@ -385,6 +385,7 @@
             '<(libjingle_source)/talk/app/webrtc/sctputils.h',
             '<(libjingle_source)/talk/app/webrtc/statscollector.cc',
             '<(libjingle_source)/talk/app/webrtc/statscollector.h',
+            '<(libjingle_source)/talk/app/webrtc/statstypes.cc',
             '<(libjingle_source)/talk/app/webrtc/statstypes.h',
             '<(libjingle_source)/talk/app/webrtc/streamcollection.h',
             '<(libjingle_source)/talk/app/webrtc/umametrics.h',
@@ -590,6 +591,8 @@
           'type': '<(libpeer_target_type)',
           'sources': [
             # Note: sources list duplicated in GN build.
+            '<(libjingle_source)/talk/media/webrtc/simulcast.cc',
+            '<(libjingle_source)/talk/media/webrtc/simulcast.h',
             '<(libjingle_source)/talk/media/webrtc/webrtcmediaengine.cc',
             '<(libjingle_source)/talk/media/webrtc/webrtcmediaengine.h',
             '<(libjingle_source)/talk/media/webrtc/webrtcvideoengine.cc',

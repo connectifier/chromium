@@ -5,7 +5,9 @@
 #include "chromecast/browser/cast_browser_main_parts.h"
 
 #include "base/command_line.h"
+#include "base/files/file_util.h"
 #include "base/message_loop/message_loop.h"
+#include "base/path_service.h"
 #include "base/prefs/pref_registry_simple.h"
 #include "cc/base/switches.h"
 #include "chromecast/base/metrics/cast_metrics_helper.h"
@@ -18,6 +20,7 @@
 #include "chromecast/browser/pref_service_helper.h"
 #include "chromecast/browser/service/cast_service.h"
 #include "chromecast/browser/url_request_context_factory.h"
+#include "chromecast/common/cast_paths.h"
 #include "chromecast/common/platform_client_auth.h"
 #include "chromecast/net/network_change_notifier_cast.h"
 #include "chromecast/net/network_change_notifier_factory_cast.h"
@@ -116,6 +119,16 @@ void CastBrowserMainParts::PostMainMessageLoopStart() {
 #endif  // defined(OS_ANDROID)
 }
 
+int CastBrowserMainParts::PreCreateThreads() {
+#if !defined(OS_ANDROID)
+  base::FilePath home_dir;
+  CHECK(PathService::Get(DIR_CAST_HOME, &home_dir));
+  if (!base::CreateDirectory(home_dir))
+    return 1;
+#endif  // !defined(OS_ANDROID)
+  return 0;
+}
+
 void CastBrowserMainParts::PreMainMessageLoopRun() {
   scoped_refptr<PrefRegistrySimple> pref_registry(new PrefRegistrySimple());
   metrics::RegisterPrefs(pref_registry.get());
@@ -126,11 +139,6 @@ void CastBrowserMainParts::PreMainMessageLoopRun() {
 
   cast_browser_process_->SetBrowserContext(
       make_scoped_ptr(new CastBrowserContext(url_request_context_factory_)));
-  cast_browser_process_->SetMetricsServiceClient(
-      metrics::CastMetricsServiceClient::Create(
-          content::BrowserThread::GetBlockingPool(),
-          cast_browser_process_->pref_service(),
-          cast_browser_process_->browser_context()->GetRequestContext()));
 
 #if defined(OS_ANDROID)
   base::FilePath crash_dumps_dir;
@@ -155,6 +163,13 @@ void CastBrowserMainParts::PreMainMessageLoopRun() {
       base::Bind(
           &metrics::CastMetricsServiceClient::EnableMetricsService,
           base::Unretained(cast_browser_process_->metrics_service_client()))));
+
+  // Creating metrics service client must happen after Cast service is created.
+  cast_browser_process_->SetMetricsServiceClient(
+      metrics::CastMetricsServiceClient::Create(
+          content::BrowserThread::GetBlockingPool(),
+          cast_browser_process_->pref_service(),
+          cast_browser_process_->browser_context()->GetRequestContext()));
 
   // Initializing network delegates must happen after Cast service is created.
   url_request_context_factory_->InitializeNetworkDelegates();

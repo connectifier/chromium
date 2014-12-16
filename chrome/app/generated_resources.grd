@@ -1115,7 +1115,7 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
       <if expr="not is_macosx">
         <if expr="not use_titlecase">
           <message name="IDS_CONTENT_CONTEXT_SPELLCHECK_MENU" desc="The name of the Spellcheck Options submenu in the content area context menu">
-            &amp;Spell-checker options
+            Spell-checker &amp;options
           </message>
           <message name="IDS_CONTENT_CONTEXT_LANGUAGE_SETTINGS" desc="The name of the Language Settings command in the content area context menu">
             &amp;Language settings...
@@ -1123,7 +1123,7 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
         </if>
         <if expr="use_titlecase">
           <message name="IDS_CONTENT_CONTEXT_SPELLCHECK_MENU" desc="In Title Case: The name of the Spellcheck Options submenu in the content area context menu">
-            &amp;Spell-checker Options
+            Spell-checker &amp;Options
           </message>
           <message name="IDS_CONTENT_CONTEXT_LANGUAGE_SETTINGS" desc="In Title Case: The name of the Language Settings command in the content area context menu">
             &amp;Language Settings...
@@ -2569,11 +2569,9 @@ Even if you have downloaded files from this website before, the website might ha
       <message name="IDS_BLOCKED_JAVASCRIPT_LINK" desc="Link to JavaScript section of content blocking management dialog, displayed in bubble when a page tries to run JavaScript.">
         Manage JavaScript blocking...
       </message>
-      <if expr="is_macosx">
-        <message name="IDS_BLOCKED_PLUGINS_TITLE" desc="Bubble info header text when a page is not allowed to display plug-ins.">
-          The following plug-ins were blocked on this page:
-        </message>
-      </if>
+      <message name="IDS_BLOCKED_PLUGINS_TITLE" desc="Bubble info header text when a page is not allowed to display plug-ins.">
+        The following plug-ins were blocked on this page:
+      </message>
       <message name="IDS_BLOCKED_PLUGINS_MESSAGE" desc="Tooltip and message when a page is not allowed to display plug-ins.">
         Plug-ins were blocked on this page.
       </message>
@@ -4497,9 +4495,6 @@ Even if you have downloaded files from this website before, the website might ha
       <message name="IDS_EXTENSION_PROMPT_WARNING_DEBUGGER" desc="Permission string for access to debugger.">
         Access the page debugger backend
       </message>
-      <message name="IDS_EXTENSION_PROMPT_WARNING_CLIPBOARD" desc="Permission string for access to clipboard.">
-        Read data you copy and paste
-      </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_TTS_ENGINE" desc="Permission string for access to text-to-speech.">
         Read all text spoken using synthesized speech
       </message>
@@ -5226,14 +5221,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
         This extension can read and change your information on all websites including Google, Facebook, Yahoo, etc.
       </message>
 
-      <!-- chrome://extension-info bubble -->
-      <message name="IDS_EXTENSION_SCRIPT_POPUP_IS_RUNNING" desc="The label in the extension info bubble that indicates the extension is running scripts on this page">
-        <ph name="EXTENSION_NAME">$1<ex>AdBlock</ex></ph> is running on this page.
-      </message>
-      <message name="IDS_EXTENSION_SCRIPT_POPUP_LAST_UPDATED" desc="The label in the extension info bubble indicating the last time an extension was updated.">
-        Last updated:
-      </message>
-
       <!-- Global error messages for extensions -->
       <message name="IDS_EXTENSION_WARNINGS_WRENCH_MENU_ITEM" desc="The wrench menu item indicating that extensions caused problems.">
         Extension error
@@ -5812,6 +5799,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_FLAGS_DISABLE_DIRECT_WRITE_DESCRIPTION" desc="Description of the 'Disable DirectWrite' lab.">
           Disables the use of experimental DirectWrite font rendering system.
         </message>
+        <message name="IDS_FLAGS_ENABLE_WIN32K_RENDERER_LOCKDOWN_NAME" desc="Name of the 'Enable win32k renderer lockdown' lab.">
+          Enable win32k renderer lockdown
+        </message>
+        <message name="IDS_FLAGS_ENABLE_WIN32K_RENDERER_LOCKDOWN_DESCRIPTION" desc="Description of the 'Enable win32k renderer lockdown' lab.">
+          Enables the win32k renderer lockdown, which is only available on Windows 8 and above.
+        </message>
       </if>
       <message name="IDS_FLAGS_ENABLE_EXPERIMENTAL_CANVAS_FEATURES_NAME" desc="Name of the 'Enable experimental canvas features' lab.">
         Enable experimental canvas features
@@ -6007,12 +6000,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_COMPOSITING_FOR_FIXED_POSITION_HIGH_DPI" desc="Description of the 'Compositing for fixed position elements on high DPI' experiment.">
         Enabled only for high-DPI displays
-      </message>
-      <message name="IDS_FLAGS_COMPOSITING_FOR_TRANSITION_NAME" desc="Name of the 'Compositing for RenderLayers with transitions' lab.">
-        Compositing for RenderLayers with transitions.
-      </message>
-      <message name="IDS_FLAGS_COMPOSITING_FOR_TRANSITION_DESCRIPTION" desc="Description for the flag to make RenderLayers with transitions become composited layers.">
-        Enabling this option will make RenderLayers with a transition on opacity, transform, or filter have their own composited layer.
       </message>
       <message name="IDS_FLAGS_ACCELERATED_FIXED_ROOT_BACKGROUND_NAME" desc="Name of the 'Accelerated fixed root background' lab.">
         Compositing for fixed root backgrounds.
@@ -6366,23 +6353,11 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_SUPERVISED_USER_SAFESITES_DESCRIPTION" desc="Description for the flag to enable the supervised user SafeSites feature.">
         Enable SafeSites filtering for supervised users.
       </message>
-      <message name="IDS_FLAGS_ENABLE_SYNCED_NOTIFICATIONS_NAME" desc="Name of the flag to enable synced notifications.">
-        Enable Synced Notifications
-      </message>
-      <message name="IDS_FLAGS_ENABLE_SYNCED_NOTIFICATIONS_DESCRIPTION" desc="Description for the flag to enable synced notifications.">
-        Enable experimental Synchronized Notifications.
-      </message>
       <message name="IDS_FLAGS_ENABLE_SYNC_APP_LIST_NAME" desc="Name of the flag to enable syncing the app list.">
         Enable App Launcher sync
       </message>
       <message name="IDS_FLAGS_ENABLE_SYNC_APP_LIST_DESCRIPTION" desc="Description for the flag to enable syncing the app list.">
         Enable App Launcher sync. This also enables Folders where available (non OSX).
-      </message>
-      <message name="IDS_FLAGS_ENABLE_MATERIAL_DESIGN_NTP_NAME" desc="Name of the flag to enable the Material Design New Tab Page (NTP).">
-        Enable Material Design NTP.
-      </message>
-      <message name="IDS_FLAGS_ENABLE_MATERIAL_DESIGN_NTP_DESCRIPTION" desc="Description for the flag to enable the Material Design New Tab Page (NTP).">
-        Enable the Material Design New Tab Page.
       </message>
       <if expr="is_macosx">
         <message name="IDS_FLAGS_ENABLE_AVFOUNDATION_NAME" desc="Name of the flag to enable Mac AVFoundation.">
@@ -6545,6 +6520,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_RESET_APP_LIST_INSTALL_STATE_DESCRIPTION" desc="Description of the flag to reset the app launcher install state.">
         Reset the App Launcher install state on every restart. While this flag is set, Chrome will forget the launcher has been installed each time it starts. This is used for testing the App Launcher install flow.
       </message>
+      <message name="IDS_FLAGS_ENABLE_WORKER_FRAME_NAME" desc="Name of the flag to enable the &lt;workerframe&gt; element.">
+        Enable the experimental &lt;workerframe&gt; element.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_WORKER_FRAME_DESCRIPTION" desc="Description of the flag to enable the &lt;workerframe&gt; element.">
+        This will allow the use of the experimental &lt;workerframe&gt; element.
+      </message>
       <if expr="enable_app_list">
         <message name="IDS_FLAGS_ENABLE_APP_LIST_NAME" desc="Name of the flag to enable the app launcher.">
           Enable the App Launcher.
@@ -6590,30 +6571,24 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_FLAGS_ENABLE_FIRST_RUN_UI_TRANSITIONS_DESCRIPTION" desc="Description for the flag to enable animated transition in the first-run tutorial.">
           If enabled, transitions during first-run tutorial are animated.
         </message>
-        <message name="IDS_FLAGS_EASY_UNLOCK_NAME" desc="Name of the Easy unlock flag.">
-          Easy unlock
+        <message name="IDS_FLAGS_DISABLE_EASY_UNLOCK_NAME" desc="Name of the flag to disable Easy unlock.">
+          Disable Smart Lock
         </message>
-        <message name="IDS_FLAGS_EASY_UNLOCK_DESCRIPTION" desc="Description of the Easy unlock flag.">
-          Easy unlock allows you to unlock your Chromebook when in proximity to your phone.
-        </message>
-        <message name="IDS_FLAGS_EASY_SIGNIN_NAME" desc="Name of the Easy sign-in flag.">
-          Easy sign-in
-        </message>
-        <message name="IDS_FLAGS_EASY_SIGNIN_DESCRIPTION" desc="Description of the Easy sign-in flag.">
-          Easy sign-in allows you to sign in to your Chromebook when in proximity to your phone.
+        <message name="IDS_FLAGS_DISABLE_EASY_UNLOCK_DESCRIPTION" desc="Description of the flag to disable Easy unlock.">
+          Do not use Smart Lock, which allows you to unlock your Chromebook when in proximity to your phone. If you are the owner of the device, this also turns off Smart Lock on sign-in screen.
         </message>
       </if>
-      <message name="IDS_FLAGS_ENABLE_STREAMLINED_HOSTED_APPS_NAME" desc="Name of the flag to enable streamlined hosted apps.">
-        Enable experimental streamlined hosted apps.
+      <message name="IDS_FLAGS_DISABLE_NEW_BOOKMARK_APPS_NAME" desc="Name of the flag to disable the new bookmark app system.">
+        Disable the new bookmark app system.
       </message>
-      <message name="IDS_FLAGS_ENABLE_STREAMLINED_HOSTED_APPS_DESCRIPTION" desc="Description for the flag to enable streamlined hosted apps.">
-        Enables an experimental, more streamlined hosted app experience.
+      <message name="IDS_FLAGS_DISABLE_NEW_BOOKMARK_APPS_DESCRIPTION" desc="Description for the flag to disable the new bookmark app system.">
+        Disables the new system for creating bookmark apps.
       </message>
-      <message name="IDS_FLAGS_ENABLE_EPHEMERAL_APPS_NAME" desc="Name of the flag to enable ephemeral apps.">
-        Enable experimental ephemeral apps.
+      <message name="IDS_FLAGS_ENABLE_EPHEMERAL_APPS_IN_WEBSTORE_NAME" desc="Name of the flag to enable ephemeral apps in the webstore.">
+        Enable experimental ephemeral apps from the webstore.
       </message>
-      <message name="IDS_FLAGS_ENABLE_EPHEMERAL_APPS_DESCRIPTION" desc="Description for the flag to enable ephemeral apps.">
-        Enables experimentation with ephemeral apps, which are launched without installing in Chrome.
+      <message name="IDS_FLAGS_ENABLE_EPHEMERAL_APPS_IN_WEBSTORE_DESCRIPTION" desc="Description for the flag to enable ephemeral apps.">
+        Enables ephemeral apps, which are launched without installing in Chrome, to be launched from the Chrome WebStore. Requires the experimental App Launcher to be enabled.
       </message>
       <message name="IDS_FLAGS_ENABLE_LINKABLE_EPHEMERAL_APPS_NAME" desc="Name of the flag to enable linkable ephemeral apps.">
         Enable experimental linkable ephemeral apps.
@@ -7558,6 +7533,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
 
       <!-- Password Manager -->
+      <message name="IDS_FILL_ON_ACCOUNT_SELECT_NAME" desc="Name of the experiment for the password manager to fill on account selection rather than page load">
+        Fill passwords on account selection
+      </message>
+      <message name="IDS_FILL_ON_ACCOUNT_SELECT_DESCRIPTION" desc="Description of the experiment for the password manager to fill on account selection rather than page load">
+        Filling of passwords when an account is explicitly selected by the user rather than autofilling credentials on page load.
+      </message>
       <if expr="not is_android">
         <message name="IDS_PASSWORD_MANAGER_SAVE_BUTTON" desc="Save button text for password manager">
           Save password
@@ -7583,6 +7564,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
         </message>
         <message name="IDS_PASSWORD_MANAGER_EMPTY_LOGIN" desc="A placeholder for the 'Manage Passwords' bubble's empty username label">
           (No username)
+        </message>
+        <message name="IDS_PASSWORD_MANAGER_SETUP_OS_LINK_BUTTON" desc="Text for the button leading to the Help Center article about setting up an OS password">
+          Read more on how to set one up
+        </message>
+        <message name="IDS_PASSWORD_MANAGER_DISMISS_OS_BUBBLE_BUTTON" desc="Text for the button disabling the warning about a missing OS password">
+          I like living dangerously
         </message>
       </if>
       <if expr="is_android">
@@ -7882,6 +7869,18 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_CHILD_BLOCK_INTERSTITIAL_REQUEST_SENT_MESSAGE_MULTI_PARENT" desc="The text that tells the child user that a request has been sent to their parents.">
         You asked your parents if it's ok to visit this page.
+      </message>
+      <message name="IDS_SUPERVISED_USER_BLOCK_MESSAGE_DEFAULT" desc="Message to be shown when a site was blocked due to the default fallback behavior.">
+        This site was blocked due to the default fallback behavior.
+      </message>
+      <message name="IDS_SUPERVISED_USER_BLOCK_MESSAGE_ASYNC_CHECKER" desc="Message to be shown when a site was blocked due to the SafeSites online safety check.">
+        This site was blocked due to the SafeSites online check.
+      </message>
+      <message name="IDS_SUPERVISED_USER_BLOCK_MESSAGE_BLACKLIST" desc="Message to be shown when a site was blocked due to the static blacklist.">
+        This site was blocked due to the SafeSites static blacklist.
+      </message>
+      <message name="IDS_SUPERVISED_USER_BLOCK_MESSAGE_MANUAL" desc="Message to be shown when a site was blocked due to a manual blacklist entry.">
+        This site was blocked due to a manual blacklist entry.
       </message>
 
       <!-- Content Settings dialog data -->
@@ -13198,6 +13197,19 @@ Some features may be unavailable.  Please check that the profile exists and you 
         This page has been blocked from tracking your location.
       </message>
 
+      <!-- CryptoToken messages -->
+      <if expr="not is_android">
+        <message name="IDS_CRYPTOTOKEN_INFOBAR_QUESTION" desc="Question asked on the info bar whenever URL wants to access the user's security keys.">
+          Allow <ph name="URL">$1<ex>accounts.google.com</ex></ph> to identify you by your Security Key?
+        </message>
+      </if>
+      <message name="IDS_CRYPTOTOKEN_ALLOW_BUTTON" desc="A button in cryptotoken infobar for allowing access to security keys for a given domain.">
+        Allow
+      </message>
+      <message name="IDS_CRYPTOTOKEN_DENY_BUTTON" desc="A button in cryptotoken infobar for denying access to security keys for a given domain.">
+        Block
+      </message>
+
       <!-- Web MIDI messages -->
       <message name="IDS_MIDI_SYSEX_TAB_LABEL" desc="Label for MIDI system exclusive message on Content Settings dialog">
         MIDI full control
@@ -13348,6 +13360,9 @@ Some features may be unavailable.  Please check that the profile exists and you 
       </message>
       <message name="IDS_MANAGE_PASSWORDS_CHOOSE_TITLE" desc="The title of the password bubble when a credential should be chosen.">
       Choose an account from your Google Smart Lock
+      </message>
+      <message name="IDS_MANAGE_PASSWORDS_OS_PASSWORD_TITLE" desc="The title of the password bubble when the user is prompted to set up an OS password.">
+      You don't have an OS password. Everybody can come to your computer and look up your credentials.
       </message>
 
       <message name="IDS_ALLOW_AUTOFILL_SYNC_CREDENTIAL" desc="The text for the choice to allow autofilling in about:flags">
@@ -14174,6 +14189,13 @@ Do you accept?
         <message name="IDS_FLAGS_ENABLE_CAPTIVE_PORTAL_BYPASS_PROXY_DESCRIPTION" desc="Description of about::flags option to enable bypass proxy for captive portal authorization on Chrome OS.">
           If proxy is configured, it usually prevents from authorization on different captive portals. This flag enables opening captive portal authorization dialog in a separate window, which ignores proxy settings.
         </message>
+
+        <message name="IDS_FLAGS_ENABLE_ROBOTO_FONT_UI_NAME" desc="Name of about::flags option to use Roboto fonts in the Chrome OS UI.">
+          Enable an experiment to use Roboto fonts in the UI.
+        </message>
+        <message name="IDS_FLAGS_ENABLE_ROBOTO_FONT_UI_DESCRIPTION" desc="Description of about::flags option to use Roboto fonts in the Chrome OS UI.">
+          Use Roboto fonts in the UI.
+        </message>
       </if>
 
       <!-- Strings for controlling the minimum SSL/TLS version in about:flags. -->
@@ -14863,6 +14885,13 @@ Do you accept?
         Make autofill suggestions on initial mouse click on a form element.
       </message>
 
+      <message name="IDS_FLAGS_ENABLE_WALLET_CARD_IMPORT_NAME" desc="Name of a lab">
+        Import Wallet cards
+      </message>
+      <message name="IDS_FLAGS_ENABLE_WALLET_CARD_IMPORT_DESCRIPTION" desc="Description of a lab">
+        Import cards from my Wallet.
+      </message>
+
       <!-- Reader mode experiment flags -->
       <if expr="is_android">
         <message name="IDS_FLAGS_READER_MODE_EXPERIMENT_NAME" desc="An about:flags experiment for reading mode UI">
@@ -15071,7 +15100,7 @@ Do you accept?
         Update your phone's screen lock so it turns off when you're nearby. You'll unlock the phone faster, and enjoy a better Smart Lock experience on your <ph name="DEVICE_TYPE">$1<ex>Chromebook</ex></ph>.
       </message>
       <message name="IDS_EASY_UNLOCK_SETUP_ANDROID_SMART_LOCK_DONE_BUTTON_LABEL" desc="The text to show as the button label in the Easy Unlock dialog step for encouraging the user to enable Smart Lock for Android. Clicking this button advances the dialog to step 3.">
-        Done
+        Next
       </message>
       <message name="IDS_EASY_UNLOCK_SETUP_ANDROID_SMART_LOCK_ABOUT_LINK_TEXT" desc="The text to show as the link text to access the Smart Lock for Android help article.">
         About Smart Lock for Android
@@ -15235,7 +15264,7 @@ Do you accept?
         Say "Ok Google" when your screen is on and unlocked
       </message>
       <message name="IDS_HOTWORD_OPT_IN_INTRO_DESCRIPTION" desc="Description explaining the steps required to continue through the hotword opt-in process.">
-        To make this happen, you'll need to enable Voice and Audio Activity and train your Chromebook in the following steps.
+        To make this happen, you'll need to enable Voice &amp; Audio Activity and train your Chromebook in the following steps.
       </message>
       <message name="IDS_HOTWORD_OPT_IN_INTRO_DESCRIPTION_AUDIO_HISTORY_ENABLED" desc="Description explaining the steps required to continue through the hotword opt-in process.">
         To make this happen, you'll need to train your Chromebook in the following step.

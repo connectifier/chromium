@@ -92,7 +92,8 @@ class TimelineBasedMetricTestData(object):
     self._metric = tbm_module._TimelineBasedMetrics(  # pylint: disable=W0212
         self._model, self._renderer_thread, GetMetricFromMetricType)
     self._ps = page_set.PageSet(file_path=os.path.dirname(__file__))
-    self._ps.AddPageWithDefaultRunNavigate('http://www.bar.com/')
+    self._ps.AddUserStory(page_module.Page(
+        'http://www.bar.com/', self._ps, self._ps.base_dir))
     self._results.WillRunPage(self._ps.pages[0])
 
   def AddResults(self):
@@ -211,7 +212,7 @@ class TimelineBasedMeasurementTest(page_test_test_case.PageTestTestCase):
   @benchmark.Disabled('android', 'mac')
   def testSmoothnessTimelineBasedMeasurementForSmoke(self):
     ps = self.CreateEmptyPageSet()
-    ps.AddPage(TestTimelinebasedMeasurementPage(
+    ps.AddUserStory(TestTimelinebasedMeasurementPage(
         ps, ps.base_dir, trigger_animation=True))
 
     measurement = tbm_module.TimelineBasedMeasurement()
@@ -231,7 +232,7 @@ class TimelineBasedMeasurementTest(page_test_test_case.PageTestTestCase):
   @benchmark.Disabled('android', 'mac')
   def testFastTimelineBasedMeasurementForSmoke(self):
     ps = self.CreateEmptyPageSet()
-    ps.AddPage(TestTimelinebasedMeasurementPage(
+    ps.AddUserStory(TestTimelinebasedMeasurementPage(
         ps, ps.base_dir, trigger_slow=True))
 
     measurement = tbm_module.TimelineBasedMeasurement()
@@ -269,7 +270,7 @@ class TimelineBasedMeasurementTest(page_test_test_case.PageTestTestCase):
   @benchmark.Disabled('android', 'win', 'mac')
   def testMainthreadJankTimelineBasedMeasurement(self):
     ps = self.CreateEmptyPageSet()
-    ps.AddPage(TestTimelinebasedMeasurementPage(
+    ps.AddUserStory(TestTimelinebasedMeasurementPage(
         ps, ps.base_dir, trigger_jank=True))
 
     measurement = tbm_module.TimelineBasedMeasurement()

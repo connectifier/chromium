@@ -67,6 +67,7 @@
 #include "content/browser/message_port_message_filter.h"
 #include "content/browser/mime_registry_message_filter.h"
 #include "content/browser/mojo/mojo_application_host.h"
+#include "content/browser/navigator_connect/navigator_connect_dispatcher_host.h"
 #include "content/browser/notifications/notification_message_filter.h"
 #include "content/browser/permissions/permission_service_context.h"
 #include "content/browser/permissions/permission_service_impl.h"
@@ -456,7 +457,7 @@ RenderProcessHostImpl::RenderProcessHostImpl(
       within_process_died_observer_(false),
       power_monitor_broadcaster_(this),
       worker_ref_count_(0),
-      permission_service_context_(new PermissionServiceContext(nullptr)),
+      permission_service_context_(new PermissionServiceContext(this)),
       weak_factory_(this) {
   widget_helper_ = new RenderWidgetHelper();
 
@@ -880,6 +881,7 @@ void RenderProcessHostImpl::CreateMessageFilters() {
 #endif
   AddFilter(new GeofencingDispatcherHost(
       storage_partition_impl_->GetGeofencingManager()));
+  AddFilter(new NavigatorConnectDispatcherHost());
   if (browser_command_line.HasSwitch(
           switches::kEnableExperimentalWebPlatformFeatures)) {
     scoped_refptr<BluetoothDispatcherHost> bluetooth_dispatcher_host(
@@ -1136,7 +1138,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableBlinkScheduler,
     switches::kDisableBreakpad,
     switches::kDisablePreferCompositingToLCDText,
-    switches::kDisableCompositingForTransition,
     switches::kDisableDatabases,
     switches::kDisableDirectNPAPIRequests,
     switches::kDisableDisplayList2dCanvas,
@@ -1147,7 +1148,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableLowResTiling,
     switches::kDisableHistogramCustomizer,
     switches::kDisableLCDText,
-    switches::kDisableLayerSquashing,
     switches::kDisableLocalStorage,
     switches::kDisableLogging,
     switches::kDisableMediaSource,
@@ -1171,7 +1171,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableBleedingEdgeRenderingFastPaths,
     switches::kEnableBrowserSideNavigation,
     switches::kEnablePreferCompositingToLCDText,
-    switches::kEnableCompositingForTransition,
     switches::kEnableCredentialManagerAPI,
     switches::kEnableDeferredImageDecoding,
     switches::kEnableDisplayList2dCanvas,
@@ -1186,7 +1185,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableLowResTiling,
     switches::kEnableInbandTextTracks,
     switches::kEnableLCDText,
-    switches::kEnableLayerSquashing,
     switches::kEnableLogging,
     switches::kEnableMemoryBenchmarking,
     switches::kEnableNetworkInformation,
@@ -1303,6 +1301,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
 #if defined(OS_WIN)
     switches::kDisableDirectWrite,
     switches::kEnableWin32kRendererLockDown,
+    switches::kDisableWin32kRendererLockDown,
 #endif
 #if defined(OS_CHROMEOS)
     switches::kDisableVaapiAcceleratedVideoEncode,

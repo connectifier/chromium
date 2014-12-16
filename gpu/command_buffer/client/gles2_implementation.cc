@@ -873,6 +873,13 @@ void GLES2Implementation::SwapBuffers() {
   }
 }
 
+void GLES2Implementation::SwapInterval(int interval) {
+  GPU_CLIENT_SINGLE_THREAD_CHECK();
+  GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glSwapInterval("
+      << interval << ")");
+  helper_->SwapInterval(interval);
+}
+
 void GLES2Implementation::BindAttribLocation(
   GLuint program, GLuint index, const char* name) {
   GPU_CLIENT_SINGLE_THREAD_CHECK();
@@ -2307,6 +2314,14 @@ void GLES2Implementation::GenValuebuffersCHROMIUMHelper(
     const GLuint* /* valuebuffers */) {
 }
 
+void GLES2Implementation::GenSamplersHelper(
+    GLsizei /* n */, const GLuint* /* samplers */) {
+}
+
+void GLES2Implementation::GenTransformFeedbacksHelper(
+    GLsizei /* n */, const GLuint* /* transformfeedbacks */) {
+}
+
 // NOTE #1: On old versions of OpenGL, calling glBindXXX with an unused id
 // generates a new resource. On newer versions of OpenGL they don't. The code
 // related to binding below will need to change if we switch to the new OpenGL
@@ -2674,6 +2689,39 @@ void GLES2Implementation::DeleteValuebuffersCHROMIUMHelper(
     if (valuebuffers[ii] == bound_valuebuffer_) {
       bound_valuebuffer_ = 0;
     }
+  }
+}
+
+void GLES2Implementation::DeleteSamplersStub(
+    GLsizei n, const GLuint* samplers) {
+  helper_->DeleteSamplersImmediate(n, samplers);
+}
+
+void GLES2Implementation::DeleteSamplersHelper(
+    GLsizei n, const GLuint* samplers) {
+  if (!GetIdHandler(id_namespaces::kSamplers)->FreeIds(
+      this, n, samplers, &GLES2Implementation::DeleteSamplersStub)) {
+    SetGLError(
+        GL_INVALID_VALUE,
+        "glDeleteSamplers", "id not created by this context.");
+    return;
+  }
+}
+
+void GLES2Implementation::DeleteTransformFeedbacksStub(
+    GLsizei n, const GLuint* transformfeedbacks) {
+  helper_->DeleteTransformFeedbacksImmediate(n, transformfeedbacks);
+}
+
+void GLES2Implementation::DeleteTransformFeedbacksHelper(
+    GLsizei n, const GLuint* transformfeedbacks) {
+  if (!GetIdHandler(id_namespaces::kTransformFeedbacks)->FreeIds(
+      this, n, transformfeedbacks,
+      &GLES2Implementation::DeleteTransformFeedbacksStub)) {
+    SetGLError(
+        GL_INVALID_VALUE,
+        "glDeleteTransformFeedbacks", "id not created by this context.");
+    return;
   }
 }
 
@@ -3477,32 +3525,38 @@ void GLES2Implementation::PopGroupMarkerEXT() {
   debug_marker_manager_.PopGroup();
 }
 
-void GLES2Implementation::TraceBeginCHROMIUM(const char* name) {
+void GLES2Implementation::TraceBeginCHROMIUM(
+    const char* category_name, const char* trace_name) {
   GPU_CLIENT_SINGLE_THREAD_CHECK();
   GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glTraceBeginCHROMIUM("
-                 << name << ")");
-  if (current_trace_name_.get()) {
+                 << category_name << ", " << trace_name << ")");
+  if (current_trace_category_.get() || current_trace_name_.get()) {
     SetGLError(GL_INVALID_OPERATION, "glTraceBeginCHROMIUM",
                "trace already running");
     return;
   }
-  TRACE_EVENT_COPY_ASYNC_BEGIN0("gpu", name, this);
-  SetBucketAsCString(kResultBucketId, name);
-  helper_->TraceBeginCHROMIUM(kResultBucketId);
+  TRACE_EVENT_COPY_ASYNC_BEGIN0(category_name, trace_name, this);
+  SetBucketAsCString(kResultBucketId, category_name);
+  SetBucketAsCString(kResultBucketId + 1, category_name);
+  helper_->TraceBeginCHROMIUM(kResultBucketId, kResultBucketId + 1);
   helper_->SetBucketSize(kResultBucketId, 0);
-  current_trace_name_.reset(new std::string(name));
+  helper_->SetBucketSize(kResultBucketId + 1, 0);
+  current_trace_category_.reset(new std::string(category_name));
+  current_trace_name_.reset(new std::string(trace_name));
 }
 
 void GLES2Implementation::TraceEndCHROMIUM() {
   GPU_CLIENT_SINGLE_THREAD_CHECK();
   GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glTraceEndCHROMIUM(" << ")");
-  if (!current_trace_name_.get()) {
+  if (!current_trace_category_.get() || !current_trace_name_.get()) {
     SetGLError(GL_INVALID_OPERATION, "glTraceEndCHROMIUM",
                "missing begin trace");
     return;
   }
   helper_->TraceEndCHROMIUM();
-  TRACE_EVENT_COPY_ASYNC_END0("gpu", current_trace_name_->c_str(), this);
+  TRACE_EVENT_COPY_ASYNC_END0(current_trace_category_->c_str(),
+                              current_trace_name_->c_str(), this);
+  current_trace_category_.reset();
   current_trace_name_.reset();
 }
 
@@ -3970,6 +4024,18 @@ bool GLES2Implementation::ValidateOffset(const char* func, GLintptr offset) {
     return false;
   }
   return true;
+}
+
+bool GLES2Implementation::GetSamplerParameterfvHelper(
+    GLuint /* sampler */, GLenum /* pname */, GLfloat* /* params */) {
+  // TODO(zmo): Implement client side caching.
+  return false;
+}
+
+bool GLES2Implementation::GetSamplerParameterivHelper(
+    GLuint /* sampler */, GLenum /* pname */, GLint* /* params */) {
+  // TODO(zmo): Implement client side caching.
+  return false;
 }
 
 // Include the auto-generated part of this file. We split this because it means

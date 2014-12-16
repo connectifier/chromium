@@ -13,6 +13,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/autofill/autofill_dialog_controller.h"
 #include "chrome/browser/ui/autofill/autofill_popup_controller_impl.h"
+#include "chrome/browser/ui/autofill/card_unmask_prompt_view.h"
 #include "chrome/browser/ui/autofill/credit_card_scanner_controller.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
@@ -32,7 +33,7 @@
 #include "chrome/browser/android/chromium_application.h"
 #include "chrome/browser/ui/android/autofill/autofill_logger_android.h"
 #else
-#include "chrome/browser/ui/zoom/zoom_controller.h"
+#include "components/ui/zoom/zoom_controller.h"
 #endif
 
 DEFINE_WEB_CONTENTS_USER_DATA_KEY(autofill::ChromeAutofillClient);
@@ -40,7 +41,7 @@ DEFINE_WEB_CONTENTS_USER_DATA_KEY(autofill::ChromeAutofillClient);
 namespace autofill {
 
 ChromeAutofillClient::ChromeAutofillClient(content::WebContents* web_contents)
-    : content::WebContentsObserver(web_contents), web_contents_(web_contents) {
+    : content::WebContentsObserver(web_contents), weak_pointer_factory_(this) {
   DCHECK(web_contents);
 
 #if !defined(OS_ANDROID)
@@ -49,8 +50,8 @@ ChromeAutofillClient::ChromeAutofillClient(content::WebContents* web_contents)
   // WebContentsObservers is not guaranteed. ZoomController silently clears
   // its ZoomObserver list during WebContentsDestroyed() so there's no need
   // to explicitly remove ourselves on destruction.
-  ZoomController* zoom_controller =
-      ZoomController::FromWebContents(web_contents);
+  ui_zoom::ZoomController* zoom_controller =
+      ui_zoom::ZoomController::FromWebContents(web_contents);
   // There may not always be a ZoomController, e.g. in tests.
   if (zoom_controller)
     zoom_controller->AddObserver(this);
@@ -79,20 +80,20 @@ void ChromeAutofillClient::TabActivated() {
 
 PersonalDataManager* ChromeAutofillClient::GetPersonalDataManager() {
   Profile* profile =
-      Profile::FromBrowserContext(web_contents_->GetBrowserContext());
+      Profile::FromBrowserContext(web_contents()->GetBrowserContext());
   return PersonalDataManagerFactory::GetForProfile(
       profile->GetOriginalProfile());
 }
 
 scoped_refptr<AutofillWebDataService> ChromeAutofillClient::GetDatabase() {
   Profile* profile =
-      Profile::FromBrowserContext(web_contents_->GetBrowserContext());
+      Profile::FromBrowserContext(web_contents()->GetBrowserContext());
   return WebDataServiceFactory::GetAutofillWebDataForProfile(
       profile, Profile::EXPLICIT_ACCESS);
 }
 
 PrefService* ChromeAutofillClient::GetPrefs() {
-  return Profile::FromBrowserContext(web_contents_->GetBrowserContext())
+  return Profile::FromBrowserContext(web_contents()->GetBrowserContext())
       ->GetPrefs();
 }
 
@@ -100,19 +101,29 @@ void ChromeAutofillClient::ShowAutofillSettings() {
 #if defined(OS_ANDROID)
   chrome::android::ChromiumApplication::ShowAutofillSettings();
 #else
-  Browser* browser = chrome::FindBrowserWithWebContents(web_contents_);
+  Browser* browser = chrome::FindBrowserWithWebContents(web_contents());
   if (browser)
     chrome::ShowSettingsSubPage(browser, chrome::kAutofillSubPage);
 #endif  // #if defined(OS_ANDROID)
 }
 
+void ChromeAutofillClient::ShowUnmaskPrompt() {
+  // TODO(estade): we'll need to store the returned pointer at some point when
+  // the view object gets more complicated.
+  CardUnmaskPromptView::CreateAndShow(
+      web_contents(), base::Bind(&ChromeAutofillClient::OnUnmaskResponse,
+                                 weak_pointer_factory_.GetWeakPtr()));
+}
+
+void ChromeAutofillClient::OnUnmaskResponse(const base::string16& response) {
+  NOTIMPLEMENTED() << " I should probably do something with this: " << response;
+}
+
 void ChromeAutofillClient::ConfirmSaveCreditCard(
-    const AutofillMetrics& metric_logger,
     const base::Closure& save_card_callback) {
   InfoBarService* infobar_service =
-      InfoBarService::FromWebContents(web_contents_);
-  AutofillCCInfoBarDelegate::Create(
-      infobar_service, &metric_logger, save_card_callback);
+      InfoBarService::FromWebContents(web_contents());
+  AutofillCCInfoBarDelegate::Create(infobar_service, save_card_callback);
 }
 
 bool ChromeAutofillClient::HasCreditCardScanFeature() {
@@ -130,8 +141,8 @@ void ChromeAutofillClient::ShowRequestAutocompleteDialog(
     const ResultCallback& callback) {
   HideRequestAutocompleteDialog();
 
-  dialog_controller_ = AutofillDialogController::Create(
-      web_contents_, form, source_url, callback);
+  dialog_controller_ = AutofillDialogController::Create(web_contents(), form,
+                                                        source_url, callback);
   if (dialog_controller_) {
     dialog_controller_->Show();
   } else {
@@ -151,7 +162,7 @@ void ChromeAutofillClient::ShowAutofillPopup(
     const std::vector<int>& identifiers,
     base::WeakPtr<AutofillPopupDelegate> delegate) {
   // Convert element_bounds to be in screen space.
-  gfx::Rect client_area = web_contents_->GetContainerBounds();
+  gfx::Rect client_area = web_contents()->GetContainerBounds();
   gfx::RectF element_bounds_in_screen_space =
       element_bounds + client_area.OffsetFromOrigin();
 
@@ -181,7 +192,7 @@ void ChromeAutofillClient::HideAutofillPopup() {
   // Password generation popups behave in the same fashion and should also
   // be hidden.
   ChromePasswordManagerClient* password_client =
-      ChromePasswordManagerClient::FromWebContents(web_contents_);
+      ChromePasswordManagerClient::FromWebContents(web_contents());
   if (password_client)
     password_client->HidePasswordGenerationPopup();
 }
@@ -201,7 +212,7 @@ void ChromeAutofillClient::WebContentsDestroyed() {
 }
 
 void ChromeAutofillClient::OnZoomChanged(
-    const ZoomController::ZoomChangedEventData& data) {
+    const ui_zoom::ZoomController::ZoomChangedEventData& data) {
   HideAutofillPopup();
 }
 

@@ -31,8 +31,10 @@ void TestAutofillClient::HideRequestAutocompleteDialog() {
 void TestAutofillClient::ShowAutofillSettings() {
 }
 
+void TestAutofillClient::ShowUnmaskPrompt() {
+}
+
 void TestAutofillClient::ConfirmSaveCreditCard(
-    const AutofillMetrics& metric_logger,
     const base::Closure& save_card_callback) {
 }
 

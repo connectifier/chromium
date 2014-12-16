@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "base/macros.h"
+#include "base/memory/weak_ptr.h"
 #include "base/strings/string16.h"
 
 namespace autofill {
@@ -25,7 +26,8 @@ class PasswordManager;
 
 // Interface that allows PasswordManager core code to interact with its driver
 // (i.e., obtain information from it and give information to it).
-class PasswordManagerDriver {
+class PasswordManagerDriver
+    : public base::SupportsWeakPtr<PasswordManagerDriver> {
  public:
   PasswordManagerDriver() {}
   virtual ~PasswordManagerDriver() {}
@@ -41,6 +43,9 @@ class PasswordManagerDriver {
   // Notifies the driver that account creation |forms| were found.
   virtual void AccountCreationFormsFound(
       const std::vector<autofill::FormData>& forms) = 0;
+
+  // Notifies the driver that the user has accepted a generated password.
+  virtual void GeneratedPasswordAccepted(const base::string16& password) = 0;
 
   // Tells the driver to fill the form with the |username| and |password|.
   virtual void FillSuggestion(const base::string16& username,

@@ -60,14 +60,9 @@ ExtensionOptionsImpl.prototype.onElementAttached = function() {
   this.createGuest();
 }
 
-ExtensionOptionsImpl.prototype.onElementDetached = function() {
-  this.guest.destroy();
-};
-
 ExtensionOptionsImpl.prototype.buildAttachParams = function() {
   var params = {
     'autosize': this.element.hasAttribute('autosize'),
-    'instanceId': this.viewInstanceId,
     'maxheight': parseInt(this.maxheight || 0),
     'maxwidth': parseInt(this.maxwidth || 0),
     'minheight': parseInt(this.minheight || 0),

@@ -45,8 +45,6 @@ class HostSharedBitmap : public cc::SharedBitmap {
       manager_->FreeSharedMemoryFromMap(id());
   }
 
-  base::SharedMemory* memory() override { return bitmap_data_->memory.get(); }
-
  private:
   scoped_refptr<BitmapData> bitmap_data_;
   HostSharedBitmapManager* manager_;
@@ -106,20 +104,11 @@ scoped_ptr<cc::SharedBitmap> HostSharedBitmapManager::GetSharedBitmapFromId(
         new HostSharedBitmap(data->pixels.get(), data, id, nullptr));
   }
   if (!data->memory->memory()) {
-    TRACE_EVENT0("renderer_host",
-                 "HostSharedBitmapManager::GetSharedBitmapFromId");
-    if (!data->memory->Map(data->buffer_size)) {
-      return scoped_ptr<cc::SharedBitmap>();
-    }
+    return scoped_ptr<cc::SharedBitmap>();
   }
 
   return make_scoped_ptr(new HostSharedBitmap(
       static_cast<uint8*>(data->memory->memory()), data, id, nullptr));
-}
-
-scoped_ptr<cc::SharedBitmap> HostSharedBitmapManager::GetBitmapForSharedMemory(
-    base::SharedMemory*) {
-  return scoped_ptr<cc::SharedBitmap>();
 }
 
 void HostSharedBitmapManager::ChildAllocatedSharedBitmap(
@@ -142,6 +131,8 @@ void HostSharedBitmapManager::ChildAllocatedSharedBitmap(
   data->memory =
       make_scoped_ptr(new base::SharedMemory(handle, false));
 #endif
+ data->memory->Map(data->buffer_size);
+ data->memory->Close();
 }
 
 void HostSharedBitmapManager::AllocateSharedBitmapForChild(
@@ -172,6 +163,7 @@ void HostSharedBitmapManager::AllocateSharedBitmapForChild(
     *shared_memory_handle = base::SharedMemory::NULLHandle();
     return;
   }
+ data->memory->Close();
 }
 
 void HostSharedBitmapManager::ChildDeletedSharedBitmap(

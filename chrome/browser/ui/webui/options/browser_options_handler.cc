@@ -44,6 +44,7 @@
 #include "chrome/browser/profiles/profile_shortcut_manager.h"
 #include "chrome/browser/profiles/profile_window.h"
 #include "chrome/browser/profiles/profiles_state.h"
+#include "chrome/browser/search/hotword_audio_history_handler.h"
 #include "chrome/browser/search/hotword_service.h"
 #include "chrome/browser/search/hotword_service_factory.h"
 #include "chrome/browser/search/search.h"
@@ -539,12 +540,12 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
   values->SetString("hotwordManageAudioHistoryURL",
                     chrome::kManageAudioHistoryURL);
 
-  Profile* profile = Profile::FromWebUI(web_ui());
 #if defined(OS_CHROMEOS)
+  Profile* profile = Profile::FromWebUI(web_ui());
   std::string username = profile->GetProfileName();
   if (username.empty()) {
     user_manager::User* user =
-      chromeos::ProfileHelper::Get()->GetUserByProfile(profile);
+        chromeos::ProfileHelper::Get()->GetUserByProfile(profile);
     if (user && (user->GetType() != user_manager::USER_TYPE_GUEST))
       username = user->email();
   }
@@ -553,22 +554,6 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
 
   values->SetString("username", username);
 #endif
-
-  base::string16 user_email;
-  // If the profile is a guest session, it will not be found in the cache.
-  // In that case, just set the value with an empty string for the email since
-  // it won't be displayed anyways for a guest profile.
-  if (!profile->IsGuestSession()) {
-    ProfileInfoCache& cache =
-        g_browser_process->profile_manager()->GetProfileInfoCache();
-    user_email = cache.GetUserNameOfProfileAtIndex(
-        cache.GetIndexOfProfileWithPath(profile->GetPath()));
-  }
-  values->SetString(
-      "hotwordAudioHistoryEnabled",
-      l10n_util::GetStringFUTF16(IDS_HOTWORD_AUDIO_HISTORY_ENABLED,
-                                 user_email));
-
   // Pass along sync status early so it will be available during page init.
   values->Set("syncData", GetSyncStateDictionary().release());
 
@@ -1214,8 +1199,9 @@ void BrowserOptionsHandler::OnTemplateURLServiceChanged() {
   } else {
     // If the user has chosen a default search provide other than Google, turn
     // off hotwording since other providers don't provide that functionality.
-    web_ui()->CallJavascriptFunction("BrowserOptions.setHotwordSectionVisible",
-                                     base::FundamentalValue(false));
+    web_ui()->CallJavascriptFunction(
+        "BrowserOptions.setAllHotwordSectionsVisible",
+        base::FundamentalValue(false));
     HotwordService* hotword_service =
         HotwordServiceFactory::GetForProfile(Profile::FromWebUI(web_ui()));
     if (hotword_service)
@@ -1566,6 +1552,13 @@ void BrowserOptionsHandler::OnConsumerManagementStatusChanged() {
 void BrowserOptionsHandler::UpdateSyncState() {
   web_ui()->CallJavascriptFunction("BrowserOptions.updateSyncState",
                                    *GetSyncStateDictionary());
+
+  // A change in sign-in state also affects how hotwording and audio history are
+  // displayed. Hide all hotwording and re-display properly.
+  web_ui()->CallJavascriptFunction(
+      "BrowserOptions.setAllHotwordSectionsVisible",
+      base::FundamentalValue(false));
+  HandleRequestHotwordAvailable(nullptr);
 }
 
 void BrowserOptionsHandler::OnSigninAllowedPrefChange() {
@@ -1674,6 +1667,18 @@ void BrowserOptionsHandler::ShowCloudPrintDevicesPage(
 
 #endif
 
+void BrowserOptionsHandler::SetHotwordAudioHistorySectionVisible(
+    bool always_on, const base::string16& audio_history_state,
+    bool success, bool logging_enabled) {
+  web_ui()->CallJavascriptFunction(
+      "BrowserOptions.setAudioHistorySectionVisible",
+      base::FundamentalValue(logging_enabled),
+      base::FundamentalValue(always_on),
+      base::StringValue(audio_history_state));
+
+  // TODO(rlp): Add version with error display if !success.
+}
+
 void BrowserOptionsHandler::HandleRequestHotwordAvailable(
     const base::ListValue* args) {
   Profile* profile = Profile::FromWebUI(web_ui());
@@ -1686,8 +1691,11 @@ void BrowserOptionsHandler::HandleRequestHotwordAvailable(
 
     std::string function_name;
     bool always_on = false;
+    SigninManagerBase* signin = SigninManagerFactory::GetForProfile(profile);
+    bool authenticated = signin && signin->IsAuthenticated();
     if (HotwordService::IsExperimentalHotwordingEnabled()) {
-      if (HotwordServiceFactory::IsHotwordHardwareAvailable()) {
+      if (HotwordServiceFactory::IsHotwordHardwareAvailable() &&
+          authenticated) {
         function_name = "BrowserOptions.showHotwordAlwaysOnSection";
         always_on = true;
         // Show the retrain link if always-on is enabled.
@@ -1705,12 +1713,25 @@ void BrowserOptionsHandler::HandleRequestHotwordAvailable(
     }
 
     // Audio history should be displayed if it's enabled regardless of the
-    // hotword error state. An additional message is displayed if always-on
-    // hotwording is enabled.
-    if (profile->GetPrefs()->GetBoolean(prefs::kHotwordAudioHistoryEnabled) &&
-        HotwordService::IsExperimentalHotwordingEnabled()) {
-      web_ui()->CallJavascriptFunction("BrowserOptions.showAudioHistorySection",
-                                       base::FundamentalValue(always_on));
+    // hotword error state if the user is signed in. If the user is not signed
+    // in, audio history is meaningless. An additional message is displayed if
+    // always-on hotwording is enabled.
+    if (HotwordService::IsExperimentalHotwordingEnabled() &&
+        authenticated) {
+      std::string user_display_name = signin->GetAuthenticatedUsername();
+      DCHECK(!user_display_name.empty());
+      base::string16 audio_history_state =
+          l10n_util::GetStringFUTF16(IDS_HOTWORD_AUDIO_HISTORY_ENABLED,
+          base::ASCIIToUTF16(user_display_name));
+      HotwordService* hotword_service =
+          HotwordServiceFactory::GetForProfile(profile);
+      if (hotword_service) {
+        hotword_service->GetAudioHistoryHandler()->GetAudioHistoryEnabled(
+            base::Bind(
+                &BrowserOptionsHandler::SetHotwordAudioHistorySectionVisible,
+                weak_ptr_factory_.GetWeakPtr(),
+                always_on, audio_history_state));
+      }
     }
 
     if (!error) {
@@ -1741,12 +1762,12 @@ void BrowserOptionsHandler::HandleLaunchHotwordAudioVerificationApp(
   if (retrain) {
     DCHECK(profile->GetPrefs()->GetBoolean(
         prefs::kHotwordAlwaysOnSearchEnabled));
+    DCHECK(profile->GetPrefs()->GetBoolean(
+        prefs::kHotwordAudioLoggingEnabled));
 
     launch_mode = HotwordService::RETRAIN;
-    // TODO(rlp): Make sure the Chrome Audio History pref is synced
-    // to the account-level Audio History setting from footprints.
   } else if (profile->GetPrefs()->GetBoolean(
-      prefs::kHotwordAudioHistoryEnabled)) {
+      prefs::kHotwordAudioLoggingEnabled)) {
     DCHECK(!profile->GetPrefs()->GetBoolean(
         prefs::kHotwordAlwaysOnSearchEnabled));
     launch_mode = HotwordService::HOTWORD_ONLY;

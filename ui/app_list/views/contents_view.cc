@@ -25,6 +25,7 @@
 #include "ui/resources/grit/ui_resources.h"
 #include "ui/views/view_model.h"
 #include "ui/views/view_model_utils.h"
+#include "ui/views/widget/widget.h"
 
 namespace app_list {
 
@@ -80,7 +81,8 @@ void ContentsView::Init(AppListModel* model) {
     search_results_page_view_->AddSearchResultContainerView(
         results, new SearchResultListView(app_list_main_view_, view_delegate));
     search_results_page_view_->AddSearchResultContainerView(
-        results, new SearchResultTileItemListView());
+        results,
+        new SearchResultTileItemListView(GetSearchBoxView()->search_box()));
 
     AddLauncherPage(search_results_page_view_,
                     AppListModel::STATE_SEARCH_RESULTS);
@@ -406,7 +408,8 @@ gfx::Rect ContentsView::GetCustomPageCollapsedBounds() const {
 }
 
 bool ContentsView::ShouldShowCustomPageClickzone() const {
-  return custom_page_view_ && IsStateActive(AppListModel::STATE_START);
+  return custom_page_view_ && IsStateActive(AppListModel::STATE_START) &&
+         app_list_main_view_->model()->custom_launcher_page_enabled();
 }
 
 bool ContentsView::Back() {
@@ -461,6 +464,15 @@ gfx::Size ContentsView::GetPreferredSize() const {
 }
 
 void ContentsView::Layout() {
+  // The search box is contained in a widget so set the bounds of the widget
+  // rather than the SearchBoxView. In athena, the search box widget will be the
+  // same as the app list widget so don't move it.
+  views::Widget* search_box_widget = GetSearchBoxView()->GetWidget();
+  if (search_box_widget && search_box_widget != GetWidget()) {
+    search_box_widget->SetBounds(
+        ConvertRectToWidget(GetSearchBoxBoundsForState(GetActiveState())));
+  }
+
   // Immediately finish all current animations.
   pagination_model_.FinishAnimation();
 

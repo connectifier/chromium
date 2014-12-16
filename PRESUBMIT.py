@@ -862,12 +862,17 @@ def _CheckHardcodedGoogleHostsInLowerLayers(input_api, output_api):
 
 def _CheckNoAbbreviationInPngFileName(input_api, output_api):
   """Makes sure there are no abbreviations in the name of PNG files.
+  The native_client_sdk directory is excluded because it has auto-generated PNG
+  files for documentation.
   """
-  pattern = input_api.re.compile(r'.*_[a-z]_.*\.png$|.*_[a-z]\.png$')
   errors = []
-  for f in input_api.AffectedFiles(include_deletes=False):
-    if pattern.match(f.LocalPath()):
-      errors.append('    %s' % f.LocalPath())
+  white_list = (r'.*_[a-z]_.*\.png$|.*_[a-z]\.png$',)
+  black_list = (r'^native_client_sdk[\\\/]',)
+  file_filter = lambda f: input_api.FilterSourceFile(
+      f, white_list=white_list, black_list=black_list)
+  for f in input_api.AffectedFiles(include_deletes=False,
+                                   file_filter=file_filter):
+    errors.append('    %s' % f.LocalPath())
 
   results = []
   if errors:
@@ -1262,6 +1267,26 @@ def _CheckJavaStyle(input_api, output_api):
       input_api, output_api, 'tools/android/checkstyle/chromium-style-5.0.xml')
 
 
+def _CheckForCopyrightedCode(input_api, output_api):
+  """Verifies that newly added code doesn't contain copyrighted material
+  and is properly licensed under the standard Chromium license.
+
+  As there can be false positives, we maintain a whitelist file. This check
+  also verifies that the whitelist file is up to date.
+  """
+  import sys
+  original_sys_path = sys.path
+  try:
+    sys.path = sys.path + [input_api.os_path.join(
+        input_api.PresubmitLocalPath(), 'android_webview', 'tools')]
+    import copyright_scanner
+  finally:
+    # Restore sys.path to what it was before.
+    sys.path = original_sys_path
+
+  return copyright_scanner.ScanAtPresubmit(input_api, output_api)
+
+
 _DEPRECATED_CSS = [
   # Values
   ( "-webkit-box", "flex" ),
@@ -1377,6 +1402,7 @@ def _CommonChecks(input_api, output_api):
   results.extend(_CheckNoDeprecatedJS(input_api, output_api))
   results.extend(_CheckParseErrors(input_api, output_api))
   results.extend(_CheckForIPCRules(input_api, output_api))
+  results.extend(_CheckForCopyrightedCode(input_api, output_api))
 
   if any('PRESUBMIT.py' == f.LocalPath() for f in input_api.AffectedFiles()):
     results.extend(input_api.canned_checks.RunUnitTestsInDirectory(
@@ -1746,9 +1772,8 @@ def GetPreferredTryMasters(project, change):
   if all(re.search('(^|[/_])win[/_.]', f) for f in files):
     return GetDefaultTryConfigs([
         'win8_chromium_rel',
-        'win_chromium_dbg',
-        'win_chromium_rel',
-        'win_chromium_x64_rel',
+        'win_chromium_rel_ng',
+        'win_chromium_x64_rel_ng',
     ])
   if all(re.search(r'(^|[\\\/_])android[\\\/_.]', f) for f in files):
     return GetDefaultTryConfigs([
@@ -1761,8 +1786,10 @@ def GetPreferredTryMasters(project, change):
   builders = [
       'android_aosp',
       'android_arm64_dbg_recipe',
-      'android_chromium_gn_compile_rel',
+      'android_arm64_dbg_recipe',
       'android_chromium_gn_compile_dbg',
+      'android_chromium_gn_compile_rel',
+      'android_clang_dbg_recipe',
       'android_clang_dbg_recipe',
       'android_dbg_tests_recipe',
       'ios_dbg_simulator',
@@ -1779,11 +1806,11 @@ def GetPreferredTryMasters(project, change):
       'mac_chromium_compile_dbg_ng',
       'mac_chromium_rel_ng',
       'mac_gpu',
-      'win_chromium_compile_dbg',
-      'win_chromium_rel',
-      'win_chromium_x64_rel',
-      'win_gpu',
       'win8_chromium_rel',
+      'win_chromium_compile_dbg',
+      'win_chromium_rel_ng',
+      'win_chromium_x64_rel_ng',
+      'win_gpu',
   ]
 
   # Match things like path/aura/file.cc and path/file_aura.cc.

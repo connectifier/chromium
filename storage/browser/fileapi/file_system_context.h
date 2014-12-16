@@ -67,7 +67,6 @@ class QuotaReservation;
 class SandboxFileSystemBackend;
 class WatchManager;
 
-struct DefaultContextDeleter;
 struct FileSystemInfo;
 
 // An auto mount handler will attempt to mount the file system requested in
@@ -85,8 +84,8 @@ typedef base::Callback<bool(
 // This class keeps and provides a file system context for FileSystem API.
 // An instance of this class is created and owned by profile.
 class STORAGE_EXPORT FileSystemContext
-    : public base::RefCountedThreadSafe<FileSystemContext,
-                                        DefaultContextDeleter> {
+    : public base::RefCountedThreadSafeDeleteOnCorrectThread<
+          FileSystemContext> {
  public:
   // Returns file permission policy we should apply for the given |type|.
   // The return value must be bitwise-or'd of FilePermissionPolicy.
@@ -299,10 +298,6 @@ class STORAGE_EXPORT FileSystemContext
   // (E.g. this returns false if the context is created for incognito mode)
   bool CanServeURLRequest(const FileSystemURL& url) const;
 
-  // Returns true if a file in the file system should be flushed for each write
-  // completion.
-  bool ShouldFlushOnWriteCompletion(FileSystemType type) const;
-
   // This must be used to open 'plugin private' filesystem.
   // See "plugin_private_file_system_backend.h" for more details.
   void OpenPluginPrivateFileSystem(
@@ -327,10 +322,9 @@ class STORAGE_EXPORT FileSystemContext
   friend class content::PluginPrivateFileSystemBackendTest;
 
   // Deleters.
-  friend struct DefaultContextDeleter;
   friend class base::DeleteHelper<FileSystemContext>;
-  friend class base::RefCountedThreadSafe<FileSystemContext,
-                                          DefaultContextDeleter>;
+  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<
+      FileSystemContext>;
   ~FileSystemContext();
 
   void DeleteOnCorrectThread() const;
@@ -417,12 +411,6 @@ class STORAGE_EXPORT FileSystemContext
   scoped_ptr<FileSystemOperationRunner> operation_runner_;
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(FileSystemContext);
-};
-
-struct DefaultContextDeleter {
-  static void Destruct(const FileSystemContext* context) {
-    context->DeleteOnCorrectThread();
-  }
 };
 
 }  // namespace storage

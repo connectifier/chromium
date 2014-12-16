@@ -9,16 +9,16 @@ import sys
 from telemetry import benchmark
 from telemetry import user_story
 from telemetry.core import exceptions
-from telemetry.page import page_set
+from telemetry.page import page as page_module
 from telemetry.page import page_test
 from telemetry.page import test_expectations
 from telemetry.results import results_options
-from unittest_data import test_simple_one_page_set
 from telemetry.unittest_util import options_for_unittests
 from telemetry.unittest_util import system_stub
 from telemetry.user_story import shared_user_story_state
 from telemetry.user_story import user_story_runner
 from telemetry.user_story import user_story_set
+from telemetry.util import cloud_storage
 from telemetry.util import exception_formatter as exception_formatter_module
 from telemetry.value import scalar
 from telemetry.value import string
@@ -88,6 +88,15 @@ class EmptyMetadataForTest(benchmark.BenchmarkMetadata):
     super(EmptyMetadataForTest, self).__init__('')
 
 
+class DummyLocalUserStory(user_story.UserStory):
+  def __init__(self, shared_user_story_state_class, name=''):
+    super(DummyLocalUserStory, self).__init__(
+        shared_user_story_state_class, name=name)
+
+  @property
+  def is_local(self):
+    return True
+
 def _GetOptionForUnittest():
   options = options_for_unittests.GetCopy()
   options.output_formats = ['none']
@@ -136,10 +145,10 @@ class UserStoryRunnerTest(unittest.TestCase):
 
   def testGetUserStoryGroupsWithSameSharedUserStoryClass(self):
     us = user_story_set.UserStorySet()
-    us.AddUserStory(user_story.UserStory(FooUserStoryState))
-    us.AddUserStory(user_story.UserStory(FooUserStoryState))
-    us.AddUserStory(user_story.UserStory(BarUserStoryState))
-    us.AddUserStory(user_story.UserStory(FooUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(FooUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(FooUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(BarUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(FooUserStoryState))
     story_groups = (
         user_story_runner.GetUserStoryGroupsWithSameSharedUserStoryClass(
             us))
@@ -151,11 +160,11 @@ class UserStoryRunnerTest(unittest.TestCase):
     self.assertEqual(story_groups[2].shared_user_story_state_class,
                      FooUserStoryState)
 
-  def testSuccefulUserStoryTest(self):
+  def testSuccessfulUserStoryTest(self):
     us = user_story_set.UserStorySet()
-    us.AddUserStory(user_story.UserStory(FooUserStoryState))
-    us.AddUserStory(user_story.UserStory(FooUserStoryState))
-    us.AddUserStory(user_story.UserStory(BarUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(FooUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(FooUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(BarUserStoryState))
     user_story_runner.Run(
         DummyTest(), us, self.expectations, self.options, self.results)
     self.assertEquals(0, len(self.results.failures))
@@ -184,10 +193,10 @@ class UserStoryRunnerTest(unittest.TestCase):
       def TearDownState(self, _results):
         barz_tear_down_call_counter[0] += 1
 
-    us.AddUserStory(user_story.UserStory(FoozUserStoryState))
-    us.AddUserStory(user_story.UserStory(FoozUserStoryState))
-    us.AddUserStory(user_story.UserStory(BarzUserStoryState))
-    us.AddUserStory(user_story.UserStory(BarzUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(FoozUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(FoozUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(BarzUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(BarzUserStoryState))
     user_story_runner.Run(
         DummyTest(), us, self.expectations, self.options, self.results)
     self.assertEquals(0, len(self.results.failures))
@@ -197,25 +206,25 @@ class UserStoryRunnerTest(unittest.TestCase):
     self.assertEquals(1, barz_init_call_counter[0])
     self.assertEquals(1, barz_tear_down_call_counter[0])
 
-  def testHandlingOfCrashedApp(self):
+  def testAppCrashExceptionCausesFailureValue(self):
     self.SuppressExceptionFormatting()
     us = user_story_set.UserStorySet()
     class SharedUserStoryThatCausesAppCrash(TestSharedUserStoryState):
       def WillRunUserStory(self, user_storyz):
         raise exceptions.AppCrashException()
 
-    us.AddUserStory(user_story.UserStory(SharedUserStoryThatCausesAppCrash))
+    us.AddUserStory(DummyLocalUserStory(SharedUserStoryThatCausesAppCrash))
     user_story_runner.Run(
         DummyTest(), us, self.expectations, self.options, self.results)
     self.assertEquals(1, len(self.results.failures))
     self.assertEquals(0, GetNumberOfSuccessfulPageRuns(self.results))
 
-  def testHandlingOfTestThatRaisesWithNonFatalUnknownExceptions(self):
+  def testUnknownExceptionIsFatal(self):
     self.SuppressExceptionFormatting()
     us = user_story_set.UserStorySet()
 
-    class ExpectedException(Exception):
-        pass
+    class UnknownException(Exception):
+      pass
 
     class Test(page_test.PageTest):
       def __init__(self, *args):
@@ -226,19 +235,17 @@ class UserStoryRunnerTest(unittest.TestCase):
         old_run_count = self.run_count
         self.run_count += 1
         if old_run_count == 0:
-          raise ExpectedException()
+          raise UnknownException
 
       def ValidateAndMeasurePage(self, page, tab, results):
         pass
 
-    us.AddUserStory(user_story.UserStory(TestSharedUserStoryState))
-    us.AddUserStory(user_story.UserStory(TestSharedUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(TestSharedUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(TestSharedUserStoryState))
     test = Test()
-    user_story_runner.Run(
-        test, us, self.expectations, self.options, self.results)
-    self.assertEquals(2, test.run_count)
-    self.assertEquals(1, len(self.results.failures))
-    self.assertEquals(1, GetNumberOfSuccessfulPageRuns(self.results))
+    with self.assertRaises(UnknownException):
+      user_story_runner.Run(
+          test, us, self.expectations, self.options, self.results)
 
   def testRaiseBrowserGoneExceptionFromRunPage(self):
     self.SuppressExceptionFormatting()
@@ -253,13 +260,13 @@ class UserStoryRunnerTest(unittest.TestCase):
         old_run_count = self.run_count
         self.run_count += 1
         if old_run_count == 0:
-          raise exceptions.BrowserGoneException()
+          raise exceptions.BrowserGoneException('i am a browser instance')
 
       def ValidateAndMeasurePage(self, page, tab, results):
         pass
 
-    us.AddUserStory(user_story.UserStory(TestSharedUserStoryState))
-    us.AddUserStory(user_story.UserStory(TestSharedUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(TestSharedUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(TestSharedUserStoryState))
     test = Test()
     user_story_runner.Run(
         test, us, self.expectations, self.options, self.results)
@@ -267,10 +274,52 @@ class UserStoryRunnerTest(unittest.TestCase):
     self.assertEquals(1, len(self.results.failures))
     self.assertEquals(1, GetNumberOfSuccessfulPageRuns(self.results))
 
+  def testAppCrashThenRaiseInTearDownFatal(self):
+    self.SuppressExceptionFormatting()
+    us = user_story_set.UserStorySet()
+
+    class DidRunTestError(Exception):
+      pass
+
+    class TestTearDownSharedUserStoryState(TestSharedUserStoryState):
+      def TearDownState(self, results):
+        self._test.DidRunTest('app', results)
+
+    class Test(page_test.PageTest):
+      def __init__(self, *args):
+        super(Test, self).__init__(*args)
+        self.run_count = 0
+        self._unit_test_events = []  # track what was called when
+
+      def RunPage(self, *_):
+        old_run_count = self.run_count
+        self.run_count += 1
+        if old_run_count == 0:
+          self._unit_test_events.append('app-crash')
+          raise exceptions.AppCrashException
+
+      def ValidateAndMeasurePage(self, page, tab, results):
+        pass
+
+      def DidRunTest(self, _, __):
+        self._unit_test_events.append('did-run-test')
+        raise DidRunTestError
+
+    us.AddUserStory(DummyLocalUserStory(TestTearDownSharedUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(TestTearDownSharedUserStoryState))
+    test = Test()
+
+    with self.assertRaises(DidRunTestError):
+      user_story_runner.Run(
+          test, us, self.expectations, self.options, self.results)
+    self.assertEqual(['app-crash', 'did-run-test'], test._unit_test_events)
+    # The AppCrashException gets added as a failure.
+    self.assertEquals(1, len(self.results.failures))
+
   def testDiscardFirstResult(self):
     us = user_story_set.UserStorySet()
-    us.AddUserStory(user_story.UserStory(TestSharedUserStoryState))
-    us.AddUserStory(user_story.UserStory(TestSharedUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(TestSharedUserStoryState))
+    us.AddUserStory(DummyLocalUserStory(TestSharedUserStoryState))
     class Measurement(page_test.PageTest):
       @property
       def discard_first_result(self):
@@ -324,9 +373,9 @@ class UserStoryRunnerTest(unittest.TestCase):
 
   def testPagesetRepeat(self):
     us = user_story_set.UserStorySet()
-    us.AddUserStory(user_story.UserStory(
+    us.AddUserStory(DummyLocalUserStory(
         TestSharedUserStoryState, name='blank'))
-    us.AddUserStory(user_story.UserStory(
+    us.AddUserStory(DummyLocalUserStory(
         TestSharedUserStoryState, name='green'))
 
     class Measurement(page_test.PageTest):
@@ -361,35 +410,43 @@ class UserStoryRunnerTest(unittest.TestCase):
       sys.stdout = real_stdout
 
   def testCheckArchives(self):
-    ps = page_set.PageSet()
-    ps.AddPageWithDefaultRunNavigate('http://www.testurl.com')
+    uss = user_story_set.UserStorySet()
+    uss.AddUserStory(page_module.Page(
+        'http://www.testurl.com', self, uss.base_dir))
     # Page set missing archive_data_file.
     self.assertFalse(user_story_runner._CheckArchives(
-        ps.archive_data_file, ps.wpr_archive_info, ps.pages))
+        uss.archive_data_file, uss.wpr_archive_info, uss.user_stories))
 
-    ps = page_set.PageSet(archive_data_file='missing_archive_data_file.json')
-    ps.AddPageWithDefaultRunNavigate('http://www.testurl.com')
+    uss = user_story_set.UserStorySet(
+        archive_data_file='missing_archive_data_file.json')
+    uss.AddUserStory(page_module.Page(
+        'http://www.testurl.com', self, uss.base_dir))
     # Page set missing json file specified in archive_data_file.
     self.assertFalse(user_story_runner._CheckArchives(
-       ps.archive_data_file, ps.wpr_archive_info, ps.pages))
+        uss.archive_data_file, uss.wpr_archive_info, uss.user_stories))
 
-    ps = page_set.PageSet(archive_data_file='../../unittest_data/test.json',
-                          bucket=page_set.PUBLIC_BUCKET)
-    ps.AddPageWithDefaultRunNavigate('http://www.testurl.com')
+    uss = user_story_set.UserStorySet(
+        archive_data_file='../../unittest_data/test.json',
+        cloud_storage_bucket=cloud_storage.PUBLIC_BUCKET)
+    uss.AddUserStory(page_module.Page(
+        'http://www.testurl.com', self, uss.base_dir))
     # Page set with valid archive_data_file.
     self.assertTrue(user_story_runner._CheckArchives(
-        ps.archive_data_file, ps.wpr_archive_info, ps.pages))
-    ps.AddPageWithDefaultRunNavigate('http://www.google.com')
+        uss.archive_data_file, uss.wpr_archive_info, uss.user_stories))
+    uss.AddUserStory(page_module.Page(
+        'http://www.google.com', self, uss.base_dir))
     # Page set with an archive_data_file which exists but is missing a page.
     self.assertFalse(user_story_runner._CheckArchives(
-        ps.archive_data_file, ps.wpr_archive_info, ps.pages))
+        uss.archive_data_file, uss.wpr_archive_info, uss.user_stories))
 
-    ps = page_set.PageSet(
+    uss = user_story_set.UserStorySet(
         archive_data_file='../../unittest_data/test_missing_wpr_file.json',
-        bucket=page_set.PUBLIC_BUCKET)
-    ps.AddPageWithDefaultRunNavigate('http://www.testurl.com')
-    ps.AddPageWithDefaultRunNavigate('http://www.google.com')
+        cloud_storage_bucket=cloud_storage.PUBLIC_BUCKET)
+    uss.AddUserStory(page_module.Page(
+        'http://www.testurl.com', self, uss.base_dir))
+    uss.AddUserStory(page_module.Page(
+        'http://www.google.com', self, uss.base_dir))
     # Page set with an archive_data_file which exists and contains all pages
     # but fails to find a wpr file.
     self.assertFalse(user_story_runner._CheckArchives(
-        ps.archive_data_file, ps.wpr_archive_info, ps.pages))
+        uss.archive_data_file, uss.wpr_archive_info, uss.user_stories))

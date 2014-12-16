@@ -24,7 +24,6 @@ import org.chromium.chrome.browser.contextmenu.ContextMenuPopulator;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulatorWrapper;
 import org.chromium.chrome.browser.contextmenu.EmptyChromeContextMenuItemDelegate;
 import org.chromium.chrome.browser.dom_distiller.DomDistillerFeedbackReporter;
-import org.chromium.chrome.browser.infobar.AutoLoginProcessor;
 import org.chromium.chrome.browser.infobar.InfoBarContainer;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
@@ -482,29 +481,31 @@ public class Tab {
      *         prerendered. DEFAULT_PAGE_LOAD if it had not.
      */
     public int loadUrl(LoadUrlParams params) {
-        TraceEvent.begin();
+        try {
+            TraceEvent.begin("Tab.loadUrl");
 
-        // We load the URL from the tab rather than directly from the ContentView so the tab has a
-        // chance of using a prerenderer page is any.
-        int loadType = nativeLoadUrl(
-                mNativeTabAndroid,
-                params.getUrl(),
-                params.getVerbatimHeaders(),
-                params.getPostData(),
-                params.getTransitionType(),
-                params.getReferrer() != null ? params.getReferrer().getUrl() : null,
-                // Policy will be ignored for null referrer url, 0 is just a placeholder.
-                // TODO(ppi): Should we pass Referrer jobject and add JNI methods to read it from
-                //            the native?
-                params.getReferrer() != null ? params.getReferrer().getPolicy() : 0,
-                params.getIsRendererInitiated());
+            // We load the URL from the tab rather than directly from the ContentView so the tab has
+            // a chance of using a prerenderer page is any.
+            int loadType = nativeLoadUrl(
+                    mNativeTabAndroid,
+                    params.getUrl(),
+                    params.getVerbatimHeaders(),
+                    params.getPostData(),
+                    params.getTransitionType(),
+                    params.getReferrer() != null ? params.getReferrer().getUrl() : null,
+                    // Policy will be ignored for null referrer url, 0 is just a placeholder.
+                    // TODO(ppi): Should we pass Referrer jobject and add JNI methods to read it
+                    //            from the native?
+                    params.getReferrer() != null ? params.getReferrer().getPolicy() : 0,
+                    params.getIsRendererInitiated());
 
-        TraceEvent.end();
-
-        for (TabObserver observer : mObservers) {
-            observer.onLoadUrl(this, params.getUrl(), loadType);
+            for (TabObserver observer : mObservers) {
+                observer.onLoadUrl(this, params.getUrl(), loadType);
+            }
+            return loadType;
+        } finally {
+            TraceEvent.end("Tab.loadUrl");
         }
-        return loadType;
     }
 
     /**
@@ -586,19 +587,6 @@ public class Tab {
     /** Returns an ByteBuffer representing the state of the Tab's WebContents. */
     protected ByteBuffer getWebContentsStateAsByteBuffer() {
         return TabState.getContentsStateAsByteBuffer(this);
-    }
-
-    /**
-     * Create an {@code AutoLoginProcessor} to decide how to handle login
-     * requests.
-     */
-    protected AutoLoginProcessor createAutoLoginProcessor() {
-        return new AutoLoginProcessor() {
-            @Override
-            public void processAutoLoginResult(String accountName, String authToken,
-                    boolean success, String result) {
-            }
-        };
     }
 
     /**
@@ -905,8 +893,7 @@ public class Tab {
             // initialized.
             WebContents webContents = mContentViewCore.getWebContents();
             mInfoBarContainer = new InfoBarContainer(
-                    (Activity) mContext, createAutoLoginProcessor(), getId(),
-                    mContentViewCore.getContainerView(), webContents);
+                    (Activity) mContext, getId(), mContentViewCore.getContainerView(), webContents);
         } else {
             mInfoBarContainer.onParentViewChanged(getId(), mContentViewCore.getContainerView());
         }
@@ -1044,6 +1031,14 @@ public class Tab {
         assert nativePage != mNativePage : "Attempting to destroy active page.";
 
         nativePage.destroy();
+    }
+
+    /**
+     * Called when the background color for the content changes.
+     * @param color The current for the background.
+     */
+    protected void onBackgroundColorChanged(int color) {
+        for (TabObserver observer : mObservers) observer.onBackgroundColorChanged(this, color);
     }
 
     /**

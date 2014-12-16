@@ -1111,6 +1111,12 @@ Press any key to continue exploring.
   <message name="IDS_FLAGS_DISABLE_DISPLAY_COLOR_CALIBRATION_DESCRIPTION" desc="Description for the flag to disable the color calibration of the display.">
     Disable calibrating the color of the display even if the display supports the feature.
   </message>
+  <message name="IDS_FLAGS_USE_MEMORY_PRESSURE_NAME" desc="Name for the flag to enable memory pressure handling on ChromeOS.">
+    Enable memory pressure handling 
+  </message>
+  <message name="IDS_FLAGS_USE_MEMORY_PRESSURE_DESCRIPTION" desc="Description for the flag to enable memory pressure handling on ChromeOS.">
+    Enables enhanced memory pressure handling on ChromeOS.
+  </message>
   <message name="IDS_FLAGS_WAKE_ON_PACKETS_NAME" desc="Name for the flag to enable wake on packets.">
     Wake On Packets
   </message>
@@ -1523,8 +1529,8 @@ Press any key to continue exploring.
   <message name="IDS_CREATE_SUPERVISED_USER_CREATION_RESTRICTED_TEXT" desc="Text shown when supervised user can be created, but owner of the device restricted supervised user creation or whitelist has been enabled for this device.">
     Creation of supervised users is restricted by the owner of this device.
   </message>
-  <message name="IDS_CREATE_SUPERVISED_USER_NO_MANAGER_EXCEPT_SUPERVISED_TEXT" desc="Text shown when supervised user can be created, but no users except regular supervised that can be manager exist.">
-    Sorry, you need to add at least one Google Account to this device before you can create a supervised user.
+  <message name="IDS_CREATE_SUPERVISED_USER_NO_MANAGER_EXCEPT_KIDS_TEXT" desc="Text shown when supervised user can be created, but no users except kids that can be manager exist.">
+    Sorry, you need to add at least one Google account to this device before you can create a supervised user. Google accounts for kids cannot be used to create a supervised user.
   </message>
   <message name="IDS_CREATE_SUPERVISED_INTRO_TEXT_TITLE" desc="Supervised user dialog, intro page, title">
     What is a supervised user?
@@ -2769,7 +2775,7 @@ Press any key to continue exploring.
     Enable
   </message>
   <message name="IDS_ENABLE_DEBUGGING_SETUP_MESSAGE" desc="Setup message in dialog for enabling debugging features.">
-   You are enabling Chrome OS debugging features which will setup sshd daemon and enable booting from USB drives.
+   You are enabling Chrome OS debugging features which will set up sshd daemon and enable booting from USB drives.
   </message>
   <message name="IDS_ENABLE_DEBUGGING_DONE_MESSAGE" desc="Completion message in dialog for enabling debugging features.">
     You have successfully enabled debugging features on this <ph name="IDS_SHORT_PRODUCT_NAME">$1<ex>Chrome</ex></ph> device.
@@ -4743,6 +4749,9 @@ Battery full
   <message name="IDS_IME_NAME_KEYBOARD_MONGOLIAN" desc="The input method name shows in system tray menu, this shows [Mongolian keyboard].">
     Mongolian keyboard
   </message>
+  <message name="IDS_IME_NAME_KEYBOARD_NETHERLANDS" desc="The input method name shows in system tray menu, this shows [Netherlands keyboard].">
+    Netherlands keyboard
+  </message>
   <message name="IDS_IME_NAME_KEYBOARD_NORWEGIAN" desc="The input method name shows in system tray menu, this shows [Norwegian keyboard].">
     Norwegian keyboard
   </message>
@@ -5731,8 +5740,7 @@ All users must sign out to continue.
   <message name="IDS_NETWORK_LOG_ENTRY" desc="The log entry displayed in network event log table.">
     [<ph name="TIMESTAMP">$1<ex>Timestamp</ex></ph>]
     <ph name="FILE_INFO">$2<ex>file:123</ex></ph>
-    <ph name="EVENT_NAME">$3<ex>Event Name</ex></ph>
-    <ph name="DESCRIPTION">$4<ex>Description</ex></ph>
+    <ph name="EVENT_NAME">$3<ex>Event Description</ex></ph>
   </message>
 
   <!-- About NFC Debug UI display strings. They aren't being internationalized bacause this page is meant for debugging only. -->
