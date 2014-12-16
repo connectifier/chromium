@@ -26,8 +26,8 @@ class BrowserContext;
 // All methods, except the ctor, are expected to be called on
 // the IO thread (unless specifically called out in doc comments).
 class CONTENT_EXPORT ChromeBlobStorageContext
-    : public base::RefCountedThreadSafe<ChromeBlobStorageContext,
-        DeleteOnCorrectThreadRefCountedThreadSafeTraits> {
+    : public base::RefCountedThreadSafeDeleteOnCorrectThread<
+        ChromeBlobStorageContext> {
  public:
   ChromeBlobStorageContext();
 
@@ -47,9 +47,8 @@ class CONTENT_EXPORT ChromeBlobStorageContext
 
  private:
   friend class base::DeleteHelper<ChromeBlobStorageContext>;
-  friend class base::RefCountedThreadSafe<ChromeBlobStorageContext,
-      DeleteOnCorrectThreadRefCountedThreadSafeTraits>;
-  friend struct DeleteOnCorrectThreadRefCountedThreadSafeTraits;
+  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<
+    ChromeBlobStorageContext>;
 
   void DeleteOnCorrectThread() const;
 

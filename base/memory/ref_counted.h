@@ -208,19 +208,19 @@ class RefCountedThreadSafe : public subtle::RefCountedThreadSafeBase {
   DISALLOW_COPY_AND_ASSIGN(RefCountedThreadSafe);
 };
 
-//
 // A variant of RefCountedThreadSafe<T> which calls T::DeleteOnCorrectThread()
-// upon destruction, to be used for classes that control which thread
-// destruction occurs on.
+// upon destruction, used by classes that control which thread destruction
+// occurs on.
 //
-// Use is the same as RefCountedThreadSafe, though the type T must implement
-// TODO
-// TODO
-// TODO
-// TODO
-// TODO
-// TODO
-// TODO
+// Example:
+//   class SomeClass
+//       : public base::RefCountedThreadSafeDeleteOnCorrectThread<SomeClass> {
+//     ...
+//    private:
+//     friend class base::RefCountedThreadSafeDeleteOnCorrectThread<SomeClass>;
+//     ~SomeClass();
+//     void DeleteOnCorrectThread() const;
+//   };
 template <class T>
 class RefCountedThreadSafeDeleteOnCorrectThread
     : public RefCountedThreadSafe<

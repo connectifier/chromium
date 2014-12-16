@@ -20,8 +20,8 @@ struct HostZoomLevelContextDeleter;
 // if one is provided. It also serves to keep the zoom level machinery details
 // separate from the owning StoragePartitionImpl.
 class HostZoomLevelContext
-    : public base::RefCountedThreadSafe<
-        HostZoomLevelContext, DeleteOnCorrectThreadRefCountedThreadSafeTraits> {
+    : public base::RefCountedThreadSafeDeleteOnCorrectThread<
+        HostZoomLevelContext> {
  public:
   explicit HostZoomLevelContext(
       scoped_ptr<ZoomLevelDelegate> zoom_level_delegate);
@@ -36,9 +36,8 @@ class HostZoomLevelContext
 
  private:
   friend class base::DeleteHelper<HostZoomLevelContext>;
-  friend class base::RefCountedThreadSafe<
-      HostZoomLevelContext, DeleteOnCorrectThreadRefCountedThreadSafeTraits>;
-  friend struct DeleteOnCorrectThreadRefCountedThreadSafeTraits;
+  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<
+      HostZoomLevelContext>;
 
   void DeleteOnCorrectThread() const;
 

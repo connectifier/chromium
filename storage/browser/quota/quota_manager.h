@@ -110,8 +110,7 @@ struct UsageInfo {
 class STORAGE_EXPORT QuotaManager
     : public QuotaTaskObserver,
       public QuotaEvictionHandler,
-      public base::RefCountedThreadSafe<
-          QuotaManager, DeleteOnCorrectThreadRefCountedThreadSafeTraits> {
+      public base::RefCountedThreadSafeDeleteOnCorrectThread<QuotaManager> {
  public:
   typedef base::Callback<void(QuotaStatusCode,
                               int64 /* usage */,
@@ -264,8 +263,7 @@ class STORAGE_EXPORT QuotaManager
 
  private:
   friend class base::DeleteHelper<QuotaManager>;
-  friend class base::RefCountedThreadSafe<
-      QuotaManager, DeleteOnCorrectThreadRefCountedThreadSafeTraits>;
+  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<QuotaManager>;
   friend class content::QuotaManagerTest;
   friend class content::StorageMonitorTest;
   friend class content::MockQuotaManager;
@@ -273,7 +271,6 @@ class STORAGE_EXPORT QuotaManager
   friend class quota_internals::QuotaInternalsProxy;
   friend class QuotaManagerProxy;
   friend class QuotaTemporaryStorageEvictor;
-  friend struct DeleteOnCorrectThreadRefCountedThreadSafeTraits;
 
   class GetUsageInfoTask;
 

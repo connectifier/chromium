@@ -36,8 +36,8 @@ class ResourceContext;
 // TODO(dpranke): Fix dependencies on AppCacheServiceImpl so that we don't have
 // to worry about clients calling AppCacheServiceImpl methods.
 class CONTENT_EXPORT ChromeAppCacheService
-    : public base::RefCountedThreadSafe<
-        ChromeAppCacheService, DeleteOnCorrectThreadRefCountedThreadSafeTraits>,
+    : public base::RefCountedThreadSafeDeleteOnCorrectThread<
+        ChromeAppCacheService>,
       NON_EXPORTED_BASE(public AppCacheServiceImpl),
       NON_EXPORTED_BASE(public AppCachePolicy) {
  public:
@@ -61,9 +61,8 @@ class CONTENT_EXPORT ChromeAppCacheService
 
  private:
   friend class base::DeleteHelper<ChromeAppCacheService>;
-  friend class base::RefCountedThreadSafe<
-      ChromeAppCacheService, DeleteOnCorrectThreadRefCountedThreadSafeTraits>;
-  friend struct DeleteOnCorrectThreadRefCountedThreadSafeTraits;
+  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<
+      ChromeAppCacheService>;
 
   void DeleteOnCorrectThread() const;
 

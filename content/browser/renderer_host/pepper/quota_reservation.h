@@ -29,8 +29,8 @@ namespace content {
 // because it needs to be passed to the file thread and kept alive during
 // potentially long-running quota operations.
 class CONTENT_EXPORT QuotaReservation
-    : public base::RefCountedThreadSafe<
-        QuotaReservation, DeleteOnCorrectThreadRefCountedThreadSafeTraits> {
+    : public base::RefCountedThreadSafeDeleteOnCorrectThread<
+        QuotaReservation> {
  public:
   // Static method to facilitate construction on the file task runner.
   static scoped_refptr<QuotaReservation> Create(
@@ -56,10 +56,9 @@ class CONTENT_EXPORT QuotaReservation
   void OnClientCrash();
 
  private:
-  friend class base::RefCountedThreadSafe<
-      QuotaReservation, DeleteOnCorrectThreadRefCountedThreadSafeTraits>;
+  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<
+      QuotaReservation>;
   friend class base::DeleteHelper<QuotaReservation>;
-  friend struct DeleteOnCorrectThreadRefCountedThreadSafeTraits;
   friend class QuotaReservationTest;
 
   QuotaReservation(
