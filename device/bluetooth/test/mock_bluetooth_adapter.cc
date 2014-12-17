@@ -14,7 +14,7 @@ MockBluetoothAdapter::MockBluetoothAdapter() {
 
 MockBluetoothAdapter::~MockBluetoothAdapter() {}
 
-void MockBluetoothAdapter::DeleteOnCorrectThread() {
+void MockBluetoothAdapter::DeleteOnCorrectThread() const {
   delete this;
 };
 
