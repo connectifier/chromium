@@ -80,6 +80,7 @@ import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.base.ViewAndroid;
 import org.chromium.ui.base.ViewAndroidDelegate;
 import org.chromium.ui.base.WindowAndroid;
+import org.chromium.ui.base.ime.TextInputType;
 import org.chromium.ui.gfx.DeviceDisplayInfo;
 import org.chromium.ui.touch_selection.SelectionEventType;
 
@@ -485,6 +486,7 @@ public class ContentViewCore
     private ViewAndroid mViewAndroid;
 
     private SmartClipDataListener mSmartClipDataListener = null;
+    private ObserverList<ContainerViewObserver> mContainerViewObservers;
 
     // This holds the state of editable text (e.g. contents of <input>, contenteditable) of
     // a focused element.
@@ -544,6 +546,7 @@ public class ContentViewCore
 
         mEditable = Editable.Factory.getInstance().newEditable("");
         Selection.setSelection(mEditable, 0);
+        mContainerViewObservers = new ObserverList<ContainerViewObserver>();
     }
 
     /**
@@ -815,9 +818,20 @@ public class ContentViewCore
             mContainerView.setWillNotDraw(false); // TODO(epenner): Remove (http://crbug.com/436689)
             mContainerView.setClickable(true);
             mViewAndroidDelegate.updateCurrentContainerView();
+            for (ContainerViewObserver observer : mContainerViewObservers) {
+                observer.onContainerViewChanged(mContainerView);
+            }
         } finally {
             TraceEvent.end("ContentViewCore.setContainerView");
         }
+    }
+
+    public void addContainerViewObserver(ContainerViewObserver observer) {
+        mContainerViewObservers.addObserver(observer);
+    }
+
+    public void removeContainerViewObserver(ContainerViewObserver observer) {
+        mContainerViewObservers.removeObserver(observer);
     }
 
     @CalledByNative
@@ -930,6 +944,7 @@ public class ContentViewCore
         mGestureStateListeners.clear();
         ScreenOrientationListener.getInstance().removeObserver(this);
         mPositionObserver.clearListener();
+        mContainerViewObservers.clear();
     }
 
     private void unregisterAccessibilityContentObserver() {
@@ -1488,7 +1503,7 @@ public class ContentViewCore
             if (newConfig.keyboard != Configuration.KEYBOARD_NOKEYS) {
                 if (mNativeContentViewCore != 0) {
                     mImeAdapter.attach(nativeGetNativeImeAdapter(mNativeContentViewCore),
-                            ImeAdapter.getTextInputTypeNone(), 0 /* no flags */);
+                            TextInputType.NONE, 0 /* no flags */);
                 }
                 mInputMethodManagerWrapper.restartInput(mContainerView);
             }
@@ -1630,15 +1645,7 @@ public class ContentViewCore
      */
     public boolean onHoverEvent(MotionEvent event) {
         TraceEvent.begin("onHoverEvent");
-        // TODO(lanwei): Remove this switch once experimentation is complete -
-        // crbug.com/418188
-        if (event.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
-            if (mEnableTouchHover == null) {
-                mEnableTouchHover =
-                        CommandLine.getInstance().hasSwitch(ContentSwitches.ENABLE_TOUCH_HOVER);
-            }
-            if (!mEnableTouchHover.booleanValue()) return false;
-        }
+
         MotionEvent offset = createOffsetMotionEvent(event);
         try {
             if (mBrowserAccessibilityManager != null) {
@@ -1649,6 +1656,16 @@ public class ContentViewCore
             // event are incorrect when touch exploration is on.
             if (mTouchExplorationEnabled && offset.getAction() == MotionEvent.ACTION_HOVER_EXIT) {
                 return true;
+            }
+
+            // TODO(lanwei): Remove this switch once experimentation is complete -
+            // crbug.com/418188
+            if (event.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
+                if (mEnableTouchHover == null) {
+                    mEnableTouchHover =
+                            CommandLine.getInstance().hasSwitch(ContentSwitches.ENABLE_TOUCH_HOVER);
+                }
+                if (!mEnableTouchHover.booleanValue()) return false;
             }
 
             mContainerView.removeCallbacks(mFakeMouseMoveRunnable);
@@ -2254,7 +2271,7 @@ public class ContentViewCore
             boolean isNonImeChange) {
         try {
             TraceEvent.begin("ContentViewCore.updateImeAdapter");
-            mFocusedNodeEditable = (textInputType != ImeAdapter.getTextInputTypeNone());
+            mFocusedNodeEditable = (textInputType != TextInputType.NONE);
             if (!mFocusedNodeEditable) hidePastePopup();
 
             mImeAdapter.updateKeyboardVisibility(

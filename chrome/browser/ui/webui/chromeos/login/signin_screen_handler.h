@@ -95,21 +95,6 @@ class LoginDisplayWebUIHandler {
                                         const std::string& password) = 0;
   virtual void LoadUsers(const base::ListValue& users_list,
                          bool show_guest) = 0;
-  virtual void SetPublicSessionDisplayName(const std::string& user_id,
-                                           const std::string& display_name) = 0;
-  virtual void SetPublicSessionLocales(const std::string& user_id,
-                                       scoped_ptr<base::ListValue> locales,
-                                       const std::string& default_locale,
-                                       bool multipleRecommendedLocales) = 0;
-
-  virtual void ShowBannerMessage(const base::string16& message) = 0;
-  virtual void ShowUserPodCustomIcon(const std::string& username,
-                                     const base::DictionaryValue& icon) = 0;
-  virtual void HideUserPodCustomIcon(const std::string& username) = 0;
-  virtual void SetAuthType(const std::string& username,
-                           ScreenlockBridge::LockHandler::AuthType auth_type,
-                           const base::string16& initial_value) = 0;
-
  protected:
   virtual ~LoginDisplayWebUIHandler() {}
 };
@@ -226,11 +211,16 @@ class SigninScreenHandler
       GaiaScreenHandler* gaia_screen_handler);
   virtual ~SigninScreenHandler();
 
+  static std::string GetUserLRUInputMethod(const std::string& username);
+
+  // Update current input method (namely keyboard layout) in the given IME state
+  // to LRU by this user.
+  static void SetUserInputMethod(
+      const std::string& username,
+      input_method::InputMethodManager::State* ime_state);
+
   // Shows the sign in screen.
   void Show(const LoginScreenContext& context);
-
-  // Shows the login spinner UI for retail mode logins.
-  void ShowRetailModeLoginSpinner();
 
   // Sets delegate to be used by the handler. It is guaranteed that valid
   // delegate is set before Show() method will be called.
@@ -249,8 +239,6 @@ class SigninScreenHandler
   virtual void OnCurrentScreenChanged(OobeUI::Screen current_screen,
                                       OobeUI::Screen new_screen) override;
 
-  // Returns least used user login input method.
-  std::string GetUserLRUInputMethod(const std::string& username) const;
 
   void SetFocusPODCallbackForTesting(base::Closure callback);
 
@@ -307,23 +295,6 @@ class SigninScreenHandler
                                         const std::string& password) override;
   virtual void LoadUsers(const base::ListValue& users_list,
                          bool show_guest) override;
-  virtual void SetPublicSessionDisplayName(
-      const std::string& user_id,
-      const std::string& display_name) override;
-  virtual void SetPublicSessionLocales(
-      const std::string& user_id,
-      scoped_ptr<base::ListValue> locales,
-      const std::string& default_locale,
-      bool multipleRecommendedLocales) override;
-
-  virtual void ShowBannerMessage(const base::string16& message) override;
-  virtual void ShowUserPodCustomIcon(
-      const std::string& username,
-      const base::DictionaryValue& icon) override;
-  virtual void HideUserPodCustomIcon(const std::string& username) override;
-  virtual void SetAuthType(const std::string& username,
-                           ScreenlockBridge::LockHandler::AuthType auth_type,
-                           const base::string16& initial_value) override;
 
   // content::NotificationObserver implementation:
   virtual void Observe(int type,
@@ -347,7 +318,6 @@ class SigninScreenHandler
   void HandleAuthenticateUser(const std::string& username,
                               const std::string& password);
   void HandleAttemptUnlock(const std::string& username);
-  void HandleLaunchDemoUser();
   void HandleLaunchIncognito();
   void HandleLaunchPublicSession(const std::string& user_id,
                                  const std::string& locale,
@@ -425,11 +395,6 @@ class SigninScreenHandler
   bool IsOfflineLoginAllowed() const;
 
   bool ShouldLoadGaia() const;
-
-  // Update current input method (namely keyboard layout) in the given IME state
-  // to LRU by this user.
-  void SetUserInputMethod(const std::string& username,
-                          input_method::InputMethodManager::State* ime_state);
 
   // Shows signin.
   void OnShowAddUser();

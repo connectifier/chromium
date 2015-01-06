@@ -58,7 +58,7 @@ class HmacImplementation : public AlgorithmImplementation {
                      bool extractable,
                      blink::WebCryptoKeyUsageMask usages,
                      GenerateKeyResult* result) const override {
-    Status status = CheckKeyCreationUsages(kAllKeyUsages, usages);
+    Status status = CheckKeyCreationUsages(kAllKeyUsages, usages, false);
     if (status.IsError())
       return status;
 
@@ -86,7 +86,7 @@ class HmacImplementation : public AlgorithmImplementation {
     switch (format) {
       case blink::WebCryptoKeyFormatRaw:
       case blink::WebCryptoKeyFormatJwk:
-        return CheckKeyCreationUsages(kAllKeyUsages, usages);
+        return CheckKeyCreationUsages(kAllKeyUsages, usages, false);
       default:
         return Status::ErrorUnsupportedImportKeyFormat();
     }
@@ -239,13 +239,12 @@ class HmacImplementation : public AlgorithmImplementation {
                                 blink::WebCryptoKeyUsageMask usages,
                                 const CryptoData& key_data,
                                 blink::WebCryptoKey* key) const override {
-    const blink::WebCryptoHmacKeyAlgorithmParams* params =
-        algorithm.hmacParams();
-
-    return ImportKeyRaw(
-        key_data,
-        CreateHmacImportAlgorithm(params->hash().id(), params->lengthBits()),
-        extractable, usages, key);
+    CK_MECHANISM_TYPE mechanism = CKM_INVALID_MECHANISM;
+    if (!WebCryptoHashToHMACMechanism(algorithm.hmacParams()->hash(),
+                                      &mechanism))
+      return Status::ErrorUnsupported();
+    return ImportKeyRawNss(key_data, algorithm, extractable, usages, mechanism,
+                           key);
   }
 
   Status GetKeyLength(const blink::WebCryptoAlgorithm& key_length_algorithm,

@@ -8,7 +8,6 @@
 #include "chrome/browser/extensions/browser_action_test_util.h"
 #include "chrome/browser/extensions/extension_toolbar_model.h"
 #include "chrome/browser/ui/browser_window.h"
-#include "chrome/browser/ui/browser_window_testing_views.h"
 #include "chrome/browser/ui/toolbar/browser_actions_bar_browsertest.h"
 #include "chrome/browser/ui/views/extensions/browser_action_drag_data.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -191,11 +190,9 @@ IN_PROC_BROWSER_TEST_F(BrowserActionsBarBrowserTest, HighlightMode) {
   EXPECT_EQ(3, browser_actions_bar()->VisibleBrowserActions());
   EXPECT_EQ(3, browser_actions_bar()->NumberOfBrowserActions());
 
-  BrowserActionsContainer* container = browser()
-                                           ->window()
-                                           ->GetBrowserWindowTesting()
-                                           ->GetToolbarView()
-                                           ->browser_actions();
+  BrowserActionsContainer* container =
+      BrowserView::GetBrowserViewForBrowser(browser())
+          ->toolbar()->browser_actions();
 
   // Currently, dragging should be enabled.
   ToolbarActionView* action_view = container->GetToolbarActionViewAt(0);
@@ -229,7 +226,7 @@ IN_PROC_BROWSER_TEST_F(BrowserActionsBarBrowserTest, HighlightMode) {
 
 // Test the behavior of the overflow container for Extension Actions.
 class BrowserActionsContainerOverflowTest
-    : public BrowserActionsBarBrowserTest {
+    : public BrowserActionsBarRedesignBrowserTest {
  public:
   BrowserActionsContainerOverflowTest() : main_bar_(nullptr),
                                           overflow_bar_(nullptr),
@@ -255,7 +252,6 @@ class BrowserActionsContainerOverflowTest
   extensions::ExtensionToolbarModel* model() { return model_; }
 
  private:
-  void SetUpCommandLine(base::CommandLine* command_line) override;
   void SetUpOnMainThread() override;
   void TearDownOnMainThread() override;
 
@@ -273,19 +269,8 @@ class BrowserActionsContainerOverflowTest
   // The associated toolbar model.
   extensions::ExtensionToolbarModel* model_;
 
-  // Enable the feature redesign switch.
-  scoped_ptr<extensions::FeatureSwitch::ScopedOverride> enable_redesign_;
-
   DISALLOW_COPY_AND_ASSIGN(BrowserActionsContainerOverflowTest);
 };
-
-void BrowserActionsContainerOverflowTest::SetUpCommandLine(
-    base::CommandLine* command_line) {
-  BrowserActionsBarBrowserTest::SetUpCommandLine(command_line);
-  enable_redesign_.reset(new extensions::FeatureSwitch::ScopedOverride(
-      extensions::FeatureSwitch::extension_action_redesign(),
-      true));
-}
 
 void BrowserActionsContainerOverflowTest::SetUpOnMainThread() {
   BrowserActionsBarBrowserTest::SetUpOnMainThread();
@@ -300,7 +285,6 @@ void BrowserActionsContainerOverflowTest::SetUpOnMainThread() {
 
 void BrowserActionsContainerOverflowTest::TearDownOnMainThread() {
   overflow_parent_.reset();
-  enable_redesign_.reset();
   BrowserActionsBarBrowserTest::TearDownOnMainThread();
 }
 

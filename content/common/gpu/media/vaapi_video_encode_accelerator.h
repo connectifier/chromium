@@ -25,7 +25,7 @@ namespace content {
 class CONTENT_EXPORT VaapiVideoEncodeAccelerator
     : public media::VideoEncodeAccelerator {
  public:
-  explicit VaapiVideoEncodeAccelerator(Display* x_display);
+  VaapiVideoEncodeAccelerator();
   virtual ~VaapiVideoEncodeAccelerator();
 
   // media::VideoEncodeAccelerator implementation.
@@ -178,8 +178,6 @@ class CONTENT_EXPORT VaapiVideoEncodeAccelerator
   // Size in bytes required for input bitstream buffers.
   size_t output_buffer_byte_size_;
 
-  Display* x_display_;
-
   // All of the members below must be accessed on the encoder_thread_,
   // while it is running.
 
@@ -188,8 +186,8 @@ class CONTENT_EXPORT VaapiVideoEncodeAccelerator
 
   // frame_num to be used for the next frame.
   unsigned int frame_num_;
-  // frame_num of the previous IDR.
-  unsigned int last_idr_frame_num_;
+  // idr_pic_id to be used for the next frame.
+  unsigned int idr_pic_id_;
 
   // Current bitrate in bps.
   unsigned int bitrate_;

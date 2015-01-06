@@ -3568,6 +3568,60 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Cryptohome.Errors" enum="CryptohomeError">
+  <owner>dkrahn@chromium.org</owner>
+  <summary>Cryptohome errors.</summary>
+</histogram>
+
+<histogram name="Cryptohome.TimeToInitPkcs11" units="milliseconds">
+  <owner>dkrahn@chromium.org</owner>
+  <summary>
+    The amount of time (ms) for Chrome OS cryptohome daemon to initialize the
+    PKCS#11. Initializations under 1 second represent checks on a previously
+    initialized PKCS#11, and should be discarded for analysis.
+  </summary>
+</histogram>
+
+<histogram name="Cryptohome.TimeToMountAsync" units="milliseconds">
+  <owner>dkrahn@chromium.org</owner>
+  <summary>
+    The amount of time (ms) for Chrome OS cryptohome to mount the encrypted home
+    directory asynchronously.
+  </summary>
+</histogram>
+
+<histogram name="Cryptohome.TimeToMountGuestAsync" units="milliseconds">
+  <owner>dkrahn@chromium.org</owner>
+  <summary>
+    The amount of time (ms) for Chrome OS cryptohome to mount the encrypted
+    guest home directory asynchronously.
+  </summary>
+</histogram>
+
+<histogram name="Cryptohome.TimeToMountGuestSync" units="milliseconds">
+  <owner>dkrahn@chromium.org</owner>
+  <summary>
+    The amount of time (ms) for Chrome OS cryptohome to mount the encrypted
+    guest home directory synchronously.
+  </summary>
+</histogram>
+
+<histogram name="Cryptohome.TimeToMountSync" units="milliseconds">
+  <owner>dkrahn@chromium.org</owner>
+  <summary>
+    The amount of time (ms) for Chrome OS cryptohome to mount the encrypted home
+    directory synchronously.
+  </summary>
+</histogram>
+
+<histogram name="Cryptohome.TimeToTakeTpmOwnership" units="milliseconds">
+  <owner>dkrahn@chromium.org</owner>
+  <summary>
+    The amount of time (ms) for Chrome OS cryptohome daemon to take ownership of
+    the TPM.
+  </summary>
+</histogram>
+
 <histogram name="DataReductionProxy.BlockTypeFallback"
     enum="DataReductionProxyBypassType">
   <owner>bengr@chromium.org</owner>
@@ -3805,6 +3859,27 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Samples which method was used by the user to dismiss the proxy promo. This
     is sampled when the promo leaves view, with the sampled value depending on
     which of four possible controls the user used.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.RequestCompletionErrorCodes"
+    enum="NetErrorCodes">
+  <owner>sclittle@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    Reports the different network errors that requests that try to use the data
+    reduction proxy are completing with, including OK and ABORTED.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.RequestCompletionErrorCodes.MainFrame"
+    enum="NetErrorCodes">
+  <owner>sclittle@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    Reports the different network errors that main frame resource requests that
+    try to use the data reduction proxy are completing with, including OK and
+    ABORTED.
   </summary>
 </histogram>
 
@@ -12455,6 +12530,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Media.Initialize.Windows" units="GetLastError">
+  <owner>scherkus@chromium.org</owner>
+  <summary>
+    Errors returned by LoadLibraryEx on Windows while attempting to load
+    ffmpegsumo.dll.
+  </summary>
+</histogram>
+
 <histogram name="Media.InputStreamDuration" units="ms">
   <owner>henrika@chromium.org</owner>
   <summary>
@@ -16792,6 +16875,25 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time it takes to request a new (unused) HTTP proxy socket.</summary>
 </histogram>
 
+<histogram name="Net.HttpRequestCompletionErrorCodes" enum="NetErrorCodes">
+  <owner>sclittle@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The network error code that the HTTP request completes with, including OK
+    and ABORTED.
+  </summary>
+</histogram>
+
+<histogram name="Net.HttpRequestCompletionErrorCodes.MainFrame"
+    enum="NetErrorCodes">
+  <owner>sclittle@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The network error code that the HTTP main frame resource request completes
+    with, including OK and ABORTED.
+  </summary>
+</histogram>
+
 <histogram name="Net.HttpResponseCode">
   <owner>mmenke@chromium.org</owner>
   <summary>The count of HTTP Response codes encountered.</summary>
@@ -20884,6 +20986,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Network.Shill.WiFi.DarkResumeUnmatchedScanResultsReceived"
+    enum="DarkResumeUnmatchedScanResultReceived">
+  <owner>samueltan@chromium.org</owner>
+  <summary>
+    Chrome OS network metric that tracks whether any unmatched scan results are
+    received during dark resume cycles. An unmatched scan result is a set of
+    scan results received by shill in response to a scan request that was not
+    sent directly by shill in the same dark resume cycle.
+  </summary>
+</histogram>
+
 <histogram name="Network.Shill.Wifi.DevicePresenceStatus" enum="BooleanPresent">
   <owner>zqiu@chromium.org</owner>
   <summary>
@@ -21298,6 +21411,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Chrome OS network usage metric that tracks the wake on WiFi features that
     are enabled in shill. Recorded once every 10 minutes.
+  </summary>
+</histogram>
+
+<histogram name="Network.Shill.WiFi.WiFiConnectionStatusAfterWake"
+    enum="WiFiConnectionStatusAfterWake">
+  <owner>samueltan@chromium.org</owner>
+  <summary>
+    Chrome OS network usage metric that tracks the WiFi connection status after
+    waking from suspend, both when wake on WiFi is enabled and disabled.
+    Recorded 1 second after waking from suspend.
   </summary>
 </histogram>
 
@@ -22907,6 +23030,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="PasswordManager.NumPasswordsDeletedDuringRollback">
+  <owner>vasilii@chromium.org</owner>
+  <summary>
+    Number of passwords deleted when browsing data is cleared during rollback.
+  </summary>
+</histogram>
+
 <histogram name="PasswordManager.NumPasswordsDeletedWhenBlacklisting">
   <owner>dubroy@chromium.org</owner>
   <owner>vabr@chromium.org</owner>
@@ -22993,6 +23123,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>vabr@chromium.org</owner>
   <summary>
     Breakdown of which response the user selected from the save password prompt.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.SubmitNavigatesToDifferentDomain"
+    enum="PostSubmitNavigation">
+  <owner>vabr@chromium.org</owner>
+  <summary>
+    Indicates whether submitting a password login form changes the registry
+    controlled domain of the main frame.
   </summary>
 </histogram>
 
@@ -29674,6 +29813,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.BrowseDatabaseKilobytes" units="KB">
+  <obsolete>
+    Deprecated 12/2014. Moved to SB2.DatabaseSizeKilobytes.Browse.
+  </obsolete>
   <owner>shess@chromium.org</owner>
   <summary>
     The size of the browsing SafeBrowsing database file on disk in kilobytes,
@@ -29783,7 +29925,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <obsolete>
     Replaced by SB2.BrowseDatabaseKilobytes.
   </obsolete>
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The size of the SafeBrowsing database file on disk in kilobytes.
   </summary>
@@ -29794,6 +29936,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The time it takes to initialize the SafeBrowsing storage backend, in
     milliseconds.
+  </summary>
+</histogram>
+
+<histogram name="SB2.DatabaseSizeKilobytes" units="KB">
+  <owner>gab@chromium.org</owner>
+  <summary>
+    The size of one of the SafeBrowsing database file on disk in kilobytes,
+    after a database update has occurred (once on startup (delayed) and
+    periodically thereafter).
   </summary>
 </histogram>
 
@@ -29840,6 +29991,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.DownloadDatabaseKilobytes" units="KB">
+  <obsolete>
+    Deprecated 12/2014. Moved to SB2.DatabaseSizeKilobytes.Download.
+  </obsolete>
   <owner>shess@chromium.org</owner>
   <summary>
     The size of the downloads SafeBrowsing database file on disk in kilobytes,
@@ -30231,12 +30385,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="SB2.PrefixSetKilobytes" units="KB">
   <owner>shess@chromium.org</owner>
-  <summary>The size of the PrefixSet file in kilobytes.</summary>
+  <summary>The size of one of the PrefixSet files in kilobytes.</summary>
 </histogram>
 
 <histogram name="SB2.PrefixSetLoad" units="ms">
   <owner>shess@chromium.org</owner>
-  <summary>Time to load the PrefixSet file.</summary>
+  <summary>Time to load one of the PrefixSet files.</summary>
 </histogram>
 
 <histogram name="SB2.PrefixSetRestoredExcess">
@@ -30304,12 +30458,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="SB2.PrefixSetVersionRead">
   <owner>shess@chromium.org</owner>
-  <summary>Version read from the PrefixSet file.</summary>
+  <summary>Version read from one of the PrefixSet files.</summary>
 </histogram>
 
 <histogram name="SB2.PrefixSetWrite" units="ms">
   <owner>shess@chromium.org</owner>
-  <summary>Time to store the PrefixSet file.</summary>
+  <summary>Time to store one of the PrefixSet files.</summary>
 </histogram>
 
 <histogram name="SB2.ReportingIsEnabled" enum="BooleanEnabled">
@@ -30343,7 +30497,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="SB2.SideEffectFreePrefixSetWrite" units="ms">
+  <obsolete>
+    Deprecated 12/2014. Merged into SB2.PrefixSetWrite.
+  </obsolete>
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Time to store the Side Effect Free Whitelist PrefixSet file. Note: this
+    histogram was intended to be stored as
+    SB2.SideEffectFreeWhitelistPrefixSetWrite but was actually reported as
+    SB2.SideEffectFreePrefixSetWrite from its inception to its deprecation...
+  </summary>
+</histogram>
+
 <histogram name="SB2.SideEffectFreeWhitelistDatabaseKilobytes" units="KB">
+  <obsolete>
+    Deprecated 12/2014. Moved to
+    SB2.DatabaseSizeKilobytes.SideEffectFreeWhitelist.
+  </obsolete>
   <owner>shess@chromium.org</owner>
   <summary>
     The size of the Side Effect Free Whitelist SaafeBrowsing database file on
@@ -30352,6 +30523,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.SideEffectFreeWhitelistPrefixSetKilobytes" units="KB">
+  <obsolete>
+    Deprecated 12/2014. Moved to SB2.PrefixSetKilobytes.SideEffectFreeWhitelist.
+  </obsolete>
   <owner>shess@chromium.org</owner>
   <summary>
     The size of the Side Effect Free Whitelist PrefixSet file in kilobytes,
@@ -30360,15 +30534,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.SideEffectFreeWhitelistPrefixSetLoad" units="ms">
+  <obsolete>
+    Deprecated 12/2014. Merged into SB2.PrefixSetLoad.
+  </obsolete>
   <owner>shess@chromium.org</owner>
   <summary>Time to load the Side Effect Free Whitelist PrefixSet file.</summary>
-</histogram>
-
-<histogram name="SB2.SideEffectFreeWhitelistPrefixSetWrite" units="ms">
-  <owner>shess@chromium.org</owner>
-  <summary>
-    Time to store the Side Effect Free Whitelist PrefixSet file.
-  </summary>
 </histogram>
 
 <histogram name="SB2.SideEffectFreeWhitelistStatus"
@@ -30942,6 +31112,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>mattm@chromium.org</owner>
   <summary>
     Final result of attempt to upload binary to download feedback service.
+  </summary>
+</histogram>
+
+<histogram name="SBIRS.BLAHashTime" units="milliseconds">
+  <owner>grt@google.com</owner>
+  <summary>
+    The elapsed time to compute the hash of a blacklisted module.
+  </summary>
+</histogram>
+
+<histogram name="SBIRS.BLASignatureTime" units="milliseconds">
+  <owner>grt@google.com</owner>
+  <summary>
+    The elapsed time to validate the signature of a blacklisted module.
   </summary>
 </histogram>
 
@@ -31714,6 +31898,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="ServiceWorkerCache.Cache" units="milliseconds">
+  <owner>dmurph@chromium.org</owner>
+  <summary>
+    The time to perform operations on the Cache object in the ServiceWorker
+    Cache API.
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorkerCache.CacheStorage" units="milliseconds">
+  <owner>dmurph@chromium.org</owner>
+  <summary>
+    The time to perform operations on the CacheStorage object in the
+    ServiceWorker Cache API.
+  </summary>
+</histogram>
+
 <histogram name="SessionCrashed.Bubble" enum="SessionCrashedBubbleUserAction">
   <owner>yiyaoliu@chromium.org</owner>
   <summary>How did the user interact with the SessionCrashed Bubble?</summary>
@@ -32350,11 +32550,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Signin.OneClickConfirmation" enum="SigninFlowConfirmations">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noms@chromium.org</owner>
   <summary>
     Count of the ways users interact with the confirmation dialogs of the new
     web based sign in to Chrome flow (accessed via the one click signin).
   </summary>
+</histogram>
+
+<histogram name="Signin.Reauth" enum="SigninReauthStates">
+  <owner>noms@chromium.org</owner>
+  <summary>Tracks events related to the reauthentication Gaia page.</summary>
 </histogram>
 
 <histogram name="Signin.Reconciler.AddedToChrome">
@@ -32422,11 +32627,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Signin.RefreshTokenAnnotationRequest" enum="BooleanSuccess">
+  <owner>pavely@chromium.org</owner>
+  <summary>
+    Track when chrome successfully sends RefreshTokenAnnotationRequest.
+  </summary>
+</histogram>
+
 <histogram name="Signin.SignedInDurationBeforeSignout" units="minutes">
   <owner>mlerman@chromium.org</owner>
   <summary>
     Track how many minutes of real time (not browser active time) elapsed
     between profile signin and signout.
+  </summary>
+</histogram>
+
+<histogram name="Signin.SigninSource" enum="SigninSource">
+  <owner>noms@chromium.org</owner>
+  <summary>
+    Logs the original source that displayed the signin or reauth Gaia page,
+    before the page is displayed.
   </summary>
 </histogram>
 
@@ -35544,6 +35764,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
 </histogram>
 
+<histogram name="Stability.ExitFunnel.WatcherLogoff" units="milliseconds">
+  <owner>siggi@chromium.org</owner>
+  <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
+</histogram>
+
 <histogram name="Stability.ExitFunnel.WM_ENDSESSION" units="milliseconds">
   <owner>siggi@chromium.org</owner>
   <summary>Temporary instrumentation. See http://crbug.com/412384.</summary>
@@ -35679,6 +35904,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram
     name="Startup.Experimental.FirstWebContents.MainFrameLoad.ManyBuckets"
     units="milliseconds">
+  <obsolete>
+    Removed in M-41.
+  </obsolete>
   <owner>erikchen@chromium.org</owner>
   <summary>
     An experimental metric only collected on the dev and canary channels.
@@ -35691,6 +35919,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram
     name="Startup.Experimental.FirstWebContents.MainFrameLoad.StandardBuckets"
     units="milliseconds">
+  <obsolete>
+    Moved to Startup.FirstWebContents.MainFrameLoad in M-41.
+  </obsolete>
   <owner>erikchen@chromium.org</owner>
   <summary>
     An experimental metric only collected on the dev and canary channels.
@@ -35702,6 +35933,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram
     name="Startup.Experimental.FirstWebContents.NonEmptyPaint.ManyBuckets"
     units="milliseconds">
+  <obsolete>
+    Removed in M-41.
+  </obsolete>
   <owner>erikchen@chromium.org</owner>
   <summary>
     An experimental metric only collected on the dev and canary channels.
@@ -35714,11 +35948,30 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram
     name="Startup.Experimental.FirstWebContents.NonEmptyPaint.StandardBuckets"
     units="milliseconds">
+  <obsolete>
+    Moved to Startup.FirstWebContents.NonEmptyPaint in M-41.
+  </obsolete>
   <owner>erikchen@chromium.org</owner>
   <summary>
     An experimental metric only collected on the dev and canary channels.
     Measure the elapsed time from process launch to the first non-empty paint of
     the first web contents. Uses standard bucket ranges.
+  </summary>
+</histogram>
+
+<histogram name="Startup.FirstWebContents.MainFrameLoad" units="milliseconds">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    Measure the elapsed time from process launch to the first main frame load of
+    the first web contents.
+  </summary>
+</histogram>
+
+<histogram name="Startup.FirstWebContents.NonEmptyPaint" units="milliseconds">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    Measure the elapsed time from process launch to the first non-empty paint of
+    the first web contents.
   </summary>
 </histogram>
 
@@ -37234,6 +37487,21 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Enumeration of the different reasons for unrecoverable errors and how often
     they have occurred.
+  </summary>
+</histogram>
+
+<histogram name="Sync.URLFetchTime" units="milliseconds">
+  <owner>zea@chromium.org</owner>
+  <summary>
+    Time spent waiting for a sync cycle to complete the url fetch.
+  </summary>
+</histogram>
+
+<histogram name="Sync.URLFetchTimedOut" enum="BooleanTimedOut">
+  <owner>zea@chromium.org</owner>
+  <summary>
+    Whether a url fetch timed out or not. Timing out implies the fetch was
+    stalled for an unknown reason.
   </summary>
 </histogram>
 
@@ -40736,11 +41004,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="WebRTC.ApplicationMaxConsecutiveBytesDiscard">
+  <obsolete>
+    Deprecated as of 12/2014, replaced by
+    WebRTC.ApplicationMaxConsecutiveBytesDiscard.v2.
+  </obsolete>
   <owner>guoweis@chromium.org</owner>
   <summary>
     The maximum consecutive discarded bytes caused by not enough buffer
     available in WebRTC's socket implementation.  This happens when WebRTC
     IpcPacketSocket's throttling mechanism kicks in.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.ApplicationMaxConsecutiveBytesDiscard.v2">
+  <owner>guoweis@chromium.org</owner>
+  <summary>
+    The maximum consecutive discarded bytes caused by not enough buffer
+    available in WebRTC's socket implementation.  This happens when WebRTC
+    IpcPacketSocket's throttling mechanism kicks in. The maximum bucket is
+    expanded from previous version to provide more insight when upper layer
+    feeds a lot of packets.
   </summary>
 </histogram>
 
@@ -41239,6 +41522,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="WebRTC.Video.ReceivedPacketsLostInPercent" units="%">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    Percentage of received packets lost for a received video stream. Recorded
+    when a stream is removed.
+  </summary>
+</histogram>
+
 <histogram name="WebRTC.Video.RetransmittedBitrateReceivedInKbps" units="kbps">
   <owner>asapersson@chromium.org</owner>
   <summary>
@@ -41268,6 +41559,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The number of sent bits over RTX per second for a sent video stream.
     Recorded when a stream is removed.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.SentPacketsLostInPercent" units="%">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    Percentage of sent packets lost for a sent video stream. Recorded when a
+    stream is removed.
   </summary>
 </histogram>
 
@@ -41364,6 +41663,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="WebsiteSettings.PermissionChanged" enum="ContentType">
+  <obsolete>
+    Deprecated 12/2014 in Issue 433776, and replaced by
+    WebsiteSettings.OriginInfo.PermissionChanged.
+  </obsolete>
   <owner>lgarron@chromium.org</owner>
   <owner>sashab@chromium.org</owner>
   <summary>
@@ -41473,6 +41776,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>edwardjung@chromium.org</owner>
   <summary>
     The time a user takes to select a menu itme after opening the menu.
+  </summary>
+</histogram>
+
+<histogram name="WrenchMenu.TouchDuration" units="milliseconds">
+  <owner>kkimlabs@google.com</owner>
+  <summary>
+    Time difference between touch down and touch up on Android wrench button.
   </summary>
 </histogram>
 
@@ -42526,6 +42836,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="Tablet"/>
 </enum>
 
+<enum name="BooleanTimedOut" type="int">
+  <int value="0" label="Did not time out"/>
+  <int value="1" label="Timed out"/>
+</enum>
+
 <enum name="BooleanUsage" type="int">
   <int value="0" label="Not Used"/>
   <int value="1" label="Used"/>
@@ -43401,6 +43716,25 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="8" label="PlayMusic"/>
 </enum>
 
+<enum name="CryptohomeError" type="int">
+  <int value="1" label="TPM returned TPM_E_FAIL"/>
+  <int value="2" label="TCS key load failed"/>
+  <int value="3" label="TPM dictionary defense lock is running"/>
+  <int value="4" label="Decrypt attempt but TPM key is missing"/>
+  <int value="5" label="Decrypt attempt but TPM is not owned"/>
+  <int value="6" label="Decrypt attempt but TPM is not available"/>
+  <int value="7" label="Decrypt attempt but TPM key is mismatched"/>
+  <int value="8" label="Decrypt attempt with TPM key failed (general)"/>
+  <int value="9" label="Cannot load TPM SRK"/>
+  <int value="10" label="Cannot read TPM SRK public info"/>
+  <int value="11" label="Cannot load cryptohome TPM key"/>
+  <int value="12" label="Cannot read cryptohome TPM key public info"/>
+  <int value="13"
+      label="TPM failed to load a key because of a bad key property"/>
+  <int value="14" label="Failed to load a PKCS #11 token"/>
+  <int value="15" label="Failed to encrypt with cryptohome TPM key"/>
+</enum>
+
 <enum name="CTRequirementCompliance" type="int">
   <int value="0" label="Not Compliant"/>
   <int value="1" label="Whitelisted"/>
@@ -43411,6 +43745,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="0" label="First Run"/>
   <int value="1" label="Day Elapsed"/>
   <int value="2" label="Clock Changed"/>
+</enum>
+
+<enum name="DarkResumeUnmatchedScanResultReceived" type="int">
+  <int value="0" label="False (all scan results match)"/>
+  <int value="1" label="True (at least one unmatched scan result)"/>
 </enum>
 
 <enum name="DataChannelCounters" type="int">
@@ -43563,6 +43902,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="8" label="Console evaluated"/>
   <int value="9" label="File saved in workspace"/>
   <int value="10" label="Device mode enabled"/>
+  <int value="11" label="Animations playback rate changed"/>
 </enum>
 
 <enum name="DevToolsPanel" type="int">
@@ -44162,6 +44502,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="15" label="Password sign-in: Tx power too high"/>
   <int value="16" label="Password sign-in: Easy sign-in failed"/>
   <int value="17" label="Password sign-in: Pairing added"/>
+  <int value="18" label="Password sign-in: No screenlock state handler"/>
 </enum>
 
 <enum name="EasyUnlockNotificationEvent" type="int">
@@ -44818,6 +45159,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
       label="Control the availability of the Contextual Search feature."/>
   <int value="282" label="Force Google SafeSearch"/>
   <int value="283" label="Force YouTube Safety Mode"/>
+  <int value="284" label="Allow device shutdown"/>
 </enum>
 
 <enum name="EnterprisePolicyInvalidations" type="int">
@@ -46967,6 +47309,63 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="596" label="UIEventCharCode"/>
   <int value="597" label="UIEventKeyCode"/>
   <int value="598" label="UIEventWhich"/>
+  <int value="599" label="TextWholeText"/>
+  <int value="600" label="AttrChildAccess"/>
+  <int value="601" label="AttrChildChange"/>
+  <int value="602" label="DocumentGetOverrideStyle"/>
+  <int value="603" label="NotificationCloseEvent"/>
+  <int value="604" label="CSSKeyframesRuleAppendRule"/>
+  <int value="605" label="CSSKeyframesRuleInsertRule"/>
+  <int value="606" label="StyleMedia"/>
+  <int value="607" label="StyleMediaType"/>
+  <int value="608" label="StyleMediaMatchMedium"/>
+  <int value="609" label="MixedContentPresent"/>
+  <int value="610" label="MixedContentBlockable"/>
+  <int value="611" label="MixedContentAudio"/>
+  <int value="612" label="MixedContentDownload"/>
+  <int value="613" label="MixedContentFavicon"/>
+  <int value="614" label="MixedContentImage"/>
+  <int value="615" label="MixedContentInternal"/>
+  <int value="616" label="MixedContentPlugin"/>
+  <int value="617" label="MixedContentPrefetch"/>
+  <int value="618" label="MixedContentVideo"/>
+  <int value="619" label="CORSCredentialedNullOriginAccessAllowed"/>
+  <int value="620" label="AudioListenerDopplerFactor"/>
+  <int value="621" label="AudioListenerSpeedOfSound"/>
+  <int value="622" label="AudioListenerSetVelocity"/>
+  <int value="623" label="ShadowRootGetElementsByClassName"/>
+  <int value="624" label="ShadowRootGetElementsByTagName"/>
+  <int value="625" label="ShadowRootGetElementsByTagNameNS"/>
+  <int value="626" label="SVGSMILAnimationInImage"/>
+  <int value="627" label="CSSSelectorPseudoFullScreenDocument"/>
+  <int value="628" label="CSSSelectorPseudoFullScreenAncestor"/>
+  <int value="629" label="CSSSelectorPseudoFullScreen"/>
+  <int value="630" label="WebKitCSSMatrix"/>
+  <int value="631" label="AudioContextCreateAnalyser"/>
+  <int value="632" label="AudioContextCreateBiquadFilter"/>
+  <int value="633" label="AudioContextCreateBufferSource"/>
+  <int value="634" label="AudioContextCreateChannelMerger"/>
+  <int value="635" label="AudioContextCreateChannelSplitter"/>
+  <int value="636" label="AudioContextCreateConvolver"/>
+  <int value="637" label="AudioContextCreateDelay"/>
+  <int value="638" label="AudioContextCreateDynamicsCompressor"/>
+  <int value="639" label="AudioContextCreateGain"/>
+  <int value="640" label="AudioContextCreateMediaElementSource"/>
+  <int value="641" label="AudioContextCreateMediaStreamDestination"/>
+  <int value="642" label="AudioContextCreateMediaStreamSource"/>
+  <int value="643" label="AudioContextCreateOscillator"/>
+  <int value="644" label="AudioContextCreatePanner"/>
+  <int value="645" label="AudioContextCreatePeriodicWave"/>
+  <int value="646" label="AudioContextCreateScriptProcessor"/>
+  <int value="647" label="AudioContextCreateStereoPanner"/>
+  <int value="648" label="AudioContextCreateWaveShaper"/>
+  <int value="649" label="AudioContextDecodeAudioData"/>
+  <int value="650" label="AudioContextResume"/>
+  <int value="651" label="AudioContextSuspend"/>
+  <int value="652" label="AudioContext"/>
+  <int value="653" label="OfflineAudioContext"/>
+  <int value="654" label="PrefixedAudioContext"/>
+  <int value="655" label="PrefixedOfflineAudioContext"/>
 </enum>
 
 <enum name="FFmpegCodecs" type="int">
@@ -48238,6 +48637,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="BinaryIntegrity"/>
   <int value="3" label="BlacklistLoad"/>
   <int value="4" label="OmniboxInteraction"/>
+  <int value="5" label="VariationsSeedSignature"/>
 </enum>
 
 <enum name="Inconsistencies" type="int">
@@ -48578,10 +48978,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="21" label="NETWORK_TIMEOUT"/>
   <int value="22" label="NETWORK_DISCONNECTED"/>
   <int value="23" label="NETWORK_SERVER_DOWN"/>
+  <int value="24" label="NETWORK_INVALID_REQUEST"/>
   <int value="30" label="SERVER_FAILED"/>
   <int value="31" label="SERVER_NO_RANGE"/>
   <int value="32" label="SERVER_PRECONDITION"/>
   <int value="33" label="SERVER_BAD_CONTENT"/>
+  <int value="34" label="SERVER_UNAUTHORIZED"/>
+  <int value="35" label="SERVER_CERT_PROBLEM"/>
   <int value="40" label="USER_CANCELED"/>
   <int value="41" label="USER_SHUTDOWN"/>
   <int value="50" label="CRASH"/>
@@ -49233,6 +49636,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="18" label="NewLogger"/>
   <int value="19" label="SyncParent"/>
   <int value="20" label="GetChildren"/>
+  <int value="21" label="NewAppendableFile"/>
 </enum>
 
 <enum name="LevelDBPrefStoreErrorCodes" type="int">
@@ -49361,6 +49765,8 @@ To add a new entry, add it with any value and run test to compute valid value.
 -->
 
   <summary>Chrome flags that lead to chrome restart on ChromeOS.</summary>
+  <int value="-2143328006"
+      label="enable-fill-on-account-select-no-highlighting"/>
   <int value="-2143113994" label="enable-ephemeral-apps-in-webstore"/>
   <int value="-2137755780" label="enable-reader-mode-toolbar-icon"/>
   <int value="-2132591642" label="enable-input-view"/>
@@ -49373,6 +49779,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-2047822258" label="enable-avfoundation"/>
   <int value="-2025367104" label="enable-material-design-ntp"/>
   <int value="-2020024440" label="scroll-end-effect"/>
+  <int value="-2017953534" label="enable-hosted-app-shim-creation"/>
   <int value="-2008272679" label="disable-webrtc-hw-encoding"/>
   <int value="-2003354337"
       label="enable-search-button-in-omnibox-for-str-or-iip"/>
@@ -49430,6 +49837,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1358669137" label="enable-supervised-user-blacklist"/>
   <int value="-1349872906"
       label="disallow-autofill-sync-credential-for-reauth"/>
+  <int value="-1349532167" label="enable-wifi-credential-sync"/>
   <int value="-1341092934" label="enable-accelerated-overflow-scroll"/>
   <int value="-1340055960" label="enable-streamlined-hosted-apps"/>
   <int value="-1334327410" label="ash-enable-touch-view-testing"/>
@@ -49440,6 +49848,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1218608640" label="disable-offline-load-stale-cache"/>
   <int value="-1212273428" label="enable-experimental-app-list"/>
   <int value="-1201183153" label="enable-centered-app-list"/>
+  <int value="-1177802205" label="enable-hosted-app-quit-notification"/>
   <int value="-1172204005" label="enable-offline-auto-reload-visible-only"/>
   <int value="-1159563774" label="enable-accessibility-script-injection"/>
   <int value="-1136627751" label="ignore-autocomplete-off-autofill"/>
@@ -49451,6 +49860,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1052782474" label="enable-cloud-devices"/>
   <int value="-1052415111" label="malware-interstitial-v2"/>
   <int value="-1022971520" label="enable-search-button-in-omnibox-for-str"/>
+  <int value="-996673716" label="enable-web-app-frame"/>
   <int value="-979057409" label="enable-seccomp-filter-sandbox"/>
   <int value="-979034258" label="disable-ntp-other-sessions-menu"/>
   <int value="-949178861" label="enable-new-avatar-menu"/>
@@ -49619,11 +50029,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1163255347" label="ash-enable-touch-view-touch-feedback"/>
   <int value="1181056275" label="enable-cloud-backup"/>
   <int value="1196644408" label="performance-monitor-gathering"/>
+  <int value="1196834473" label="disable-smart-virtual-keyboard"/>
   <int value="1205849612" label="enable-sync-synced-notifications"/>
   <int value="1210343926" label="enable-drop-sync-credential"/>
   <int value="1220464509" label="enable-first-run-ui-transitions"/>
   <int value="1221559505" label="enable-spelling-feedback-field-trial"/>
   <int value="1237297772" label="no-pings"/>
+  <int value="1245889469" label="enable-surface-worker"/>
   <int value="1257980502" label="disable-accelerated-video-decode"/>
   <int value="1268470658" label="disable-android-password-link"/>
   <int value="1279584261" label="enable-carrier-switching"/>
@@ -49695,7 +50107,6 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2000091128" label="enable-touch-hover"/>
   <int value="2004829262" label="enable-webgl-draft-extensions"/>
   <int value="2037756154" label="enable-impl-side-painting"/>
-  <int value="2052321823" label="enable-worker-frame"/>
   <int value="2059322877" label="new-avatar-menu"/>
   <int value="2071461362" label="disable-credit-card-scan"/>
   <int value="2093235103" label="default-tile-width"/>
@@ -52663,6 +53074,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="6" label="Clicked 'Enable password manager'"/>
   <int value="7" label="Clicked 'OK'"/>
   <int value="8" label="Clicked on a credential"/>
+  <int value="9" label="Clicked collect URL"/>
+  <int value="10" label="Clicked do not collect URL"/>
 </enum>
 
 <enum name="PeerConnectionCounters" type="int">
@@ -52976,6 +53389,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="0" label="Never Unthrottled"/>
   <int value="1" label="Unthrottled by Click"/>
   <int value="2" label="Unthrottled by Retroactive Whitelist"/>
+  <int value="3" label="Unthrottled by Audio Playback"/>
 </enum>
 
 <enum name="PNaClOptionsOptLevelEnum" type="int">
@@ -53029,6 +53443,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="5" label="Verification failed"/>
   <int value="6" label="Connection failed"/>
   <int value="7" label="Overflow"/>
+</enum>
+
+<enum name="PostSubmitNavigation" type="int">
+  <int value="0" label="Same domain"/>
+  <int value="1" label="Different domain"/>
 </enum>
 
 <enum name="PowerBrightnessAdjust" type="int">
@@ -55357,6 +55776,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="10" label="Undo">The sync was aborted with an undo button.</int>
 </enum>
 
+<enum name="SigninReauthStates" type="int">
+  <int value="0" label="Account mismatch"/>
+  <int value="1" label="Reauth Shown"/>
+</enum>
+
 <enum name="SigninSignoutProfile" type="int">
   <int value="0" label="Preference changed">
     The preference or policy controlling if signin is valid has changed.
@@ -55380,6 +55804,22 @@ To add a new entry, add it with any value and run test to compute valid value.
     The credentials are being transfered to a new profile, so the old one is
     signed out.
   </int>
+</enum>
+
+<enum name="SigninSource" type="int">
+  <int value="0" label="Start page"/>
+  <int value="1" label="NTP Link"/>
+  <int value="2" label="Menu"/>
+  <int value="3" label="Settings"/>
+  <int value="4" label="Extension install bubble"/>
+  <int value="5" label="App launcher"/>
+  <int value="6" label="Apps page link"/>
+  <int value="7" label="Bookmark bubble"/>
+  <int value="8" label="Avatar bubble sign in"/>
+  <int value="9" label="Avatar bubble add account"/>
+  <int value="10" label="Devices page"/>
+  <int value="11" label="Reauth"/>
+  <int value="12" label="Unknown"/>
 </enum>
 
 <enum name="SimpleCache.EntryCreatedAndStream2Omitted" type="int">
@@ -56297,6 +56737,9 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="49321" label="TLS_PSK_WITH_AES_256_CCM_8"/>
   <int value="49322" label="TLS_PSK_DHE_WITH_AES_128_CCM_8"/>
   <int value="49323" label="TLS_PSK_DHE_WITH_AES_256_CCM_8"/>
+  <int value="52243" label="TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"/>
+  <int value="52244" label="TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305"/>
+  <int value="52245" label="TLS_DHE_RSA_WITH_CHACHA20_POLY1305"/>
 </enum>
 
 <enum name="SSLErrorTypes" type="int">
@@ -56788,6 +57231,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="29" label="App list"/>
   <int value="30" label="Managed User Shared Settings"/>
   <int value="31" label="Synced Notification App Info"/>
+  <int value="32" label="Wifi Credentials"/>
+  <int value="33" label="Managed User Whitelists"/>
 </enum>
 
 <enum name="SyncNigoriMigrationResult" type="int">
@@ -57712,6 +58157,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2" label="AdHoc"/>
 </enum>
 
+<enum name="WiFiConnectionStatusAfterWake" type="int">
+  <int value="0" label="Connected (Wake On WiFi enabled)"/>
+  <int value="1" label="Not connected (Wake On WiFi enabled)"/>
+  <int value="2" label="Connected (Wake On WiFi disabled)"/>
+  <int value="3" label="Not connected (Wake On WiFi disabled)"/>
+</enum>
+
 <enum name="WiFiReasonCode" type="int">
   <int value="0" label="kReasonReserved0"/>
   <int value="1" label="kReasonCodeUnspecified"/>
@@ -58389,6 +58841,21 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="DataReductionProxy.MissingViaHeader.ResponseCode"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="DataReductionProxyRequestCompletionErrorCodes"
+    separator=".">
+  <suffix name="Primary" label="Primary data reduction proxy"/>
+  <suffix name="Fallback" label="Fallback data reduction proxy"/>
+  <affected-histogram name="DataReductionProxy.RequestCompletionErrorCodes"/>
+</histogram_suffixes>
+
+<histogram_suffixes
+    name="DataReductionProxyRequestCompletionErrorCodesMainFrame" separator=".">
+  <suffix name="Primary" label="Primary data reduction proxy"/>
+  <suffix name="Fallback" label="Fallback data reduction proxy"/>
+  <affected-histogram
+      name="DataReductionProxy.RequestCompletionErrorCodes.MainFrame"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="DefaultAppsExperiment">
   <suffix name="NoDefaultApps" label="User's without default apps installed"/>
   <suffix name="WithDefaultApps" label="User's with default apps installed"/>
@@ -58782,6 +59249,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="PLT.PT_StartToFinish_WithPreview"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="HistogramInconsistencies" separator=".">
+  <suffix name="Cronet" label="Cronet histograms."/>
+  <affected-histogram name="Histogram.InconsistenciesBrowser"/>
+  <affected-histogram name="Histogram.InconsistenciesBrowserUnique"/>
+  <affected-histogram name="Histogram.InconsistentSnapshotBrowser"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="HttpPipeliningCompatibility">
   <suffix name="disable_test" label="Do nothing"/>
   <suffix name="enable_test" label="Test connection for HTTP pipelining"/>
@@ -58878,6 +59352,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="GetChildren" label="ChromiumEnv::GetChildren"/>
   <suffix name="GetFileSize" label="ChromiumEnv::GetFileSize"/>
   <suffix name="LockFile" label="ChromiumEnv::LockFile"/>
+  <suffix name="NewAppendableFile" label="ChromiumEnv::NewAppendableFile"/>
   <suffix name="NewRandomAccessFile" label="ChromiumEnv::NewRandomAccessFile"/>
   <suffix name="RandomAccessFileRead" label="ChromiumRandomAccessFile::Read"/>
   <suffix name="RenameFile" label="ChromiumEnv::RenameFile"/>
@@ -61404,6 +61879,19 @@ To add a new entry, add it with any value and run test to compute valid value.
       name="ResourcePrefetchPredictor.Url.PredictedPrefetchMisses"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="SafeBrowsingLists" separator=".">
+  <suffix name="Browse" label="Browse"/>
+  <suffix name="Download" label="Download"/>
+  <suffix name="CsdWhitelist" label="CsdWhitelist"/>
+  <suffix name="DownloadWhitelist" label="DownloadWhitelist"/>
+  <suffix name="ExtensionBlacklist" label="ExtensionBlacklist"/>
+  <suffix name="SideEffectFreeWhitelist" label="SideEffectFreeWhitelist"/>
+  <suffix name="IPBlacklist" label="IPBlacklist"/>
+  <suffix name="UnwantedSoftware" label="UnwantedSoftware"/>
+  <affected-histogram name="SB2.DatabaseSizeKilobytes"/>
+  <affected-histogram name="SB2.PrefixSetKilobytes"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="SBInterstitial">
   <obsolete>
     deprecated November 10 2012 crrev.com/167056
@@ -61417,6 +61905,41 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="SB2.MalwareInterstitialTimePrivacyPolicy"/>
   <affected-histogram name="SB2.MalwareInterstitialTimeProceed"/>
   <affected-histogram name="SB2.MalwareInterstitialTimeTakeMeBack"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="ServiceWorkerCache.Cache" separator=".">
+  <suffix name="Batch"
+      label="The time to perform the 'batch' operation on a ServiceWorker
+             Cache, which batches other basic operations."/>
+  <suffix name="Keys"
+      label="The time to perform the 'keys' operation on a ServiceWorker
+             Cache, which returns all of the keys in the cache."/>
+  <suffix name="Match"
+      label="The time to perform the 'match' operation on a ServiceWorker
+             Cache, which does a lookup."/>
+  <suffix name="MatchAll"
+      label="The time to perform the 'matchAll' operation on a ServiceWorker
+             Cache, which does a mass cache lookup."/>
+  <affected-histogram name="ServiceWorkerCache.Cache"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="ServiceWorkerCache.CacheStorage" separator=".">
+  <suffix name="Delete"
+      label="The time to perform the 'delete' operation on a ServiceWorker
+             CacheStorage, which deletes a cache."/>
+  <suffix name="Has"
+      label="The time to perform the 'has' operation on a ServiceWorker
+             CacheStorage, which returns if the cache exists."/>
+  <suffix name="Keys"
+      label="The time to perform the 'keys' operation on a ServiceWorker
+             CacheStorage, which returns all of the cache names."/>
+  <suffix name="Match"
+      label="The time to perform the 'match' operation on a ServiceWorker
+             CacheStorage, which does a shortcut cache lookup."/>
+  <suffix name="Open"
+      label="The time to perform the 'open' operation on a ServiceWorker
+             CacheStorage, which gets or creates a cache."/>
+  <affected-histogram name="ServiceWorkerCache.CacheStorage"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="SessionRestoreTabCounts">
@@ -61479,6 +62002,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="AndroidAccountConsistencyFirstRunActions"
       label="Signin Flow shown on android after Account Consistency flag was
              enabled."/>
+  <affected-histogram name="Signin"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="Signin.ObsoleteActions" separator=".">
+  <obsolete>
+    Deprecated as of 12/2014.
+  </obsolete>
   <suffix name="AppLauncherActions"/>
   <suffix name="ExtensionInstallBubbleActions"/>
   <suffix name="MenuActions"/>

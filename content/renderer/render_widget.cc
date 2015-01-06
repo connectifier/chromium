@@ -68,16 +68,15 @@
 #include "third_party/skia/include/core/SkShader.h"
 #include "ui/base/ui_base_switches.h"
 #include "ui/gfx/frame_time.h"
-#include "ui/gfx/point_conversions.h"
-#include "ui/gfx/rect_conversions.h"
-#include "ui/gfx/size_conversions.h"
+#include "ui/gfx/geometry/point_conversions.h"
+#include "ui/gfx/geometry/rect_conversions.h"
+#include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/skia_util.h"
 #include "ui/gl/gl_switches.h"
 #include "ui/surface/transport_dib.h"
 
 #if defined(OS_ANDROID)
 #include <android/keycodes.h>
-#include "base/android/build_info.h"
 #include "content/renderer/android/synchronous_compositor_factory.h"
 #endif
 
@@ -151,11 +150,6 @@ ui::TextInputMode ConvertInputMode(const blink::WebString& input_mode) {
   if (it == singleton->map().end())
     return ui::TEXT_INPUT_MODE_DEFAULT;
   return it->second;
-}
-
-bool IsThreadedCompositingEnabled() {
-  content::RenderThreadImpl* impl = content::RenderThreadImpl::current();
-  return impl && !!impl->compositor_message_loop_proxy().get();
 }
 
 // TODO(brianderson): Replace the hard-coded threshold with a fraction of
@@ -463,7 +457,8 @@ RenderWidget::RenderWidget(blink::WebPopupType popup_type,
                            bool never_visible)
     : routing_id_(MSG_ROUTING_NONE),
       surface_id_(0),
-      webwidget_(NULL),
+      compositor_deps_(nullptr),
+      webwidget_(nullptr),
       opener_id_(MSG_ROUTING_NONE),
       init_complete_(false),
       top_controls_shrink_blink_size_(false),
@@ -521,12 +516,13 @@ RenderWidget::~RenderWidget() {
 
 // static
 RenderWidget* RenderWidget::Create(int32 opener_id,
+                                   CompositorDependencies* compositor_deps,
                                    blink::WebPopupType popup_type,
                                    const blink::WebScreenInfo& screen_info) {
   DCHECK(opener_id != MSG_ROUTING_NONE);
   scoped_refptr<RenderWidget> widget(
       new RenderWidget(popup_type, screen_info, false, false, false));
-  if (widget->Init(opener_id)) {  // adds reference on success.
+  if (widget->Init(opener_id, compositor_deps)) {  // adds reference on success.
     return widget.get();
   }
   return NULL;
@@ -548,14 +544,15 @@ WebWidget* RenderWidget::CreateWebWidget(RenderWidget* render_widget) {
   return NULL;
 }
 
-bool RenderWidget::Init(int32 opener_id) {
-  return DoInit(opener_id,
-                RenderWidget::CreateWebWidget(this),
+bool RenderWidget::Init(int32 opener_id,
+                        CompositorDependencies* compositor_deps) {
+  return DoInit(opener_id, compositor_deps, RenderWidget::CreateWebWidget(this),
                 new ViewHostMsg_CreateWidget(opener_id, popup_type_,
                                              &routing_id_, &surface_id_));
 }
 
 bool RenderWidget::DoInit(int32 opener_id,
+                          CompositorDependencies* compositor_deps,
                           WebWidget* web_widget,
                           IPC::SyncMessage* create_widget_message) {
   DCHECK(!webwidget_);
@@ -563,6 +560,7 @@ bool RenderWidget::DoInit(int32 opener_id,
   if (opener_id != MSG_ROUTING_NONE)
     opener_id_ = opener_id;
 
+  compositor_deps_ = compositor_deps;
   webwidget_ = web_widget;
 
   bool result = RenderThread::Get()->Send(create_widget_message);
@@ -946,7 +944,8 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
   }
 #endif
 
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
   bool use_software = fallback;
   if (command_line.HasSwitch(switches::kDisableGpuCompositing))
     use_software = true;
@@ -963,7 +962,7 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
 
   uint32 output_surface_id = next_output_surface_id_++;
   if (command_line.HasSwitch(switches::kEnableDelegatedRenderer)) {
-    DCHECK(IsThreadedCompositingEnabled());
+    DCHECK(compositor_deps_->GetCompositorImplThreadTaskRunner());
     return scoped_ptr<cc::OutputSurface>(
         new DelegatedCompositorOutputSurface(routing_id(),
                                              output_surface_id,
@@ -987,8 +986,7 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
     // Composite-to-mailbox is currently used for layout tests in order to cause
     // them to draw inside in the renderer to do the readback there. This should
     // no longer be the case when crbug.com/311404 is fixed.
-    DCHECK(IsThreadedCompositingEnabled() ||
-           RenderThreadImpl::current()->layout_test_mode());
+    DCHECK(RenderThreadImpl::current()->layout_test_mode());
     cc::ResourceFormat format = cc::RGBA_8888;
     if (base::SysInfo::IsLowEndDevice())
       format = cc::RGB_565;
@@ -1158,6 +1156,13 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
     }
   }
 
+  // Send mouse wheel events and their disposition to the compositor thread, so
+  // that they can be used to produce the elastic overscroll effect on Mac.
+  if (input_event->type == WebInputEvent::MouseWheel) {
+    ObserveWheelEventAndResult(
+        static_cast<const WebMouseWheelEvent&>(*input_event), processed);
+  }
+
   bool frame_pending = compositor_ && compositor_->BeginMainFrameRequested();
 
   // If we don't have a fast and accurate HighResNow, we assume the input
@@ -1293,8 +1298,7 @@ void RenderWidget::AutoResizeCompositor()  {
 void RenderWidget::initializeLayerTreeView() {
   DCHECK(!host_closing_);
 
-  compositor_ =
-      RenderWidgetCompositor::Create(this, IsThreadedCompositingEnabled());
+  compositor_ = RenderWidgetCompositor::Create(this, compositor_deps_);
   compositor_->setViewportSize(size_, physical_backing_size_);
   if (init_complete_)
     StartCompositor();
@@ -1428,10 +1432,8 @@ void RenderWidget::didCompleteSwapBuffers() {
 }
 
 void RenderWidget::scheduleComposite() {
-  RenderThreadImpl* render_thread = RenderThreadImpl::current();
-  // render_thread may be NULL in tests.
-  if (render_thread && render_thread->compositor_message_loop_proxy().get() &&
-      compositor_) {
+  if (compositor_ &&
+      compositor_deps_->GetCompositorImplThreadTaskRunner().get()) {
     compositor_->setNeedsAnimate();
   }
 }
@@ -1759,8 +1761,11 @@ void RenderWidget::SetHidden(bool hidden) {
   if (is_hidden_ == hidden)
     return;
 
-  // The status has changed.  Tell the RenderThread about it.
+  // The status has changed.  Tell the RenderThread about it and ensure
+  // throttled acks are released in case frame production ceases.
   is_hidden_ = hidden;
+  FlushPendingInputEventAck();
+
   if (is_hidden_)
     RenderThreadImpl::current()->WidgetHidden();
   else
@@ -2017,12 +2022,9 @@ ui::TextInputType RenderWidget::GetTextInputType() {
 
 void RenderWidget::UpdateCompositionInfo(bool should_update_range) {
 #if defined(OS_ANDROID)
-  // Sending composition info makes sense only in Lollipop (API level 21)
-  // and above due to the API availability.
-  if (base::android::BuildInfo::GetInstance()->sdk_int() < 21)
-    return;
-#endif
-
+  // TODO(yukawa): Start sending character bounds when the browser side
+  // implementation becomes ready (crbug.com/424866).
+#else
   gfx::Range range = gfx::Range();
   if (should_update_range) {
     GetCompositionRange(&range);
@@ -2038,6 +2040,7 @@ void RenderWidget::UpdateCompositionInfo(bool should_update_range) {
   composition_range_ = range;
   Send(new InputHostMsg_ImeCompositionRangeChanged(
       routing_id(), composition_range_, composition_character_bounds_));
+#endif
 }
 
 void RenderWidget::GetCompositionCharacterBounds(
@@ -2152,7 +2155,11 @@ void RenderWidget::StartCompositor() {
   // at all.
   if (never_visible_)
     return;
-  compositor_->setSurfaceReady();
+  // In tests without a RenderThreadImpl, don't set ready as this kicks
+  // off creating output surfaces that the test can't create.
+  if (!RenderThreadImpl::current())
+    return;
+  compositor_->StartCompositor();
 }
 
 void RenderWidget::SchedulePluginMove(const WebPluginGeometry& move) {
@@ -2194,6 +2201,35 @@ bool RenderWidget::WillHandleMouseEvent(const blink::WebMouseEvent& event) {
 bool RenderWidget::WillHandleGestureEvent(
     const blink::WebGestureEvent& event) {
   return false;
+}
+
+void RenderWidget::ObserveWheelEventAndResult(
+    const blink::WebMouseWheelEvent& wheel_event,
+    bool event_processed) {
+  if (!compositor_deps_->IsElasticOverscrollEnabled())
+    return;
+
+  // Blink does not accurately compute scroll bubbling or overscroll. For now,
+  // assume that an unprocessed event was entirely an overscroll, and that a
+  // processed event was entirely scroll.
+  // TODO(ccameron): Retrieve an accurate scroll result from Blink.
+  // http://crbug.com/442859
+  cc::InputHandlerScrollResult scroll_result;
+  if (event_processed) {
+    scroll_result.did_scroll = true;
+  } else {
+    scroll_result.did_overscroll_root = true;
+    scroll_result.unused_scroll_delta =
+        gfx::Vector2dF(-wheel_event.deltaX, -wheel_event.deltaY);
+  }
+
+  RenderThreadImpl* render_thread = RenderThreadImpl::current();
+  InputHandlerManager* input_handler_manager =
+      render_thread ? render_thread->input_handler_manager() : NULL;
+  if (input_handler_manager) {
+    input_handler_manager->ObserveWheelEventAndResultOnMainThread(
+        routing_id_, wheel_event, scroll_result);
+  }
 }
 
 void RenderWidget::hasTouchEventHandlers(bool has_handlers) {
@@ -2245,7 +2281,7 @@ scoped_ptr<WebGraphicsContext3DCommandBufferImpl>
 RenderWidget::CreateGraphicsContext3D() {
   if (!webwidget_)
     return scoped_ptr<WebGraphicsContext3DCommandBufferImpl>();
-  if (CommandLine::ForCurrentProcess()->HasSwitch(
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kDisableGpuCompositing))
     return scoped_ptr<WebGraphicsContext3DCommandBufferImpl>();
   if (!RenderThreadImpl::current())

@@ -77,19 +77,6 @@ class ASH_EXPORT DisplayManager
     MIRRORING
   };
 
-  // Returns the list of possible UI scales for the display.
-  static std::vector<float> GetScalesForDisplay(const DisplayInfo& info);
-
-  // Returns next valid UI scale.
-  static float GetNextUIScale(const DisplayInfo& info, bool up);
-
-  // Updates the bounds of the display given by |secondary_display_id|
-  // according to |layout|.
-  static void UpdateDisplayBoundsForLayoutById(
-      const DisplayLayout& layout,
-      const gfx::Display& primary_display,
-      int64 secondary_display_id);
-
   DisplayManager();
   virtual ~DisplayManager();
 
@@ -122,7 +109,7 @@ class ASH_EXPORT DisplayManager
 
   // Initializes font related params that depends on display
   // configuration.
-  void InitFontParams();
+  void RefreshFontParams();
 
   // True if the given |display| is currently connected.
   bool IsActiveDisplay(const gfx::Display& display) const;
@@ -163,9 +150,10 @@ class ASH_EXPORT DisplayManager
   // Sets the display's rotation.
   void SetDisplayRotation(int64 display_id, gfx::Display::Rotation rotation);
 
-  // Sets the display's ui scale.
-  // TODO(mukai): remove this and merge into SetDisplayMode.
-  void SetDisplayUIScale(int64 display_id, float ui_scale);
+  // Sets the display's ui scale. Returns true if it's successful, or
+  // false otherwise.  TODO(mukai): remove this and merge into
+  // SetDisplayMode.
+  bool SetDisplayUIScale(int64 display_id, float ui_scale);
 
   // Sets the display's resolution.
   // TODO(mukai): remove this and merge into SetDisplayMode.
@@ -305,6 +293,11 @@ class ASH_EXPORT DisplayManager
 
   // Create a screen instance to be used during shutdown.
   void CreateScreenForShutdown() const;
+
+  // A unit test may change the internal display id (which never happens on
+  // a real device). This will update the mode list for internal display
+  // for this test scenario.
+  void UpdateInternalDisplayModeListForTest();
 
 private:
   FRIEND_TEST_ALL_PREFIXES(ExtendedDesktopTest, ConvertPoint);

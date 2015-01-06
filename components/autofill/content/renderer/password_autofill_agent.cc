@@ -48,7 +48,10 @@ static const size_t kMaximumTextSizeForAutocomplete = 1000;
 
 // Experiment information
 const char kFillOnAccountSelectFieldTrialName[] = "FillOnAccountSelect";
-const char kFillOnAccountSelectFieldTrialEnabledGroup[] = "Enable";
+const char kFillOnAccountSelectFieldTrialEnabledWithHighlightGroup[] =
+    "EnableWithHighlight";
+const char kFillOnAccountSelectFieldTrialEnabledWithNoHighlightGroup[] =
+    "EnableWithNoHighlight";
 
 // Maps element names to the actual elements to simplify form filling.
 typedef std::map<base::string16, blink::WebInputElement> FormInputElementMap;
@@ -132,17 +135,41 @@ bool ShouldFillOnAccountSelect() {
   std::string group_name =
       base::FieldTrialList::FindFullName(kFillOnAccountSelectFieldTrialName);
 
-  if (CommandLine::ForCurrentProcess()->HasSwitch(
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kDisableFillOnAccountSelect)) {
     return false;
   }
 
-  if (CommandLine::ForCurrentProcess()->HasSwitch(
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableFillOnAccountSelect) ||
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableFillOnAccountSelectNoHighlighting)) {
+    return true;
+  }
+
+  return group_name ==
+             kFillOnAccountSelectFieldTrialEnabledWithHighlightGroup ||
+         group_name ==
+             kFillOnAccountSelectFieldTrialEnabledWithNoHighlightGroup;
+}
+
+bool ShouldHighlightFields() {
+  std::string group_name =
+      base::FieldTrialList::FindFullName(kFillOnAccountSelectFieldTrialName);
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kDisableFillOnAccountSelect) ||
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableFillOnAccountSelect)) {
     return true;
   }
 
-  return group_name == kFillOnAccountSelectFieldTrialEnabledGroup;
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableFillOnAccountSelectNoHighlighting)) {
+    return false;
+  }
+
+  return group_name !=
+         kFillOnAccountSelectFieldTrialEnabledWithNoHighlightGroup;
 }
 
 // Helper to search the given form element for the specified input elements in
@@ -295,6 +322,28 @@ bool GetSuggestionsStats(const PasswordFormFillData& fill_data,
   return false;
 }
 
+// Returns true if there exists a credential suggestion whose username field is
+// an exact match to the current username (not just a prefix).
+bool HasExactMatchSuggestion(const PasswordFormFillData& fill_data,
+                             const base::string16& current_username) {
+  if (fill_data.username_field.value == current_username)
+    return true;
+
+  for (const auto& usernames : fill_data.other_possible_usernames) {
+    for (const auto& username_string : usernames.second) {
+      if (username_string == current_username)
+        return true;
+    }
+  }
+
+  for (const auto& login : fill_data.additional_logins) {
+    if (login.first == current_username)
+      return true;
+  }
+
+  return false;
+}
+
 // This function attempts to fill |username_element| and |password_element|
 // with values from |fill_data|. The |password_element| will only have the
 // |suggestedValue| set, and will be registered for copying that to the real
@@ -416,34 +465,42 @@ bool FillFormOnPasswordReceived(
     return false;
 
   bool form_contains_username_field = FillDataContainsUsername(fill_data);
-  // If the form contains a username field, try to set the username to the
-  // preferred name, but only if:
-  //   (a) The username element is autocompletable, and
-  //   (b) The fill-on-account-select flag is not set, and
-  //   (c) The username element isn't prefilled
+  // If the form contains an autocompletable username field, try to set the
+  // username to the preferred name, but only if:
+  //   (a) The fill-on-account-select flag is not set, and
+  //   (b) The username element isn't prefilled
   //
-  // If (a) is true but (b) is false, then just mark the username element as
-  // autofilled and return so the fill step is skipped.
+  // If (a) is false, then just mark the username element as autofilled if the
+  // user is not in the "no highlighting" group and return so the fill step is
+  // skipped.
   //
-  // If (a) is false but (b) is true, then the username element should not be
-  // autofilled, but the user should still be able to select to fill the
-  // password element, so the password element must be marked as autofilled and
-  // the fill step should also be skipped.
+  // If there is no autocompletable username field, and (a) is false, then the
+  // username element cannot be autofilled, but the user should still be able to
+  // select to fill the password element, so the password element must be marked
+  // as autofilled and the fill step should also be skipped if the user is not
+  // in the "no highlighting" group.
   //
   // In all other cases, do nothing.
-  if (form_contains_username_field) {
-    if (IsElementAutocompletable(username_element)) {
-      if (ShouldFillOnAccountSelect()) {
-        username_element.setAutofilled(true);
-        return false;
-      } else if (username_element.value().isEmpty()) {
-        // TODO(tkent): Check maxlength and pattern.
-        username_element.setValue(fill_data.username_field.value, true);
-      }
-    } else if (ShouldFillOnAccountSelect()) {
-      password_element.setAutofilled(true);
+  bool form_has_fillable_username = form_contains_username_field &&
+                                    IsElementAutocompletable(username_element);
+
+  if (ShouldFillOnAccountSelect()) {
+    if (!ShouldHighlightFields()) {
       return false;
     }
+
+    if (form_has_fillable_username) {
+      username_element.setAutofilled(true);
+    } else if (username_element.isNull() ||
+               HasExactMatchSuggestion(fill_data, username_element.value())) {
+      password_element.setAutofilled(true);
+    }
+    return false;
+  }
+
+  if (form_has_fillable_username && username_element.value().isEmpty()) {
+    // TODO(tkent): Check maxlength and pattern.
+    username_element.setValue(fill_data.username_field.value, true);
   }
 
   // Fill if we have an exact match for the username. Note that this sets
@@ -568,6 +625,9 @@ bool PasswordAutofillAgent::TextDidChangeInTextField(
   // TODO(vabr): Get a mutable argument instead. http://crbug.com/397083
   blink::WebInputElement mutable_element = element;  // We need a non-const.
 
+  if (element.isTextField())
+    user_modified_elements_[element] = element.value();
+
   DCHECK_EQ(element.document().frame(), render_frame()->GetWebFrame());
 
   if (element.isPasswordField()) {
@@ -655,22 +715,27 @@ bool PasswordAutofillAgent::FillSuggestion(
     const blink::WebNode& node,
     const blink::WebString& username,
     const blink::WebString& password) {
-  blink::WebInputElement username_element;
+  // The element in context of the suggestion popup.
+  blink::WebInputElement filled_element;
   PasswordInfo* password_info;
 
-  if (!FindLoginInfo(node, &username_element, &password_info) ||
-      !IsElementAutocompletable(username_element) ||
+  if (!FindLoginInfo(node, &filled_element, &password_info) ||
+      !IsElementAutocompletable(filled_element) ||
       !IsElementAutocompletable(password_info->password_field)) {
     return false;
   }
 
   password_info->password_was_edited_last = false;
-  username_element.setValue(username, true);
-  username_element.setAutofilled(true);
-  username_element.setSelectionRange(username.length(), username.length());
+  // Note that in cases where filled_element is the password element, the value
+  // gets overwritten with the correct one below.
+  filled_element.setValue(username, true);
+  filled_element.setAutofilled(true);
 
   password_info->password_field.setValue(password, true);
   password_info->password_field.setAutofilled(true);
+
+  filled_element.setSelectionRange(filled_element.value().length(),
+                                   filled_element.value().length());
 
   return true;
 }
@@ -755,19 +820,23 @@ bool PasswordAutofillAgent::ShowSuggestions(
       !IsElementAutocompletable(password_info->password_field))
     return true;
 
-  // If the element is a password field, a popup should only be shown if the
-  // corresponding username element is not editable since it is only in that
-  // case that the username element does not have a suggestions popup.
-  if (element.isPasswordField() && IsElementEditable(*username_element))
+  bool username_is_available =
+      !username_element->isNull() && IsElementEditable(*username_element);
+  // If the element is a password field, a popup should only be shown if there
+  // is no username or the corresponding username element is not editable since
+  // it is only in that case that the username element does not have a
+  // suggestions popup.
+  if (element.isPasswordField() && username_is_available)
     return true;
 
   // Chrome should never show more than one account for a password element since
   // this implies that the username element cannot be modified. Thus even if
   // |show_all| is true, check if the element in question is a password element
   // for the call to ShowSuggestionPopup.
-  return ShowSuggestionPopup(password_info->fill_data, *username_element,
-                             show_all && !element.isPasswordField(),
-                             element.isPasswordField());
+  return ShowSuggestionPopup(
+      password_info->fill_data,
+      username_element->isNull() ? element : *username_element,
+      show_all && !element.isPasswordField(), element.isPasswordField());
 }
 
 bool PasswordAutofillAgent::OriginCanAccessPasswordManager(
@@ -832,7 +901,7 @@ void PasswordAutofillAgent::SendPasswordForms(bool only_visible) {
     if (only_visible && !is_form_visible)
       continue;
 
-    scoped_ptr<PasswordForm> password_form(CreatePasswordForm(form));
+    scoped_ptr<PasswordForm> password_form(CreatePasswordForm(form, nullptr));
     if (password_form.get()) {
       if (logger) {
         logger->LogPasswordForm(Logger::STRING_FORM_IS_PASSWORD,
@@ -887,6 +956,24 @@ void PasswordAutofillAgent::FrameWillClose() {
   FrameClosing();
 }
 
+void PasswordAutofillAgent::DidCommitProvisionalLoad(bool is_new_navigation) {
+  blink::WebFrame* frame = render_frame()->GetWebFrame();
+  // TODO(dvadym): check if we need to check if it is main frame navigation
+  // http://crbug.com/443155
+  if (frame->parent())
+    return;  // Not a top-level navigation.
+
+  content::DocumentState* document_state =
+      content::DocumentState::FromDataSource(frame->dataSource());
+  content::NavigationState* navigation_state =
+      document_state->navigation_state();
+  if (navigation_state->was_within_same_page() && provisionally_saved_form_) {
+    Send(new AutofillHostMsg_InPageNavigation(routing_id(),
+                                              *provisionally_saved_form_));
+    provisionally_saved_form_.reset();
+  }
+}
+
 void PasswordAutofillAgent::DidStartLoading() {
   did_stop_loading_ = false;
   if (usernames_usage_ != NOTHING_TO_AUTOFILL) {
@@ -906,10 +993,7 @@ void PasswordAutofillAgent::FrameDetached(blink::WebFrame* frame) {
 }
 
 void PasswordAutofillAgent::WillSendSubmitEvent(
-    blink::WebLocalFrame* frame,
     const blink::WebFormElement& form) {
-  if (frame != render_frame()->GetWebFrame())
-    return;
   // Forms submitted via XHR are not seen by WillSubmitForm if the default
   // onsubmit handler is overridden. Such submission first gets detected in
   // DidStartProvisionalLoad, which no longer knows about the particular form,
@@ -926,11 +1010,7 @@ void PasswordAutofillAgent::WillSendSubmitEvent(
   ProvisionallySavePassword(form, RESTRICTION_NON_EMPTY_PASSWORD);
 }
 
-void PasswordAutofillAgent::WillSubmitForm(blink::WebLocalFrame* frame,
-                                           const blink::WebFormElement& form) {
-  if (frame != render_frame()->GetWebFrame())
-    return;
-
+void PasswordAutofillAgent::WillSubmitForm(const blink::WebFormElement& form) {
   scoped_ptr<RendererSavePasswordProgressLogger> logger;
   if (logging_state_active_) {
     logger.reset(new RendererSavePasswordProgressLogger(this, routing_id()));
@@ -938,7 +1018,7 @@ void PasswordAutofillAgent::WillSubmitForm(blink::WebLocalFrame* frame,
     LogHTMLForm(logger.get(), Logger::STRING_HTML_FORM_FOR_SUBMIT, form);
   }
 
-  scoped_ptr<PasswordForm> submitted_form = CreatePasswordForm(form);
+  scoped_ptr<PasswordForm> submitted_form = CreatePasswordForm(form, nullptr);
 
   // If there is a provisionally saved password, copy over the previous
   // password value so we get the user's typed password, not the value that
@@ -1022,7 +1102,7 @@ void PasswordAutofillAgent::LegacyDidStartProvisionalLoad(
                       form_element);
         }
         scoped_ptr<PasswordForm> password_form(
-            CreatePasswordForm(form_element));
+            CreatePasswordForm(form_element, &user_modified_elements_));
         if (password_form.get() && !password_form->username_value.empty() &&
             FormContainsNonDefaultPasswordValue(*password_form, form_element)) {
           password_forms_found = true;
@@ -1123,6 +1203,7 @@ bool PasswordAutofillAgent::ShowSuggestionPopup(
     const blink::WebInputElement& user_input,
     bool show_all,
     bool show_on_password_field) {
+  DCHECK(!user_input.isNull());
   blink::WebFrame* frame = user_input.document().frame();
   if (!frame)
     return false;
@@ -1137,7 +1218,7 @@ bool PasswordAutofillAgent::ShowSuggestionPopup(
       user_input, &form, &field, REQUIRE_NONE);
 
   blink::WebInputElement selected_element = user_input;
-  if (show_on_password_field) {
+  if (show_on_password_field && !selected_element.isPasswordField()) {
     LoginToPasswordInfoMap::const_iterator iter =
         login_to_password_info_.find(user_input);
     DCHECK(iter != login_to_password_info_.end());
@@ -1145,8 +1226,12 @@ bool PasswordAutofillAgent::ShowSuggestionPopup(
   }
   gfx::Rect bounding_box(selected_element.boundsInViewportSpace());
 
+  blink::WebInputElement username;
+  if (!show_on_password_field || !user_input.isPasswordField()) {
+    username = user_input;
+  }
   LoginToPasswordInfoKeyMap::const_iterator key_it =
-      login_to_password_info_key_.find(user_input);
+      login_to_password_info_key_.find(username);
   DCHECK(key_it != login_to_password_info_key_.end());
 
   float scale =
@@ -1160,12 +1245,15 @@ bool PasswordAutofillAgent::ShowSuggestionPopup(
     options |= SHOW_ALL;
   if (show_on_password_field)
     options |= IS_PASSWORD_FIELD;
+  base::string16 username_string(
+      username.isNull() ? base::string16()
+                        : static_cast<base::string16>(user_input.value()));
   Send(new AutofillHostMsg_ShowPasswordSuggestions(
-      routing_id(), key_it->second, field.text_direction, user_input.value(),
+      routing_id(), key_it->second, field.text_direction, username_string,
       options, bounding_box_scaled));
 
   bool suggestions_present = false;
-  if (GetSuggestionsStats(fill_data, user_input.value(), show_all,
+  if (GetSuggestionsStats(fill_data, username_string, show_all,
                           &suggestions_present)) {
     usernames_usage_ = OTHER_POSSIBLE_USERNAME_SHOWN;
   }
@@ -1215,6 +1303,7 @@ void PasswordAutofillAgent::FrameClosing() {
   }
   login_to_password_info_.clear();
   provisionally_saved_form_.reset();
+  user_modified_elements_.clear();
 }
 
 bool PasswordAutofillAgent::FindLoginInfo(const blink::WebNode& node,
@@ -1251,7 +1340,8 @@ void PasswordAutofillAgent::ClearPreview(
 void PasswordAutofillAgent::ProvisionallySavePassword(
     const blink::WebFormElement& form,
     ProvisionallySaveRestriction restriction) {
-  scoped_ptr<PasswordForm> password_form(CreatePasswordForm(form));
+  scoped_ptr<PasswordForm> password_form(
+      CreatePasswordForm(form, &user_modified_elements_));
   if (!password_form || (restriction == RESTRICTION_NON_EMPTY_PASSWORD &&
                          password_form->password_value.empty() &&
                          password_form->new_password_value.empty())) {
@@ -1292,18 +1382,6 @@ void PasswordAutofillAgent::LegacyPasswordAutofillAgent::
 void PasswordAutofillAgent::LegacyPasswordAutofillAgent::FrameDetached(
     blink::WebFrame* frame) {
   agent_->FrameDetached(frame);
-}
-
-void PasswordAutofillAgent::LegacyPasswordAutofillAgent::WillSendSubmitEvent(
-    blink::WebLocalFrame* frame,
-    const blink::WebFormElement& form) {
-  agent_->WillSendSubmitEvent(frame, form);
-}
-
-void PasswordAutofillAgent::LegacyPasswordAutofillAgent::WillSubmitForm(
-    blink::WebLocalFrame* frame,
-    const blink::WebFormElement& form) {
-  agent_->WillSubmitForm(frame, form);
 }
 
 }  // namespace autofill

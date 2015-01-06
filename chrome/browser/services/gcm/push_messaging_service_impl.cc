@@ -60,7 +60,7 @@ void PushMessagingServiceImpl::RegisterProfilePrefs(
 void PushMessagingServiceImpl::InitializeForProfile(Profile* profile) {
   // TODO(mvanouwerkerk): Make sure to remove this check at the same time as
   // push graduates from experimental in Blink.
-  if (!CommandLine::ForCurrentProcess()->HasSwitch(
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableExperimentalWebPlatformFeatures)) {
     return;
   }
@@ -158,7 +158,7 @@ void PushMessagingServiceImpl::OnMessage(
     if (!HasPermission(application_id.origin)) {
       // The |origin| lost push permission. We need to unregister and drop this
       // message.
-      Unregister(application_id);
+      Unregister(application_id, UnregisterCallback());
       return;
     }
 
@@ -197,7 +197,7 @@ void PushMessagingServiceImpl::DeliverMessageCallback(
     case content::PUSH_DELIVERY_STATUS_EVENT_WAITUNTIL_REJECTED:
       break;
     case content::PUSH_DELIVERY_STATUS_NO_SERVICE_WORKER:
-      Unregister(application_id);
+      Unregister(application_id, UnregisterCallback());
       break;
   }
 }
@@ -338,28 +338,6 @@ void PushMessagingServiceImpl::RegisterFromWorker(
 
 blink::WebPushPermissionStatus PushMessagingServiceImpl::GetPermissionStatus(
     const GURL& requesting_origin,
-    int renderer_id,
-    int render_frame_id) {
-  content::RenderFrameHost* render_frame_host =
-      content::RenderFrameHost::FromID(renderer_id, render_frame_id);
-  if (!render_frame_host)
-    return blink::WebPushPermissionStatusDenied;
-
-  content::WebContents* web_contents =
-      content::WebContents::FromRenderFrameHost(render_frame_host);
-  if (!web_contents)
-    return blink::WebPushPermissionStatusDenied;
-
-  GURL embedder_origin = web_contents->GetLastCommittedURL().GetOrigin();
-  gcm::PushMessagingPermissionContext* permission_context =
-      gcm::PushMessagingPermissionContextFactory::GetForProfile(profile_);
-  return ToPushPermission(
-      permission_context->GetPermissionStatus(
-          requesting_origin, embedder_origin));
-}
-
-blink::WebPushPermissionStatus PushMessagingServiceImpl::GetPermissionStatus(
-    const GURL& requesting_origin,
     const GURL& embedding_origin) {
   PushMessagingPermissionContext* permission_context =
       PushMessagingPermissionContextFactory::GetForProfile(profile_);
@@ -414,22 +392,59 @@ void PushMessagingServiceImpl::DidRequestPermission(
 }
 
 void PushMessagingServiceImpl::Unregister(
-    const PushMessagingApplicationId& application_id) {
+    const GURL& requesting_origin,
+    int64 service_worker_registration_id,
+    const content::PushMessagingService::UnregisterCallback& callback) {
+  DCHECK(gcm_profile_service_->driver());
+
+  PushMessagingApplicationId application_id = PushMessagingApplicationId(
+      requesting_origin, service_worker_registration_id);
+  DCHECK(application_id.IsValid());
+
+  Unregister(application_id, callback);
+}
+
+void PushMessagingServiceImpl::Unregister(
+    const PushMessagingApplicationId& application_id,
+    const content::PushMessagingService::UnregisterCallback& callback) {
   DCHECK(gcm_profile_service_->driver());
 
   gcm_profile_service_->driver()->Unregister(
       application_id.ToString(),
       base::Bind(&PushMessagingServiceImpl::DidUnregister,
-                 weak_factory_.GetWeakPtr()));
+                 weak_factory_.GetWeakPtr(), callback));
 }
 
-void PushMessagingServiceImpl::DidUnregister(GCMClient::Result result) {
-  if (result != GCMClient::SUCCESS) {
-    DVLOG(1) << "GCM unregistration failed.";
-    return;
+void PushMessagingServiceImpl::DidUnregister(
+    const content::PushMessagingService::UnregisterCallback& callback,
+    GCMClient::Result result) {
+  // Internal calls pass a null callback.
+  if (!callback.is_null()) {
+    switch (result) {
+    case GCMClient::SUCCESS:
+      callback.Run(content::PUSH_UNREGISTRATION_STATUS_SUCCESS_UNREGISTER);
+      break;
+    case GCMClient::NETWORK_ERROR:
+    case GCMClient::TTL_EXCEEDED:
+      callback.Run(content::PUSH_UNREGISTRATION_STATUS_NETWORK_ERROR);
+      break;
+    case GCMClient::SERVER_ERROR:
+    case GCMClient::INVALID_PARAMETER:
+    case GCMClient::GCM_DISABLED:
+    case GCMClient::NOT_SIGNED_IN:
+    case GCMClient::ASYNC_OPERATION_PENDING:
+    case GCMClient::UNKNOWN_ERROR:
+      callback.Run(content::PUSH_UNREGISTRATION_STATUS_UNKNOWN_ERROR);
+      break;
+    default:
+      NOTREACHED() << "Unexpected GCMClient::Result value.";
+      callback.Run(content::PUSH_UNREGISTRATION_STATUS_UNKNOWN_ERROR);
+      break;
+    }
   }
 
-  DecreasePushRegistrationCount(1);
+  if (result == GCMClient::SUCCESS)
+    DecreasePushRegistrationCount(1);
 }
 
 bool PushMessagingServiceImpl::HasPermission(const GURL& origin) {

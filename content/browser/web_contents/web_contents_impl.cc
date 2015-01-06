@@ -222,11 +222,13 @@ WebContents* WebContents::CreateWithSessionStorage(
   return new_contents;
 }
 
-void WebContentsImpl::AddCreatedCallback(const CreatedCallback& callback) {
+void WebContentsImpl::FriendZone::AddCreatedCallbackForTesting(
+    const CreatedCallback& callback) {
   g_created_callbacks.Get().push_back(callback);
 }
 
-void WebContentsImpl::RemoveCreatedCallback(const CreatedCallback& callback) {
+void WebContentsImpl::FriendZone::RemoveCreatedCallbackForTesting(
+    const CreatedCallback& callback) {
   for (size_t i = 0; i < g_created_callbacks.Get().size(); ++i) {
     if (g_created_callbacks.Get().at(i).Equals(callback)) {
       g_created_callbacks.Get().erase(g_created_callbacks.Get().begin() + i);
@@ -333,8 +335,6 @@ WebContentsImpl::WebContentsImpl(BrowserContext* browser_context,
       audio_stream_monitor_(this),
       virtual_keyboard_requested_(false),
       loading_weak_factory_(this) {
-  for (size_t i = 0; i < g_created_callbacks.Get().size(); i++)
-    g_created_callbacks.Get().at(i).Run(this);
   frame_tree_.SetFrameRemoveListener(
       base::Bind(&WebContentsImpl::OnFrameRemoved,
                  base::Unretained(this)));
@@ -1206,6 +1206,9 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params) {
   // a RenderWidgetHostViewGuest. That is, |view_->CreateView| above.
   if (browser_plugin_guest_)
     browser_plugin_guest_->Init();
+
+  for (size_t i = 0; i < g_created_callbacks.Get().size(); i++)
+    g_created_callbacks.Get().at(i).Run(this);
 }
 
 void WebContentsImpl::OnWebContentsDestroyed(WebContentsImpl* web_contents) {
@@ -2376,6 +2379,10 @@ bool WebContentsImpl::HasOpener() const {
   return opener_ != NULL;
 }
 
+WebContents* WebContentsImpl::GetOpener() const {
+  return static_cast<WebContents*>(opener_);
+}
+
 void WebContentsImpl::DidChooseColorInColorChooser(SkColor color) {
   if (!color_chooser_info_.get())
     return;
@@ -2735,6 +2742,13 @@ void WebContentsImpl::OnDidStartLoading(bool to_different_document) {
       static_cast<RenderFrameHostImpl*>(render_frame_message_source_);
   int64 render_frame_id = rfh->frame_tree_node()->frame_tree_node_id();
 
+  // Any main frame load to a new document should reset the load progress, since
+  // it will replace the current page and any frames.
+  if (to_different_document && !rfh->GetParent()) {
+    ResetLoadProgressState();
+    loading_frames_in_progress_ = 0;
+  }
+
   // It is possible to get multiple calls to OnDidStartLoading that don't have
   // corresponding calls to OnDidStopLoading:
   // - With "swappedout://" URLs, this happens when a RenderView gets swapped
@@ -2754,6 +2768,9 @@ void WebContentsImpl::OnDidStartLoading(bool to_different_document) {
     ++loading_frames_in_progress_;
   }
 
+  // Notify the RenderFrameHostManager of the event.
+  rfh->frame_tree_node()->render_manager()->OnDidStartLoading();
+
   loading_progresses_[render_frame_id] = kMinimumLoadingProgress;
   SendLoadProgressChanged();
 }
@@ -2772,6 +2789,9 @@ void WebContentsImpl::OnDidStopLoading() {
     if (loading_total_progress_ == 1.0)
       ResetLoadProgressState();
   }
+
+  // Notify the RenderFrameHostManager of the event.
+  rfh->frame_tree_node()->render_manager()->OnDidStopLoading();
 
   // TODO(japhet): This should be a DCHECK, but the pdf plugin sometimes
   // calls DidStopLoading() without a matching DidStartLoading().

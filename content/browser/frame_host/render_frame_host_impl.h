@@ -235,11 +235,11 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // Tells the renderer that this RenderFrame is being swapped out for one in a
   // different renderer process.  It should run its unload handler and move to
   // a blank document.  If |proxy| is not null, it should also create a
-  // RenderFrameProxy to replace the RenderFrame. The renderer should preserve
-  // the RenderFrameProxy object until it exits, in case we come back.  The
-  // renderer can exit if it has no other active RenderFrames, but not until
-  // WasSwappedOut is called.
-  void SwapOut(RenderFrameProxyHost* proxy);
+  // RenderFrameProxy to replace the RenderFrame and set it to |is_loading|
+  // state. The renderer should preserve the RenderFrameProxy object until it
+  // exits, in case we come back.  The renderer can exit if it has no other
+  // active RenderFrames, but not until WasSwappedOut is called.
+  void SwapOut(RenderFrameProxyHost* proxy, bool is_loading);
 
   bool is_waiting_for_beforeunload_ack() const {
     return is_waiting_for_beforeunload_ack_;
@@ -271,10 +271,14 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // Load the specified URL; this is a shortcut for Navigate().
   void NavigateToURL(const GURL& url);
 
-  // Treat this prospective navigation as thought it originated from the
-  // frame. Used, e.g., for a navigation request that originated from
-  // a RemoteFrame.
-  void OpenURL(const FrameHostMsg_OpenURL_Params& params);
+  // Treat this prospective navigation as though it originated from the frame.
+  // Used, e.g., for a navigation request that originated from a RemoteFrame.
+  // |source_site_instance| is the SiteInstance of the frame that initiated the
+  // navigation.
+  // TODO(creis): Remove this method and have RenderFrameProxyHost call
+  // RequestOpenURL with its FrameTreeNode.
+  void OpenURL(const FrameHostMsg_OpenURL_Params& params,
+               SiteInstance* source_site_instance);
 
   // Stop the load in progress.
   void Stop();

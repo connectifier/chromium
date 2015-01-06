@@ -11,6 +11,7 @@
 #include "base/callback_forward.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
+#include "base/threading/thread_checker.h"
 #include "chrome/browser/drive/drive_service_interface.h"
 #include "google_apis/drive/gdata_errorcode.h"
 
@@ -40,9 +41,8 @@ typedef base::Callback<void(
 
 class DriveUploaderInterface {
  public:
-  typedef DriveServiceInterface::InitiateUploadNewFileOptions
-      UploadNewFileOptions;
-  typedef DriveServiceInterface::InitiateUploadExistingFileOptions
+  typedef DriveServiceInterface::UploadNewFileOptions UploadNewFileOptions;
+  typedef DriveServiceInterface::UploadExistingFileOptions
       UploadExistingFileOptions;
 
   virtual ~DriveUploaderInterface() {}
@@ -195,6 +195,9 @@ class DriveUploader : public DriveUploaderInterface {
   // Handle failed uploads.
   void UploadFailed(scoped_ptr<UploadFileInfo> upload_file_info,
                     google_apis::GDataErrorCode error);
+
+  // The class is expected to run on UI thread.
+  base::ThreadChecker thread_checker_;
 
   // The lifetime of this object should be guaranteed to exceed that of the
   // DriveUploader instance.

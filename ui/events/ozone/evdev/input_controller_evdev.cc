@@ -46,6 +46,7 @@ void SetGestureBoolProperty(GesturePropertyProvider* provider,
 
 InputControllerEvdev::InputControllerEvdev(
     EventFactoryEvdev* event_factory,
+    KeyboardEvdev* keyboard,
     MouseButtonMapEvdev* button_map
 #if defined(USE_EVDEV_GESTURES)
     ,
@@ -53,6 +54,7 @@ InputControllerEvdev::InputControllerEvdev(
 #endif
     )
     : event_factory_(event_factory),
+      keyboard_(keyboard),
       button_map_(button_map)
 #if defined(USE_EVDEV_GESTURES)
       ,
@@ -70,6 +72,36 @@ bool InputControllerEvdev::HasMouse() {
 
 bool InputControllerEvdev::HasTouchpad() {
   return event_factory_->GetDeviceIdsByType(DT_TOUCHPAD, NULL);
+}
+
+bool InputControllerEvdev::IsCapsLockEnabled() {
+  return false;
+}
+
+void InputControllerEvdev::SetCapsLockEnabled(bool enabled) {
+  NOTIMPLEMENTED();
+}
+
+void InputControllerEvdev::SetNumLockEnabled(bool enabled) {
+  NOTIMPLEMENTED();
+}
+
+bool InputControllerEvdev::IsAutoRepeatEnabled() {
+  return keyboard_->IsAutoRepeatEnabled();
+}
+
+void InputControllerEvdev::SetAutoRepeatEnabled(bool enabled) {
+  keyboard_->SetAutoRepeatEnabled(enabled);
+}
+
+void InputControllerEvdev::SetAutoRepeatRate(const base::TimeDelta& delay,
+                                             const base::TimeDelta& interval) {
+  keyboard_->SetAutoRepeatRate(delay, interval);
+}
+
+void InputControllerEvdev::GetAutoRepeatRate(base::TimeDelta* delay,
+                                             base::TimeDelta* interval) {
+  keyboard_->GetAutoRepeatRate(delay, interval);
 }
 
 void InputControllerEvdev::SetIntPropertyForOneType(const EventDeviceType type,
@@ -129,6 +161,10 @@ void InputControllerEvdev::SetMouseSensitivity(int value) {
 void InputControllerEvdev::SetPrimaryButtonRight(bool right) {
   button_map_->UpdateButtonMap(BTN_LEFT, right ? BTN_RIGHT : BTN_LEFT);
   button_map_->UpdateButtonMap(BTN_RIGHT, right ? BTN_LEFT : BTN_RIGHT);
+}
+
+void InputControllerEvdev::SetTapToClickPaused(bool state) {
+  SetBoolPropertyForOneType(DT_TOUCHPAD, "Tap Paused", state);
 }
 
 }  // namespace ui

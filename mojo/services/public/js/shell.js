@@ -3,13 +3,33 @@
 // found in the LICENSE file.
 
 define("mojo/services/public/js/shell", [
+  "mojo/public/js/bindings",
+  "mojo/public/js/core",
+  "mojo/public/js/connection",
+  "mojo/public/interfaces/application/shell.mojom",
   "mojo/public/interfaces/application/service_provider.mojom",
   "mojo/services/public/js/service_provider",
-], function(spInterfaceModule, spModule) {
+], function(bindings,
+            core,
+            connection,
+            shellMojom,
+            serviceProviderMojom,
+            serviceProvider) {
+
+  const ProxyBindings = bindings.ProxyBindings;
+  const StubBindings = bindings.StubBindings;
+  const ServiceProvider = serviceProvider.ServiceProvider;
+  const ServiceProviderInterface = serviceProviderMojom.ServiceProvider;
+  const ShellInterface = shellMojom.Shell;
 
   class Shell {
-    constructor(appShell) {
-      this.appShell_ = appShell;
+    constructor(shellHandle, app) {
+      this.shellHandle = shellHandle;
+      this.proxy = connection.bindProxyHandle(
+          shellHandle, ShellInterface.client, ShellInterface);
+
+      ProxyBindings(this.proxy).setLocalDelegate(app);
+      // TODO: call this serviceProviders_
       this.applications_ = new Map();
     }
 
@@ -18,15 +38,15 @@ define("mojo/services/public/js/shell", [
       if (application)
         return application;
 
-      var proxy = new spInterfaceModule.ServiceProvider.proxyClass;
-      this.appShell_.connectToApplication(url, proxy);
-      application = new spModule.ServiceProvider(proxy);
+      this.proxy.connectToApplication(url, function(sp) {
+        application = new ServiceProvider(sp);
+      });
       this.applications_.set(url, application);
       return application;
     }
 
     connectToService(url, service, client) {
-      return this.connectToApplication(url).connectToService(service, client);
+      return this.connectToApplication(url).requestService(service, client);
     };
 
     close() {
@@ -34,6 +54,7 @@ define("mojo/services/public/js/shell", [
         application.close();
       });
       this.applications_.clear();
+      core.close(this.shellHandle);
     }
   }
 

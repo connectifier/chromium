@@ -105,6 +105,10 @@
 #include "net/ocsp/nss_ocsp.h"
 #endif
 
+#if defined(OS_ANDROID)
+#include "base/android/build_info.h"
+#endif
+
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/net/cert_verify_proc_chromeos.h"
 #include "chromeos/network/host_resolver_impl_chromeos.h"
@@ -170,7 +174,8 @@ class SystemURLRequestContext : public net::URLRequestContext {
 
 scoped_ptr<net::HostResolver> CreateGlobalHostResolver(net::NetLog* net_log) {
   TRACE_EVENT0("startup", "IOThread::CreateGlobalHostResolver");
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
 
   net::HostResolver::Options options;
 
@@ -293,7 +298,7 @@ ConstructSystemRequestContext(IOThread::Globals* globals,
   return context;
 }
 
-int GetSwitchValueAsInt(const CommandLine& command_line,
+int GetSwitchValueAsInt(const base::CommandLine& command_line,
                         const std::string& switch_name) {
   int value;
   if (!base::StringToInt(command_line.GetSwitchValueASCII(switch_name),
@@ -322,6 +327,17 @@ bool IsStaleWhileRevalidateEnabled(const base::CommandLine& command_line) {
   const std::string group_name =
       base::FieldTrialList::FindFullName(kStaleWhileRevalidateFieldTrialName);
   return group_name == "Enabled";
+}
+
+bool IsCertificateTransparencyRequiredForEV(
+    const base::CommandLine& command_line) {
+  const std::string group_name =
+      base::FieldTrialList::FindFullName("CTRequiredForEVTrial");
+
+  if (command_line.HasSwitch(switches::kRequireCTForEV))
+    return true;
+
+  return group_name == "RequirementEnforced";
 }
 
 }  // namespace
@@ -566,7 +582,8 @@ void IOThread::InitAsync() {
   net::SetMessageLoopForNSSHttpIO();
 #endif
 
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
 
   DCHECK(!globals_);
   globals_ = new Globals;
@@ -656,12 +673,8 @@ void IOThread::InitAsync() {
   }
 
   net::CertPolicyEnforcer* policy_enforcer = NULL;
-  // TODO(eranm): Control with Finch, crbug.com/437766
-  if (command_line.HasSwitch(switches::kRequireCTForEV)) {
-    policy_enforcer = new net::CertPolicyEnforcer(kNumKnownCTLogs, true);
-  } else {
-    policy_enforcer = new net::CertPolicyEnforcer(kNumKnownCTLogs, false);
-  }
+  policy_enforcer = new net::CertPolicyEnforcer(
+      IsCertificateTransparencyRequiredForEV(command_line));
   globals_->cert_policy_enforcer.reset(policy_enforcer);
 
   globals_->ssl_config_service = GetSSLConfigService();
@@ -801,7 +814,7 @@ void IOThread::CleanUp() {
   base::debug::LeakTracker<SystemURLRequestContextGetter>::CheckForLeaks();
 }
 
-void IOThread::InitializeNetworkOptions(const CommandLine& command_line) {
+void IOThread::InitializeNetworkOptions(const base::CommandLine& command_line) {
   // Only handle use-spdy command line flags if "spdy.disabled" preference is
   // not disabled via policy.
   if (is_spdy_disabled_by_policy_) {
@@ -841,7 +854,7 @@ void IOThread::InitializeNetworkOptions(const CommandLine& command_line) {
   // HttpNetworkSession::Params.
 }
 
-void IOThread::ConfigureTCPFastOpen(const CommandLine& command_line) {
+void IOThread::ConfigureTCPFastOpen(const base::CommandLine& command_line) {
   const std::string trial_group =
       base::FieldTrialList::FindFullName(kTCPFastOpenFieldTrialName);
   if (trial_group == kTCPFastOpenHttpsEnabledGroupName)
@@ -1053,6 +1066,10 @@ void IOThread::InitializeNetworkSessionParamsFromGlobals(
       &params->quic_disable_connection_pooling);
   globals.quic_load_server_info_timeout_ms.CopyToIfSet(
       &params->quic_load_server_info_timeout_ms);
+  globals.quic_disable_loading_server_info_for_new_servers.CopyToIfSet(
+      &params->quic_disable_loading_server_info_for_new_servers);
+  globals.quic_load_server_info_timeout_srtt_multiplier.CopyToIfSet(
+      &params->quic_load_server_info_timeout_srtt_multiplier);
   globals.enable_quic_port_selection.CopyToIfSet(
       &params->enable_quic_port_selection);
   globals.quic_max_packet_length.CopyToIfSet(&params->quic_max_packet_length);
@@ -1109,7 +1126,8 @@ void IOThread::InitSystemRequestContextOnIOThread() {
   DCHECK(!globals_->system_proxy_service.get());
   DCHECK(system_proxy_config_service_.get());
 
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
   globals_->system_proxy_service.reset(
       ProxyServiceFactory::CreateProxyService(
           net_log_,
@@ -1142,7 +1160,7 @@ void IOThread::UpdateDnsClientEnabled() {
   globals()->host_resolver->SetDnsClientEnabled(*dns_client_enabled_);
 }
 
-void IOThread::ConfigureQuic(const CommandLine& command_line) {
+void IOThread::ConfigureQuic(const base::CommandLine& command_line) {
   // Always fetch the field trial group to ensure it is reported correctly.
   // The command line flags will be associated with a group that is reported
   // so long as trial is actually queried.
@@ -1171,6 +1189,13 @@ void IOThread::SetupDataReductionProxy() {
       IsIncludedInHoldbackFieldTrial()) {
     flags |= data_reduction_proxy::DataReductionProxyParams::kHoldback;
   }
+#if defined(OS_ANDROID)
+  if (data_reduction_proxy::DataReductionProxyParams::
+          IsIncludedInAndroidOnePromoFieldTrial(
+              base::android::BuildInfo::GetInstance()->android_build_fp())) {
+    flags |= data_reduction_proxy::DataReductionProxyParams::kPromoAllowed;
+  }
+#endif
   globals_->data_reduction_proxy_params.reset(
       new data_reduction_proxy::DataReductionProxyParams(flags));
   globals_->data_reduction_proxy_auth_request_handler.reset(
@@ -1202,6 +1227,14 @@ void IOThread::ConfigureQuicGlobals(
     if (load_server_info_timeout_ms != 0) {
       globals->quic_load_server_info_timeout_ms.set(
           load_server_info_timeout_ms);
+    }
+    globals->quic_disable_loading_server_info_for_new_servers.set(
+        ShouldDisableLoadingServerInfoForNewServers(quic_trial_params));
+    float load_server_info_timeout_srtt_multiplier =
+        GetQuicLoadServerInfoTimeoutSrttMultiplier(quic_trial_params);
+    if (load_server_info_timeout_srtt_multiplier != 0) {
+      globals->quic_load_server_info_timeout_srtt_multiplier.set(
+          load_server_info_timeout_srtt_multiplier);
     }
     globals->enable_quic_port_selection.set(
         ShouldEnableQuicPortSelection(command_line));
@@ -1253,7 +1286,7 @@ void IOThread::ConfigureQuicGlobals(
   }
 }
 
-bool IOThread::ShouldEnableQuic(const CommandLine& command_line,
+bool IOThread::ShouldEnableQuic(const base::CommandLine& command_line,
                                 base::StringPiece quic_trial_group) {
   if (command_line.HasSwitch(switches::kDisableQuic))
     return false;
@@ -1266,7 +1299,7 @@ bool IOThread::ShouldEnableQuic(const CommandLine& command_line,
 }
 
 bool IOThread::ShouldEnableQuicPortSelection(
-      const CommandLine& command_line) {
+    const base::CommandLine& command_line) {
   if (command_line.HasSwitch(switches::kDisableQuicPortSelection))
     return false;
 
@@ -1277,7 +1310,7 @@ bool IOThread::ShouldEnableQuicPortSelection(
 }
 
 bool IOThread::ShouldEnableQuicPacing(
-    const CommandLine& command_line,
+    const base::CommandLine& command_line,
     base::StringPiece quic_trial_group,
     const VariationParameters& quic_trial_params) {
   if (command_line.HasSwitch(switches::kEnableQuicPacing))
@@ -1292,7 +1325,7 @@ bool IOThread::ShouldEnableQuicPacing(
 }
 
 net::QuicTagVector IOThread::GetQuicConnectionOptions(
-    const CommandLine& command_line,
+    const base::CommandLine& command_line,
     const VariationParameters& quic_trial_params) {
   if (command_line.HasSwitch(switches::kQuicConnectionOptions)) {
     return net::QuicUtils::ParseQuicConnectionOptions(
@@ -1367,8 +1400,29 @@ int IOThread::GetQuicLoadServerInfoTimeout(
 }
 
 // static
+bool IOThread::ShouldDisableLoadingServerInfoForNewServers(
+    const VariationParameters& quic_trial_params) {
+  return LowerCaseEqualsASCII(
+      GetVariationParam(quic_trial_params,
+                        "disable_loading_server_info_for_new_servers"),
+      "true");
+}
+
+// static
+float IOThread::GetQuicLoadServerInfoTimeoutSrttMultiplier(
+    const VariationParameters& quic_trial_params) {
+  double value;
+  if (base::StringToDouble(GetVariationParam(quic_trial_params,
+                                             "load_server_info_time_to_srtt"),
+                           &value)) {
+    return (float)value;
+  }
+  return 0.0f;
+}
+
+// static
 size_t IOThread::GetQuicMaxPacketLength(
-    const CommandLine& command_line,
+    const base::CommandLine& command_line,
     base::StringPiece quic_trial_group,
     const VariationParameters& quic_trial_params) {
   if (command_line.HasSwitch(switches::kQuicMaxPacketLength)) {
@@ -1392,7 +1446,7 @@ size_t IOThread::GetQuicMaxPacketLength(
 
 // static
 net::QuicVersion IOThread::GetQuicVersion(
-    const CommandLine& command_line,
+    const base::CommandLine& command_line,
     const VariationParameters& quic_trial_params) {
   if (command_line.HasSwitch(switches::kQuicVersion)) {
     return ParseQuicVersion(

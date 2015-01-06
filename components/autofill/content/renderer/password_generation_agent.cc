@@ -24,7 +24,7 @@
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
 #include "third_party/WebKit/public/web/WebView.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/rect.h"
 
 namespace autofill {
 
@@ -188,7 +188,7 @@ void PasswordGenerationAgent::FindPossibleGenerationForm() {
     // If we can't get a valid PasswordForm, we skip this form because the
     // the password won't get saved even if we generate it.
     scoped_ptr<PasswordForm> password_form(
-        CreatePasswordForm(forms[i]));
+        CreatePasswordForm(forms[i], nullptr));
     if (!password_form.get()) {
       DVLOG(2) << "Skipping form as it would not be saved";
       continue;

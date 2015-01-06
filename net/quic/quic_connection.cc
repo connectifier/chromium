@@ -467,10 +467,8 @@ void QuicConnection::OnDecryptedPacket(EncryptionLevel level) {
   last_packet_decrypted_ = true;
   // If this packet was foward-secure encrypted and the forward-secure encrypter
   // is not being used, start using it.
-  if (FLAGS_enable_quic_delay_forward_security &&
-      encryption_level_ != ENCRYPTION_FORWARD_SECURE &&
-      has_forward_secure_encrypter_ &&
-      level == ENCRYPTION_FORWARD_SECURE) {
+  if (encryption_level_ != ENCRYPTION_FORWARD_SECURE &&
+      has_forward_secure_encrypter_ && level == ENCRYPTION_FORWARD_SECURE) {
     SetDefaultEncryptionLevel(ENCRYPTION_FORWARD_SECURE);
   }
 }
@@ -942,9 +940,6 @@ void QuicConnection::ClearLastFrames() {
 }
 
 void QuicConnection::MaybeCloseIfTooManyOutstandingPackets() {
-  if (!FLAGS_quic_too_many_outstanding_packets) {
-    return;
-  }
   // This occurs if we don't discard old packets we've sent fast enough.
   // It's possible largest observed is less than least unacked.
   if (sent_packet_manager_.largest_observed() >
@@ -1075,13 +1070,9 @@ QuicConsumedData QuicConnection::SendStreamData(
     QuicAckNotifier::DelegateInterface* delegate) {
   if (!fin && data.Empty()) {
     LOG(DFATAL) << "Attempt to send empty stream frame";
-  }
-
-  // This notifier will be owned by the AckNotifierManager (or deleted below if
-  // no data or FIN was consumed).
-  QuicAckNotifier* notifier = nullptr;
-  if (delegate) {
-    notifier = new QuicAckNotifier(delegate);
+    if (FLAGS_quic_empty_data_no_fin_early_return) {
+      return QuicConsumedData(0, false);
+    }
   }
 
   // Opportunistically bundle an ack with every outgoing packet.
@@ -1098,17 +1089,8 @@ QuicConsumedData QuicConnection::SendStreamData(
   // also if there is possibility of revival. Only bundle an ack if there's no
   // processing left that may cause received_info_ to change.
   ScopedPacketBundler ack_bundler(this, BUNDLE_PENDING_ACK);
-  QuicConsumedData consumed_data =
-      packet_generator_.ConsumeData(id, data, offset, fin, fec_protection,
-                                    notifier);
-
-  if (notifier &&
-      (consumed_data.bytes_consumed == 0 && !consumed_data.fin_consumed)) {
-    // No data was consumed, nor was a fin consumed, so delete the notifier.
-    delete notifier;
-  }
-
-  return consumed_data;
+  return packet_generator_.ConsumeData(id, data, offset, fin, fec_protection,
+                                       delegate);
 }
 
 void QuicConnection::SendRstStream(QuicStreamId id,
@@ -1135,11 +1117,30 @@ void QuicConnection::SendBlocked(QuicStreamId id) {
 }
 
 const QuicConnectionStats& QuicConnection::GetStats() {
-  // Update rtt and estimated bandwidth.
-  stats_.min_rtt_us =
-      sent_packet_manager_.GetRttStats()->min_rtt().ToMicroseconds();
-  stats_.srtt_us =
-      sent_packet_manager_.GetRttStats()->smoothed_rtt().ToMicroseconds();
+  if (!FLAGS_quic_use_initial_rtt_for_stats) {
+    stats_.min_rtt_us =
+        sent_packet_manager_.GetRttStats()->min_rtt().ToMicroseconds();
+    stats_.srtt_us =
+        sent_packet_manager_.GetRttStats()->smoothed_rtt().ToMicroseconds();
+  } else {
+    const RttStats* rtt_stats = sent_packet_manager_.GetRttStats();
+
+    // Update rtt and estimated bandwidth.
+    QuicTime::Delta min_rtt = rtt_stats->min_rtt();
+    if (min_rtt.IsZero()) {
+      // If min RTT has not been set, use initial RTT instead.
+      min_rtt = QuicTime::Delta::FromMicroseconds(rtt_stats->initial_rtt_us());
+    }
+    stats_.min_rtt_us = min_rtt.ToMicroseconds();
+
+    QuicTime::Delta srtt = rtt_stats->smoothed_rtt();
+    if (srtt.IsZero()) {
+      // If SRTT has not been set, use initial RTT instead.
+      srtt = QuicTime::Delta::FromMicroseconds(rtt_stats->initial_rtt_us());
+    }
+    stats_.srtt_us = srtt.ToMicroseconds();
+  }
+
   stats_.estimated_bandwidth = sent_packet_manager_.BandwidthEstimate();
   stats_.max_packet_size = packet_generator_.max_packet_length();
   return stats_;
@@ -1584,8 +1585,7 @@ void QuicConnection::OnSerializedPacket(
   // If a forward-secure encrypter is available but is not being used and this
   // packet's sequence number is after the first packet which requires
   // forward security, start using the forward-secure encrypter.
-  if (FLAGS_enable_quic_delay_forward_security &&
-      encryption_level_ != ENCRYPTION_FORWARD_SECURE &&
+  if (encryption_level_ != ENCRYPTION_FORWARD_SECURE &&
       has_forward_secure_encrypter_ &&
       serialized_packet.sequence_number >=
           first_required_forward_secure_packet_) {
@@ -1602,6 +1602,16 @@ void QuicConnection::OnCongestionWindowChange() {
   packet_generator_.OnCongestionWindowChange(
       sent_packet_manager_.EstimateMaxPacketsInFlight(max_packet_length()));
   visitor_->OnCongestionWindowChange(clock_->ApproximateNow());
+}
+
+void QuicConnection::OnRttChange() {
+  // Uses the connection's smoothed RTT. If zero, uses initial_rtt.
+  QuicTime::Delta rtt = sent_packet_manager_.GetRttStats()->smoothed_rtt();
+  if (rtt.IsZero()) {
+    rtt = QuicTime::Delta::FromMicroseconds(
+        sent_packet_manager_.GetRttStats()->initial_rtt_us());
+  }
+  packet_generator_.OnRttChange(rtt);
 }
 
 void QuicConnection::OnHandshakeComplete() {
@@ -1696,8 +1706,7 @@ void QuicConnection::OnRetransmissionTimeout() {
 void QuicConnection::SetEncrypter(EncryptionLevel level,
                                   QuicEncrypter* encrypter) {
   framer_.SetEncrypter(level, encrypter);
-  if (FLAGS_enable_quic_delay_forward_security &&
-      level == ENCRYPTION_FORWARD_SECURE) {
+  if (level == ENCRYPTION_FORWARD_SECURE) {
     has_forward_secure_encrypter_ = true;
     first_required_forward_secure_packet_ =
         sequence_number_of_last_sent_packet_ +

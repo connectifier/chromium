@@ -20,6 +20,8 @@ component("system") {
   output_name = "mojo_system_impl"
 
   sources = [
+    "async_waiter.cc",
+    "async_waiter.h",
     "awakable.h",
     "awakable_list.cc",
     "awakable_list.h",
@@ -51,6 +53,8 @@ component("system") {
     "handle_signals_state.h",
     "handle_table.cc",
     "handle_table.h",
+    "incoming_endpoint.cc",
+    "incoming_endpoint.h",
     "local_data_pipe.cc",
     "local_data_pipe.h",
     "local_message_pipe_endpoint.cc",

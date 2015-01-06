@@ -18,8 +18,8 @@
 #include "third_party/skia/include/core/SkTypeface.h"
 #include "third_party/skia/include/effects/SkGradientShader.h"
 #include "ui/gfx/canvas.h"
+#include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/safe_integer_conversions.h"
-#include "ui/gfx/insets.h"
 #include "ui/gfx/render_text_harfbuzz.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/skia_util.h"
@@ -399,18 +399,21 @@ RenderText::~RenderText() {
 
 RenderText* RenderText::CreateInstance() {
 #if defined(OS_MACOSX)
-  static const bool use_harfbuzz = CommandLine::ForCurrentProcess()->
-      HasSwitch(switches::kEnableHarfBuzzRenderText);
+  static const bool use_harfbuzz =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableHarfBuzzRenderText);
 #else
-  static const bool use_harfbuzz = !CommandLine::ForCurrentProcess()->
-      HasSwitch(switches::kDisableHarfBuzzRenderText);
+  static const bool use_harfbuzz =
+      !base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kDisableHarfBuzzRenderText);
 #endif
   return use_harfbuzz ? new RenderTextHarfBuzz : CreateNativeInstance();
 }
 
 RenderText* RenderText::CreateInstanceForEditing() {
-  static const bool use_harfbuzz = !CommandLine::ForCurrentProcess()->
-      HasSwitch(switches::kDisableHarfBuzzRenderText);
+  static const bool use_harfbuzz =
+      !base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kDisableHarfBuzzRenderText);
   return use_harfbuzz ? new RenderTextHarfBuzz : CreateNativeInstance();
 }
 

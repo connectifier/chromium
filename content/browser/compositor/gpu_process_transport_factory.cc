@@ -43,8 +43,8 @@
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/compositor_constants.h"
 #include "ui/compositor/compositor_switches.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/native_widget_types.h"
-#include "ui/gfx/size.h"
 
 #if defined(OS_WIN)
 #include "content/browser/compositor/software_output_device_win.h"
@@ -416,6 +416,28 @@ void GpuProcessTransportFactory::OnSurfaceDisplayed(int surface_id) {
       surface_id);
   if (surface)
     surface->OnSurfaceDisplayed();
+}
+
+void GpuProcessTransportFactory::OnCompositorRecycled(
+    ui::Compositor* compositor) {
+  PerCompositorDataMap::iterator it = per_compositor_data_.find(compositor);
+  if (it == per_compositor_data_.end())
+    return;
+  PerCompositorData* data = it->second;
+  DCHECK(data);
+  BrowserCompositorOutputSurface* surface =
+      output_surface_map_.Lookup(data->surface_id);
+  if (surface)
+    surface->OnSurfaceRecycled();
+}
+
+bool GpuProcessTransportFactory::SurfaceShouldNotShowFramesAfterRecycle(
+    int surface_id) const {
+  BrowserCompositorOutputSurface* surface =
+      output_surface_map_.Lookup(surface_id);
+  if (surface)
+    return surface->ShouldNotShowFramesAfterRecycle();
+  return false;
 }
 #endif
 

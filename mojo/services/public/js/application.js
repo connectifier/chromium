@@ -6,20 +6,27 @@ define("mojo/services/public/js/application", [
   "services/js/app_bridge",
   "mojo/services/public/js/service_provider",
   "mojo/services/public/js/shell",
-], function(appBridgeModule, spModule, shellModule) {
+], function(appBridge, serviceProvider, shell) {
+
+  const ServiceProvider = serviceProvider.ServiceProvider;
+  const Shell = shell.Shell;
 
   class Application {
-    constructor(appShell, url) {
-      this.shell = new shellModule.Shell(appShell);
+    constructor(shellHandle, url) {
       this.url = url;
       this.serviceProviders = [];
+      this.shellHandle_ = shellHandle;
+      this.shell = new Shell(shellHandle, {
+        initialize: this.initialize.bind(this),
+        acceptConnection: this.doAcceptConnection.bind(this),
+      });
     }
 
     initialize(args) {
     }
 
-    acceptConnection_(url, spHandle) {
-      var serviceProvider =  new spModule.ServiceProvider(spHandle);
+    doAcceptConnection(url, serviceProviderProxy) {
+      var serviceProvider =  new ServiceProvider(serviceProviderProxy);
       this.serviceProviders.push(serviceProvider);
       this.acceptConnection(url, serviceProvider);
     }
@@ -28,11 +35,11 @@ define("mojo/services/public/js/application", [
     }
 
     quit() {
-      this.shell.close();
       this.serviceProviders.forEach(function(sp) {
         sp.close();
       });
-      appBridgeModule.quit();
+      this.shell.close();
+      appBridge.quit();
     }
   }
 

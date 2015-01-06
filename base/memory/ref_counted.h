@@ -141,10 +141,8 @@ class RefCounted : public subtle::RefCountedBase {
   DISALLOW_COPY_AND_ASSIGN(RefCounted<T>);
 };
 
-// Forward declarations.
+// Forward declaration.
 template <class T, typename Traits> class RefCountedThreadSafe;
-template <class T>
-class RefCountedThreadSafeDeleteOnCorrectThread;
 
 // Default traits for RefCountedThreadSafe<T>.  Deletes the object when its ref
 // count reaches 0.  Overload to delete it on a different thread etc.
@@ -156,17 +154,6 @@ struct DefaultRefCountedThreadSafeTraits {
     // implementation detail.
     RefCountedThreadSafe<T,
                          DefaultRefCountedThreadSafeTraits>::DeleteInternal(x);
-  }
-};
-
-// Traits used by RefCountedThreadSafeDeleteOnCorrectThread to call
-// DeleteOnCorrectThread() on an object when its ref count reaches 0.
-template <typename T>
-struct DeleteOnCorrectThreadRefCountedThreadSafeTraits {
-  static void Destruct(const T* x) {
-    // Delete through RefCountedThreadSafeDeleteOnCorrectThread so child classes
-    // only need to add RefCountedThreadSafeDeleteOnCorrectThread as a friend.
-    RefCountedThreadSafeDeleteOnCorrectThread<T>::DeleteOnCorrectThread(x);
   }
 };
 
@@ -207,36 +194,13 @@ class RefCountedThreadSafe : public subtle::RefCountedThreadSafeBase {
   DISALLOW_COPY_AND_ASSIGN(RefCountedThreadSafe);
 };
 
-// A variant of RefCountedThreadSafe<T> which calls T::DeleteOnCorrectThread()
-// upon destruction, used by classes that control which thread destruction
-// occurs on.
-//
-// Example:
-//   class SomeClass
-//       : public base::RefCountedThreadSafeDeleteOnCorrectThread<SomeClass> {
-//     ...
-//    private:
-//     friend class base::RefCountedThreadSafeDeleteOnCorrectThread<SomeClass>;
-//     ~SomeClass();
-//     void DeleteOnCorrectThread() const;
-//   };
-template <class T>
-class RefCountedThreadSafeDeleteOnCorrectThread
-    : public RefCountedThreadSafe<
-          T,
-          DeleteOnCorrectThreadRefCountedThreadSafeTraits<T>> {
- private:
-  friend struct DeleteOnCorrectThreadRefCountedThreadSafeTraits<T>;
-  static void DeleteOnCorrectThread(const T* x) { x->DeleteOnCorrectThread(); }
-};
-
 //
 // A thread-safe wrapper for some piece of data so we can place other
 // things in scoped_refptrs<>.
 //
-template <typename T>
+template<typename T>
 class RefCountedData
-    : public base::RefCountedThreadSafe<base::RefCountedData<T>> {
+    : public base::RefCountedThreadSafe< base::RefCountedData<T> > {
  public:
   RefCountedData() : data() {}
   RefCountedData(const T& in_value) : data(in_value) {}

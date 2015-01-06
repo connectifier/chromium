@@ -8,18 +8,23 @@
 #include "base/strings/sys_string_conversions.h"
 #include "chrome/browser/extensions/extension_toolbar_model.h"
 #include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/toolbar/toolbar_action_view_controller.h"
-#include "chrome/browser/ui/toolbar/toolbar_actions_bar.h"
 #import "chrome/browser/ui/cocoa/browser_window_cocoa.h"
 #import "chrome/browser/ui/cocoa/browser_window_controller.h"
 #import "chrome/browser/ui/cocoa/extensions/browser_action_button.h"
-#import "chrome/browser/ui/cocoa/extensions/browser_actions_controller.h"
 #import "chrome/browser/ui/cocoa/extensions/browser_actions_container_view.h"
+#import "chrome/browser/ui/cocoa/extensions/browser_actions_controller.h"
 #import "chrome/browser/ui/cocoa/extensions/extension_popup_controller.h"
-#import "chrome/browser/ui/cocoa/info_bubble_window.h"
 #import "chrome/browser/ui/cocoa/toolbar/toolbar_controller.h"
-#include "ui/gfx/rect.h"
-#include "ui/gfx/size.h"
+#import "chrome/browser/ui/cocoa/toolbar/wrench_toolbar_button_cell.h"
+#import "chrome/browser/ui/cocoa/info_bubble_window.h"
+#import "chrome/browser/ui/cocoa/themed_window.h"
+#import "chrome/browser/ui/cocoa/toolbar/toolbar_controller.h"
+#include "chrome/browser/ui/toolbar/toolbar_action_view_controller.h"
+#include "chrome/browser/ui/toolbar/toolbar_actions_bar.h"
+#include "grit/theme_resources.h"
+#include "ui/base/theme_provider.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/size.h"
 
 namespace {
 
@@ -115,6 +120,31 @@ bool BrowserActionTestUtil::HidePopup() {
       setAllowedAnimations:info_bubble::kAnimateNone];
   [controller close];
   return !HasPopup();
+}
+
+bool BrowserActionTestUtil::ActionButtonWantsToRun(size_t index) {
+  BrowserActionsController* controller = GetController(browser_, bar_delegate_);
+  ui::ThemeProvider* themeProvider =
+      [[[controller containerView] window] themeProvider];
+  DCHECK(themeProvider);
+  NSImage* wantsToRunImage =
+      themeProvider->GetNSImageNamed(IDR_BROWSER_ACTION_H);
+  BrowserActionButton* button = [controller buttonWithIndex:index];
+  BrowserActionCell* cell =
+      base::mac::ObjCCastStrict<BrowserActionCell>([button cell]);
+  NSImage* actualImage = [cell imageForState:image_button_cell::kDefaultState
+                                        view:button];
+
+  return wantsToRunImage == actualImage;
+}
+
+bool BrowserActionTestUtil::OverflowedActionButtonWantsToRun() {
+  NSView* wrench = [[[BrowserWindowController browserWindowControllerForWindow:
+      browser_->window()->GetNativeWindow()] toolbarController] wrenchButton];
+  NSButton* wrenchButton = base::mac::ObjCCastStrict<NSButton>(wrench);
+  WrenchToolbarButtonCell* cell =
+      base::mac::ObjCCastStrict<WrenchToolbarButtonCell>([wrenchButton cell]);
+  return [cell overflowedToolbarActionWantsToRun];
 }
 
 // static

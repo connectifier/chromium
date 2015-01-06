@@ -5,6 +5,7 @@
 'use strict';
 
 var pushData = new FutureData();
+var pushRegistration = null;
 
 // Sends data back to the test. This must be in response to an earlier
 // request, but it's ok to respond asynchronously. The request blocks until
@@ -83,28 +84,28 @@ function removeManifest() {
   if (element) {
     element.parentNode.removeChild(element);
     sendResultToTest('manifest removed');
-  } else
-  sendResultToTest('unable to find manifest element');
+  } else {
+    sendResultToTest('unable to find manifest element');
+  }
 }
 
 function registerPush() {
   navigator.serviceWorker.ready.then(function(swRegistration) {
-    // TODO(mvanouwerkerk): Cleanup once the final API is exposed.
-    var pushManager = swRegistration.pushManager || navigator.push;
-    return pushManager.register().then(function(pushRegistration) {
-      sendResultToTest(pushRegistration.pushEndpoint + ' - ' +
-          pushRegistration.pushRegistrationId);
-    });
+    return swRegistration.pushManager.register()
+        .then(function(registration) {
+          pushRegistration = registration
+          sendResultToTest(pushRegistration.endpoint + ' - ' +
+                           pushRegistration.registrationId);
+        });
   }).catch(sendErrorToTest);
 }
 
 function hasPermission() {
   navigator.serviceWorker.ready.then(function(swRegistration) {
-    // TODO(mvanouwerkerk): Cleanup once the final API is exposed.
-    var pushManager = swRegistration.pushManager || navigator.push;
-    return pushManager.hasPermission().then(function(permission) {
-      sendResultToTest('permission status - ' + permission);
-    });
+    return swRegistration.pushManager.hasPermission()
+        .then(function(permission) {
+          sendResultToTest('permission status - ' + permission);
+        });
   }).catch(sendErrorToTest);
 }
 
@@ -114,6 +115,19 @@ function isControlled() {
   } else {
     sendResultToTest('false - is not controlled');
   }
+}
+
+function unregister() {
+  if (!pushRegistration) {
+    sendResultToTest('unregister error: no registration');
+    return;
+  }
+
+  pushRegistration.unregister().then(function(result) {
+    sendResultToTest('unregister result: ' + result);
+  }, function(error) {
+    sendResultToTest('unregister error: ' + error.name + ': ' + error.message);
+  });
 }
 
 addEventListener('message', function(event) {

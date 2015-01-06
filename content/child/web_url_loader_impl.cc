@@ -437,7 +437,7 @@ void WebURLLoaderImpl::Context::Start(const WebURLRequest& request,
   // contains the body of the response. The request has already been made by the
   // browser.
   if (stream_override_.get()) {
-    CHECK(CommandLine::ForCurrentProcess()->HasSwitch(
+    CHECK(base::CommandLine::ForCurrentProcess()->HasSwitch(
         switches::kEnableBrowserSideNavigation));
     DCHECK(!sync_load_response);
     DCHECK_NE(WebURLRequest::FrameTypeNone, request.frameType());
@@ -447,8 +447,8 @@ void WebURLLoaderImpl::Context::Start(const WebURLRequest& request,
 
   // PlzNavigate: the only navigation requests going through the WebURLLoader
   // are the ones created by CommitNavigation.
-  DCHECK(!CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kEnableBrowserSideNavigation) ||
+  DCHECK(!base::CommandLine::ForCurrentProcess()->HasSwitch(
+             switches::kEnableBrowserSideNavigation) ||
          stream_override_.get() ||
          request.frameType() == WebURLRequest::FrameTypeNone);
 
@@ -505,57 +505,7 @@ void WebURLLoaderImpl::Context::Start(const WebURLRequest& request,
   request_info.fetch_frame_type = GetRequestContextFrameType(request);
   request_info.extra_data = request.extraData();
   bridge_.reset(resource_dispatcher_->CreateBridge(request_info));
-
-  if (!request.httpBody().isNull()) {
-    // GET and HEAD requests shouldn't have http bodies.
-    DCHECK(method != "GET" && method != "HEAD");
-    const WebHTTPBody& httpBody = request.httpBody();
-    size_t i = 0;
-    WebHTTPBody::Element element;
-    scoped_refptr<ResourceRequestBody> request_body = new ResourceRequestBody;
-    while (httpBody.elementAt(i++, element)) {
-      switch (element.type) {
-        case WebHTTPBody::Element::TypeData:
-          if (!element.data.isEmpty()) {
-            // WebKit sometimes gives up empty data to append. These aren't
-            // necessary so we just optimize those out here.
-            request_body->AppendBytes(
-                element.data.data(), static_cast<int>(element.data.size()));
-          }
-          break;
-        case WebHTTPBody::Element::TypeFile:
-          if (element.fileLength == -1) {
-            request_body->AppendFileRange(
-                base::FilePath::FromUTF16Unsafe(element.filePath),
-                0, kuint64max, base::Time());
-          } else {
-            request_body->AppendFileRange(
-                base::FilePath::FromUTF16Unsafe(element.filePath),
-                static_cast<uint64>(element.fileStart),
-                static_cast<uint64>(element.fileLength),
-                base::Time::FromDoubleT(element.modificationTime));
-          }
-          break;
-        case WebHTTPBody::Element::TypeFileSystemURL: {
-          GURL file_system_url = element.fileSystemURL;
-          DCHECK(file_system_url.SchemeIsFileSystem());
-          request_body->AppendFileSystemFileRange(
-              file_system_url,
-              static_cast<uint64>(element.fileStart),
-              static_cast<uint64>(element.fileLength),
-              base::Time::FromDoubleT(element.modificationTime));
-          break;
-        }
-        case WebHTTPBody::Element::TypeBlob:
-          request_body->AppendBlob(element.blobUUID.utf8());
-          break;
-        default:
-          NOTREACHED();
-      }
-    }
-    request_body->set_identifier(request.httpBody().identifier());
-    bridge_->SetRequestBody(request_body.get());
-  }
+  bridge_->SetRequestBody(GetRequestBodyForWebURLRequest(request).get());
 
   if (sync_load_response) {
     bridge_->SyncLoad(sync_load_response);
@@ -637,7 +587,7 @@ void WebURLLoaderImpl::Context::OnReceivedResponse(
   // PlzNavigate: during navigations, the ResourceResponse has already been
   // received on the browser side, and has been passed down to the renderer.
   if (stream_override_.get()) {
-    CHECK(CommandLine::ForCurrentProcess()->HasSwitch(
+    CHECK(base::CommandLine::ForCurrentProcess()->HasSwitch(
         switches::kEnableBrowserSideNavigation));
     info = stream_override_->response;
   }
@@ -1028,6 +978,7 @@ void WebURLLoaderImpl::PopulateURLResponse(const GURL& url,
   response->setConnectionID(info.load_timing.socket_log_id);
   response->setConnectionReused(info.load_timing.socket_reused);
   response->setDownloadFilePath(info.download_file_path.AsUTF16Unsafe());
+  response->setWasFetchedViaSPDY(info.was_fetched_via_spdy);
   response->setWasFetchedViaServiceWorker(info.was_fetched_via_service_worker);
   response->setWasFallbackRequiredByServiceWorker(
       info.was_fallback_required_by_service_worker);
@@ -1087,6 +1038,8 @@ void WebURLLoaderImpl::PopulateURLResponse(const GURL& url,
       load_info.addResponseHeader(WebString::fromLatin1(it->first),
           WebString::fromLatin1(it->second));
     }
+    load_info.setNPNNegotiatedProtocol(WebString::fromLatin1(
+        info.npn_negotiated_protocol));
     response->setHTTPLoadInfo(load_info);
   }
 

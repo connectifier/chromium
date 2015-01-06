@@ -54,29 +54,16 @@ class CC_EXPORT PictureLayerTilingSet {
                       PictureLayerTilingSet* twin_set,
                       PictureLayerTilingSet* recycled_twin_set);
   void RemoveNonIdealTilings();
-  // Make this set of tilings match the same set of content scales from |other|.
-  // Delete any tilings that don't meet |minimum_contents_scale|.  Recreate
-  // any tiles that intersect |layer_invalidation|.  Update the size of all
-  // tilings to |new_layer_bounds|.
-  // Returns true if we had at least one high res tiling synced.
-  // TODO(danakj): Remove this !!!
-  bool SyncTilingsForTesting(const PictureLayerTilingSet& other,
-                             const gfx::Size& new_layer_bounds,
-                             const Region& layer_invalidation,
-                             float minimum_contents_scale,
-                             RasterSource* raster_source);
 
   void UpdateTilingsToCurrentRasterSource(
-      RasterSource* raster_source,
+      scoped_refptr<RasterSource> raster_source,
       const PictureLayerTilingSet* twin_set,
-      // TODO(danakj): Don't need to pass layer bounds here, we have the raster
-      // source already, and they are the same as the raster source size.
-      const gfx::Size& layer_bounds,
       const Region& layer_invalidation,
-      float minimum_contents_scale);
+      float minimum_contents_scale,
+      float maximum_contents_scale);
 
   PictureLayerTiling* AddTiling(float contents_scale,
-                                const gfx::Size& layer_bounds);
+                                scoped_refptr<RasterSource> raster_source);
   size_t num_tilings() const { return tilings_.size(); }
   int NumHighResTilings() const;
   PictureLayerTiling* tiling_at(size_t idx) { return tilings_[idx]; }
@@ -102,6 +89,9 @@ class CC_EXPORT PictureLayerTilingSet {
 
   // Removes all tilings with a contents scale < |minimum_scale|.
   void RemoveTilingsBelowScale(float minimum_scale);
+
+  // Removes all tilings with a contents scale > |maximum_scale|.
+  void RemoveTilingsAboveScale(float maximum_scale);
 
   // Remove all tilings.
   void RemoveAllTilings();
@@ -136,8 +126,6 @@ class CC_EXPORT PictureLayerTilingSet {
     gfx::Rect geometry_rect() const;
     // Texture rect (in texels) for geometry_rect
     gfx::RectF texture_rect() const;
-    // Texture size in texels
-    gfx::Size texture_size() const;
 
     Tile* operator->() const;
     Tile* operator*() const;

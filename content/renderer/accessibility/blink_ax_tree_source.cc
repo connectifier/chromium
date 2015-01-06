@@ -74,6 +74,8 @@ std::string GetEquivalentAriaRoleString(const ui::AXRole role) {
       return "figure";
     case ui::AX_ROLE_FOOTER:
       return "contentinfo";
+    case ui::AX_ROLE_HEADING:
+      return "heading";
     case ui::AX_ROLE_IMAGE:
       return "img";
     case ui::AX_ROLE_MAIN:
@@ -267,6 +269,9 @@ void BlinkAXTreeSource::SerializeNode(blink::WebAXObject src,
   }
   if (src.actionVerb().length())
     dst->AddStringAttribute(ui::AX_ATTR_ACTION, UTF16ToUTF8(src.actionVerb()));
+  if (src.ariaAutoComplete().length())
+    dst->AddStringAttribute(ui::AX_ATTR_AUTO_COMPLETE,
+                            UTF16ToUTF8(src.ariaAutoComplete()));
   if (src.isAriaReadOnly())
     dst->AddBoolAttribute(ui::AX_ATTR_ARIA_READONLY, true);
   if (src.isButtonStateMixed())
@@ -283,6 +288,10 @@ void BlinkAXTreeSource::SerializeNode(blink::WebAXObject src,
   }
   if (src.helpText().length())
     dst->AddStringAttribute(ui::AX_ATTR_HELP, UTF16ToUTF8(src.helpText()));
+  if (src.placeholder().length()) {
+    dst->AddStringAttribute(ui::AX_ATTR_PLACEHOLDER,
+                            UTF16ToUTF8(src.placeholder()));
+  }
   if (src.keyboardShortcut().length()) {
     dst->AddStringAttribute(ui::AX_ATTR_SHORTCUT,
                             UTF16ToUTF8(src.keyboardShortcut()));

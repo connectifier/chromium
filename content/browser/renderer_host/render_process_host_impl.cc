@@ -67,6 +67,7 @@
 #include "content/browser/message_port_message_filter.h"
 #include "content/browser/mime_registry_message_filter.h"
 #include "content/browser/mojo/mojo_application_host.h"
+#include "content/browser/navigator_connect/navigator_connect_context.h"
 #include "content/browser/navigator_connect/navigator_connect_dispatcher_host.h"
 #include "content/browser/notifications/notification_message_filter.h"
 #include "content/browser/permissions/permission_service_context.h"
@@ -157,6 +158,7 @@
 #if defined(OS_ANDROID)
 #include "content/browser/android/child_process_launcher_android.h"
 #include "content/browser/media/android/browser_demuxer_android.h"
+#include "content/browser/mojo/service_registrar_android.h"
 #include "content/browser/screen_orientation/screen_orientation_message_filter_android.h"
 #endif
 
@@ -458,6 +460,8 @@ RenderProcessHostImpl::RenderProcessHostImpl(
       power_monitor_broadcaster_(this),
       worker_ref_count_(0),
       permission_service_context_(new PermissionServiceContext(this)),
+      pending_valuebuffer_state_(new gpu::ValueStateMap()),
+      subscribe_uniform_enabled_(false),
       weak_factory_(this) {
   widget_helper_ = new RenderWidgetHelper();
 
@@ -476,6 +480,9 @@ RenderProcessHostImpl::RenderProcessHostImpl(
                             base::Bind(&CacheShaderInfo, GetID(),
                                        storage_partition_impl_->GetPath()));
   }
+  subscribe_uniform_enabled_ =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableSubscribeUniformExtension);
 
   // Note: When we create the RenderProcessHostImpl, it's technically
   //       backgrounded, because it has no visible listeners.  But the process
@@ -881,7 +888,9 @@ void RenderProcessHostImpl::CreateMessageFilters() {
 #endif
   AddFilter(new GeofencingDispatcherHost(
       storage_partition_impl_->GetGeofencingManager()));
-  AddFilter(new NavigatorConnectDispatcherHost());
+  AddFilter(new NavigatorConnectDispatcherHost(
+      storage_partition_impl_->GetServiceWorkerContext(),
+      storage_partition_impl_->GetNavigatorConnectContext()));
   if (browser_command_line.HasSwitch(
           switches::kEnableExperimentalWebPlatformFeatures)) {
     scoped_refptr<BluetoothDispatcherHost> bluetooth_dispatcher_host(
@@ -900,6 +909,11 @@ void RenderProcessHostImpl::RegisterMojoServices() {
   mojo_application_host_->service_registry()->AddService(
       base::Bind(&PermissionServiceContext::CreateService,
                  base::Unretained(permission_service_context_.get())));
+
+#if defined(OS_ANDROID)
+  ServiceRegistrarAndroid::RegisterProcessHostServices(
+      mojo_application_host_->service_registry_android());
+#endif
 
   GetContentClient()->browser()->OverrideRenderProcessMojoServices(
       mojo_application_host_->service_registry());
@@ -931,6 +945,38 @@ ServiceRegistry* RenderProcessHostImpl::GetServiceRegistry() {
 const base::TimeTicks& RenderProcessHostImpl::GetInitTimeForNavigationMetrics()
     const {
   return init_time_;
+}
+
+bool RenderProcessHostImpl::SubscribeUniformEnabled() const {
+  return subscribe_uniform_enabled_;
+}
+
+void RenderProcessHostImpl::OnAddSubscription(unsigned int target) {
+  DCHECK(subscribe_uniform_enabled_);
+  subscription_set_.insert(target);
+  const gpu::ValueState* state = pending_valuebuffer_state_->GetState(target);
+  if (state) {
+    SendUpdateValueState(target, *state);
+  }
+}
+
+void RenderProcessHostImpl::OnRemoveSubscription(unsigned int target) {
+  DCHECK(subscribe_uniform_enabled_);
+  subscription_set_.erase(target);
+}
+
+void RenderProcessHostImpl::SendUpdateValueState(unsigned int target,
+                                                 const gpu::ValueState& state) {
+  DCHECK(subscribe_uniform_enabled_);
+  if (subscription_set_.find(target) != subscription_set_.end()) {
+    GpuProcessHost::SendOnIO(
+        GpuProcessHost::GPU_PROCESS_KIND_SANDBOXED,
+        CAUSE_FOR_GPU_LAUNCH_NO_LAUNCH,
+        new GpuMsg_UpdateValueState(id_, target, state));
+  } else {
+    // Store the ValueState locally in case a Valuebuffer subscribes to it later
+    pending_valuebuffer_state_->UpdateState(target, state);
+  }
 }
 
 void RenderProcessHostImpl::AddRoute(
@@ -1133,6 +1179,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDefaultTileWidth,
     switches::kDefaultTileHeight,
     switches::kDisable3DAPIs,
+    switches::kDisableAcceleratedJpegDecoding,
     switches::kDisableAcceleratedVideoDecode,
     switches::kDisableApplicationCache,
     switches::kDisableBlinkScheduler,
@@ -1166,7 +1213,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableTouchEditing,
     switches::kDisableV8IdleNotificationAfterCommit,
     switches::kDomAutomationController,
-    switches::kEnableAcceleratedJpegDecoding,
     switches::kEnableBeginFrameScheduling,
     switches::kEnableBleedingEdgeRenderingFastPaths,
     switches::kEnableBrowserSideNavigation,
@@ -1243,6 +1289,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     // --in-process-webgl.
     switches::kUseGL,
     switches::kUseMobileUserAgent,
+    switches::kUseNormalPriorityForTileTaskWorkerThreads,
     switches::kV,
     switches::kVideoThreads,
     switches::kVModule,
@@ -1277,11 +1324,11 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
 #if defined(ENABLE_WEBRTC)
     switches::kDisableWebRtcHWDecoding,
     switches::kDisableWebRtcHWEncoding,
-    switches::kEnableWebRtcHWVp8Encoding,
     switches::kEnableWebRtcHWH264Encoding,
     switches::kWebRtcMaxCaptureFramerate,
 #endif
-    switches::kLowEndDeviceMode,
+    switches::kEnableLowEndDeviceMode,
+    switches::kDisableLowEndDeviceMode,
 #if defined(OS_ANDROID)
     switches::kDisableGestureRequirementForMediaPlayback,
     switches::kDisableWebRTC,

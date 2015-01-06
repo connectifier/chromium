@@ -23,6 +23,7 @@ namespace devtools {
 namespace page {
 
 class ColorPicker;
+class FrameRecorder;
 
 class PageHandler {
  public:
@@ -76,6 +77,9 @@ class PageHandler {
   Response StopScreencast();
   Response ScreencastFrameAck(int frame_number);
 
+  Response StartRecordingFrames(int max_frame_count);
+  Response StopRecordingFrames(DevToolsCommandId command_id);
+
   Response HandleJavaScriptDialog(bool accept, const std::string* prompt_text);
 
   Response QueryUsageAndQuota(DevToolsCommandId command_id,
@@ -101,6 +105,9 @@ class PageHandler {
       size_t png_size);
 
   void OnColorPicked(int r, int g, int b, int a);
+  void OnFramesRecorded(
+      DevToolsCommandId command_id,
+      scoped_refptr<StopRecordingFramesResponse> response_data);
 
   void QueryUsageAndQuotaCompleted(
       DevToolsCommandId command_id,
@@ -124,6 +131,7 @@ class PageHandler {
   bool processing_screencast_frame_;
 
   scoped_ptr<ColorPicker> color_picker_;
+  scoped_ptr<FrameRecorder> frame_recorder_;
 
   RenderViewHostImpl* host_;
   scoped_ptr<Client> client_;

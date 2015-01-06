@@ -64,6 +64,9 @@ DefaultCommandLineSwitch g_default_switches[] = {
   // glPostSubBufferCHROMIUM (crbug.com/429200)
   { cc::switches::kUIDisablePartialSwap, ""},
 #endif
+  // Needed to fix a bug where the raster thread doesn't get scheduled for a
+  // substantial time (~5 seconds).  See https://crbug.com/441895.
+  { switches::kUseNormalPriorityForTileTaskWorkerThreads, "" },
   { NULL, NULL },  // Termination
 };
 
@@ -139,6 +142,11 @@ void CastBrowserMainParts::PreMainMessageLoopRun() {
 
   cast_browser_process_->SetBrowserContext(
       make_scoped_ptr(new CastBrowserContext(url_request_context_factory_)));
+  cast_browser_process_->SetMetricsServiceClient(
+      metrics::CastMetricsServiceClient::Create(
+          content::BrowserThread::GetBlockingPool(),
+          cast_browser_process_->pref_service(),
+          cast_browser_process_->browser_context()->GetRequestContext()));
 
 #if defined(OS_ANDROID)
   base::FilePath crash_dumps_dir;
@@ -159,20 +167,15 @@ void CastBrowserMainParts::PreMainMessageLoopRun() {
   cast_browser_process_->SetCastService(CastService::Create(
       cast_browser_process_->browser_context(),
       cast_browser_process_->pref_service(),
-      url_request_context_factory_->GetSystemGetter(),
-      base::Bind(
-          &metrics::CastMetricsServiceClient::EnableMetricsService,
-          base::Unretained(cast_browser_process_->metrics_service_client()))));
+      cast_browser_process_->metrics_service_client(),
+      url_request_context_factory_->GetSystemGetter()));
 
-  // Creating metrics service client must happen after Cast service is created.
-  cast_browser_process_->SetMetricsServiceClient(
-      metrics::CastMetricsServiceClient::Create(
-          content::BrowserThread::GetBlockingPool(),
-          cast_browser_process_->pref_service(),
-          cast_browser_process_->browser_context()->GetRequestContext()));
+  cast_browser_process_->metrics_service_client()
+      ->Initialize(cast_browser_process_->cast_service());
 
   // Initializing network delegates must happen after Cast service is created.
   url_request_context_factory_->InitializeNetworkDelegates();
+
   cast_browser_process_->cast_service()->Start();
 }
 

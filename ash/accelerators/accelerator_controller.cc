@@ -14,6 +14,7 @@
 #include "ash/debug.h"
 #include "ash/display/display_controller.h"
 #include "ash/display/display_manager.h"
+#include "ash/display/display_util.h"
 #include "ash/focus_cycler.h"
 #include "ash/gpu_support.h"
 #include "ash/ime_control_delegate.h"
@@ -41,11 +42,11 @@
 #include "ash/system/tray/system_tray_notifier.h"
 #include "ash/system/web_notification/web_notification_tray.h"
 #include "ash/touch/touch_hud_debug.h"
+#include "ash/utility/partial_screenshot_controller.h"
 #include "ash/volume_control_delegate.h"
 #include "ash/wm/maximize_mode/maximize_mode_controller.h"
 #include "ash/wm/mru_window_tracker.h"
 #include "ash/wm/overview/window_selector_controller.h"
-#include "ash/wm/partial_screenshot_view.h"
 #include "ash/wm/power_button_controller.h"
 #include "ash/wm/window_cycle_controller.h"
 #include "ash/wm/window_state.h"
@@ -345,7 +346,7 @@ void HandleScaleUI(bool up) {
   }
 
   const DisplayInfo& display_info = display_manager->GetDisplayInfo(display_id);
-  float next_scale = DisplayManager::GetNextUIScale(display_info, up);
+  float next_scale = GetNextUIScale(display_info, up);
   display_manager->SetDisplayUIScale(display_id, next_scale);
 }
 
@@ -405,7 +406,7 @@ void HandleSwitchIme(ImeControlDelegate* ime_control_delegate,
 void HandleTakePartialScreenshot(ScreenshotDelegate* screenshot_delegate) {
   base::RecordAction(UserMetricsAction("Accel_Take_Partial_Screenshot"));
   if (screenshot_delegate) {
-    ash::PartialScreenshotView::StartPartialScreenshot(
+    ash::PartialScreenshotController::StartPartialScreenshotSession(
         screenshot_delegate);
   }
 }
@@ -1274,12 +1275,6 @@ void  AcceleratorController::PerformAction(AcceleratorAction action,
 
 bool AcceleratorController::ShouldActionConsumeKeyEvent(
     AcceleratorAction action) {
-  if (action == NEXT_IME || action == SWITCH_IME) {
-    // NEXT_IME is bound to Alt-Shift key up event. SWITCH_IME is bound to
-    // HANKAKU_ZENKAKU, HENKAN, MUHENKAN keys.  To be consistent with Windows
-    // behavior, do not consume the key event here.
-    return false;
-  }
 #if defined(OS_CHROMEOS)
   if (action == SILENCE_SPOKEN_FEEDBACK)
     return false;

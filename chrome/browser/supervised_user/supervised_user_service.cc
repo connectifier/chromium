@@ -10,6 +10,7 @@
 #include "base/prefs/pref_service.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/component_updater/supervised_user_whitelist_installer.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_info_cache.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -28,6 +29,7 @@
 #include "chrome/browser/supervised_user/supervised_user_settings_service_factory.h"
 #include "chrome/browser/supervised_user/supervised_user_shared_settings_service_factory.h"
 #include "chrome/browser/supervised_user/supervised_user_site_list.h"
+#include "chrome/browser/supervised_user/supervised_user_whitelist_service.h"
 #include "chrome/browser/sync/profile_sync_service.h"
 #include "chrome/browser/sync/profile_sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
@@ -50,8 +52,6 @@
 #endif
 
 #if defined(ENABLE_EXTENSIONS)
-#include "chrome/browser/extensions/extension_service.h"
-#include "chrome/common/extensions/api/supervised_user_private/supervised_user_handler.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #endif
@@ -64,10 +64,6 @@
 using base::DictionaryValue;
 using base::UserMetricsAction;
 using content::BrowserThread;
-
-bool SupervisedUserService::Delegate::IsChildAccount() const {
-  return false;
-}
 
 base::FilePath SupervisedUserService::Delegate::GetBlacklistPath() const {
   return base::FilePath();
@@ -124,14 +120,15 @@ void SupervisedUserService::URLFilterContext::LoadWhitelists(
 }
 
 void SupervisedUserService::URLFilterContext::LoadBlacklist(
-    const base::FilePath& path) {
+    const base::FilePath& path,
+    const base::Closure& callback) {
   // For now, support loading only once. If we want to support re-load, we'll
   // have to clear the blacklist pointer in the url filters first.
   DCHECK_EQ(0u, blacklist_.GetEntryCount());
   blacklist_.ReadFromFile(
       path,
       base::Bind(&SupervisedUserService::URLFilterContext::OnBlacklistLoaded,
-                 base::Unretained(this)));
+                 base::Unretained(this), callback));
 }
 
 void SupervisedUserService::URLFilterContext::SetManualHosts(
@@ -154,7 +151,8 @@ void SupervisedUserService::URLFilterContext::SetManualURLs(
                  io_url_filter_, base::Owned(url_map.release())));
 }
 
-void SupervisedUserService::URLFilterContext::OnBlacklistLoaded() {
+void SupervisedUserService::URLFilterContext::OnBlacklistLoaded(
+    const base::Closure& callback) {
   ui_url_filter_->SetBlacklist(&blacklist_);
   BrowserThread::PostTask(
       BrowserThread::IO,
@@ -162,6 +160,7 @@ void SupervisedUserService::URLFilterContext::OnBlacklistLoaded() {
       base::Bind(&SupervisedUserURLFilter::SetBlacklist,
                  io_url_filter_,
                  &blacklist_));
+  callback.Run();
 }
 
 void SupervisedUserService::URLFilterContext::InitAsyncURLChecker(
@@ -180,19 +179,17 @@ SupervisedUserService::SupervisedUserService(Profile* profile)
       profile_(profile),
       active_(false),
       delegate_(NULL),
-#if defined(ENABLE_EXTENSIONS)
-      extension_registry_observer_(this),
-#endif
       waiting_for_sync_initialization_(false),
       is_profile_active_(false),
-      elevated_for_testing_(false),
       did_init_(false),
       did_shutdown_(false),
       weak_ptr_factory_(this) {
+  url_filter_context_.ui_url_filter()->AddObserver(this);
 }
 
 SupervisedUserService::~SupervisedUserService() {
   DCHECK(!did_init_ || did_shutdown_);
+  url_filter_context_.ui_url_filter()->RemoveObserver(this);
 }
 
 void SupervisedUserService::Shutdown() {
@@ -281,6 +278,10 @@ SupervisedUserService::GetURLFilterForIOThread() {
 
 SupervisedUserURLFilter* SupervisedUserService::GetURLFilterForUIThread() {
   return url_filter_context_.ui_url_filter();
+}
+
+SupervisedUserWhitelistService* SupervisedUserService::GetWhitelistService() {
+  return whitelist_service_.get();
 }
 
 // Items not on any list must return -1 (CATEGORY_NOT_ON_LIST in history.js).
@@ -413,23 +414,6 @@ bool SupervisedUserService::UserMayModifySettings(
   return ExtensionManagementPolicyImpl(extension, error);
 }
 
-void SupervisedUserService::OnExtensionLoaded(
-    content::BrowserContext* browser_context,
-    const extensions::Extension* extension) {
-  if (!extensions::SupervisedUserInfo::GetContentPackSiteList(extension)
-           .empty()) {
-    UpdateSiteLists();
-  }
-}
-void SupervisedUserService::OnExtensionUnloaded(
-    content::BrowserContext* browser_context,
-    const extensions::Extension* extension,
-    extensions::UnloadedExtensionInfo::Reason reason) {
-  if (!extensions::SupervisedUserInfo::GetContentPackSiteList(extension)
-           .empty()) {
-    UpdateSiteLists();
-  }
-}
 #endif  // defined(ENABLE_EXTENSIONS)
 
 syncer::ModelTypeSet SupervisedUserService::GetPreferredDataTypes() const {
@@ -528,36 +512,9 @@ bool SupervisedUserService::ExtensionManagementPolicyImpl(
   if (!ProfileIsSupervised() || (extension && extension->is_theme()))
     return true;
 
-  if (elevated_for_testing_)
-    return true;
-
   if (error)
     *error = l10n_util::GetStringUTF16(IDS_EXTENSIONS_LOCKED_SUPERVISED_USER);
   return false;
-}
-
-ScopedVector<SupervisedUserSiteList>
-SupervisedUserService::GetActiveSiteLists() {
-  ScopedVector<SupervisedUserSiteList> site_lists;
-  ExtensionService* extension_service =
-      extensions::ExtensionSystem::Get(profile_)->extension_service();
-  // Can be NULL in unit tests.
-  if (!extension_service)
-    return site_lists.Pass();
-
-  for (const scoped_refptr<const extensions::Extension>& extension :
-       extensions::ExtensionRegistry::Get(profile_)->enabled_extensions()) {
-    if (!extension_service->IsExtensionEnabled(extension->id()))
-      continue;
-
-    extensions::ExtensionResource site_list =
-        extensions::SupervisedUserInfo::GetContentPackSiteList(extension.get());
-    if (!site_list.empty()) {
-      site_lists.push_back(new SupervisedUserSiteList(site_list.GetFilePath()));
-    }
-  }
-
-  return site_lists.Pass();
 }
 
 void SupervisedUserService::SetExtensionsActive() {
@@ -566,17 +523,11 @@ void SupervisedUserService::SetExtensionsActive() {
   extensions::ManagementPolicy* management_policy =
       extension_system->management_policy();
 
-  if (active_) {
-    if (management_policy)
+  if (management_policy) {
+    if (active_)
       management_policy->RegisterProvider(this);
-
-    extension_registry_observer_.Add(
-        extensions::ExtensionRegistry::Get(profile_));
-  } else {
-    if (management_policy)
+    else
       management_policy->UnregisterProvider(this);
-
-    extension_registry_observer_.RemoveAll();
   }
 }
 #endif  // defined(ENABLE_EXTENSIONS)
@@ -641,13 +592,14 @@ void SupervisedUserService::OnDefaultFilteringBehaviorChanged() {
       SupervisedUserServiceObserver, observer_list_, OnURLFilterChanged());
 }
 
-void SupervisedUserService::UpdateSiteLists() {
-#if defined(ENABLE_EXTENSIONS)
-  url_filter_context_.LoadWhitelists(GetActiveSiteLists());
+void SupervisedUserService::OnSiteListsChanged(
+    ScopedVector<SupervisedUserSiteList> site_lists) {
+  url_filter_context_.LoadWhitelists(site_lists.Pass());
+}
 
+void SupervisedUserService::OnSiteListUpdated() {
   FOR_EACH_OBSERVER(
       SupervisedUserServiceObserver, observer_list_, OnURLFilterChanged());
-#endif
 }
 
 void SupervisedUserService::LoadBlacklist(const base::FilePath& path,
@@ -657,7 +609,7 @@ void SupervisedUserService::LoadBlacklist(const base::FilePath& path,
     return;
   }
 
-  DCHECK(!blacklist_downloader_.get());
+  DCHECK(!blacklist_downloader_);
   blacklist_downloader_.reset(new SupervisedUserBlacklistDownloader(
       url,
       path,
@@ -667,10 +619,11 @@ void SupervisedUserService::LoadBlacklist(const base::FilePath& path,
 }
 
 void SupervisedUserService::LoadBlacklistFromFile(const base::FilePath& path) {
-  url_filter_context_.LoadBlacklist(path);
-
-  FOR_EACH_OBSERVER(
-      SupervisedUserServiceObserver, observer_list_, OnURLFilterChanged());
+  // This object is guaranteed to outlive the URLFilterContext, so we can bind a
+  // raw pointer to it in the callback.
+  url_filter_context_.LoadBlacklist(
+      path, base::Bind(&SupervisedUserService::OnBlacklistLoaded,
+                       base::Unretained(this)));
 }
 
 void SupervisedUserService::OnBlacklistDownloadDone(const base::FilePath& path,
@@ -681,6 +634,11 @@ void SupervisedUserService::OnBlacklistDownloadDone(const base::FilePath& path,
     LOG(WARNING) << "Blacklist download failed";
   }
   blacklist_downloader_.reset();
+}
+
+void SupervisedUserService::OnBlacklistLoaded() {
+  FOR_EACH_OBSERVER(
+      SupervisedUserServiceObserver, observer_list_, OnURLFilterChanged());
 }
 
 bool SupervisedUserService::AccessRequestsEnabled() {
@@ -725,6 +683,16 @@ void SupervisedUserService::Init() {
   if (sync_service)
     sync_service->AddPreferenceProvider(this);
 
+  component_updater::ComponentUpdateService* component_updater =
+      g_browser_process->component_updater();
+  whitelist_service_.reset(new SupervisedUserWhitelistService(
+      profile_->GetPrefs(),
+      component_updater::SupervisedUserWhitelistInstaller::Create(
+          component_updater)));
+  whitelist_service_->AddSiteListsChangedCallback(
+      base::Bind(&SupervisedUserService::OnSiteListsChanged,
+                 weak_ptr_factory_.GetWeakPtr()));
+
   SetActive(ProfileIsSupervised());
 }
 
@@ -738,7 +706,7 @@ void SupervisedUserService::SetActive(bool active) {
       SupervisedUserPrefMappingServiceFactory::GetForBrowserContext(profile_)
           ->Init();
 
-      CommandLine* command_line = CommandLine::ForCurrentProcess();
+      base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
       if (command_line->HasSwitch(switches::kSupervisedUserSyncToken)) {
         InitSync(
             command_line->GetSwitchValueASCII(
@@ -821,20 +789,18 @@ void SupervisedUserService::SetActive(bool active) {
 
     // Initialize the filter.
     OnDefaultFilteringBehaviorChanged();
-    UpdateSiteLists();
+    whitelist_service_->Init();
     UpdateManualHosts();
     UpdateManualURLs();
-    bool use_blacklist =
-        CommandLine::ForCurrentProcess()->HasSwitch(
-            switches::kEnableSupervisedUserBlacklist);
+    bool use_blacklist = base::CommandLine::ForCurrentProcess()->HasSwitch(
+        switches::kEnableSupervisedUserBlacklist);
     if (delegate_ && use_blacklist) {
       base::FilePath blacklist_path = delegate_->GetBlacklistPath();
       if (!blacklist_path.empty())
         LoadBlacklist(blacklist_path, delegate_->GetBlacklistURL());
     }
-    bool use_safesites =
-        CommandLine::ForCurrentProcess()->HasSwitch(
-            switches::kEnableSupervisedUserSafeSites);
+    bool use_safesites = base::CommandLine::ForCurrentProcess()->HasSwitch(
+        switches::kEnableSupervisedUserSafeSites);
     if (delegate_ && use_safesites) {
       const std::string& cx = delegate_->GetSafeSitesCx();
       if (!cx.empty()) {

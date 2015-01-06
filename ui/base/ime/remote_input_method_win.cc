@@ -18,7 +18,7 @@
 #include "ui/base/ui_base_switches.h"
 #include "ui/events/event.h"
 #include "ui/events/event_utils.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/rect.h"
 
 namespace ui {
 namespace {
@@ -384,8 +384,8 @@ bool IsRemoteInputMethodWinRequired(gfx::AcceleratedWidget widget) {
   if (!process_handle.IsValid())
     return false;
   return base::win::IsProcessImmersive(process_handle.Get()) ||
-         CommandLine::ForCurrentProcess()->HasSwitch(
-            switches::kViewerConnect);
+         base::CommandLine::ForCurrentProcess()->HasSwitch(
+             switches::kViewerConnect);
 }
 
 RemoteInputMethodPrivateWin::RemoteInputMethodPrivateWin() {}

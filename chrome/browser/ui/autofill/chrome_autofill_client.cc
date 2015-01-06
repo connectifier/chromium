@@ -27,7 +27,7 @@
 #include "components/autofill/core/common/autofill_pref_names.h"
 #include "components/password_manager/content/browser/content_password_manager_driver.h"
 #include "content/public/browser/render_view_host.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/rect.h"
 
 #if defined(OS_ANDROID)
 #include "chrome/browser/android/chromium_application.h"
@@ -41,7 +41,8 @@ DEFINE_WEB_CONTENTS_USER_DATA_KEY(autofill::ChromeAutofillClient);
 namespace autofill {
 
 ChromeAutofillClient::ChromeAutofillClient(content::WebContents* web_contents)
-    : content::WebContentsObserver(web_contents), weak_pointer_factory_(this) {
+    : content::WebContentsObserver(web_contents),
+      unmask_controller_(web_contents) {
   DCHECK(web_contents);
 
 #if !defined(OS_ANDROID)
@@ -107,16 +108,14 @@ void ChromeAutofillClient::ShowAutofillSettings() {
 #endif  // #if defined(OS_ANDROID)
 }
 
-void ChromeAutofillClient::ShowUnmaskPrompt() {
-  // TODO(estade): we'll need to store the returned pointer at some point when
-  // the view object gets more complicated.
-  CardUnmaskPromptView::CreateAndShow(
-      web_contents(), base::Bind(&ChromeAutofillClient::OnUnmaskResponse,
-                                 weak_pointer_factory_.GetWeakPtr()));
+void ChromeAutofillClient::ShowUnmaskPrompt(
+    const CreditCard& card,
+    base::WeakPtr<CardUnmaskDelegate> delegate) {
+  unmask_controller_.ShowPrompt(card, delegate);
 }
 
-void ChromeAutofillClient::OnUnmaskResponse(const base::string16& response) {
-  NOTIMPLEMENTED() << " I should probably do something with this: " << response;
+void ChromeAutofillClient::OnUnmaskVerificationResult(bool success) {
+  unmask_controller_.OnVerificationResult(success);
 }
 
 void ChromeAutofillClient::ConfirmSaveCreditCard(
@@ -156,10 +155,7 @@ void ChromeAutofillClient::ShowRequestAutocompleteDialog(
 void ChromeAutofillClient::ShowAutofillPopup(
     const gfx::RectF& element_bounds,
     base::i18n::TextDirection text_direction,
-    const std::vector<base::string16>& values,
-    const std::vector<base::string16>& labels,
-    const std::vector<base::string16>& icons,
-    const std::vector<int>& identifiers,
+    const std::vector<autofill::Suggestion>& suggestions,
     base::WeakPtr<AutofillPopupDelegate> delegate) {
   // Convert element_bounds to be in screen space.
   gfx::Rect client_area = web_contents()->GetContainerBounds();
@@ -175,7 +171,7 @@ void ChromeAutofillClient::ShowAutofillPopup(
                                                element_bounds_in_screen_space,
                                                text_direction);
 
-  popup_controller_->Show(values, labels, icons, identifiers);
+  popup_controller_->Show(suggestions);
 }
 
 void ChromeAutofillClient::UpdateAutofillPopupDataListValues(

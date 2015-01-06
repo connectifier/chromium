@@ -24,9 +24,9 @@
 #include "ipc/ipc_sender.h"
 #include "media/base/video_decoder_config.h"
 #include "ui/events/latency_info.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/gpu_memory_buffer.h"
 #include "ui/gfx/native_widget_types.h"
-#include "ui/gfx/size.h"
 #include "ui/gl/gl_surface.h"
 #include "ui/gl/gpu_preference.h"
 #include "url/gurl.h"
@@ -36,6 +36,7 @@ struct Mailbox;
 class ValueStateMap;
 namespace gles2 {
 class MailboxManager;
+class SubscriptionRefSet;
 }
 }
 
@@ -70,6 +71,7 @@ class GpuCommandBufferStub
       GpuCommandBufferStub* share_group,
       const gfx::GLSurfaceHandle& handle,
       gpu::gles2::MailboxManager* mailbox_manager,
+      gpu::gles2::SubscriptionRefSet* subscription_ref_set,
       gpu::ValueStateMap* pending_valuebuffer_state,
       const gfx::Size& size,
       const gpu::gles2::DisallowedFeatures& disallowed_features,

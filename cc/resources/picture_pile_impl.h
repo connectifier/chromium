@@ -5,7 +5,6 @@
 #ifndef CC_RESOURCES_PICTURE_PILE_IMPL_H_
 #define CC_RESOURCES_PICTURE_PILE_IMPL_H_
 
-#include <list>
 #include <map>
 #include <set>
 #include <vector>
@@ -30,7 +29,6 @@ namespace cc {
 
 class CC_EXPORT PicturePileImpl : public RasterSource {
  public:
-  static scoped_refptr<PicturePileImpl> Create();
   static scoped_refptr<PicturePileImpl> CreateFromPicturePile(
       const PicturePile* other);
 

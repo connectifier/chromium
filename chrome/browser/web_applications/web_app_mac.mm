@@ -32,6 +32,7 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/shell_integration.h"
 #include "chrome/browser/ui/app_list/app_list_service.h"
+#include "chrome/browser/ui/cocoa/key_equivalent_constants.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
@@ -148,7 +149,7 @@ bool AddGfxImageToIconFamily(IconFamilyHandle icon_family,
 bool AppShimsDisabledForTest() {
   // Disable app shims in tests because shims created in ~/Applications will not
   // be cleaned up.
-  return CommandLine::ForCurrentProcess()->HasSwitch(switches::kTestType);
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kTestType);
 }
 
 base::FilePath GetWritableApplicationsDirectory() {
@@ -236,7 +237,7 @@ void LaunchShimOnFileThread(const web_app::ShortcutInfo& shortcut_info,
   if (!base::PathExists(shim_path))
     return;
 
-  CommandLine command_line(CommandLine::NO_PROGRAM);
+  base::CommandLine command_line(base::CommandLine::NO_PROGRAM);
   command_line.AppendSwitchASCII(
       app_mode::kLaunchedByChromeProcessId,
       base::IntToString(base::GetCurrentProcId()));
@@ -859,7 +860,7 @@ bool WebAppShortcutCreator::UpdatePlist(const base::FilePath& app_path) const {
   [plist setObject:base::mac::FilePathToNSString(app_name)
             forKey:base::mac::CFToNSCast(kCFBundleNameKey)];
 
-  if (CommandLine::ForCurrentProcess()->HasSwitch(
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableAppsFileAssociations)) {
     UpdateFileTypes(plist, file_handlers_info_);
   }
@@ -974,12 +975,25 @@ void WebAppShortcutCreator::RevealAppShimInFinder() const {
   if (app_path.empty())
     return;
 
+  // Check if the app shim exists.
+  if (base::PathExists(app_path)) {
+    // Use selectFile to show the contents of parent directory with the app
+    // shim selected.
+    [[NSWorkspace sharedWorkspace]
+                      selectFile:base::mac::FilePathToNSString(app_path)
+        inFileViewerRootedAtPath:nil];
+    return;
+  }
+
+  // Otherwise, go up a directory.
+  app_path = app_path.DirName();
+  // Check if the Chrome apps folder exists, otherwise go up to ~/Applications.
   if (!base::PathExists(app_path))
     app_path = app_path.DirName();
-
+  // Since |app_path| is a directory, use openFile to show the contents of
+  // that directory in Finder.
   [[NSWorkspace sharedWorkspace]
-                    selectFile:base::mac::FilePathToNSString(app_path)
-      inFileViewerRootedAtPath:nil];
+      openFile:base::mac::FilePathToNSString(app_path)];
 }
 
 base::FilePath GetAppInstallPath(const ShortcutInfo& shortcut_info) {
@@ -1000,7 +1014,7 @@ void MaybeLaunchShortcut(const ShortcutInfo& shortcut_info) {
       base::Bind(&LaunchShimOnFileThread, shortcut_info, false));
 }
 
-bool MaybeRebuildShortcut(const CommandLine& command_line) {
+bool MaybeRebuildShortcut(const base::CommandLine& command_line) {
   if (!command_line.HasSwitch(app_mode::kAppShimError))
     return false;
 
@@ -1024,11 +1038,11 @@ void CreateAppShortcutInfoLoaded(
 
   NSButton* continue_button = [alert
       addButtonWithTitle:l10n_util::GetNSString(IDS_CREATE_SHORTCUTS_COMMIT)];
-  [continue_button setKeyEquivalent:@""];
+  [continue_button setKeyEquivalent:kKeyEquivalentReturn];
 
   NSButton* cancel_button =
       [alert addButtonWithTitle:l10n_util::GetNSString(IDS_CANCEL)];
-  [cancel_button setKeyEquivalent:@"\r"];
+  [cancel_button setKeyEquivalent:kKeyEquivalentEscape];
 
   [alert setMessageText:l10n_util::GetNSString(IDS_CREATE_SHORTCUTS_LABEL)];
   [alert setAlertStyle:NSInformationalAlertStyle];

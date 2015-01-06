@@ -24,10 +24,11 @@ import org.chromium.ui.base.WindowAndroid;
  * and extends {@link Tab}.
  */
 public class ChromeShellTab extends Tab {
+    private final TabManager mTabManager;
+
     // Tab state
     private boolean mIsLoading;
     private boolean mIsFullscreen = false;
-    private TabManager mTabManager;
 
     /**
      * @param context           The Context the view is running in.
@@ -38,8 +39,7 @@ public class ChromeShellTab extends Tab {
     public ChromeShellTab(Context context, String url, WindowAndroid window,
             ContentViewClient contentViewClient, TabManager tabManager) {
         super(false, context, window);
-        initialize();
-        initContentViewCore();
+        initialize(0, null, false);
         setContentViewClient(contentViewClient);
         loadUrlWithSanitization(url);
         mTabManager = tabManager;
@@ -96,11 +96,6 @@ public class ChromeShellTab extends Tab {
     protected ContextMenuPopulator createContextMenuPopulator() {
         return new ChromeContextMenuPopulator(new TabChromeContextMenuItemDelegate() {
             @Override
-            public void onOpenImageUrl(String url, Referrer referrer) {
-                loadUrlWithSanitization(url);
-            }
-
-            @Override
             public void onOpenInNewTab(String url, Referrer referrer) {
                 mTabManager.createTab(url, TabLaunchType.FROM_LINK);
             }
@@ -117,11 +112,13 @@ public class ChromeShellTab extends Tab {
         @Override
         public void onLoadStarted() {
             mIsLoading = true;
+            super.onLoadStarted();
         }
 
         @Override
         public void onLoadStopped() {
             mIsLoading = false;
+            super.onLoadStopped();
         }
 
         @Override
@@ -139,6 +136,8 @@ public class ChromeShellTab extends Tab {
         public void webContentsCreated(long sourceWebContents, long openerRenderFrameId,
                 String frameName, String targetUrl, long newWebContents) {
             mTabManager.createTab(targetUrl, TabLaunchType.FROM_LINK);
+            super.webContentsCreated(
+                    sourceWebContents, openerRenderFrameId, frameName, targetUrl, newWebContents);
         }
     }
 }

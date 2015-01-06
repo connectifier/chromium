@@ -90,6 +90,7 @@ extern const char kDisableOfflineAutoReloadVisibleOnly[];
 extern const char kDisableOriginChip[];
 extern const char kDisableOutOfProcessPdf[];
 extern const char kDisablePasswordManagerReauthentication[];
+extern const char kDisablePdfMaterialUI[];
 extern const char kDisablePeopleSearch[];
 extern const char kDisablePermissionsBubbles[];
 extern const char kDisablePopupBlocking[];
@@ -148,6 +149,7 @@ extern const char kEnableOriginChipAlways[];
 extern const char kEnableOriginChipOnSrp[];
 extern const char kEnableOutOfProcessPdf[];
 extern const char kEnablePanels[];
+extern const char kEnablePdfMaterialUI[];
 extern const char kEnablePermissionsBubbles[];
 extern const char kEnablePluginPlaceholderShadowDom[];
 extern const char kEnablePowerOverlay[];
@@ -179,7 +181,9 @@ extern const char kEnableTabAudioMuting[];
 extern const char kEnableThumbnailRetargeting[];
 extern const char kEnableTranslateNewUX[];
 extern const char kEnableUserAlternateProtocolPorts[];
+extern const char kEnableWebAppFrame[];
 extern const char kEnableWebsiteSettingsManager[];
+extern const char kEnableWifiCredentialSync[];
 extern const char kEnhancedBookmarksExperiment[];
 extern const char kExplicitlyAllowedPorts[];
 extern const char kExtensionContentVerificationBootstrap[];
@@ -338,10 +342,6 @@ extern const char kWindowSize[];
 extern const char kWinHttpProxyResolver[];
 extern const char kWinJumplistAction[];
 
-#if defined(ENABLE_PLUGIN_INSTALLATION)
-extern const char kPluginsMetadataServerURL[];
-#endif
-
 #if defined(OS_ANDROID)
 extern const char kDisableCast[];
 extern const char kDisableContextualSearch[];
@@ -368,7 +368,9 @@ extern const char kMigrateDataDirForSxS[];
 
 #if defined(OS_MACOSX)
 extern const char kAppsKeepChromeAliveInTests[];
+extern const char kHostedAppQuitNotification[];
 extern const char kDisableSystemFullscreenForTesting[];
+extern const char kEnableHostedAppShimCreation[];
 extern const char kRelauncherProcess[];
 #endif
 
@@ -399,6 +401,7 @@ extern const char kFileManagerExtensionPath[];
 
 bool AboutInSettingsEnabled();
 bool OutOfProcessPdfEnabled();
+bool PdfMaterialUIEnabled();
 bool SettingsWindowEnabled();
 
 #if defined(OS_CHROMEOS)

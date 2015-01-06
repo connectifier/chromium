@@ -77,8 +77,8 @@ def ProcessCommandLineArgs(parser, args):
     parser.error('--pageset-repeat must be a positive integer.')
 
 
-def _RunUserStoryAndProcessErrorIfNeeded(
-    test, expectations, user_story, results, state):
+def _RunUserStoryAndProcessErrorIfNeeded(expectations, user_story, results,
+                                         state):
   def ProcessError():
     if expectation == 'fail':
       msg = 'Expected exception while running %s' % user_story.display_name
@@ -100,10 +100,6 @@ def _RunUserStoryAndProcessErrorIfNeeded(
     ProcessError()
   except exceptions.AppCrashException:
     ProcessError()
-    if test.is_multi_tab_test:
-      logging.error('Aborting multi-tab test after browser or tab crashed at '
-                    'user story %s' % user_story.display_name)
-      test.RequestExit()
     raise
   except page_action.PageActionNotSupported as e:
     results.AddValue(
@@ -192,7 +188,8 @@ def GetUserStoryGroupsWithSameSharedUserStoryClass(user_story_set):
   return user_story_groups
 
 
-def Run(test, user_story_set, expectations, finder_options, results):
+def Run(test, user_story_set, expectations, finder_options, results,
+        max_failures=None):
   """Runs a given test against a given page_set with the given options.
 
   Stop execution for unexpected exceptions such as KeyboardInterrupt.
@@ -224,22 +221,21 @@ def Run(test, user_story_set, expectations, finder_options, results):
   if not user_stories:
     return
 
-  user_story_with_discarded_first_results = set()
-  max_failures = finder_options.max_failures  # command-line gets priority
-  if max_failures is None:
-    max_failures = test.max_failures  # may be None
+  # Effective max failures gives priority to command-line flag value.
+  effective_max_failures = finder_options.max_failures
+  if effective_max_failures is None:
+    effective_max_failures = max_failures
+
   user_story_groups = GetUserStoryGroupsWithSameSharedUserStoryClass(
       user_stories)
+  user_story_with_discarded_first_results = set()
 
-  test.WillRunTest(finder_options)
   for group in user_story_groups:
     state = None
     try:
       for _ in xrange(finder_options.pageset_repeat):
         for user_story in group.user_stories:
           for _ in xrange(finder_options.page_repeat):
-            if test.IsExiting():
-              break
             if not state:
               state = group.shared_user_story_state_class(
                   test, finder_options, user_story_set)
@@ -247,19 +243,18 @@ def Run(test, user_story_set, expectations, finder_options, results):
             try:
               _WaitForThermalThrottlingIfNeeded(state.platform)
               _RunUserStoryAndProcessErrorIfNeeded(
-                  test, expectations, user_story, results, state)
+                  expectations, user_story, results, state)
             except exceptions.AppCrashException:
               # Catch AppCrashException to give the story a chance to retry.
               # The retry is enabled by tearing down the state and creating
               # a new state instance in the next iteration.
-              if not test.IsExiting():
-                try:
-                  # If TearDownState raises, do not catch the exception.
-                  # (The AppCrashException was saved as a failure value.)
-                  state.TearDownState(results)
-                finally:
-                  # Later finally-blocks use state, so ensure it is cleared.
-                  state = None
+              try:
+                # If TearDownState raises, do not catch the exception.
+                # (The AppCrashException was saved as a failure value.)
+                state.TearDownState(results)
+              finally:
+                # Later finally-blocks use state, so ensure it is cleared.
+                state = None
             finally:
               has_existing_exception = sys.exc_info() is not None
               try:
@@ -277,9 +272,10 @@ def Run(test, user_story_set, expectations, finder_options, results):
                 # Print current exception and propagate existing exception.
                 exception_formatter.PrintFormattedException(
                     msg='Exception from result processing:')
-          if max_failures is not None and len(results.failures) > max_failures:
+          if (effective_max_failures is not None and
+              len(results.failures) > effective_max_failures):
             logging.error('Too many failures. Aborting.')
-            test.RequestExit()
+            return
     finally:
       if state:
         has_existing_exception = sys.exc_info() is not None

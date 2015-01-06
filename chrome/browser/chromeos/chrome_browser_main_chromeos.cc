@@ -11,7 +11,6 @@
 #include "ash/shell.h"
 #include "base/bind.h"
 #include "base/callback.h"
-#include "base/chromeos/memory_pressure_observer_chromeos.h"
 #include "base/command_line.h"
 #include "base/files/file_util.h"
 #include "base/lazy_instance.h"
@@ -41,11 +40,9 @@
 #include "chrome/browser/chromeos/events/event_rewriter_controller.h"
 #include "chrome/browser/chromeos/events/keyboard_driven_event_rewriter.h"
 #include "chrome/browser/chromeos/extensions/default_app_order.h"
-#include "chrome/browser/chromeos/extensions/extension_system_event_observer.h"
 #include "chrome/browser/chromeos/external_metrics.h"
 #include "chrome/browser/chromeos/input_method/input_method_configuration.h"
 #include "chrome/browser/chromeos/input_method/input_method_util.h"
-#include "chrome/browser/chromeos/kiosk_mode/kiosk_mode_settings.h"
 #include "chrome/browser/chromeos/language_preferences.h"
 #include "chrome/browser/chromeos/login/helper.h"
 #include "chrome/browser/chromeos/login/lock/screen_locker.h"
@@ -88,7 +85,7 @@
 #include "chrome/common/chrome_version_info.h"
 #include "chrome/common/logging_chrome.h"
 #include "chrome/common/pref_names.h"
-#include "chromeos/audio/audio_devices_pref_handler.h"
+#include "chromeos/audio/audio_devices_pref_handler_impl.h"
 #include "chromeos/audio/cras_audio_handler.h"
 #include "chromeos/cert_loader.h"
 #include "chromeos/chromeos_paths.h"
@@ -120,7 +117,6 @@
 #include "components/user_manager/user_manager.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_service.h"
-#include "content/public/browser/power_save_blocker.h"
 #include "content/public/common/main_function_params.h"
 #include "media/audio/sounds/sounds_manager.h"
 #include "net/base/network_change_notifier.h"
@@ -140,9 +136,8 @@
 #endif
 
 #if !defined(USE_ATHENA)
-#include "chrome/browser/chromeos/kiosk_mode/kiosk_mode_idle_logout.h"
-#include "chrome/browser/chromeos/kiosk_mode/kiosk_mode_screensaver.h"
 #include "chrome/browser/chromeos/login/users/wallpaper/wallpaper_manager.h"
+#include "components/wallpaper/wallpaper_manager_base.h"
 #endif
 
 namespace chromeos {
@@ -272,11 +267,6 @@ ChromeBrowserMainPartsChromeos::ChromeBrowserMainPartsChromeos(
 }
 
 ChromeBrowserMainPartsChromeos::~ChromeBrowserMainPartsChromeos() {
-#if !defined(USE_ATHENA)
-  if (KioskModeSettings::Get()->IsKioskModeEnabled())
-    ShutdownKioskModeScreensaver();
-#endif
-
   // To be precise, logout (browser shutdown) is not yet done, but the
   // remaining work is negligible, hence we say LogoutDone here.
   BootTimesLoader::Get()->AddLogoutTimeMarker("LogoutDone", false);
@@ -286,7 +276,8 @@ ChromeBrowserMainPartsChromeos::~ChromeBrowserMainPartsChromeos() {
 // content::BrowserMainParts and ChromeBrowserMainExtraParts overrides ---------
 
 void ChromeBrowserMainPartsChromeos::PreEarlyInitialization() {
-  CommandLine* singleton_command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* singleton_command_line =
+      base::CommandLine::ForCurrentProcess();
 
   if (parsed_command_line().HasSwitch(switches::kGuestSession)) {
     // Disable sync and extensions if we're in "browse without sign-in" mode.
@@ -333,12 +324,6 @@ void ChromeBrowserMainPartsChromeos::PreMainMessageLoopStart() {
 }
 
 void ChromeBrowserMainPartsChromeos::PostMainMessageLoopStart() {
-  // Instantiate the MemoryPressureObserver.
-  if (CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kUseMemoryPressureSystemChromeOS)) {
-    memory_pressure_observer_.reset(new base::MemoryPressureObserverChromeOS);
-  }
-
   base::FilePath user_data_dir;
   if (!base::SysInfo::IsRunningOnChromeOS() &&
       PathService::Get(chrome::DIR_USER_DATA, &user_data_dir)) {
@@ -365,8 +350,8 @@ void ChromeBrowserMainPartsChromeos::PreMainMessageLoopRun() {
       content::BrowserThread::GetMessageLoopProxyForThread(
           content::BrowserThread::IO));
 
-  CrasAudioHandler::Initialize(
-      AudioDevicesPrefHandler::Create(g_browser_process->local_state()));
+  CrasAudioHandler::Initialize(new AudioDevicesPrefHandlerImpl(
+      g_browser_process->local_state(), prefs::kAudioCaptureAllowed));
 
   // Start loading machine statistics here. StatisticsProvider::Shutdown()
   // will ensure that loading is aborted on early exit.
@@ -402,16 +387,7 @@ void ChromeBrowserMainPartsChromeos::PreProfileInit() {
 
   g_browser_process->platform_part()->InitializeChromeUserManager();
 
-#if defined(USE_ATHENA)
   ScreenLocker::InitClass();
-#else
-  // Initialize the screen locker now so that it can receive
-  // LOGIN_USER_CHANGED notification from UserManager.
-  if (KioskModeSettings::Get()->IsKioskModeEnabled())
-    KioskModeIdleLogout::Initialize();
-  else
-    ScreenLocker::InitClass();
-#endif
 
   // This forces the ProfileManager to be created and register for the
   // notification it needs to track the logged in user.
@@ -432,7 +408,7 @@ void ChromeBrowserMainPartsChromeos::PreProfileInit() {
   // logged in and we should behave accordingly.
   bool immediate_login =
       parsed_command_line().HasSwitch(switches::kLoginUser);
-  if (immediate_login){
+  if (immediate_login) {
     // Redirects Chrome logging to the user data dir.
     logging::RedirectChromeLogging(parsed_command_line());
 
@@ -455,6 +431,11 @@ void ChromeBrowserMainPartsChromeos::PreProfileInit() {
   // TODO(oshima): MagnificationManager/WallpaperManager depends on ash.
   // crbug.com/408733, crbug.com/408734.
   MagnificationManager::Initialize();
+
+  wallpaper::WallpaperManagerBase::SetPathIds(
+      chrome::DIR_USER_DATA,
+      chrome::DIR_CHROMEOS_WALLPAPERS,
+      chrome::DIR_CHROMEOS_CUSTOM_WALLPAPERS);
 
   // Add observers for WallpaperManager. This depends on PowerManagerClient,
   // TimezoneSettings and CrosSettings.
@@ -609,21 +590,13 @@ void ChromeBrowserMainPartsChromeos::PostProfileInit() {
   if (user_manager::UserManager::Get()->IsLoggedInAsGuest())
     SetGuestLocale(profile());
 
-  // These observers must be initialized after the profile because
-  // they use the profile to dispatch extension events.
-  extension_system_event_observer_.reset(new ExtensionSystemEventObserver());
-  if (KioskModeSettings::Get()->IsKioskModeEnabled()) {
-    retail_mode_power_save_blocker_ = content::PowerSaveBlocker::Create(
-        content::PowerSaveBlocker::kPowerSaveBlockPreventDisplaySleep,
-        "Retail mode");
-  }
-
   peripheral_battery_observer_.reset(new PeripheralBatteryObserver());
 
   renderer_freezer_.reset(
       new RendererFreezer(scoped_ptr<RendererFreezer::Delegate>(
           new FreezerCgroupProcessManager())));
-  if (CommandLine::ForCurrentProcess()->HasSwitch(switches::kWakeOnPackets))
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kWakeOnPackets))
     light_bar_.reset(new LightBar());
 
   g_browser_process->platform_part()->InitializeAutomaticRebootManager();
@@ -673,7 +646,7 @@ void ChromeBrowserMainPartsChromeos::PreBrowserStart() {
   g_browser_process->platform_part()->oom_priority_manager()->Start();
 
   if (ui::ShouldDefaultToNaturalScroll()) {
-    CommandLine::ForCurrentProcess()->AppendSwitch(
+    base::CommandLine::ForCurrentProcess()->AppendSwitch(
         chromeos::switches::kNaturalScrollDefault);
     system::InputDeviceSettings::Get()->SetTapToClick(true);
   }
@@ -708,9 +681,6 @@ void ChromeBrowserMainPartsChromeos::PostBrowserStart() {
 void ChromeBrowserMainPartsChromeos::PostMainMessageLoopRun() {
   BootTimesLoader::Get()->AddLogoutTimeMarker("UIMessageLoopEnded", true);
 
-  // Remove the MemoryPressureObserver since it is not needed anymore.
-  memory_pressure_observer_.reset();
-
   g_browser_process->platform_part()->oom_priority_manager()->Stop();
 
   // Early wake-up of HID device service.
@@ -741,19 +711,12 @@ void ChromeBrowserMainPartsChromeos::PostMainMessageLoopRun() {
 
   // We should remove observers attached to D-Bus clients before
   // DBusThreadManager is shut down.
-  extension_system_event_observer_.reset();
-  retail_mode_power_save_blocker_.reset();
   peripheral_battery_observer_.reset();
   power_prefs_.reset();
   renderer_freezer_.reset();
   light_bar_.reset();
   wake_on_wifi_manager_.reset();
-
-  // Let the ScreenLocker unregister itself from SessionManagerClient before
-  // DBusThreadManager is shut down.
-  if (!KioskModeSettings::Get()->IsKioskModeEnabled())
-    ScreenLocker::ShutDownClass();
-
+  ScreenLocker::ShutDownClass();
   keyboard_event_rewriters_.reset();
 #if defined(USE_X11)
   // The XInput2 event listener needs to be shut down earlier than when

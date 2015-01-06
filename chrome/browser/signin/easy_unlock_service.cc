@@ -40,10 +40,13 @@
 #if defined(OS_CHROMEOS)
 #include "base/sys_info.h"
 #include "chrome/browser/chromeos/login/easy_unlock/easy_unlock_key_manager.h"
+#include "chrome/browser/chromeos/login/easy_unlock/easy_unlock_tpm_key_manager.h"
+#include "chrome/browser/chromeos/login/easy_unlock/easy_unlock_tpm_key_manager_factory.h"
 #include "chrome/browser/chromeos/login/session/user_session_manager.h"
 #include "chrome/browser/chromeos/profiles/profile_helper.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/dbus/power_manager_client.h"
+#include "components/user_manager/user_manager.h"
 #endif
 
 namespace {
@@ -82,7 +85,7 @@ EasyUnlockService* EasyUnlockService::GetForUser(
 
 // static
 bool EasyUnlockService::IsSignInEnabled() {
-  return !CommandLine::ForCurrentProcess()->HasSwitch(
+  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
       proximity_auth::switches::kDisableEasyUnlock);
 }
 
@@ -198,6 +201,7 @@ EasyUnlockService::EasyUnlockService(Profile* profile)
     : profile_(profile),
       bluetooth_detector_(new BluetoothDetector(this)),
       shut_down_(false),
+      tpm_key_checked_(false),
       weak_ptr_factory_(this) {
   extensions::ExtensionSystem::Get(profile_)->ready().Post(
       FROM_HERE,
@@ -232,6 +236,9 @@ void EasyUnlockService::RegisterProfilePrefs(
 // static
 void EasyUnlockService::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterDictionaryPref(prefs::kEasyUnlockHardlockState);
+#if defined(OS_CHROMEOS)
+  EasyUnlockTpmKeyManager::RegisterLocalStatePrefs(registry);
+#endif
 }
 
 // static
@@ -244,13 +251,17 @@ void EasyUnlockService::ResetLocalStateForUser(const std::string& user_id) {
 
   DictionaryPrefUpdate update(local_state, prefs::kEasyUnlockHardlockState);
   update->RemoveWithoutPathExpansion(user_id, NULL);
+
+#if defined(OS_CHROMEOS)
+  EasyUnlockTpmKeyManager::ResetLocalStateForUser(user_id);
+#endif
 }
 
 bool EasyUnlockService::IsAllowed() {
   if (shut_down_)
     return false;
 
-  if (CommandLine::ForCurrentProcess()->HasSwitch(
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           proximity_auth::switches::kDisableEasyUnlock)) {
     return false;
   }
@@ -489,7 +500,7 @@ void EasyUnlockService::LoadApp() {
 #if defined(OS_CHROMEOS)
   // TODO(xiyuan): Remove this when the app is bundled with chrome.
   if (!base::SysInfo::IsRunningOnChromeOS() &&
-      !CommandLine::ForCurrentProcess()->HasSwitch(
+      !base::CommandLine::ForCurrentProcess()->HasSwitch(
           proximity_auth::switches::kForceLoadEasyUnlockAppInTests)) {
     return;
   }
@@ -503,7 +514,8 @@ void EasyUnlockService::LoadApp() {
 
 #ifndef NDEBUG
   // Only allow app path override switch for debug build.
-  const CommandLine* command_line = CommandLine::ForCurrentProcess();
+  const base::CommandLine* command_line =
+      base::CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(switches::kEasyUnlockAppPath)) {
     easy_unlock_path =
         command_line->GetSwitchValuePath(switches::kEasyUnlockAppPath);
@@ -554,6 +566,7 @@ void EasyUnlockService::ReloadApp() {
 
 void EasyUnlockService::UpdateAppState() {
   if (IsAllowed()) {
+    EnsureTpmKeyPresentIfNeeded();
     LoadApp();
 
 #if defined(OS_CHROMEOS)
@@ -690,4 +703,26 @@ void EasyUnlockService::PrepareForSuspend() {
     UpdateScreenlockState(
         EasyUnlockScreenlockStateHandler::STATE_BLUETOOTH_CONNECTING);
   }
+}
+
+void EasyUnlockService::EnsureTpmKeyPresentIfNeeded() {
+  if (tpm_key_checked_ || GetType() != TYPE_REGULAR || GetUserEmail().empty())
+    return;
+
+#if defined(OS_CHROMEOS)
+  // If this is called before the session is started, the chances are Chrome
+  // is restarting in order to apply user flags. Don't check TPM keys in this
+  // case.
+  if (!user_manager::UserManager::Get() ||
+      !user_manager::UserManager::Get()->IsSessionStarted())
+    return;
+
+  // TODO(tbarzic): Set check_private_key only if previous sign-in attempt
+  // failed.
+  EasyUnlockTpmKeyManagerFactory::GetInstance()->Get(profile_)
+      ->PrepareTpmKey(true /* check_private_key */,
+                      base::Closure());
+#endif  // defined(OS_CHROMEOS)
+
+  tpm_key_checked_ = true;
 }

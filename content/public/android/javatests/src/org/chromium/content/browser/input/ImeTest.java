@@ -398,8 +398,12 @@ public class ImeTest extends ContentShellTestBase {
         assertTrue(ev.isShiftPressed());
     }
 
+    /*
     @SmallTest
     @Feature({"TextInput", "Main"})
+    http://crbug.com/445499
+    */
+    @DisabledTest
     public void testKeyCodesWhileComposingText() throws Throwable {
         DOMUtils.focusNode(mWebContents, "textarea");
         assertWaitForKeyboardStatus(true);
@@ -468,8 +472,12 @@ public class ImeTest extends ContentShellTestBase {
         assertEquals("", mConnection.getTextBeforeCursor(9, 0));
     }
 
+    /*
     @SmallTest
     @Feature({"TextInput", "Main"})
+    http://crbug.com/445499
+    */
+    @DisabledTest
     public void testKeyCodesWhileSwipingText() throws Throwable {
         DOMUtils.focusNode(mWebContents, "textarea");
         assertWaitForKeyboardStatus(true);

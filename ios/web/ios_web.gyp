@@ -14,7 +14,6 @@
         '../..',
       ],
       'dependencies': [
-        'webp_decoder',
         '../../base/base.gyp:base',
         '../../content/content.gyp:content_browser',
         '../../net/net.gyp:net',
@@ -36,6 +35,7 @@
         'public/ssl_status.cc',
         'public/ssl_status.h',
         'public/string_util.h',
+        'public/url_scheme_util.h',
         'public/user_agent.h',
         'public/user_agent.mm',
         'public/web_state/js/crw_js_base_manager.h',
@@ -46,6 +46,7 @@
         'public/web_state/web_state_observer.h',
         'public/web_thread.h',
         'string_util.cc',
+        'url_scheme_util.mm',
         'web_state/js/crw_js_base_manager.mm',
         'web_state/js/crw_js_common_manager.h',
         'web_state/js/crw_js_common_manager.mm',
@@ -56,6 +57,8 @@
         'web_state/js/crw_js_message_manager.mm',
         'web_state/web_state_observer.cc',
         'web_thread.cc',
+        'web_thread_impl.cc',
+        'web_thread_impl.h',
         'web_view_util.h',
         'web_view_util.mm',
       ],
@@ -84,24 +87,10 @@
       ],
     },
     {
-      'target_name': 'webp_decoder',
-      'type': 'static_library',
-      'include_dirs': [
-        '../..',
-      ],
-      'dependencies': [
-        '../../base/base.gyp:base',
-        '../../third_party/libwebp/libwebp.gyp:libwebp_dec',
-      ],
-      'sources': [
-        'public/webp_decoder.h',
-        'public/webp_decoder.mm',
-      ],
-    },
-    {
       'target_name': 'test_support_ios_web',
       'type': 'static_library',
       'dependencies': [
+        '../../content/content_shell_and_tests.gyp:test_support_content',
         'ios_web',
       ],
       'include_dirs': [
@@ -110,10 +99,16 @@
       'sources': [
         'public/test/crw_test_js_injection_receiver.h',
         'public/test/crw_test_js_injection_receiver.mm',
+        'public/test/js_test_util.h',
+        'public/test/js_test_util.mm',
         'public/test/test_browser_state.cc',
         'public/test/test_browser_state.h',
         'public/test/test_web_state.cc',
         'public/test/test_web_state.h',
+        'public/test/test_web_thread.h',
+        'public/test/test_web_thread_bundle.h',
+        'test/test_web_thread.cc',
+        'test/test_web_thread_bundle.cc',
       ],
     },
   ],

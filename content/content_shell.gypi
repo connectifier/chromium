@@ -510,7 +510,7 @@
             ],
             'conditions': [
               ['OS!="android"', {
-                'pak_inputs': ['<(SHARED_INTERMEDIATE_DIR)/webkit/devtools_resources.pak',],
+                'pak_inputs': ['<(SHARED_INTERMEDIATE_DIR)/blink/devtools_resources.pak',],
                 'pak_output': '<(PRODUCT_DIR)/content_shell.pak',
               }, {
                 'pak_output': '<(PRODUCT_DIR)/content_shell/assets/content_shell.pak',
@@ -1157,7 +1157,7 @@
               ],
               'action': [
                 'python',
-                '<(DEPTH)/chrome/tools/build/win/syzygy_instrument.py',
+                '<(DEPTH)/chrome/tools/build/win/syzygy/instrument.py',
                 '--mode', 'asan',
                 '--input_executable', '<(PRODUCT_DIR)/content_shell.exe',
                 '--input_symbol', '<(PRODUCT_DIR)/content_shell.exe.pdb',

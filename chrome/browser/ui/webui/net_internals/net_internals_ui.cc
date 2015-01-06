@@ -700,7 +700,8 @@ void NetInternalsMessageHandler::OnGetDataReductionProxyInfo(
   DataReductionProxyChromeSettings* data_reduction_proxy_settings =
       DataReductionProxyChromeSettingsFactory::GetForBrowserContext(profile);
   data_reduction_proxy::DataReductionProxyEventStore* event_store =
-      data_reduction_proxy_settings->GetEventStore();
+      (data_reduction_proxy_settings == nullptr) ? nullptr :
+          data_reduction_proxy_settings->GetEventStore();
   SendJavascriptCommand(
       "receivedDataReductionProxyInfo",
       (event_store == nullptr) ? nullptr : event_store->GetSummaryValue());
@@ -1448,8 +1449,9 @@ base::Value* NetInternalsUI::GetConstants() {
     dict->SetString("official",
                     version_info.IsOfficialBuild() ? "official" : "unofficial");
     dict->SetString("os_type", version_info.OSType());
-    dict->SetString("command_line",
-                    CommandLine::ForCurrentProcess()->GetCommandLineString());
+    dict->SetString(
+        "command_line",
+        base::CommandLine::ForCurrentProcess()->GetCommandLineString());
 
     constants_dict->Set("clientInfo", dict);
 

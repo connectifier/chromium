@@ -184,7 +184,8 @@ LocationBarView::LocationBarView(Browser* browser,
       starting_omnibox_leading_inset_(0),
       current_omnibox_leading_inset_(0),
       current_omnibox_width_(0),
-      ending_omnibox_width_(0) {
+      ending_omnibox_width_(0),
+      web_contents_null_at_last_refresh_(true) {
   edit_bookmarks_enabled_.Init(
       bookmarks::prefs::kEditBookmarksEnabled, profile->GetPrefs(),
       base::Bind(&LocationBarView::Update, base::Unretained(this),
@@ -1078,18 +1079,18 @@ bool LocationBarView::RefreshPageActionViews() {
         extensions_tab_helper->location_bar_controller();
     new_page_actions = controller->GetCurrentActions();
   }
+  web_contents_null_at_last_refresh_ = web_contents == NULL;
 
   // On startup we sometimes haven't loaded any extensions. This makes sure
   // we catch up when the extensions (and any page actions) load.
-  if (page_actions_ != new_page_actions) {
+  if (PageActionsDiffer(new_page_actions)) {
     changed = true;
 
-    page_actions_.swap(new_page_actions);
-    DeletePageActionViews();  // Delete the old views (if any).
+    DeletePageActionViews();
 
     // Create the page action views.
-    for (PageActions::const_iterator i = page_actions_.begin();
-         i != page_actions_.end(); ++i) {
+    for (PageActions::const_iterator i = new_page_actions.begin();
+         i != new_page_actions.end(); ++i) {
       PageActionWithBadgeView* page_action_view = new PageActionWithBadgeView(
           delegate_->CreatePageActionImageView(this, *i));
       page_action_view->SetVisible(false);
@@ -1116,16 +1117,28 @@ bool LocationBarView::RefreshPageActionViews() {
       AddChildViewAt(*i, GetIndexOf(right_anchor));
   }
 
-  if (!page_action_views_.empty() && web_contents) {
-    for (PageActionViews::const_iterator i(page_action_views_.begin());
-         i != page_action_views_.end(); ++i) {
-      bool old_visibility = (*i)->visible();
-      (*i)->UpdateVisibility(
-          GetToolbarModel()->input_in_progress() ? NULL : web_contents);
-      changed |= old_visibility != (*i)->visible();
-    }
+  for (PageActionViews::const_iterator i(page_action_views_.begin());
+       i != page_action_views_.end(); ++i) {
+    bool old_visibility = (*i)->visible();
+    (*i)->UpdateVisibility(
+        GetToolbarModel()->input_in_progress() ? NULL : web_contents);
+    changed |= old_visibility != (*i)->visible();
   }
   return changed;
+}
+
+bool LocationBarView::PageActionsDiffer(
+    const PageActions& page_actions) const {
+  if (page_action_views_.size() != page_actions.size())
+    return true;
+
+  for (size_t index = 0; index < page_actions.size(); ++index) {
+    PageActionWithBadgeView* view = page_action_views_[index];
+    if (view->image_view()->extension_action() != page_actions[index])
+      return true;
+  }
+
+  return false;
 }
 
 bool LocationBarView::RefreshZoomView() {
@@ -1292,10 +1305,6 @@ void LocationBarView::UpdatePageActions() {
   }
 }
 
-void LocationBarView::InvalidatePageActions() {
-  DeletePageActionViews();
-}
-
 void LocationBarView::UpdateBookmarkStarVisibility() {
   if (star_view_) {
     star_view_->SetVisible(
@@ -1312,9 +1321,21 @@ bool LocationBarView::ShowPageActionPopup(
   ExtensionAction* extension_action =
       extensions::ExtensionActionManager::Get(profile())->GetPageAction(
           *extension);
-  DCHECK(extension_action);
-  return GetPageActionView(extension_action)->image_view()->view_controller()->
-      ExecuteAction(grant_tab_permissions);
+  CHECK(extension_action);
+  PageActionWithBadgeView* page_action_view =
+      GetPageActionView(extension_action);
+  if (!page_action_view) {
+    CHECK(!web_contents_null_at_last_refresh_);
+    CHECK(!is_popup_mode_);
+    CHECK(!extensions::FeatureSwitch::extension_action_redesign()->IsEnabled());
+    CHECK(false);
+  }
+  PageActionImageView* page_action_image_view = page_action_view->image_view();
+  CHECK(page_action_image_view);
+  ExtensionActionViewController* extension_action_view_controller =
+      page_action_image_view->view_controller();
+  CHECK(extension_action_view_controller);
+  return extension_action_view_controller->ExecuteAction(grant_tab_permissions);
 }
 
 void LocationBarView::UpdateOpenPDFInReaderPrompt() {

@@ -32,6 +32,9 @@
       'cocoa/bridged_content_view.mm',
       'cocoa/bridged_native_widget.h',
       'cocoa/bridged_native_widget.mm',
+      'cocoa/cocoa_mouse_capture.h',
+      'cocoa/cocoa_mouse_capture.mm',
+      'cocoa/cocoa_mouse_capture_delegate.h',
       'cocoa/native_widget_mac_nswindow.h',
       'cocoa/native_widget_mac_nswindow.mm',
       'cocoa/views_nswindow_delegate.h',
@@ -506,6 +509,7 @@
       'bubble/bubble_frame_view_unittest.cc',
       'bubble/bubble_window_targeter_unittest.cc',
       'cocoa/bridged_native_widget_unittest.mm',
+      'cocoa/cocoa_mouse_capture_unittest.mm',
       'controls/button/blue_button_unittest.cc',
       'controls/button/custom_button_unittest.cc',
       'controls/button/image_button_unittest.cc',
@@ -561,7 +565,6 @@
       'window/dialog_delegate_unittest.cc',
     ],
     'views_unittests_aura_sources': [
-      'corewm/capture_controller_unittest.cc',
       'corewm/tooltip_aura_unittest.cc',
       'corewm/tooltip_controller_unittest.cc',
       'touchui/touch_selection_controller_impl_unittest.cc',
@@ -825,11 +828,6 @@
             '../../build/linux/system.gyp:xext',
             '../events/devices/events_devices.gyp:events_devices',
             '../events/platform/x11/x11_events_platform.gyp:x11_events_platform',
-          ],
-        }],
-        ['use_ozone==1', {
-          'sources!': [
-            'corewm/capture_controller_unittest.cc',
           ],
         }],
         ['use_aura==1', {

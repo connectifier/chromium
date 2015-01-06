@@ -37,6 +37,7 @@ class MimeHandlerViewGuest : public GuestView<MimeHandlerViewGuest>,
                          const WebContentsCreatedCallback& callback) override;
   void DidAttachToEmbedder() override;
   void DidInitialize() override;
+  bool ZoomPropagatesFromEmbedderToGuest() const override;
 
   // content::BrowserPluginGuestDelegate implementation
   bool Find(int request_id,
@@ -58,6 +59,7 @@ class MimeHandlerViewGuest : public GuestView<MimeHandlerViewGuest>,
   bool SaveFrame(const GURL& url, const content::Referrer& referrer) override;
 
   // content::WebContentsObserver implementation.
+  void DocumentOnLoadCompletedInMainFrame() override;
   bool OnMessageReceived(const IPC::Message& message) override;
 
  private:

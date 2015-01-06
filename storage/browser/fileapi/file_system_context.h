@@ -67,6 +67,7 @@ class QuotaReservation;
 class SandboxFileSystemBackend;
 class WatchManager;
 
+struct DefaultContextDeleter;
 struct FileSystemInfo;
 
 // An auto mount handler will attempt to mount the file system requested in
@@ -84,8 +85,8 @@ typedef base::Callback<bool(
 // This class keeps and provides a file system context for FileSystem API.
 // An instance of this class is created and owned by profile.
 class STORAGE_EXPORT FileSystemContext
-    : public base::RefCountedThreadSafeDeleteOnCorrectThread<
-          FileSystemContext> {
+    : public base::RefCountedThreadSafe<FileSystemContext,
+                                        DefaultContextDeleter> {
  public:
   // Returns file permission policy we should apply for the given |type|.
   // The return value must be bitwise-or'd of FilePermissionPolicy.
@@ -322,9 +323,10 @@ class STORAGE_EXPORT FileSystemContext
   friend class content::PluginPrivateFileSystemBackendTest;
 
   // Deleters.
+  friend struct DefaultContextDeleter;
   friend class base::DeleteHelper<FileSystemContext>;
-  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<
-      FileSystemContext>;
+  friend class base::RefCountedThreadSafe<FileSystemContext,
+                                          DefaultContextDeleter>;
   ~FileSystemContext();
 
   void DeleteOnCorrectThread() const;
@@ -411,6 +413,12 @@ class STORAGE_EXPORT FileSystemContext
   scoped_ptr<FileSystemOperationRunner> operation_runner_;
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(FileSystemContext);
+};
+
+struct DefaultContextDeleter {
+  static void Destruct(const FileSystemContext* context) {
+    context->DeleteOnCorrectThread();
+  }
 };
 
 }  // namespace storage

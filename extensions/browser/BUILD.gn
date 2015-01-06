@@ -52,6 +52,9 @@ source_set("browser") {
       "api/app_window/app_window_api.h",
       "api/async_api_function.cc",
       "api/async_api_function.h",
+      "api/audio/audio_api.cc",
+      "api/audio/audio_api.h",
+      "api/audio/audio_service.h",
       "api/bluetooth/bluetooth_api.cc",
       "api/bluetooth/bluetooth_api.h",
       "api/bluetooth/bluetooth_api_pairing_delegate.cc",
@@ -389,6 +392,10 @@ source_set("browser") {
       "guest_view/mime_handler_view/mime_handler_view_guest.cc",
       "guest_view/mime_handler_view/mime_handler_view_guest_delegate.cc",
       "guest_view/mime_handler_view/mime_handler_view_guest_delegate.h",
+      "guest_view/surface_worker/surface_worker_constants.cc",
+      "guest_view/surface_worker/surface_worker_constants.h",
+      "guest_view/surface_worker/surface_worker_guest.cc",
+      "guest_view/surface_worker/surface_worker_guest.h",
       "guest_view/web_view/javascript_dialog_helper.cc",
       "guest_view/web_view/javascript_dialog_helper.h",
       "guest_view/web_view/web_view_constants.cc",
@@ -405,10 +412,6 @@ source_set("browser") {
       "guest_view/web_view/web_view_permission_helper_delegate.h",
       "guest_view/web_view/web_view_renderer_state.cc",
       "guest_view/web_view/web_view_renderer_state.h",
-      "guest_view/worker_frame/worker_frame_constants.cc",
-      "guest_view/worker_frame/worker_frame_constants.h",
-      "guest_view/worker_frame/worker_frame_guest.cc",
-      "guest_view/worker_frame/worker_frame_guest.h",
       "image_loader.cc",
       "image_loader.h",
       "image_loader_factory.cc",
@@ -519,13 +522,19 @@ source_set("browser") {
     }
 
     if (is_chromeos) {
+      deps += [ "//chromeos" ]
       sources += [
+        "api/audio/audio_service_chromeos.cc",
         "api/vpn_provider/vpn_provider_api.cc",
         "api/vpn_provider/vpn_provider_api.h",
         "api/vpn_provider/vpn_service.cc",
         "api/vpn_provider/vpn_service.h",
         "api/vpn_provider/vpn_service_factory.h",
       ]
+    } else if (is_linux) {
+      sources += [ "api/audio/audio_service_linux.cc" ]
+    } else {
+      sources += [ "api/audio/audio_service.cc" ]
     }
   }
 

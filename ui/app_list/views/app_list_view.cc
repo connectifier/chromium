@@ -30,8 +30,8 @@
 #include "ui/compositor/layer_animation_observer.h"
 #include "ui/compositor/scoped_layer_animation_settings.h"
 #include "ui/gfx/canvas.h"
+#include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/image/image_skia.h"
-#include "ui/gfx/insets.h"
 #include "ui/gfx/path.h"
 #include "ui/gfx/skia_util.h"
 #include "ui/resources/grit/ui_resources.h"
@@ -71,7 +71,7 @@ bool SupportsShadow() {
 #if defined(OS_WIN)
   // Shadows are not supported on Windows without Aero Glass.
   if (!ui::win::IsAeroGlassEnabled() ||
-      CommandLine::ForCurrentProcess()->HasSwitch(
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
           ::switches::kDisableDwmComposition)) {
     return false;
   }
@@ -469,6 +469,12 @@ void AppListView::InitAsBubbleInternal(gfx::NativeView parent,
   // This creates the app list widget. (Before this, child widgets cannot be
   // created.)
   views::BubbleDelegateView::CreateBubble(this);
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/431326 is fixed.
+  tracked_objects::ScopedTracker tracking_profile2_11(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "431326 AppListView::InitAsBubbleInternal2_11"));
+
   SetBubbleArrow(arrow);
 
   // TODO(vadimt): Remove ScopedTracker below once crbug.com/431326 is fixed.

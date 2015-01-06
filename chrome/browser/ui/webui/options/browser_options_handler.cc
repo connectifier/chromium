@@ -110,6 +110,7 @@
 #include "chrome/browser/browser_process_platform_part.h"
 #include "chrome/browser/chromeos/accessibility/accessibility_util.h"
 #include "chrome/browser/chromeos/chromeos_utils.h"
+#include "chrome/browser/chromeos/net/wake_on_wifi_manager.h"
 #include "chrome/browser/chromeos/policy/browser_policy_connector_chromeos.h"
 #include "chrome/browser/chromeos/profiles/profile_helper.h"
 #include "chrome/browser/chromeos/reset/metrics.h"
@@ -371,6 +372,9 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
     { "themes", IDS_THEMES_GROUP_NAME },
 #endif
     { "themesReset", IDS_THEMES_RESET_BUTTON },
+#if defined(OS_CHROMEOS)
+    { "wakeOnWifiLabel", IDS_OPTIONS_SETTINGS_WAKE_ON_WIFI_DESCRIPTION },
+#endif
     { "accessibilityTitle",
       IDS_OPTIONS_SETTINGS_SECTION_TITLE_ACCESSIBILITY },
     { "accessibilityFeaturesLink",
@@ -640,16 +644,14 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
       "easyUnlockAllowed",
       EasyUnlockService::Get(Profile::FromWebUI(web_ui()))->IsAllowed());
   values->SetString("easyUnlockLearnMoreURL", chrome::kEasyUnlockLearnMoreUrl);
-  values->SetBoolean(
-      "easyUnlockProximityDetectionAllowed",
-      CommandLine::ForCurrentProcess()->HasSwitch(
-          proximity_auth::switches::kEnableProximityDetection));
+  values->SetBoolean("easyUnlockProximityDetectionAllowed",
+                     base::CommandLine::ForCurrentProcess()->HasSwitch(
+                         proximity_auth::switches::kEnableProximityDetection));
 
 #if defined(OS_CHROMEOS)
-  values->SetBoolean(
-      "consumerManagementEnabled",
-      CommandLine::ForCurrentProcess()->HasSwitch(
-          chromeos::switches::kEnableConsumerManagement));
+  values->SetBoolean("consumerManagementEnabled",
+                     base::CommandLine::ForCurrentProcess()->HasSwitch(
+                         chromeos::switches::kEnableConsumerManagement));
 
   RegisterTitle(values, "thirdPartyImeConfirmOverlay",
                 IDS_OPTIONS_SETTINGS_LANGUAGES_THIRD_PARTY_WARNING_TITLE);
@@ -660,10 +662,17 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
   values->SetBoolean("allowAdvancedSettings", ShouldAllowAdvancedSettings());
 
   values->SetBoolean("websiteSettingsManagerEnabled",
-                     CommandLine::ForCurrentProcess()->HasSwitch(
+                     base::CommandLine::ForCurrentProcess()->HasSwitch(
                          switches::kEnableWebsiteSettingsManager));
 
   values->SetBoolean("usingNewProfilesUI", switches::IsNewAvatarMenu());
+
+#if defined(OS_CHROMEOS)
+  values->SetBoolean(
+      "showWakeOnWifi",
+      chromeos::WakeOnWifiManager::Get()->WakeOnWifiSupported() &&
+      chromeos::switches::WakeOnWifiEnabled());
+#endif
 }
 
 #if defined(ENABLE_PRINT_PREVIEW)
@@ -878,7 +887,8 @@ void BrowserOptionsHandler::InitializeHandler() {
 #if defined(OS_WIN)
   ExtensionRegistry::Get(Profile::FromWebUI(web_ui()))->AddObserver(this);
 
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
   if (!command_line.HasSwitch(switches::kUserDataDir)) {
     BrowserThread::PostTask(BrowserThread::FILE, FROM_HERE,
         base::Bind(&BrowserOptionsHandler::CheckAutoLaunch,
@@ -1191,24 +1201,9 @@ void BrowserOptionsHandler::OnTemplateURLServiceChanged() {
           template_url_service_->is_default_search_managed() ||
           template_url_service_->IsExtensionControlledDefaultSearch()));
 
-  if (default_index != -1 && model_urls[default_index]->HasGoogleBaseURLs(
-          template_url_service_->search_terms_data())) {
-    // If the user has chosen Google as the default search provider, make
-    // hotwording as an option available again.
-    HandleRequestHotwordAvailable(nullptr);
-  } else {
-    // If the user has chosen a default search provide other than Google, turn
-    // off hotwording since other providers don't provide that functionality.
-    web_ui()->CallJavascriptFunction(
-        "BrowserOptions.setAllHotwordSectionsVisible",
-        base::FundamentalValue(false));
-    HotwordService* hotword_service =
-        HotwordServiceFactory::GetForProfile(Profile::FromWebUI(web_ui()));
-    if (hotword_service)
-      hotword_service->DisableHotwordPreferences();
-  }
-
   SetupExtensionControlledIndicators();
+
+  HandleRequestHotwordAvailable(nullptr);
 }
 
 void BrowserOptionsHandler::SetDefaultSearchEngine(
@@ -1682,6 +1677,30 @@ void BrowserOptionsHandler::SetHotwordAudioHistorySectionVisible(
 void BrowserOptionsHandler::HandleRequestHotwordAvailable(
     const base::ListValue* args) {
   Profile* profile = Profile::FromWebUI(web_ui());
+
+  bool is_search_provider_google = false;
+  if (template_url_service_) {
+    const TemplateURL* default_url =
+        template_url_service_->GetDefaultSearchProvider();
+    if (default_url && default_url->HasGoogleBaseURLs(
+            template_url_service_->search_terms_data())) {
+      is_search_provider_google = true;
+    }
+  }
+
+  if (!is_search_provider_google) {
+    // If the user has chosen a default search provide other than Google, turn
+    // off hotwording since other providers don't provide that functionality.
+    web_ui()->CallJavascriptFunction(
+        "BrowserOptions.setAllHotwordSectionsVisible",
+        base::FundamentalValue(false));
+    HotwordService* hotword_service =
+        HotwordServiceFactory::GetForProfile(profile);
+    if (hotword_service)
+      hotword_service->DisableHotwordPreferences();
+    return;
+  }
+
   std::string group = base::FieldTrialList::FindFullName("VoiceTrigger");
   if (group != "" && group != "Disabled" &&
       HotwordServiceFactory::IsHotwordAllowed(profile)) {

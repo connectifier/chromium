@@ -20,7 +20,6 @@
 #include "base/timer/timer.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/history/history_database.h"
-#include "chrome/browser/history/history_db_task.h"
 #include "chrome/browser/history/history_service.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/prerender/prerender_field_trial.h"
@@ -33,6 +32,7 @@
 #include "chrome/browser/safe_browsing/safe_browsing_service.h"
 #include "chrome/browser/ui/tab_contents/tab_contents_iterator.h"
 #include "chrome/common/prefetch_messages.h"
+#include "components/history/core/browser/history_db_task.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
@@ -307,14 +307,14 @@ bool IsLogOutURL(const GURL& url) {
 }
 
 int64 URLHashToInt64(const unsigned char* data) {
-  COMPILE_ASSERT(kURLHashSize < sizeof(int64), url_hash_must_fit_in_int64);
+  static_assert(kURLHashSize < sizeof(int64), "url hash must fit in int64");
   int64 value = 0;
   memcpy(&value, data, kURLHashSize);
   return value;
 }
 
 int64 GetInt64URLHashForURL(const GURL& url) {
-  COMPILE_ASSERT(kURLHashSize < sizeof(int64), url_hash_must_fit_in_int64);
+  static_assert(kURLHashSize < sizeof(int64), "url hash must fit in int64");
   scoped_ptr<crypto::SecureHash> hash(
       crypto::SecureHash::Create(crypto::SecureHash::SHA256));
   int64 hash_value = 0;

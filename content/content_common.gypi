@@ -214,6 +214,8 @@
       'common/device_sensors/device_orientation_hardware_buffer.h',
       'common/device_sensors/device_orientation_messages.h',
       'common/devtools_messages.h',
+      'common/discardable_shared_memory_heap.cc',
+      'common/discardable_shared_memory_heap.h',
       'common/dom_storage/dom_storage_map.cc',
       'common/dom_storage/dom_storage_map.h',
       'common/dom_storage/dom_storage_messages.h',
@@ -558,6 +560,7 @@
     }, {  # OS!="ios"
       'dependencies': [
         '../cc/cc.gyp:cc',
+        '../gpu/blink/gpu_blink.gyp:gpu_blink',
         '../gpu/gpu.gyp:command_buffer_service',
         '../gpu/gpu.gyp:gles2_c_lib',
         '../gpu/gpu.gyp:gles2_implementation',
@@ -570,10 +573,10 @@
         '../ipc/mojo/ipc_mojo.gyp:ipc_mojo',
         '../media/media.gyp:media',
         '../media/media.gyp:shared_memory_support',
-        '../mojo/edk/mojo_edk.gyp:mojo_system_impl',
         '../mojo/mojo_base.gyp:mojo_environment_chromium',
-        '../mojo/public/mojo_public.gyp:mojo_application_bindings',
-        '../mojo/public/mojo_public.gyp:mojo_cpp_bindings',
+        '../mojo/mojo_edk.gyp:mojo_system_impl',
+        '../mojo/mojo_public.gyp:mojo_application_bindings',
+        '../mojo/mojo_public.gyp:mojo_cpp_bindings',
         '../storage/storage_browser.gyp:storage',
         '../storage/storage_common.gyp:storage_common',
         '../third_party/WebKit/public/blink.gyp:blink',
@@ -581,8 +584,8 @@
         '../webkit/common/gpu/webkit_gpu.gyp:webkit_gpu',
       ],
       'export_dependent_settings' : [
-        '../mojo/public/mojo_public.gyp:mojo_application_bindings',
-        '../mojo/public/mojo_public.gyp:mojo_cpp_bindings',
+        '../mojo/mojo_public.gyp:mojo_application_bindings',
+        '../mojo/mojo_public.gyp:mojo_cpp_bindings',
       ],
       'actions': [
         {
@@ -761,8 +764,8 @@
         '../media/media.gyp:media',
       ],
       'sources': [
-        'common/gpu/media/exynos_v4l2_video_device.cc',
-        'common/gpu/media/exynos_v4l2_video_device.h',
+        'common/gpu/media/generic_v4l2_video_device.cc',
+        'common/gpu/media/generic_v4l2_video_device.h',
         'common/gpu/media/tegra_v4l2_video_device.cc',
         'common/gpu/media/tegra_v4l2_video_device.h',
         'common/gpu/media/v4l2_image_processor.cc',
@@ -778,7 +781,7 @@
         '<(DEPTH)/third_party/khronos',
       ],
     }],
-    ['target_arch != "arm" and chromeos == 1 and use_x11 == 1', {
+    ['target_arch != "arm" and chromeos == 1', {
       'dependencies': [
         '../media/media.gyp:media',
         '../third_party/libyuv/libyuv.gyp:libyuv',
@@ -789,6 +792,8 @@
         'common/gpu/media/va_surface.h',
         'common/gpu/media/vaapi_h264_decoder.cc',
         'common/gpu/media/vaapi_h264_decoder.h',
+        'common/gpu/media/vaapi_picture.cc',
+        'common/gpu/media/vaapi_picture.h',
         'common/gpu/media/vaapi_video_decode_accelerator.cc',
         'common/gpu/media/vaapi_video_decode_accelerator.h',
         'common/gpu/media/vaapi_video_encode_accelerator.cc',
@@ -796,10 +801,34 @@
         'common/gpu/media/vaapi_wrapper.cc',
         'common/gpu/media/vaapi_wrapper.h',
       ],
+      'conditions': [
+        ['use_x11 == 1', {
+          'variables': {
+            'sig_files': [
+              'common/gpu/media/va.sigs',
+              'common/gpu/media/va_x11.sigs',
+            ],
+          },
+          'sources': [
+            'common/gpu/media/vaapi_tfp_picture.cc',
+            'common/gpu/media/vaapi_tfp_picture.h',
+          ],
+        }, {
+          'variables': {
+            'sig_files': [
+              'common/gpu/media/va.sigs',
+              'common/gpu/media/va_drm.sigs',
+            ],
+          },
+          'sources': [
+            'common/gpu/media/vaapi_drm_picture.cc',
+            'common/gpu/media/vaapi_drm_picture.h',
+          ],
+        }],
+      ],
       'variables': {
         'generate_stubs_script': '../tools/generate_stubs/generate_stubs.py',
         'extra_header': 'common/gpu/media/va_stub_header.fragment',
-        'sig_files': ['common/gpu/media/va.sigs'],
         'outfile_type': 'posix_stubs',
         'stubs_filename_root': 'va_stubs',
         'project_path': 'content/common/gpu/media',

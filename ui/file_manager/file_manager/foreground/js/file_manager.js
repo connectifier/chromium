@@ -23,11 +23,7 @@ function FileManager() {
    */
   this.volumeManager_ = null;
 
-  /**
-   * History loader. Gimme summa 'dat history!
-   * @type {importer.HistoryLoader}
-   * @private
-   */
+  /** @private {importer.HistoryLoader} */
   this.historyLoader_ = null;
 
   /**
@@ -47,6 +43,15 @@ function FileManager() {
    * @private {function(!importer.ImportHistory.ChangedEvent)}
    */
   this.onHistoryChangedBound_ = this.onHistoryChanged_.bind(this);
+
+  /** @private {importer.MediaScanner} */
+  this.mediaScanner_ = null;
+
+  /** @private {importer.ImportController} */
+  this.importController_ = null;
+
+  /** @private {importer.MediaImportHandler} */
+  this.mediaImportHandler_ = null;
 
   /**
    * Metadata cache.
@@ -102,11 +107,6 @@ function FileManager() {
    * @private
    */
   this.selectionHandler_ = null;
-
-  /**
-   * @private {importer.MediaImportHandler}
-   */
-  this.mediaImportHandler_ = null;
 
   /**
    * UI management class of file manager.
@@ -319,16 +319,16 @@ FileManager.prototype = /** @struct */ {
     return this.volumeManager_;
   },
   /**
+   * @return {importer.ImportController}
+   */
+  get importController() {
+    return this.importController_;
+  },
+  /**
    * @return {importer.HistoryLoader}
    */
   get historyLoader() {
     return this.historyLoader_;
-  },
-  /**
-   * @return {MetadataCache}
-   */
-  get metadataCache() {
-    return this.metadataCache_;
   },
   /**
    * @return {importer.MediaImportHandler}
@@ -337,73 +337,18 @@ FileManager.prototype = /** @struct */ {
     return this.mediaImportHandler_;
   },
   /**
+   * @return {MetadataCache}
+   */
+  get metadataCache() {
+    return this.metadataCache_;
+  },
+  /**
    * @return {FileManagerUI}
    */
   get ui() {
     return this.ui_;
   }
 };
-
-/**
- * List of dialog types.
- *
- * Keep this in sync with FileManagerDialog::GetDialogTypeAsString, except
- * FULL_PAGE which is specific to this code.
- *
- * @enum {string}
- * @const
- */
-var DialogType = {
-  SELECT_FOLDER: 'folder',
-  SELECT_UPLOAD_FOLDER: 'upload-folder',
-  SELECT_SAVEAS_FILE: 'saveas-file',
-  SELECT_OPEN_FILE: 'open-file',
-  SELECT_OPEN_MULTI_FILE: 'open-multi-file',
-  FULL_PAGE: 'full-page'
-};
-
-/**
- * @param {DialogType} type Dialog type.
- * @return {boolean} Whether the type is modal.
- */
-DialogType.isModal = function(type) {
-  return type == DialogType.SELECT_FOLDER ||
-      type == DialogType.SELECT_UPLOAD_FOLDER ||
-      type == DialogType.SELECT_SAVEAS_FILE ||
-      type == DialogType.SELECT_OPEN_FILE ||
-      type == DialogType.SELECT_OPEN_MULTI_FILE;
-};
-
-/**
- * @param {DialogType} type Dialog type.
- * @return {boolean} Whether the type is open dialog.
- */
-DialogType.isOpenDialog = function(type) {
-  return type == DialogType.SELECT_OPEN_FILE ||
-         type == DialogType.SELECT_OPEN_MULTI_FILE ||
-         type == DialogType.SELECT_FOLDER ||
-         type == DialogType.SELECT_UPLOAD_FOLDER;
-};
-
-/**
- * @param {DialogType} type Dialog type.
- * @return {boolean} Whether the type is open dialog for file(s).
- */
-DialogType.isOpenFileDialog = function(type) {
-  return type == DialogType.SELECT_OPEN_FILE ||
-         type == DialogType.SELECT_OPEN_MULTI_FILE;
-};
-
-/**
- * @param {DialogType} type Dialog type.
- * @return {boolean} Whether the type is folder selection dialog.
- */
-DialogType.isFolderDialog = function(type) {
-  return type == DialogType.SELECT_FOLDER ||
-         type == DialogType.SELECT_UPLOAD_FOLDER;
-};
-
-Object.freeze(DialogType);
 
 // Anonymous "namespace".
 (function() {
@@ -531,6 +476,23 @@ Object.freeze(DialogType);
 
     this.commandHandler = new CommandHandler(this);
 
+    // Kick the import enabled promise to be sure it is loaded
+    // (and cached) for use by code that requires synchronous
+    // access (e.g. Commands).
+    importer.importEnabled().then(
+        function(enabled) {
+          if (enabled) {
+            this.importController_ = new importer.ImportController(
+                new importer.RuntimeControllerEnvironment(this),
+                /** @type {!importer.MediaScanner} */ (
+                    this.mediaScanner_),
+                /** @type {!importer.ImportRunner} */ (
+                    this.mediaImportHandler_),
+                this.commandHandler.updateAvailability.bind(
+                    this.commandHandler));
+          }
+        }.bind(this));
+
     // TODO(hirono): Move the following block to the UI part.
     var commandButtons = this.dialogDom_.querySelectorAll('button[command]');
     for (var j = 0; j < commandButtons.length; j++)
@@ -639,10 +601,6 @@ Object.freeze(DialogType);
     // Initialize the member variables that depend this.launchParams_.
     this.dialogType = this.launchParams_.type;
 
-    // Kick the import enabled promise to be sure it is loaded
-    // (and cached) for use by code that requires synchronous
-    // access (e.g. Commands).
-    importer.importEnabled();
     callback();
   };
 
@@ -665,15 +623,10 @@ Object.freeze(DialogType);
                 this.backgroundPage_.background.fileOperationManager;
             this.mediaImportHandler_ =
                 this.backgroundPage_.background.mediaImportHandler;
-            this.backgroundPage_.background.historyLoaderPromise.then(
-                /**
-                 * @param {!importer.HistoryLoader} loader
-                 * @this {FileManager}
-                 */
-                function(loader) {
-                  this.historyLoader_ = loader;
-                  callback();
-                }.bind(this));
+            this.mediaScanner_ =
+                this.backgroundPage_.background.mediaScanner;
+            this.historyLoader_ = this.backgroundPage_.background.historyLoader;
+            callback();
           }.bind(this));
         }.bind(this)));
   };

@@ -25,9 +25,9 @@ STATIC_CONST_MEMBER_DEFINITION const MessageInTransit::Subtype
 STATIC_CONST_MEMBER_DEFINITION const MessageInTransit::Subtype
     MessageInTransit::kSubtypeChannelAttachAndRunEndpoint;
 STATIC_CONST_MEMBER_DEFINITION const MessageInTransit::Subtype
-    MessageInTransit::kSubtypeChannelRemoveMessagePipeEndpoint;
+    MessageInTransit::kSubtypeChannelRemoveEndpoint;
 STATIC_CONST_MEMBER_DEFINITION const MessageInTransit::Subtype
-    MessageInTransit::kSubtypeChannelRemoveMessagePipeEndpointAck;
+    MessageInTransit::kSubtypeChannelRemoveEndpointAck;
 STATIC_CONST_MEMBER_DEFINITION const MessageInTransit::Subtype
     MessageInTransit::kSubtypeRawChannelPosixExtraPlatformHandles;
 STATIC_CONST_MEMBER_DEFINITION const size_t MessageInTransit::kMessageAlignment;
@@ -177,6 +177,7 @@ void MessageInTransit::SetTransportData(
   DCHECK(!dispatchers_);
 
   transport_data_ = transport_data.Pass();
+  UpdateTotalSize();
 }
 
 void MessageInTransit::SerializeAndCloseDispatchers(Channel* channel) {

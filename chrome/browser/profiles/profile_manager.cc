@@ -792,7 +792,7 @@ void ProfileManager::InitProfileUserPrefs(Profile* profile) {
   if (!profile->GetPrefs()->HasPrefPath(prefs::kProfileName))
     profile->GetPrefs()->SetString(prefs::kProfileName, profile_name);
 
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   bool force_supervised_user_id =
       command_line->HasSwitch(switches::kSupervisedUserId);
   if (force_supervised_user_id) {
@@ -834,7 +834,8 @@ void ProfileManager::Observe(
   if (type == chrome::NOTIFICATION_LOGIN_USER_CHANGED) {
     logged_in_ = true;
 
-    const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+    const base::CommandLine& command_line =
+        *base::CommandLine::ForCurrentProcess();
     if (!command_line.HasSwitch(switches::kTestType)) {
       // If we don't have a mounted profile directory we're in trouble.
       // TODO(davemoore) Once we have better api this check should ensure that
@@ -1185,13 +1186,17 @@ void ProfileManager::AddProfileToCache(Profile* profile) {
   if (profile->GetPath().DirName() != cache.GetUserDataDir())
     return;
 
-  if (cache.GetIndexOfProfileWithPath(profile->GetPath()) != std::string::npos)
-    return;
-
   SigninManagerBase* signin_manager =
       SigninManagerFactory::GetForProfile(profile);
   base::string16 username = base::UTF8ToUTF16(
       signin_manager->GetAuthenticatedUsername());
+
+  size_t profile_index = cache.GetIndexOfProfileWithPath(profile->GetPath());
+  if (profile_index != std::string::npos) {
+    // The ProfileInfoCache's username must match the Signin Manager's username.
+    cache.SetUserNameOfProfileAtIndex(profile_index, username);
+    return;
+  }
 
   // Profile name and avatar are set by InitProfileUserPrefs and stored in the
   // profile. Use those values to setup the cache entry.

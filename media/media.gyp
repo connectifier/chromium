@@ -392,6 +392,8 @@
         'base/wall_clock_time_source.h',
         'cdm/aes_decryptor.cc',
         'cdm/aes_decryptor.h',
+        'cdm/default_cdm_factory.cc',
+        'cdm/default_cdm_factory.h',
         'cdm/json_web_key.cc',
         'cdm/json_web_key.h',
         'cdm/key_system_names.cc',
@@ -697,7 +699,7 @@
           ],
         }],
         # For VaapiVideoEncodeAccelerator.
-        ['target_arch != "arm" and chromeos == 1 and use_x11 == 1', {
+        ['target_arch != "arm" and chromeos == 1', {
           'sources': [
             'filters/h264_bitstream_buffer.cc',
             'filters/h264_bitstream_buffer.h',
@@ -1201,8 +1203,6 @@
         'filters/h264_bit_reader_unittest.cc',
         'filters/h264_parser_unittest.cc',
         'filters/in_memory_url_protocol_unittest.cc',
-        'filters/pipeline_integration_test.cc',
-        'filters/pipeline_integration_test_base.cc',
         'filters/renderer_impl_unittest.cc',
         'filters/skcanvas_video_renderer_unittest.cc',
         'filters/source_buffer_stream_unittest.cc',
@@ -1231,6 +1231,8 @@
         'formats/webm/webm_parser_unittest.cc',
         'formats/webm/webm_tracks_parser_unittest.cc',
         'formats/webm/webm_webvtt_parser_unittest.cc',
+        'test/pipeline_integration_test.cc',
+        'test/pipeline_integration_test_base.cc',
       ],
       'include_dirs': [
         # Needed by media_drm_bridge.cc.
@@ -1261,8 +1263,8 @@
             'filters/ffmpeg_h264_to_annex_b_bitstream_converter_unittest.cc',
             'filters/ffmpeg_video_decoder_unittest.cc',
             'filters/in_memory_url_protocol_unittest.cc',
-            'filters/pipeline_integration_test.cc',
-            'filters/pipeline_integration_test_base.cc',
+            'test/pipeline_integration_test.cc',
+            'test/pipeline_integration_test_base.cc',
           ],
         }],
         ['use_alsa==1', {
@@ -1384,8 +1386,8 @@
         'base/sinc_resampler_perftest.cc',
         'base/vector_math_perftest.cc',
         'base/yuv_convert_perftest.cc',
-        'filters/pipeline_integration_perftest.cc',
-        'filters/pipeline_integration_test_base.cc',
+        'test/pipeline_integration_perftest.cc',
+        'test/pipeline_integration_test_base.cc',
       ],
       'conditions': [
         ['arm_neon==1', {
@@ -1406,8 +1408,8 @@
         }, {  # media_use_ffmpeg==0
           'sources!': [
             'base/demuxer_perftest.cc',
-            'filters/pipeline_integration_perftest.cc',
-            'filters/pipeline_integration_test_base.cc',
+            'test/pipeline_integration_perftest.cc',
+            'test/pipeline_integration_test_base.cc',
           ],
         }],
       ],
@@ -1795,7 +1797,7 @@
           'sources': [
             'base/run_all_unittests.cc',
             'ffmpeg/ffmpeg_regression_tests.cc',
-            'filters/pipeline_integration_test_base.cc',
+            'test/pipeline_integration_test_base.cc',
           ],
           'conditions': [
             ['os_posix==1 and OS!="mac"', {

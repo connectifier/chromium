@@ -8,6 +8,7 @@
 #include "ash/display/display_controller.h"
 #include "ash/display/display_info.h"
 #include "ash/display/display_layout_store.h"
+#include "ash/display/display_util.h"
 #include "ash/screen_util.h"
 #include "ash/shell.h"
 #include "ash/test/ash_test_base.h"
@@ -830,7 +831,7 @@ TEST_F(DisplayManagerTest, DontRememberBestResolution) {
   display_modes.push_back(
       DisplayMode(gfx::Size(400, 500), 60.0f, false, false));
 
-  native_display_info.set_display_modes(display_modes);
+  native_display_info.SetDisplayModes(display_modes);
 
   std::vector<DisplayInfo> display_info_list;
   display_info_list.push_back(native_display_info);
@@ -887,7 +888,7 @@ TEST_F(DisplayManagerTest, ResolutionFallback) {
       DisplayMode(gfx::Size(400, 500), 60.0f, false, false));
 
   std::vector<DisplayMode> copy = display_modes;
-  native_display_info.set_display_modes(copy);
+  native_display_info.SetDisplayModes(copy);
 
   std::vector<DisplayInfo> display_info_list;
   display_info_list.push_back(native_display_info);
@@ -897,7 +898,7 @@ TEST_F(DisplayManagerTest, ResolutionFallback) {
     DisplayInfo new_native_display_info =
         CreateDisplayInfo(display_id, gfx::Rect(0, 0, 400, 500));
     copy = display_modes;
-    new_native_display_info.set_display_modes(copy);
+    new_native_display_info.SetDisplayModes(copy);
     std::vector<DisplayInfo> new_display_info_list;
     new_display_info_list.push_back(new_native_display_info);
     display_manager()->OnNativeDisplaysChanged(new_display_info_list);
@@ -915,7 +916,7 @@ TEST_F(DisplayManagerTest, ResolutionFallback) {
     DisplayInfo new_native_display_info =
         CreateDisplayInfo(display_id, gfx::Rect(0, 0, 1000, 500));
     std::vector<DisplayMode> copy = display_modes;
-    new_native_display_info.set_display_modes(copy);
+    new_native_display_info.SetDisplayModes(copy);
     std::vector<DisplayInfo> new_display_info_list;
     new_display_info_list.push_back(new_native_display_info);
     display_manager()->OnNativeDisplaysChanged(new_display_info_list);
@@ -1000,7 +1001,8 @@ TEST_F(DisplayManagerTest, UIScale) {
   display_manager()->SetDisplayUIScale(display_id, 0.625f);
   EXPECT_EQ(1.0f, GetDisplayInfoAt(0).configured_ui_scale());
 
-  gfx::Display::SetInternalDisplayId(display_id);
+  test::DisplayManagerTestApi(display_manager())
+      .SetInternalDisplayId(display_id);
 
   display_manager()->SetDisplayUIScale(display_id, 1.5f);
   EXPECT_EQ(1.0f, GetDisplayInfoAt(0).configured_ui_scale());
@@ -1088,15 +1090,9 @@ TEST_F(DisplayManagerTest, UIScaleWithDisplayMode) {
       CreateDisplayInfo(display_id, gfx::Rect(0, 0, 1280, 800));
   std::vector<DisplayMode> display_modes;
   const DisplayMode base_mode(gfx::Size(1280, 800), 60.0f, false, false);
-  std::vector<float> scales =
-      DisplayManager::GetScalesForDisplay(native_display_info);
-  for (size_t i = 0; i < scales.size(); i++) {
-    DisplayMode mode = base_mode;
-    mode.ui_scale = scales[i];
-    mode.native = (scales[i] == 1.0f);
-    display_modes.push_back(mode);
-  }
-  native_display_info.set_display_modes(display_modes);
+  std::vector<DisplayMode> mode_list = CreateInternalDisplayModeList(base_mode);
+  native_display_info.SetDisplayModes(mode_list);
+
   std::vector<DisplayInfo> display_info_list;
   display_info_list.push_back(native_display_info);
   display_manager()->OnNativeDisplaysChanged(display_info_list);
@@ -1122,7 +1118,8 @@ TEST_F(DisplayManagerTest, UIScaleWithDisplayMode) {
   EXPECT_TRUE(expected_mode.IsEquivalent(
       display_manager()->GetActiveModeForDisplayId(display_id)));
 
-  gfx::Display::SetInternalDisplayId(display_id);
+  test::DisplayManagerTestApi(display_manager())
+      .SetInternalDisplayId(display_id);
 
   display_manager()->SetDisplayUIScale(display_id, 1.5f);
   EXPECT_EQ(1.0f, GetDisplayInfoAt(0).configured_ui_scale());
@@ -1163,9 +1160,11 @@ TEST_F(DisplayManagerTest, UIScaleWithDisplayMode) {
 }
 
 TEST_F(DisplayManagerTest, Use125DSFRorUIScaling) {
-  int64 display_id = Shell::GetScreen()->GetPrimaryDisplay().id();
-  gfx::Display::SetInternalDisplayId(display_id);
   DisplayInfo::SetUse125DSFForUIScaling(true);
+
+  int64 display_id = Shell::GetScreen()->GetPrimaryDisplay().id();
+  test::DisplayManagerTestApi(display_manager())
+      .SetInternalDisplayId(display_id);
 
   UpdateDisplay("1920x1080*1.25");
   EXPECT_EQ(1.0f, GetDisplayInfoAt(0).GetEffectiveDeviceScaleFactor());
@@ -1597,6 +1596,12 @@ bool IsTextSubpixelPositioningEnabled() {
   return params.subpixel_positioning;
 }
 
+gfx::FontRenderParams::Hinting GetFontHintingParams() {
+  gfx::FontRenderParams params =
+      gfx::GetFontRenderParams(gfx::FontRenderParamsQuery(false), NULL);
+  return params.hinting;
+}
+
 }  // namespace
 
 typedef testing::Test DisplayManagerFontTest;
@@ -1606,6 +1611,7 @@ TEST_F(DisplayManagerFontTest, TextSubpixelPositioningWithDsf100Internal) {
   ASSERT_DOUBLE_EQ(
       1.0f, Shell::GetScreen()->GetPrimaryDisplay().device_scale_factor());
   EXPECT_FALSE(IsTextSubpixelPositioningEnabled());
+  EXPECT_NE(gfx::FontRenderParams::HINTING_NONE, GetFontHintingParams());
 }
 
 TEST_F(DisplayManagerFontTest, TextSubpixelPositioningWithDsf125Internal) {
@@ -1613,6 +1619,7 @@ TEST_F(DisplayManagerFontTest, TextSubpixelPositioningWithDsf125Internal) {
   ASSERT_DOUBLE_EQ(
       1.25f, Shell::GetScreen()->GetPrimaryDisplay().device_scale_factor());
   EXPECT_TRUE(IsTextSubpixelPositioningEnabled());
+  EXPECT_EQ(gfx::FontRenderParams::HINTING_NONE, GetFontHintingParams());
 }
 
 TEST_F(DisplayManagerFontTest, TextSubpixelPositioningWithDsf200Internal) {
@@ -1620,6 +1627,15 @@ TEST_F(DisplayManagerFontTest, TextSubpixelPositioningWithDsf200Internal) {
   ASSERT_DOUBLE_EQ(
       2.0f, Shell::GetScreen()->GetPrimaryDisplay().device_scale_factor());
   EXPECT_TRUE(IsTextSubpixelPositioningEnabled());
+  EXPECT_EQ(gfx::FontRenderParams::HINTING_NONE, GetFontHintingParams());
+
+  Shell::GetInstance()->display_manager()->SetDisplayUIScale(
+      Shell::GetScreen()->GetPrimaryDisplay().id(), 2.0f);
+
+  ASSERT_DOUBLE_EQ(
+      1.0f, Shell::GetScreen()->GetPrimaryDisplay().device_scale_factor());
+  EXPECT_FALSE(IsTextSubpixelPositioningEnabled());
+  EXPECT_NE(gfx::FontRenderParams::HINTING_NONE, GetFontHintingParams());
 }
 
 TEST_F(DisplayManagerFontTest, TextSubpixelPositioningWithDsf100External) {
@@ -1627,6 +1643,7 @@ TEST_F(DisplayManagerFontTest, TextSubpixelPositioningWithDsf100External) {
   ASSERT_DOUBLE_EQ(
       1.0f, Shell::GetScreen()->GetPrimaryDisplay().device_scale_factor());
   EXPECT_FALSE(IsTextSubpixelPositioningEnabled());
+  EXPECT_NE(gfx::FontRenderParams::HINTING_NONE, GetFontHintingParams());
 }
 
 TEST_F(DisplayManagerFontTest, TextSubpixelPositioningWithDsf125External) {
@@ -1634,6 +1651,7 @@ TEST_F(DisplayManagerFontTest, TextSubpixelPositioningWithDsf125External) {
   ASSERT_DOUBLE_EQ(
       1.25f, Shell::GetScreen()->GetPrimaryDisplay().device_scale_factor());
   EXPECT_FALSE(IsTextSubpixelPositioningEnabled());
+  EXPECT_NE(gfx::FontRenderParams::HINTING_NONE, GetFontHintingParams());
 }
 
 TEST_F(DisplayManagerFontTest, TextSubpixelPositioningWithDsf200External) {
@@ -1641,6 +1659,7 @@ TEST_F(DisplayManagerFontTest, TextSubpixelPositioningWithDsf200External) {
   ASSERT_DOUBLE_EQ(
       2.0f, Shell::GetScreen()->GetPrimaryDisplay().device_scale_factor());
   EXPECT_FALSE(IsTextSubpixelPositioningEnabled());
+  EXPECT_NE(gfx::FontRenderParams::HINTING_NONE, GetFontHintingParams());
 }
 
 TEST_F(DisplayManagerFontTest,
@@ -1650,6 +1669,16 @@ TEST_F(DisplayManagerFontTest,
   ASSERT_DOUBLE_EQ(
       1.0f, Shell::GetScreen()->GetPrimaryDisplay().device_scale_factor());
   EXPECT_FALSE(IsTextSubpixelPositioningEnabled());
+  EXPECT_NE(gfx::FontRenderParams::HINTING_NONE, GetFontHintingParams());
+
+  Shell::GetInstance()->display_manager()->SetDisplayUIScale(
+      Shell::GetScreen()->GetPrimaryDisplay().id(), 0.8f);
+
+  ASSERT_DOUBLE_EQ(
+      1.25f, Shell::GetScreen()->GetPrimaryDisplay().device_scale_factor());
+  EXPECT_TRUE(IsTextSubpixelPositioningEnabled());
+  EXPECT_EQ(gfx::FontRenderParams::HINTING_NONE, GetFontHintingParams());
+
   DisplayInfo::SetUse125DSFForUIScaling(false);
 }
 

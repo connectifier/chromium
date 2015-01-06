@@ -14,6 +14,7 @@
 #include "pdf/out_of_process_instance.h"
 #include "ppapi/c/ppp.h"
 #include "ppapi/cpp/private/pdf.h"
+#include "v8/include/v8.h"
 
 bool g_sdk_initialized_via_pepper = false;
 
@@ -28,7 +29,6 @@ bool g_sdk_initialized_via_pepper = false;
 #endif
 
 #if defined(OS_WIN)
-HMODULE g_hmodule;
 
 void HandleInvalidParameter(const wchar_t* expression,
                             const wchar_t* function,
@@ -48,7 +48,6 @@ void HandlePureVirtualCall() {
 
 
 BOOL APIENTRY DllMain(HMODULE module, DWORD reason_for_call, LPVOID reserved) {
-  g_hmodule = module;
   if (reason_for_call == DLL_PROCESS_ATTACH) {
     // On windows following handlers work only inside module. So breakpad in
     // chrome.dll does not catch that. To avoid linking related code or
@@ -99,11 +98,16 @@ bool PDFModule::Init() {
 
 pp::Instance* PDFModule::CreateInstance(PP_Instance instance) {
   if (!g_sdk_initialized_via_pepper) {
-    void* data = NULL;
-#if defined(OS_WIN)
-    data = g_hmodule;
-#endif
-    if (!chrome_pdf::InitializeSDK(data))
+    v8::StartupData natives;
+    v8::StartupData snapshot;
+    pp::PDF::GetV8ExternalSnapshotData(pp::InstanceHandle(instance),
+                                       &natives.data, &natives.raw_size,
+                                       &snapshot.data, &snapshot.raw_size);
+    if (natives.data) {
+      v8::V8::SetNativesDataBlob(&natives);
+      v8::V8::SetSnapshotDataBlob(&snapshot);
+    }
+    if (!chrome_pdf::InitializeSDK())
       return NULL;
     g_sdk_initialized_via_pepper = true;
   }
@@ -166,7 +170,7 @@ PP_EXPORT bool RenderPDFPageToDC(const void* pdf_buffer,
                                  bool center_in_bounds,
                                  bool autorotate) {
   if (!g_sdk_initialized_via_pepper) {
-    if (!chrome_pdf::InitializeSDK(g_hmodule)) {
+    if (!chrome_pdf::InitializeSDK()) {
       return false;
     }
   }
@@ -194,11 +198,7 @@ bool GetPDFDocInfo(const void* pdf_buffer,
                    int buffer_size, int* page_count,
                    double* max_page_width) {
   if (!g_sdk_initialized_via_pepper) {
-    void* data = NULL;
-#if defined(OS_WIN)
-    data = g_hmodule;
-#endif
-    if (!chrome_pdf::InitializeSDK(data))
+    if (!chrome_pdf::InitializeSDK())
       return false;
   }
   scoped_ptr<chrome_pdf::PDFEngineExports> engine_exports(
@@ -225,11 +225,7 @@ bool GetPDFPageSizeByIndex(const void* pdf_buffer,
                            int pdf_buffer_size, int page_number,
                            double* width, double* height) {
   if (!g_sdk_initialized_via_pepper) {
-    void* data = NULL;
-#if defined(OS_WIN)
-    data = g_hmodule;
-#endif
-    if (!chrome_pdf::InitializeSDK(data))
+    if (!chrome_pdf::InitializeSDK())
       return false;
   }
   scoped_ptr<chrome_pdf::PDFEngineExports> engine_exports(
@@ -263,11 +259,7 @@ bool RenderPDFPageToBitmap(const void* pdf_buffer,
                            int dpi,
                            bool autorotate) {
   if (!g_sdk_initialized_via_pepper) {
-    void* data = NULL;
-#if defined(OS_WIN)
-    data = g_hmodule;
-#endif
-    if (!chrome_pdf::InitializeSDK(data))
+    if (!chrome_pdf::InitializeSDK())
       return false;
   }
   scoped_ptr<chrome_pdf::PDFEngineExports> engine_exports(

@@ -190,16 +190,14 @@ InputHandlerProxy::InputHandlerProxy(cc::InputHandler* input_handler,
           base::TimeTicks::IsHighResNowFastAndReliable()) {
   DCHECK(client);
   input_handler_->BindToClient(this);
-  smooth_scroll_enabled_ = CommandLine::ForCurrentProcess()->HasSwitch(
+  smooth_scroll_enabled_ = base::CommandLine::ForCurrentProcess()->HasSwitch(
       switches::kEnableSmoothScrolling);
-
-#if defined(OS_MACOSX)
-  if (CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableThreadedEventHandlingMac)) {
-    scroll_elasticity_controller_.reset(new InputScrollElasticityController(
-        input_handler_->CreateScrollElasticityHelper()));
+  cc::ScrollElasticityHelper* scroll_elasticity_helper =
+      input_handler_->CreateScrollElasticityHelper();
+  if (scroll_elasticity_helper) {
+    scroll_elasticity_controller_.reset(
+        new InputScrollElasticityController(scroll_elasticity_helper));
   }
-#endif
 }
 
 InputHandlerProxy::~InputHandlerProxy() {}
@@ -567,6 +565,9 @@ bool InputHandlerProxy::FilterInputEventForFlingBoosting(
   const WebGestureEvent& gesture_event =
       static_cast<const WebGestureEvent&>(event);
   if (gesture_event.type == WebInputEvent::GestureFlingCancel) {
+    if (gesture_event.data.flingCancel.preventBoosting)
+      return false;
+
     if (current_fling_velocity_.LengthSquared() < kMinBoostFlingSpeedSquare)
       return false;
 
@@ -747,6 +748,11 @@ void InputHandlerProxy::Animate(base::TimeTicks time) {
 void InputHandlerProxy::MainThreadHasStoppedFlinging() {
   fling_may_be_active_on_main_thread_ = false;
   client_->DidStopFlinging();
+}
+
+void InputHandlerProxy::ReconcileElasticOverscrollAndRootScroll() {
+  if (scroll_elasticity_controller_)
+    scroll_elasticity_controller_->ReconcileStretchAndScroll();
 }
 
 void InputHandlerProxy::HandleOverscroll(

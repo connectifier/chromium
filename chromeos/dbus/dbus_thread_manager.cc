@@ -36,6 +36,7 @@
 #include "chromeos/dbus/nfc_manager_client.h"
 #include "chromeos/dbus/nfc_record_client.h"
 #include "chromeos/dbus/nfc_tag_client.h"
+#include "chromeos/dbus/peer_daemon_manager_client.h"
 #include "chromeos/dbus/permission_broker_client.h"
 #include "chromeos/dbus/power_manager_client.h"
 #include "chromeos/dbus/privet_daemon_client.h"
@@ -255,6 +256,10 @@ NfcTagClient* DBusThreadManager::GetNfcTagClient() {
   return client_bundle_->nfc_tag_client();
 }
 
+PeerDaemonManagerClient* DBusThreadManager::GetPeerDaemonManagerClient() {
+  return client_bundle_->peer_daemon_manager_client();
+}
+
 PermissionBrokerClient* DBusThreadManager::GetPermissionBrokerClient() {
   return client_bundle_->permission_broker_client();
 }
@@ -349,14 +354,14 @@ void DBusThreadManager::Initialize() {
 
   CHECK(!g_dbus_thread_manager);
   bool use_dbus_stub = !base::SysInfo::IsRunningOnChromeOS() ||
-      CommandLine::ForCurrentProcess()->HasSwitch(
-          chromeos::switches::kDbusStub);
-  bool force_unstub_clients = CommandLine::ForCurrentProcess()->HasSwitch(
+                       base::CommandLine::ForCurrentProcess()->HasSwitch(
+                           chromeos::switches::kDbusStub);
+  bool force_unstub_clients = base::CommandLine::ForCurrentProcess()->HasSwitch(
       chromeos::switches::kDbusUnstubClients);
   // Determine whether we use stub or real client implementations.
   if (force_unstub_clients) {
     InitializeWithPartialStub(
-        CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+        base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
             chromeos::switches::kDbusUnstubClients));
   } else if (use_dbus_stub) {
     InitializeWithStubs();
@@ -612,6 +617,12 @@ void DBusThreadManagerSetter::SetNfcRecordClient(
 void DBusThreadManagerSetter::SetNfcTagClient(
     scoped_ptr<NfcTagClient> client) {
   DBusThreadManager::Get()->client_bundle_->nfc_tag_client_ = client.Pass();
+}
+
+void DBusThreadManagerSetter::SetPeerDaemonManagerClient(
+    scoped_ptr<PeerDaemonManagerClient> client) {
+  DBusThreadManager::Get()->client_bundle_->peer_daemon_manager_client_ =
+      client.Pass();
 }
 
 void DBusThreadManagerSetter::SetPermissionBrokerClient(

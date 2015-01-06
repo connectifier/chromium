@@ -2909,6 +2909,9 @@ void BrowserAccessibilityWin::OnDataChanged() {
 
   InitRoleAndState();
 
+  // Expose autocomplete attribute for combobox and textbox.
+  StringAttributeToIA2(ui::AX_ATTR_AUTO_COMPLETE, "autocomplete");
+
   // Expose the "display" and "tag" attributes.
   StringAttributeToIA2(ui::AX_ATTR_DISPLAY, "display");
   StringAttributeToIA2(ui::AX_ATTR_TEXT_INPUT_TYPE, "text-input-type");
@@ -3084,6 +3087,14 @@ void BrowserAccessibilityWin::OnDataChanged() {
     relation->Initialize(this, IA2_RELATION_LABELLED_BY);
     relation->AddTarget(title_elem_id);
     relations_.push_back(relation);
+  }
+
+  // If this is a web area for a presentational iframe, give it a role of
+  // something other than DOCUMENT so that the fact that it's a separate doc
+  // is not exposed to AT.
+  if (IsWebAreaForPresentationalIframe()) {
+    ia_role_ = ROLE_SYSTEM_GROUPING;
+    ia2_role_ = ROLE_SYSTEM_GROUPING;
   }
 }
 
@@ -3380,6 +3391,9 @@ void BrowserAccessibilityWin::InitRoleAndState() {
   if (GetBoolAttribute(ui::AX_ATTR_CAN_SET_VALUE))
     ia2_state_ |= IA2_STATE_EDITABLE;
 
+  if (!GetStringAttribute(ui::AX_ATTR_AUTO_COMPLETE).empty())
+    ia2_state_ |= IA2_STATE_SUPPORTS_AUTOCOMPLETION;
+
   base::string16 html_tag = GetString16Attribute(
       ui::AX_ATTR_HTML_TAG);
   ia_role_ = 0;
@@ -3420,6 +3434,10 @@ void BrowserAccessibilityWin::InitRoleAndState() {
       } else {
         ia_role_ = ROLE_SYSTEM_GRAPHIC;
       }
+      break;
+    case ui::AX_ROLE_CAPTION:
+      ia_role_ = ROLE_SYSTEM_TEXT;
+      ia2_role_ = IA2_ROLE_CAPTION;
       break;
     case ui::AX_ROLE_CELL:
       ia_role_ = ROLE_SYSTEM_CELL;
@@ -3544,6 +3562,9 @@ void BrowserAccessibilityWin::InitRoleAndState() {
       ia2_role_ = IA2_ROLE_INTERNAL_FRAME;
       ia_state_ = STATE_SYSTEM_READONLY;
       break;
+    case ui::AX_ROLE_IFRAME_PRESENTATIONAL:
+      ia_role_ = ROLE_SYSTEM_GROUPING;
+      break;
     case ui::AX_ROLE_IMAGE:
       ia_role_ = ROLE_SYSTEM_GRAPHIC;
       ia_state_ |= STATE_SYSTEM_READONLY;
@@ -3667,6 +3688,7 @@ void BrowserAccessibilityWin::InitRoleAndState() {
       break;
     case ui::AX_ROLE_RADIO_BUTTON:
       ia_role_ = ROLE_SYSTEM_RADIOBUTTON;
+      ia2_state_ = IA2_STATE_CHECKABLE;
       break;
     case ui::AX_ROLE_RADIO_GROUP:
       ia_role_ = ROLE_SYSTEM_GROUPING;

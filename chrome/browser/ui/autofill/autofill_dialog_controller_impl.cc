@@ -488,16 +488,15 @@ base::string16 GenerateRandomCardNumber() {
 gfx::Image CreditCardIconForType(const std::string& credit_card_type) {
   const int input_card_idr = CreditCard::IconResourceId(credit_card_type);
   ui::ResourceBundle& rb = ui::ResourceBundle::GetSharedInstance();
-  gfx::Image result = rb.GetImageNamed(input_card_idr);
   if (input_card_idr == IDR_AUTOFILL_CC_GENERIC) {
     // When the credit card type is unknown, no image should be shown. However,
     // to simplify the view code on Mac, save space for the credit card image by
-    // returning a transparent image of the appropriate size. Not all credit
-    // card images are the same size, but none is larger than the Visa icon.
-    result = gfx::Image(gfx::ImageSkiaOperations::CreateTransparentImage(
-        rb.GetImageNamed(IDR_AUTOFILL_CC_VISA).AsImageSkia(), 0));
+    // returning a transparent image of the appropriate size. All credit card
+    // icons are the same size.
+    return gfx::Image(gfx::ImageSkiaOperations::CreateTransparentImage(
+        rb.GetImageNamed(IDR_AUTOFILL_CC_GENERIC).AsImageSkia(), 0));
   }
-  return result;
+  return rb.GetImageNamed(input_card_idr);
 }
 
 gfx::Image CvcIconForCreditCardType(const base::string16& credit_card_type) {
@@ -2125,32 +2124,39 @@ void AutofillDialogControllerImpl::UserEditedOrActivatedInput(
     return;
   }
 
-  std::vector<base::string16> popup_values, popup_labels, popup_icons;
+  std::vector<autofill::Suggestion> popup_suggestions;
+  popup_suggestion_ids_.clear();
   if (common::IsCreditCardType(type)) {
-    GetManager()->GetCreditCardSuggestions(AutofillType(type),
-                                           field_contents,
-                                           &popup_values,
-                                           &popup_labels,
-                                           &popup_icons,
-                                           &popup_guids_);
+    popup_suggestions = GetManager()->GetCreditCardSuggestions(
+        AutofillType(type), field_contents);
+    for (const auto& suggestion : popup_suggestions)
+      popup_suggestion_ids_.push_back(suggestion.backend_id);
   } else {
-    GetManager()->GetProfileSuggestions(
+    popup_suggestions = GetManager()->GetProfileSuggestions(
         AutofillType(type),
         field_contents,
         false,
-        RequestedTypesForSection(section),
-        base::Bind(&AutofillDialogControllerImpl::ShouldSuggestProfile,
-                   base::Unretained(this), section),
-        &popup_values,
-        &popup_labels,
-        &popup_icons,
-        &popup_guids_);
+        RequestedTypesForSection(section));
+    // Filter out ones we don't want.
+    for (int i = 0; i < static_cast<int>(popup_suggestions.size()); i++) {
+      const autofill::AutofillProfile* profile =
+          GetManager()->GetProfileByGUID(popup_suggestions[i].backend_id.guid);
+      if (!profile || !ShouldSuggestProfile(section, *profile)) {
+        popup_suggestions.erase(popup_suggestions.begin() + i);
+        i--;
+      }
+    }
 
-    GetI18nValidatorSuggestions(section, type, &popup_values, &popup_labels,
-                                &popup_icons);
+    // Save the IDs.
+    for (const auto& suggestion : popup_suggestions)
+      popup_suggestion_ids_.push_back(suggestion.backend_id);
+
+    // This will append to the popup_suggestions but not the IDs since there
+    // are no backend IDs for the I18N validator suggestions.
+    GetI18nValidatorSuggestions(section, type, &popup_suggestions);
   }
 
-  if (popup_values.empty()) {
+  if (popup_suggestions.empty()) {
     HidePopup();
     return;
   }
@@ -2159,11 +2165,11 @@ void AutofillDialogControllerImpl::UserEditedOrActivatedInput(
   popup_input_type_ = type;
   popup_section_ = section;
 
+  // Use our own 0-based IDs for the items.
   // TODO(estade): do we need separators and control rows like 'Clear
   // Form'?
-  std::vector<int> popup_ids;
-  for (size_t i = 0; i < popup_values.size(); ++i) {
-    popup_ids.push_back(i);
+  for (size_t i = 0; i < popup_suggestions.size(); ++i) {
+    popup_suggestions[i].frontend_id = i;
   }
 
   popup_controller_ = AutofillPopupControllerImpl::GetOrCreate(
@@ -2174,10 +2180,7 @@ void AutofillDialogControllerImpl::UserEditedOrActivatedInput(
       content_bounds,
       base::i18n::IsRTL() ?
           base::i18n::RIGHT_TO_LEFT : base::i18n::LEFT_TO_RIGHT);
-  popup_controller_->Show(popup_values,
-                          popup_labels,
-                          popup_icons,
-                          popup_ids);
+  popup_controller_->Show(popup_suggestions);
 }
 
 void AutofillDialogControllerImpl::FocusMoved() {
@@ -2410,20 +2413,21 @@ void AutofillDialogControllerImpl::DidAcceptSuggestion(
   ScopedViewUpdates updates(view_.get());
   scoped_ptr<DataModelWrapper> wrapper;
 
-  if (static_cast<size_t>(identifier) < popup_guids_.size()) {
-    const PersonalDataManager::GUIDPair& pair = popup_guids_[identifier];
+  if (static_cast<size_t>(identifier) < popup_suggestion_ids_.size()) {
+    const SuggestionBackendID& sid = popup_suggestion_ids_[identifier];
     if (common::IsCreditCardType(popup_input_type)) {
       wrapper.reset(new AutofillCreditCardWrapper(
-          GetManager()->GetCreditCardByGUID(pair.first)));
+          GetManager()->GetCreditCardByGUID(sid.guid)));
     } else {
       wrapper.reset(new AutofillProfileWrapper(
-          GetManager()->GetProfileByGUID(pair.first),
+          GetManager()->GetProfileByGUID(sid.guid),
           AutofillType(popup_input_type),
-          pair.second));
+          sid.variant));
     }
   } else {
     wrapper.reset(new I18nAddressDataWrapper(
-        &i18n_validator_suggestions_[identifier - popup_guids_.size()]));
+        &i18n_validator_suggestions_[
+            identifier - popup_suggestion_ids_.size()]));
   }
 
   // If the user hasn't switched away from the default country and |wrapper|'s
@@ -3385,9 +3389,7 @@ CountryComboboxModel* AutofillDialogControllerImpl::
 void AutofillDialogControllerImpl::GetI18nValidatorSuggestions(
     DialogSection section,
     ServerFieldType type,
-    std::vector<base::string16>* popup_values,
-    std::vector<base::string16>* popup_labels,
-    std::vector<base::string16>* popup_icons) {
+    std::vector<autofill::Suggestion>* popup_suggestions) {
   AddressField focused_field;
   if (!i18n::FieldForType(type, &focused_field))
     return;
@@ -3412,24 +3414,23 @@ void AutofillDialogControllerImpl::GetI18nValidatorSuggestions(
     return;
 
   for (size_t i = 0; i < i18n_validator_suggestions_.size(); ++i) {
-    popup_values->push_back(base::UTF8ToUTF16(
-        i18n_validator_suggestions_[i].GetFieldValue(focused_field)));
+    popup_suggestions->push_back(autofill::Suggestion(
+        base::UTF8ToUTF16(
+            i18n_validator_suggestions_[i].GetFieldValue(focused_field))));
 
     // Disambiguate the suggestion by showing the smallest administrative
     // region of the suggested address:
     //    ADMIN_AREA > LOCALITY > DEPENDENT_LOCALITY
-    popup_labels->push_back(base::string16());
     for (int field = DEPENDENT_LOCALITY; field >= ADMIN_AREA; --field) {
       const std::string& field_value =
           i18n_validator_suggestions_[i].GetFieldValue(
               static_cast<AddressField>(field));
       if (focused_field != field && !field_value.empty()) {
-        popup_labels->back().assign(base::UTF8ToUTF16(field_value));
+        popup_suggestions->back().label = base::UTF8ToUTF16(field_value);
         break;
       }
     }
   }
-  popup_icons->resize(popup_values->size());
 }
 
 DetailInputs* AutofillDialogControllerImpl::MutableRequestedFieldsForSection(

@@ -19,15 +19,6 @@ namespace webcrypto {
 
 class Status;
 
-// Converts a JWK "key_ops" array to the corresponding WebCrypto usages.
-CONTENT_EXPORT Status
-GetWebCryptoUsagesFromJwkKeyOps(const base::ListValue* key_ops,
-                                blink::WebCryptoKeyUsageMask* usages);
-
-// Composes a JWK key_ops array from a Web Crypto usage mask.
-base::ListValue* CreateJwkKeyOpsFromWebCryptoUsages(
-    blink::WebCryptoKeyUsageMask usages);
-
 // Creates a WebCryptoAlgorithm without any parameters.
 CONTENT_EXPORT blink::WebCryptoAlgorithm CreateAlgorithm(
     blink::WebCryptoAlgorithmId id);
@@ -79,7 +70,8 @@ Status GetHmacImportKeyLengthBits(
 Status VerifyAesKeyLengthForImport(unsigned int keylen_bytes);
 
 Status CheckKeyCreationUsages(blink::WebCryptoKeyUsageMask all_possible_usages,
-                              blink::WebCryptoKeyUsageMask actual_usages);
+                              blink::WebCryptoKeyUsageMask actual_usages,
+                              bool allow_empty_usages);
 
 // Extracts the public exponent and modulus length from the Blink parameters.
 // On success it is guaranteed that:

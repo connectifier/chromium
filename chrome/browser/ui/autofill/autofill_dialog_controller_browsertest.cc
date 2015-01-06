@@ -69,7 +69,6 @@
 #if defined(OS_WIN)
 #include "base/win/windows_version.h"
 #elif defined(OS_MACOSX)
-#include "base/mac/mac_util.h"
 #include "base/mac/scoped_nsautorelease_pool.h"
 #include "chrome/browser/ui/cocoa/run_loop_testing.h"
 #endif
@@ -279,13 +278,13 @@ class NavEntryCommittedObserver : public content::WindowedNotificationObserver {
 class AutofillDialogControllerTest : public InProcessBrowserTest {
  public:
   AutofillDialogControllerTest() : controller_(NULL) {}
-  virtual ~AutofillDialogControllerTest() {}
+  ~AutofillDialogControllerTest() override {}
 
-  virtual void SetUpCommandLine(CommandLine* command_line) override {
+  void SetUpCommandLine(base::CommandLine* command_line) override {
     command_line->AppendSwitch(::switches::kReduceSecurityForTesting);
   }
 
-  virtual void SetUpOnMainThread() override {
+  void SetUpOnMainThread() override {
     autofill::test::DisableSystemServices(browser()->profile()->GetPrefs());
     InitializeController();
   }
@@ -1329,7 +1328,14 @@ IN_PROC_BROWSER_TEST_F(AutofillDialogControllerTest, AddNewClearsComboboxes) {
             view->GetTextContentsOfInput(CREDIT_CARD_EXP_MONTH));
 }
 
-IN_PROC_BROWSER_TEST_F(AutofillDialogControllerTest, TabOpensToJustRight) {
+// Flaky on Win7 (http://crbug.com/446432)
+#if defined(OS_WIN)
+#define MAYBE_TabOpensToJustRight DISABLED_TabOpensToJustRight
+#else
+#define MAYBE_TabOpensToJustRight TabOpensToJustRight
+#endif
+IN_PROC_BROWSER_TEST_F(AutofillDialogControllerTest,
+                       MAYBE_TabOpensToJustRight) {
   ASSERT_TRUE(browser()->is_type_tabbed());
 
   // Tabs should currently be: / rAc() \.
@@ -1374,8 +1380,14 @@ IN_PROC_BROWSER_TEST_F(AutofillDialogControllerTest, TabOpensToJustRight) {
   EXPECT_EQ(3, tab_strip->GetIndexOfWebContents(blank_tab));
 }
 
+// Flaky on Win7 (http://crbug.com/446432)
+#if defined(OS_WIN)
+#define MAYBE_SignInWebViewOpensLinksInNewTab DISABLED_SignInWebViewOpensLinksInNewTab
+#else
+#define MAYBE_SignInWebViewOpensLinksInNewTab SignInWebViewOpensLinksInNewTab
+#endif
 IN_PROC_BROWSER_TEST_F(AutofillDialogControllerTest,
-                       SignInWebViewOpensLinksInNewTab) {
+                       MAYBE_SignInWebViewOpensLinksInNewTab) {
   controller()->OnDidFetchWalletCookieValue(std::string());
   controller()->OnDidGetWalletItems(
       wallet::GetTestWalletItemsWithRequiredAction(wallet::GAIA_AUTH));
@@ -1475,7 +1487,7 @@ class AutofillDialogControllerSecurityTest :
   AutofillDialogControllerSecurityTest() {}
   ~AutofillDialogControllerSecurityTest() override {}
 
-  void SetUpCommandLine(CommandLine* command_line) override {
+  void SetUpCommandLine(base::CommandLine* command_line) override {
     CHECK(!command_line->HasSwitch(::switches::kReduceSecurityForTesting));
   }
 

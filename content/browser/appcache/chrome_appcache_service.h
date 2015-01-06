@@ -24,6 +24,8 @@ class URLRequestContextGetter;
 namespace content {
 class ResourceContext;
 
+struct ChromeAppCacheServiceDeleter;
+
 // An AppCacheServiceImpl subclass used by the chrome. There is an instance
 // associated with each BrowserContext. This derivation adds refcounting
 // semantics since a browser context has multiple URLRequestContexts which refer
@@ -36,8 +38,8 @@ class ResourceContext;
 // TODO(dpranke): Fix dependencies on AppCacheServiceImpl so that we don't have
 // to worry about clients calling AppCacheServiceImpl methods.
 class CONTENT_EXPORT ChromeAppCacheService
-    : public base::RefCountedThreadSafeDeleteOnCorrectThread<
-        ChromeAppCacheService>,
+    : public base::RefCountedThreadSafe<ChromeAppCacheService,
+                                        ChromeAppCacheServiceDeleter>,
       NON_EXPORTED_BASE(public AppCacheServiceImpl),
       NON_EXPORTED_BASE(public AppCachePolicy) {
  public:
@@ -61,8 +63,9 @@ class CONTENT_EXPORT ChromeAppCacheService
 
  private:
   friend class base::DeleteHelper<ChromeAppCacheService>;
-  friend class base::RefCountedThreadSafeDeleteOnCorrectThread<
-      ChromeAppCacheService>;
+  friend class base::RefCountedThreadSafe<ChromeAppCacheService,
+                                          ChromeAppCacheServiceDeleter>;
+  friend struct ChromeAppCacheServiceDeleter;
 
   void DeleteOnCorrectThread() const;
 
@@ -70,6 +73,12 @@ class CONTENT_EXPORT ChromeAppCacheService
   base::FilePath cache_path_;
 
   DISALLOW_COPY_AND_ASSIGN(ChromeAppCacheService);
+};
+
+struct ChromeAppCacheServiceDeleter {
+  static void Destruct(const ChromeAppCacheService* service) {
+    service->DeleteOnCorrectThread();
+  }
 };
 
 }  // namespace content

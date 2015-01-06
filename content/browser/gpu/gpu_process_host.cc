@@ -80,7 +80,6 @@ static const char* const kSwitchNames[] = {
   switches::kDisableSeccompFilterSandbox,
 #if defined(ENABLE_WEBRTC)
   switches::kDisableWebRtcHWEncoding,
-  switches::kEnableWebRtcHWVp8Encoding,
 #endif
   switches::kEnableLogging,
   switches::kEnableShareGroupAsyncTextureUpload,
@@ -93,7 +92,8 @@ static const char* const kSwitchNames[] = {
   switches::kGpuSandboxStartEarly,
   switches::kIgnoreResolutionLimitsForAcceleratedVideoDecode,
   switches::kLoggingLevel,
-  switches::kLowEndDeviceMode,
+  switches::kEnableLowEndDeviceMode,
+  switches::kDisableLowEndDeviceMode,
   switches::kNoSandbox,
   switches::kTestGLLib,
   switches::kTraceStartup,

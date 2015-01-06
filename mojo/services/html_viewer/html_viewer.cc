@@ -8,6 +8,7 @@
 #include "base/message_loop/message_loop.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread.h"
+#include "gin/public/isolate_holder.h"
 #include "mojo/application/application_runner_chromium.h"
 #include "mojo/public/c/system/main.h"
 #include "mojo/public/cpp/application/application_connection.h"
@@ -15,12 +16,13 @@
 #include "mojo/public/cpp/application/application_impl.h"
 #include "mojo/public/cpp/application/connect.h"
 #include "mojo/public/cpp/application/interface_factory_impl.h"
+#include "mojo/services/content_handler/public/interfaces/content_handler.mojom.h"
 #include "mojo/services/html_viewer/html_document.h"
 #include "mojo/services/html_viewer/mojo_blink_platform_impl.h"
 #include "mojo/services/html_viewer/webmediaplayer_factory.h"
-#include "mojo/services/public/interfaces/content_handler/content_handler.mojom.h"
-#include "mojo/services/public/interfaces/network/network_service.mojom.h"
+#include "mojo/services/network/public/interfaces/network_service.mojom.h"
 #include "third_party/WebKit/public/web/WebKit.h"
+#include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
 
 #if !defined(COMPONENT_BUILD)
 #include "base/i18n/icu_util.h"
@@ -29,7 +31,16 @@
 #include "ui/base/ui_base_paths.h"
 #endif
 
-namespace mojo {
+using mojo::ApplicationConnection;
+using mojo::Array;
+using mojo::ContentHandler;
+using mojo::ServiceProviderPtr;
+using mojo::ShellPtr;
+using mojo::String;
+using mojo::URLLoaderPtr;
+using mojo::URLResponsePtr;
+
+namespace html_viewer {
 
 // Switches for html_viewer to be used with "--args-for". For example:
 // --args-for='mojo:html_viewer --enable-mojo-media-renderer'
@@ -38,9 +49,12 @@ namespace mojo {
 // media::Renderer implementation.
 const char kEnableMojoMediaRenderer[] = "enable-mojo-media-renderer";
 
+// Enables support for Encrypted Media Extensions (e.g. MediaKeys).
+const char kEnableEncryptedMedia[] = "enable-encrypted-media";
+
 class HTMLViewer;
 
-class HTMLViewerApplication : public Application {
+class HTMLViewerApplication : public mojo::Application {
  public:
   HTMLViewerApplication(ShellPtr shell,
                         URLResponsePtr response,
@@ -68,14 +82,14 @@ class HTMLViewerApplication : public Application {
     } else {
       URLLoaderPtr loader;
       network_service_->CreateURLLoader(GetProxy(&loader));
-      URLRequestPtr request(URLRequest::New());
+      mojo::URLRequestPtr request(mojo::URLRequest::New());
       request->url = url_;
       request->auto_follow_redirects = true;
 
       // |loader| will be pass to the OnResponseReceived method through a
       // callback. Because order of evaluation is undefined, a reference to the
       // raw pointer is needed.
-      URLLoader* raw_loader = loader.get();
+      mojo::URLLoader* raw_loader = loader.get();
       raw_loader->Start(
           request.Pass(),
           base::Bind(&HTMLViewerApplication::OnResponseReceived,
@@ -94,13 +108,13 @@ class HTMLViewerApplication : public Application {
 
   String url_;
   ShellPtr shell_;
-  NetworkServicePtr network_service_;
+  mojo::NetworkServicePtr network_service_;
   URLResponsePtr initial_response_;
   scoped_refptr<base::MessageLoopProxy> compositor_thread_;
   WebMediaPlayerFactory* web_media_player_factory_;
 };
 
-class ContentHandlerImpl : public InterfaceImpl<ContentHandler> {
+class ContentHandlerImpl : public mojo::InterfaceImpl<ContentHandler> {
  public:
   ContentHandlerImpl(scoped_refptr<base::MessageLoopProxy> compositor_thread,
                      WebMediaPlayerFactory* web_media_player_factory)
@@ -121,8 +135,8 @@ class ContentHandlerImpl : public InterfaceImpl<ContentHandler> {
   DISALLOW_COPY_AND_ASSIGN(ContentHandlerImpl);
 };
 
-class HTMLViewer : public ApplicationDelegate,
-                   public InterfaceFactory<ContentHandler> {
+class HTMLViewer : public mojo::ApplicationDelegate,
+                   public mojo::InterfaceFactory<ContentHandler> {
  public:
   HTMLViewer() : compositor_thread_("compositor thread") {}
 
@@ -130,8 +144,11 @@ class HTMLViewer : public ApplicationDelegate,
 
  private:
   // Overridden from ApplicationDelegate:
-  void Initialize(ApplicationImpl* app) override {
+  void Initialize(mojo::ApplicationImpl* app) override {
     blink_platform_.reset(new MojoBlinkPlatformImpl(app));
+#if defined(V8_USE_EXTERNAL_STARTUP_DATA)
+    gin::IsolateHolder::LoadV8Snapshot();
+#endif
     blink::initialize(blink_platform_.get());
 #if !defined(COMPONENT_BUILD)
     base::i18n::InitializeICU();
@@ -157,9 +174,14 @@ class HTMLViewer : public ApplicationDelegate,
     logging::LoggingSettings settings;
     settings.logging_dest = logging::LOG_TO_SYSTEM_DEBUG_LOG;
     logging::InitLogging(settings);
+    // Display process ID, thread ID and timestamp in logs.
+    logging::SetLogItems(true, true, true, false);
 
     bool enable_mojo_media_renderer =
         command_line->HasSwitch(kEnableMojoMediaRenderer);
+
+    if (command_line->HasSwitch(kEnableEncryptedMedia))
+      blink::WebRuntimeFeatures::enableEncryptedMedia(true);
 
     compositor_thread_.Start();
     web_media_player_factory_.reset(new WebMediaPlayerFactory(
@@ -173,7 +195,7 @@ class HTMLViewer : public ApplicationDelegate,
 
   // Overridden from InterfaceFactory<ContentHandler>
   void Create(ApplicationConnection* connection,
-              InterfaceRequest<ContentHandler> request) override {
+              mojo::InterfaceRequest<ContentHandler> request) override {
     BindToRequest(
         new ContentHandlerImpl(compositor_thread_.message_loop_proxy(),
                                web_media_player_factory_.get()),
@@ -187,9 +209,9 @@ class HTMLViewer : public ApplicationDelegate,
   DISALLOW_COPY_AND_ASSIGN(HTMLViewer);
 };
 
-}  // namespace mojo
+}  // namespace html_viewer
 
 MojoResult MojoMain(MojoHandle shell_handle) {
-  mojo::ApplicationRunnerChromium runner(new mojo::HTMLViewer);
+  mojo::ApplicationRunnerChromium runner(new html_viewer::HTMLViewer);
   return runner.Run(shell_handle);
 }

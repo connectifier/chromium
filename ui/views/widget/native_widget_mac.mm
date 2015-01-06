@@ -195,12 +195,11 @@ void NativeWidgetMac::ViewRemoved(View* view) {
 }
 
 void NativeWidgetMac::SetNativeWindowProperty(const char* name, void* value) {
-  NOTIMPLEMENTED();
+  bridge_->SetNativeWindowProperty(name, value);
 }
 
 void* NativeWidgetMac::GetNativeWindowProperty(const char* name) const {
-  NOTIMPLEMENTED();
-  return NULL;
+  return bridge_->GetNativeWindowProperty(name);
 }
 
 TooltipManager* NativeWidgetMac::GetTooltipManager() const {
@@ -209,16 +208,17 @@ TooltipManager* NativeWidgetMac::GetTooltipManager() const {
 }
 
 void NativeWidgetMac::SetCapture() {
-  NOTIMPLEMENTED();
+  if (bridge_ && !bridge_->HasCapture())
+    bridge_->AcquireCapture();
 }
 
 void NativeWidgetMac::ReleaseCapture() {
-  NOTIMPLEMENTED();
+  if (bridge_)
+    bridge_->ReleaseCapture();
 }
 
 bool NativeWidgetMac::HasCapture() const {
-  NOTIMPLEMENTED();
-  return false;
+  return bridge_ && bridge_->HasCapture();
 }
 
 InputMethod* NativeWidgetMac::CreateInputMethod() {

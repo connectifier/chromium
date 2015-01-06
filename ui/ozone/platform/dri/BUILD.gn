@@ -78,6 +78,7 @@ source_set("dri_common") {
     "//ui/display/types",
     "//ui/events",
     "//ui/events/ozone:events_ozone_evdev",
+    "//ui/events/ozone:events_ozone_layout",
     "//ui/gfx",
     "//ui/gfx/geometry",
   ]
@@ -97,6 +98,7 @@ if (ozone_platform_dri) {
       "//base",
       "//skia",
       "//ui/events/ozone:events_ozone_evdev",
+      "//ui/events/ozone:events_ozone_layout",
     ]
   }
 
@@ -146,6 +148,7 @@ if (ozone_platform_gbm) {
       "//base",
       "//skia",
       "//ui/events/ozone:events_ozone_evdev",
+      "//ui/events/ozone:events_ozone_layout",
     ]
 
     public_configs = [ ":libgbm" ]

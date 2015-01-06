@@ -10,7 +10,6 @@
 #include "content/child/webcrypto/crypto_data.h"
 #include "content/child/webcrypto/jwk.h"
 #include "content/child/webcrypto/openssl/key_openssl.h"
-#include "content/child/webcrypto/openssl/sym_key_openssl.h"
 #include "content/child/webcrypto/openssl/util_openssl.h"
 #include "content/child/webcrypto/status.h"
 #include "content/child/webcrypto/webcrypto_util.h"
@@ -69,7 +68,7 @@ class HmacImplementation : public AlgorithmImplementation {
                      bool extractable,
                      blink::WebCryptoKeyUsageMask usages,
                      GenerateKeyResult* result) const override {
-    Status status = CheckKeyCreationUsages(kAllKeyUsages, usages);
+    Status status = CheckKeyCreationUsages(kAllKeyUsages, usages, false);
     if (status.IsError())
       return status;
 
@@ -81,9 +80,9 @@ class HmacImplementation : public AlgorithmImplementation {
     if (status.IsError())
       return status;
 
-    return GenerateSecretKeyOpenSsl(blink::WebCryptoKeyAlgorithm::createHmac(
-                                        params->hash().id(), keylen_bits),
-                                    extractable, usages, keylen_bits, result);
+    return GenerateWebCryptoSecretKey(blink::WebCryptoKeyAlgorithm::createHmac(
+                                          params->hash().id(), keylen_bits),
+                                      extractable, usages, keylen_bits, result);
   }
 
   Status VerifyKeyUsagesBeforeImportKey(
@@ -92,7 +91,7 @@ class HmacImplementation : public AlgorithmImplementation {
     switch (format) {
       case blink::WebCryptoKeyFormatRaw:
       case blink::WebCryptoKeyFormatJwk:
-        return CheckKeyCreationUsages(kAllKeyUsages, usages);
+        return CheckKeyCreationUsages(kAllKeyUsages, usages, false);
       default:
         return Status::ErrorUnsupportedImportKeyFormat();
     }
@@ -118,16 +117,16 @@ class HmacImplementation : public AlgorithmImplementation {
 
     // If no bit truncation was requested, then done!
     if ((keylen_bits % 8) == 0) {
-      return ImportKeyRawOpenSsl(key_data, key_algorithm, extractable, usages,
-                                 key);
+      return CreateWebCryptoSecretKey(key_data, key_algorithm, extractable,
+                                      usages, key);
     }
 
     // Otherwise zero out the unused bits in the key data before importing.
     std::vector<uint8_t> modified_key_data(
         key_data.bytes(), key_data.bytes() + key_data.byte_length());
     TruncateToBitLength(keylen_bits, &modified_key_data);
-    return ImportKeyRawOpenSsl(CryptoData(modified_key_data), key_algorithm,
-                               extractable, usages, key);
+    return CreateWebCryptoSecretKey(CryptoData(modified_key_data),
+                                    key_algorithm, extractable, usages, key);
   }
 
   Status ImportKeyJwk(const CryptoData& key_data,
@@ -216,13 +215,8 @@ class HmacImplementation : public AlgorithmImplementation {
                                 blink::WebCryptoKeyUsageMask usages,
                                 const CryptoData& key_data,
                                 blink::WebCryptoKey* key) const override {
-    const blink::WebCryptoHmacKeyAlgorithmParams* params =
-        algorithm.hmacParams();
-
-    return ImportKeyRaw(
-        key_data,
-        CreateHmacImportAlgorithm(params->hash().id(), params->lengthBits()),
-        extractable, usages, key);
+    return CreateWebCryptoSecretKey(key_data, algorithm, extractable, usages,
+                                    key);
   }
 
   Status GetKeyLength(const blink::WebCryptoAlgorithm& key_length_algorithm,

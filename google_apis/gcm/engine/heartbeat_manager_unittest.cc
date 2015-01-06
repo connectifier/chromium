@@ -46,7 +46,7 @@ void TestHeartbeatManager::TriggerMissedHeartbeatCheck() {
 class HeartbeatManagerTest : public testing::Test {
  public:
   HeartbeatManagerTest();
-  virtual ~HeartbeatManagerTest() {}
+  ~HeartbeatManagerTest() override {}
 
   TestHeartbeatManager* manager() const { return manager_.get(); }
   int heartbeats_sent() const { return heartbeats_sent_; }
@@ -190,7 +190,7 @@ TEST_F(HeartbeatManagerTest, UpdateTimerAfterStart) {
   manager()->UpdateHeartbeatTimer(
       make_scoped_ptr(new base::Timer(true, false)));
   EXPECT_LT(manager()->GetNextHeartbeatTime() - heartbeat,
-            base::TimeDelta::FromMilliseconds(1));
+            base::TimeDelta::FromMilliseconds(5));
 }
 
 // Stopping the manager should reset the heartbeat timer.

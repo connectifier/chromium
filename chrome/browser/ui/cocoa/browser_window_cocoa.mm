@@ -7,7 +7,6 @@
 #include "base/bind.h"
 #include "base/command_line.h"
 #include "base/logging.h"
-#include "base/mac/mac_util.h"
 #import "base/mac/sdk_forward_declarations.h"
 #include "base/message_loop/message_loop.h"
 #include "base/prefs/pref_service.h"
@@ -24,12 +23,13 @@
 #include "chrome/browser/shell_integration.h"
 #include "chrome/browser/signin/signin_header_helper.h"
 #include "chrome/browser/translate/chrome_translate_client.h"
+#include "chrome/browser/ui/app_list/app_list_util.h"
+#include "chrome/browser/ui/app_list/app_list_service.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_command_controller.h"
 #include "chrome/browser/ui/browser_commands_mac.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window_state.h"
-#include "chrome/browser/ui/cocoa/key_equivalent_constants.h"
 #import "chrome/browser/ui/cocoa/browser/edit_search_engine_cocoa_controller.h"
 #import "chrome/browser/ui/cocoa/browser_window_controller.h"
 #import "chrome/browser/ui/cocoa/browser_window_utils.h"
@@ -37,6 +37,7 @@
 #import "chrome/browser/ui/cocoa/download/download_shelf_controller.h"
 #include "chrome/browser/ui/cocoa/find_bar/find_bar_bridge.h"
 #import "chrome/browser/ui/cocoa/info_bubble_view.h"
+#include "chrome/browser/ui/cocoa/key_equivalent_constants.h"
 #import "chrome/browser/ui/cocoa/location_bar/location_bar_view_mac.h"
 #import "chrome/browser/ui/cocoa/nsmenuitem_additions.h"
 #import "chrome/browser/ui/cocoa/profiles/avatar_base_controller.h"
@@ -47,7 +48,7 @@
 #import "chrome/browser/ui/cocoa/toolbar/toolbar_controller.h"
 #import "chrome/browser/ui/cocoa/web_dialog_window_controller.h"
 #import "chrome/browser/ui/cocoa/website_settings/website_settings_bubble_controller.h"
-#include "chrome/browser/ui/fullscreen/fullscreen_controller.h"
+#include "chrome/browser/ui/exclusive_access/fullscreen_controller.h"
 #include "chrome/browser/ui/search/search_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/web_applications/web_app.h"
@@ -59,13 +60,14 @@
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_source.h"
+#include "content/public/browser/notification_service.h"
 #include "content/public/browser/web_contents.h"
-#include "extensions/common/constants.h"
-#include "extensions/browser/extension_system.h"
 #include "extensions/browser/extension_registry.h"
+#include "extensions/browser/extension_system.h"
 #include "extensions/browser/pref_names.h"
+#include "extensions/common/constants.h"
 #include "ui/base/l10n/l10n_util_mac.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/rect.h"
 
 #if defined(ENABLE_ONE_CLICK_SIGNIN)
 #import "chrome/browser/ui/cocoa/one_click_signin_bubble_controller.h"
@@ -123,8 +125,8 @@ void BrowserWindowCocoa::Show() {
   NSWindowAnimationBehavior saved_animation_behavior =
       NSWindowAnimationBehaviorDefault;
   bool did_save_animation_behavior = false;
-  // Turn off swishing when restoring windows.
-  if (is_session_restore &&
+  // Turn off swishing when restoring windows or showing an app.
+  if ((is_session_restore || browser_->is_app()) &&
       [window() respondsToSelector:@selector(animationBehavior)] &&
       [window() respondsToSelector:@selector(setAnimationBehavior:)]) {
     did_save_animation_behavior = true;
@@ -163,7 +165,7 @@ void BrowserWindowCocoa::ShowInactive() {
 }
 
 void BrowserWindowCocoa::Hide() {
-  // Not implemented.
+  [window() orderOut:controller_];
 }
 
 void BrowserWindowCocoa::SetBounds(const gfx::Rect& bounds) {
@@ -253,10 +255,6 @@ bool BrowserWindowCocoa::IsActive() const {
 
 gfx::NativeWindow BrowserWindowCocoa::GetNativeWindow() const {
   return window();
-}
-
-BrowserWindowTesting* BrowserWindowCocoa::GetBrowserWindowTesting() {
-  return NULL;
 }
 
 StatusBubble* BrowserWindowCocoa::GetStatusBubble() {
@@ -574,12 +572,34 @@ void BrowserWindowCocoa::ShowBookmarkAppBubble(
       extensions::CreateOrUpdateBookmarkApp(service, &new_web_app_info);
     }
 
-    extensions::ExtensionRegistry* registry =
-        extensions::ExtensionRegistry::Get(profile);
-    const extensions::Extension* app = registry->GetExtensionById(
-        extension_id, extensions::ExtensionRegistry::ENABLED);
+    // If we're not creating app shims, no need to reveal it in Finder.
+    // Otherwise reveal the app in the app launcher. If not installed,
+    // then open the chrome://apps page.
+    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+            switches::kEnableHostedAppShimCreation)) {
+      extensions::ExtensionRegistry* registry =
+          extensions::ExtensionRegistry::Get(profile);
+      const extensions::Extension* app = registry->GetExtensionById(
+          extension_id, extensions::ExtensionRegistry::ENABLED);
 
-    web_app::RevealAppShimInFinderForApp(profile, app);
+      web_app::RevealAppShimInFinderForApp(profile, app);
+    } else {
+      if (IsAppLauncherEnabled()) {
+        AppListService::Get(chrome::GetHostDesktopTypeForNativeWindow(
+                                browser_->window()->GetNativeWindow()))
+            ->ShowForAppInstall(profile, extension_id, false);
+      } else {
+        chrome::NavigateParams params(profile, GURL(chrome::kChromeUIAppsURL),
+                                      ui::PAGE_TRANSITION_LINK);
+        params.disposition = NEW_FOREGROUND_TAB;
+        chrome::Navigate(&params);
+
+        content::NotificationService::current()->Notify(
+            chrome::NOTIFICATION_APP_INSTALLED_TO_NTP,
+            content::Source<content::WebContents>(params.target_contents),
+            content::Details<const std::string>(&extension_id));
+      }
+    }
   } else {
     service->UninstallExtension(extension_id,
                                 extensions::UNINSTALL_REASON_INSTALL_CANCELED,

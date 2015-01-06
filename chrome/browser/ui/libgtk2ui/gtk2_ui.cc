@@ -42,10 +42,10 @@
 #include "third_party/skia/include/core/SkShader.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/gfx/canvas.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/image/image.h"
 #include "ui/gfx/pango_util.h"
-#include "ui/gfx/rect.h"
-#include "ui/gfx/size.h"
 #include "ui/gfx/skbitmap_operations.h"
 #include "ui/gfx/skia_util.h"
 #include "ui/resources/grit/ui_resources.h"
@@ -396,7 +396,7 @@ views::LinuxUI::NonClientMiddleClickAction GetDefaultMiddleClickAction() {
 }  // namespace
 
 Gtk2UI::Gtk2UI() : middle_click_action_(GetDefaultMiddleClickAction()) {
-  GtkInitFromCommandLine(*CommandLine::ForCurrentProcess());
+  GtkInitFromCommandLine(*base::CommandLine::ForCurrentProcess());
 }
 
 void Gtk2UI::Initialize() {

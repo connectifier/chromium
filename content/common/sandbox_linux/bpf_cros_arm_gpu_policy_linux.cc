@@ -59,17 +59,11 @@ void AddArmMaliGpuWhitelist(std::vector<BrokerFilePermission>* permissions) {
   // Device file needed by the ARM GPU userspace.
   static const char kMali0Path[] = "/dev/mali0";
 
-  // Devices needed for video decode acceleration on ARM.
-  static const char kDevMfcDecPath[] = "/dev/mfc-dec";
+  // Video processor used on ARM Exynos platforms.
   static const char kDevGsc1Path[] = "/dev/gsc1";
 
-  // Devices needed for video encode acceleration on ARM.
-  static const char kDevMfcEncPath[] = "/dev/mfc-enc";
-
   permissions->push_back(BrokerFilePermission::ReadWrite(kMali0Path));
-  permissions->push_back(BrokerFilePermission::ReadWrite(kDevMfcDecPath));
   permissions->push_back(BrokerFilePermission::ReadWrite(kDevGsc1Path));
-  permissions->push_back(BrokerFilePermission::ReadWrite(kDevMfcEncPath));
 }
 
 void AddArmGpuWhitelist(std::vector<BrokerFilePermission>* permissions) {

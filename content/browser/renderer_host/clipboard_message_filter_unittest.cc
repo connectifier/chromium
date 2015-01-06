@@ -13,7 +13,7 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/test/test_clipboard.h"
-#include "ui/gfx/size.h"
+#include "ui/gfx/geometry/size.h"
 
 namespace content {
 
@@ -25,7 +25,7 @@ class ClipboardMessageFilterTest : public ::testing::Test {
     filter_->set_peer_pid_for_testing(base::GetCurrentProcId());
   }
 
-  virtual ~ClipboardMessageFilterTest() override {
+  ~ClipboardMessageFilterTest() override {
     ui::Clipboard::DestroyClipboardForCurrentThread();
   }
 

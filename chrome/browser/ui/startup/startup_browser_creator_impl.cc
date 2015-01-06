@@ -292,7 +292,7 @@ GURL GetWelcomePageURL() {
 
 StartupBrowserCreatorImpl::StartupBrowserCreatorImpl(
     const base::FilePath& cur_dir,
-    const CommandLine& command_line,
+    const base::CommandLine& command_line,
     chrome::startup::IsFirstRun is_first_run)
     : cur_dir_(cur_dir),
       command_line_(command_line),
@@ -303,7 +303,7 @@ StartupBrowserCreatorImpl::StartupBrowserCreatorImpl(
 
 StartupBrowserCreatorImpl::StartupBrowserCreatorImpl(
     const base::FilePath& cur_dir,
-    const CommandLine& command_line,
+    const base::CommandLine& command_line,
     StartupBrowserCreator* browser_creator,
     chrome::startup::IsFirstRun is_first_run)
     : cur_dir_(cur_dir),
@@ -616,7 +616,7 @@ bool StartupBrowserCreatorImpl::ProcessStartupURLs(
 
     uint32 restore_behavior = SessionRestore::SYNCHRONOUS;
     if (browser_defaults::kAlwaysCreateTabbedBrowserOnSessionRestore ||
-        CommandLine::ForCurrentProcess()->HasSwitch(
+        base::CommandLine::ForCurrentProcess()->HasSwitch(
             switches::kCreateBrowserOnStartupForTests)) {
       restore_behavior |= SessionRestore::ALWAYS_CREATE_TABBED_BROWSER;
     }
@@ -803,8 +803,9 @@ Browser* StartupBrowserCreatorImpl::OpenTabsInBrowser(
     browser->window()->Show();
 
   // In kiosk mode, we want to always be fullscreen, so switch to that now.
-  if (CommandLine::ForCurrentProcess()->HasSwitch(switches::kKioskMode) ||
-      CommandLine::ForCurrentProcess()->HasSwitch(switches::kStartFullscreen))
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kKioskMode) ||
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kStartFullscreen))
     chrome::ToggleFullscreenMode(browser);
 
   return browser;
@@ -887,8 +888,8 @@ void StartupBrowserCreatorImpl::AddStartupURLs(
   if (signin::ShouldShowPromoAtStartup(profile_, is_first_run_)) {
     signin::DidShowPromoAtStartup(profile_);
 
-    const GURL sync_promo_url = signin::GetPromoURL(signin::SOURCE_START_PAGE,
-                                                    false);
+    const GURL sync_promo_url = signin::GetPromoURL(
+        signin_metrics::SOURCE_START_PAGE, false);
 
     // No need to add if the sync promo is already in the startup list.
     bool add_promo = true;

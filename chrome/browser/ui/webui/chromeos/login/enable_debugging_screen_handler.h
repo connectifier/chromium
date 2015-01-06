@@ -57,8 +57,11 @@ class EnableDebuggingScreenHandler : public EnableDebuggingScreenActor,
 
   void ShowWithParams();
 
+  // Callback for CryptohomeClient::WaitForServiceToBeAvailable
+  void OnCryptohomeDaemonAvailabilityChecked(bool service_is_available);
+
   // Callback for DebugDaemonClient::WaitForServiceToBeAvailable
-  void OnServiceAvailabilityChecked(bool service_is_available);
+  void OnDebugDaemonServiceAvailabilityChecked(bool service_is_available);
 
   // Callback for DebugDaemonClient::EnableDebuggingFeatures().
   void OnEnableDebuggingFeatures(bool success);
@@ -73,9 +76,6 @@ class EnableDebuggingScreenHandler : public EnableDebuggingScreenActor,
   void UpdateUIState(UIState state);
 
   Delegate* delegate_;
-
-  // Help application used for help dialogs.
-  scoped_refptr<HelpAppLauncher> help_app_;
 
   // Keeps whether screen should be shown right after initialization.
   bool show_on_init_;

@@ -44,22 +44,23 @@
         ['OS=="ios"', {
           'dependencies': [
             '../chrome/chrome.gyp:browser',
+            '../chrome/chrome.gyp:browser_ui',
             '../ios/ios.gyp:*',
             # NOTE: This list of targets is present because
             # mojo_base.gyp:mojo_base cannot be built on iOS, as
             # javascript-related targets cause v8 to be built.
-            '../mojo/edk/mojo_edk_tests.gyp:mojo_public_bindings_unittests',
-            '../mojo/edk/mojo_edk_tests.gyp:mojo_public_environment_unittests',
-            '../mojo/edk/mojo_edk_tests.gyp:mojo_public_system_perftests',
-            '../mojo/edk/mojo_edk_tests.gyp:mojo_public_system_unittests',
-            '../mojo/edk/mojo_edk_tests.gyp:mojo_public_utility_unittests',
-            '../mojo/edk/mojo_edk.gyp:mojo_system_impl',
-            '../mojo/edk/mojo_edk_tests.gyp:mojo_system_unittests',
             '../mojo/mojo_base.gyp:mojo_common_lib',
             '../mojo/mojo_base.gyp:mojo_common_unittests',
-            '../mojo/public/mojo_public.gyp:mojo_cpp_bindings',
-            '../mojo/public/mojo_public.gyp:mojo_public_test_utils',
-            '../mojo/public/mojo_public.gyp:mojo_system',
+            '../mojo/mojo_edk.gyp:mojo_system_impl',
+            '../mojo/mojo_edk_tests.gyp:mojo_public_bindings_unittests',
+            '../mojo/mojo_edk_tests.gyp:mojo_public_environment_unittests',
+            '../mojo/mojo_edk_tests.gyp:mojo_public_system_perftests',
+            '../mojo/mojo_edk_tests.gyp:mojo_public_system_unittests',
+            '../mojo/mojo_edk_tests.gyp:mojo_public_utility_unittests',
+            '../mojo/mojo_edk_tests.gyp:mojo_system_unittests',
+            '../mojo/mojo_public.gyp:mojo_cpp_bindings',
+            '../mojo/mojo_public.gyp:mojo_public_test_utils',
+            '../mojo/mojo_public.gyp:mojo_system',
             '../google_apis/google_apis.gyp:google_apis_unittests',
             '../ui/base/ui_base_tests.gyp:ui_base_unittests',
             '../ui/ios/ui_ios_tests.gyp:ui_ios_unittests',
@@ -271,7 +272,7 @@
             '../google_apis/gcm/gcm.gyp:*',
           ],
         }],
-        ['chromeos==1 or OS=="linux" or OS=="win"', {
+        ['chromeos==1 or OS=="linux" or OS=="win" or OS=="mac"', {
           'dependencies': [
             '../extensions/shell/app_shell.gyp:*',
           ],
@@ -474,7 +475,7 @@
         }],
         ['disable_nacl==0 and disable_nacl_untrusted==0', {
           'dependencies': [
-            '../mojo/mojo_nacl.gyp:mojo_nacl',
+            '../mojo/mojo_nacl_untrusted.gyp:libmojo',
             '../mojo/mojo_nacl.gyp:monacl_codegen',
             '../mojo/mojo_nacl.gyp:monacl_sel',
             '../mojo/mojo_nacl.gyp:monacl_shell',
