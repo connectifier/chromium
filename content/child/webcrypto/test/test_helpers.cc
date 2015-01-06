@@ -467,7 +467,8 @@ scoped_ptr<base::DictionaryValue> GetJwkDictionary(
   if (!dict->GetList("key_ops", &key_ops))
     return ::testing::AssertionFailure() << "Missing 'key_ops'";
   blink::WebCryptoKeyUsageMask key_ops_mask = 0;
-  Status status = GetWebCryptoUsagesFromJwkKeyOps(key_ops, &key_ops_mask);
+  Status status =
+      GetWebCryptoUsagesFromJwkKeyOpsForTest(key_ops, &key_ops_mask);
   if (status.IsError())
     return ::testing::AssertionFailure() << "Failure extracting 'key_ops'";
   if (key_ops_mask != use_mask_expected)
@@ -665,11 +666,10 @@ std::vector<uint8_t> GetKeyDataFromJsonTestCase(
 }
 
 blink::WebCryptoNamedCurve GetCurveNameFromDictionary(
-    const base::DictionaryValue* dict,
-    const char* property_name) {
+    const base::DictionaryValue* dict) {
   std::string curve_str;
-  if (!dict->GetString(property_name, &curve_str)) {
-    ADD_FAILURE() << "Missing " << property_name << " parameter";
+  if (!dict->GetString("crv", &curve_str)) {
+    ADD_FAILURE() << "Missing crv parameter";
     return blink::WebCryptoNamedCurveP384;
   }
 

@@ -1054,15 +1054,15 @@ TEST_F(AcceleratorControllerTest, ImeGlobalAccelerators) {
     EXPECT_TRUE(ProcessInController(control_space_up));
     EXPECT_EQ(1, delegate->handle_previous_ime_count());
     EXPECT_EQ(0, delegate->handle_switch_ime_count());
-    EXPECT_FALSE(ProcessInController(convert));
+    EXPECT_TRUE(ProcessInController(convert));
     EXPECT_EQ(1, delegate->handle_switch_ime_count());
-    EXPECT_FALSE(ProcessInController(non_convert));
+    EXPECT_TRUE(ProcessInController(non_convert));
     EXPECT_EQ(2, delegate->handle_switch_ime_count());
-    EXPECT_FALSE(ProcessInController(wide_half_1));
+    EXPECT_TRUE(ProcessInController(wide_half_1));
     EXPECT_EQ(3, delegate->handle_switch_ime_count());
-    EXPECT_FALSE(ProcessInController(wide_half_2));
+    EXPECT_TRUE(ProcessInController(wide_half_2));
     EXPECT_EQ(4, delegate->handle_switch_ime_count());
-    EXPECT_FALSE(ProcessInController(hangul));
+    EXPECT_TRUE(ProcessInController(hangul));
     EXPECT_EQ(5, delegate->handle_switch_ime_count());
   }
 
@@ -1080,10 +1080,10 @@ TEST_F(AcceleratorControllerTest, ImeGlobalAccelerators) {
         scoped_ptr<ImeControlDelegate>(delegate).Pass());
     EXPECT_EQ(0, delegate->handle_next_ime_count());
     EXPECT_FALSE(ProcessInController(shift_alt_press));
-    EXPECT_FALSE(ProcessInController(shift_alt));
+    EXPECT_TRUE(ProcessInController(shift_alt));
     EXPECT_EQ(1, delegate->handle_next_ime_count());
     EXPECT_FALSE(ProcessInController(alt_shift_press));
-    EXPECT_FALSE(ProcessInController(alt_shift));
+    EXPECT_TRUE(ProcessInController(alt_shift));
     EXPECT_EQ(2, delegate->handle_next_ime_count());
 
     // We should NOT switch IME when e.g. Shift+Alt+X is pressed and X is
@@ -1112,7 +1112,7 @@ TEST_F(AcceleratorControllerTest, ImeGlobalAccelerators) {
     EXPECT_FALSE(ProcessInController(shift_alt_press));
     EXPECT_FALSE(ProcessInController(shift_alt_return_press));
     EXPECT_FALSE(ProcessInController(shift_alt_return));
-    EXPECT_FALSE(ProcessInController(shift_alt));
+    EXPECT_TRUE(ProcessInController(shift_alt));
     EXPECT_EQ(3, delegate->handle_next_ime_count());
 
     const ui::Accelerator shift_alt_space_press(
@@ -1125,7 +1125,7 @@ TEST_F(AcceleratorControllerTest, ImeGlobalAccelerators) {
     EXPECT_FALSE(ProcessInController(shift_alt_press));
     EXPECT_FALSE(ProcessInController(shift_alt_space_press));
     EXPECT_FALSE(ProcessInController(shift_alt_space));
-    EXPECT_FALSE(ProcessInController(shift_alt));
+    EXPECT_TRUE(ProcessInController(shift_alt));
     EXPECT_EQ(4, delegate->handle_next_ime_count());
   }
 
@@ -1142,10 +1142,10 @@ TEST_F(AcceleratorControllerTest, ImeGlobalAccelerators) {
         scoped_ptr<ImeControlDelegate>(delegate).Pass());
     EXPECT_EQ(0, delegate->handle_next_ime_count());
     EXPECT_FALSE(ProcessInController(shift_alt_press));
-    EXPECT_FALSE(ProcessInController(shift_alt));
+    EXPECT_TRUE(ProcessInController(shift_alt));
     EXPECT_EQ(1, delegate->handle_next_ime_count());
     EXPECT_FALSE(ProcessInController(alt_shift_press));
-    EXPECT_FALSE(ProcessInController(alt_shift));
+    EXPECT_TRUE(ProcessInController(alt_shift));
     EXPECT_EQ(2, delegate->handle_next_ime_count());
 
     // We should NOT switch IME when e.g. Shift+Alt+X is pressed and X is

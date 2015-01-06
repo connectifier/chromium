@@ -100,6 +100,11 @@
 #include "ui/base/l10n/l10n_util_win.h"
 #endif
 
+#if defined(OS_CHROMEOS)
+#include "base/chromeos/memory_pressure_observer_chromeos.h"
+#include "chromeos/chromeos_switches.h"
+#endif
+
 #if defined(USE_GLIB)
 #include <glib-object.h>
 #endif
@@ -482,6 +487,13 @@ void BrowserMainLoop::MainMessageLoopStart() {
 
   InitializeMainThread();
 
+#if defined(OS_CHROMEOS)
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          chromeos::switches::kUseMemoryPressureSystemChromeOS)) {
+    memory_pressure_observer_.reset(new base::MemoryPressureObserverChromeOS);
+  }
+#endif
+
   {
     TRACE_EVENT0("startup", "BrowserMainLoop::Subsystem:SystemMonitor");
     system_monitor_.reset(new base::SystemMonitor);
@@ -822,6 +834,10 @@ void BrowserMainLoop::ShutdownThreadsAndCleanUp() {
                  "BrowserMainLoop::Subsystem:ResourceDispatcherHost");
     resource_dispatcher_host_.get()->Shutdown();
   }
+
+#if defined(OS_CHROMEOS)
+  memory_pressure_observer_.reset();
+#endif
 
 #if defined(OS_MACOSX)
   BrowserCompositorMac::DisableRecyclingForShutdown();

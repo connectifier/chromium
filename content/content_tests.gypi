@@ -17,11 +17,13 @@
     'test_support_content_sources': [
       'public/test/async_file_test_helper.cc',
       'public/test/async_file_test_helper.h',
+      'public/test/browser_test.h',
       'public/test/browser_test_base.cc',
       'public/test/browser_test_base.h',
-      'public/test/browser_test.h',
       'public/test/browser_test_utils.cc',
       'public/test/browser_test_utils.h',
+      'public/test/content_browser_sanity_checker.cc',
+      'public/test/content_browser_sanity_checker.h',
       'public/test/content_test_suite_base.cc',
       'public/test/content_test_suite_base.h',
       'public/test/download_test_observer.cc',
@@ -86,6 +88,8 @@
       'public/test/test_utils.h',
       'public/test/unittest_test_suite.cc',
       'public/test/unittest_test_suite.h',
+      'public/test/web_contents_observer_sanity_checker.cc',
+      'public/test/web_contents_observer_sanity_checker.h',
       'public/test/web_contents_tester.cc',
       'public/test/web_contents_tester.h',
       # TODO(phajdan.jr): All of those files should live in content/test (if
@@ -111,8 +115,12 @@
       'test/content_browser_test_utils_internal.h',
       'test/content_test_suite.cc',
       'test/content_test_suite.h',
+      'test/fake_compositor_dependencies.cc',
+      'test/fake_compositor_dependencies.h',
       'test/fake_plugin_service.cc',
       'test/fake_plugin_service.h',
+      'test/fake_renderer_scheduler.cc',
+      'test/fake_renderer_scheduler.h',
       'test/mock_google_streaming_server.cc',
       'test/mock_google_streaming_server.h',
       'test/mock_keyboard.cc',
@@ -134,6 +142,8 @@
       'test/net/url_request_slow_download_job.h',
       'test/ppapi_unittest.cc',
       'test/ppapi_unittest.h',
+      'test/render_thread_impl_browser_test_ipc_helper.cc',
+      'test/render_thread_impl_browser_test_ipc_helper.h',
       'test/test_blink_web_unit_test_support.cc',
       'test/test_blink_web_unit_test_support.h',
       'test/test_content_browser_client.cc',
@@ -199,8 +209,8 @@
       'target_name': 'test_support_content',
       'type': 'static_library',
       'dependencies': [
-        '../mojo/edk/mojo_edk.gyp:mojo_system_impl',
         '../mojo/mojo_base.gyp:mojo_environment_chromium',
+        '../mojo/mojo_edk.gyp:mojo_system_impl',
         '../net/net.gyp:net_test_support',
         '../skia/skia.gyp:skia',
         '../storage/storage_common.gyp:storage_common',
@@ -249,6 +259,7 @@
             ['include', '^public/test/mock_notification_observer\\.cc$'],
             ['include', '^public/test/mock_resource_context\\.cc$'],
             ['include', '^public/test/test_browser_thread\\.cc$'],
+            ['include', '^public/test/test_browser_thread_bundle\\.cc$'],
             ['include', '^public/test/test_content_client_initializer\\.cc$'],
             ['include', '^public/test/test_notification_tracker\\.cc$'],
             ['include', '^public/test/test_utils\\.cc$'],
@@ -281,6 +292,8 @@
             '../cc/blink/cc_blink.gyp:cc_blink',
             '../cc/cc.gyp:cc',
             '../cc/cc_tests.gyp:cc_test_support',
+            '../gpu/blink/gpu_blink.gyp:gpu_blink',
+            '../ipc/mojo/ipc_mojo.gyp:*',
             '../media/blink/media_blink.gyp:media_blink',
             '../media/media.gyp:media',
             '../ppapi/ppapi_internal.gyp:ppapi_host',
@@ -311,6 +324,8 @@
             'renderer/media/mock_media_stream_dispatcher.h',
             'renderer/media/mock_peer_connection_impl.cc',
             'renderer/media/mock_peer_connection_impl.h',
+            'renderer/media/mock_data_channel_impl.cc',
+            'renderer/media/mock_data_channel_impl.h',
             'renderer/media/mock_web_rtc_peer_connection_handler_client.cc',
             'renderer/media/mock_web_rtc_peer_connection_handler_client.h',
             'renderer/media/webrtc/mock_peer_connection_dependency_factory.cc',
@@ -383,9 +398,9 @@
         '../crypto/crypto.gyp:crypto',
         '../device/battery/battery.gyp:device_battery',
         '../device/battery/battery.gyp:device_battery_mojo_bindings',
-        '../mojo/edk/mojo_edk.gyp:mojo_common_test_support',
         '../mojo/mojo_base.gyp:mojo_environment_chromium',
-        '../mojo/public/mojo_public.gyp:mojo_cpp_bindings',
+        '../mojo/mojo_edk.gyp:mojo_common_test_support',
+        '../mojo/mojo_public.gyp:mojo_cpp_bindings',
         '../net/net.gyp:net_test_support',
         '../skia/skia.gyp:skia',
         '../sql/sql.gyp:sql',
@@ -444,9 +459,9 @@
         'browser/database_util_unittest.cc',
         'browser/device_sensors/data_fetcher_shared_memory_base_unittest.cc',
         'browser/device_sensors/sensor_manager_android_unittest.cc',
-        'browser/devtools/embedded_worker_devtools_manager_unittest.cc',
         'browser/devtools/devtools_http_handler_unittest.cc',
         'browser/devtools/devtools_manager_unittest.cc',
+        'browser/devtools/shared_worker_devtools_manager_unittest.cc',
         'browser/dom_storage/dom_storage_area_unittest.cc',
         'browser/dom_storage/dom_storage_context_impl_unittest.cc',
         'browser/dom_storage/dom_storage_database_unittest.cc',
@@ -665,6 +680,7 @@
         'browser/web_contents/web_contents_view_mac_unittest.mm',
         'browser/web_contents/web_drag_dest_mac_unittest.mm',
         'browser/web_contents/web_drag_source_mac_unittest.mm',
+        'browser/webui/url_data_manager_backend_unittest.cc',
         'browser/webui/web_ui_data_source_unittest.cc',
         'browser/webui/web_ui_message_handler_unittest.cc',
         'child/blink_platform_impl_unittest.cc',
@@ -703,6 +719,7 @@
         'common/cursors/webcursor_unittest.cc',
         'common/database_connections_unittest.cc',
         'common/database_identifier_unittest.cc',
+        'common/discardable_shared_memory_heap_unittest.cc',
         'common/dom_storage/dom_storage_map_unittest.cc',
         'common/dwrite_font_platform_win_unittest.cc',
         'common/fileapi/file_system_util_unittest.cc',
@@ -746,6 +763,7 @@
         'renderer/ico_image_decoder_unittest.cc',
         'renderer/input/input_event_filter_unittest.cc',
         'renderer/input/input_handler_proxy_unittest.cc',
+        'renderer/input/input_scroll_elasticity_controller_unittest.cc',
         'renderer/manifest/manifest_parser_unittest.cc',
         'renderer/media/android/media_info_loader_unittest.cc',
         'renderer/media/audio_message_filter_unittest.cc',
@@ -856,6 +874,7 @@
             'renderer/media/mock_media_stream_video_source.cc',
             'renderer/media/mock_media_stream_video_source.h',
             'renderer/media/mock_media_constraint_factory.cc',
+            'renderer/media/rtc_data_channel_handler_unittest.cc',
             'renderer/media/rtc_peer_connection_handler_unittest.cc',
             'renderer/media/rtc_video_decoder_unittest.cc',
             'renderer/media/speech_recognition_audio_sink_unittest.cc',
@@ -971,6 +990,7 @@
             'browser/geolocation/wifi_data_provider_chromeos_unittest.cc',
             'browser/geolocation/wifi_data_provider_common_unittest.cc',
             'browser/geolocation/wifi_data_provider_linux_unittest.cc',
+            'browser/webui/url_data_manager_backend_unittest.cc',
           ],
         }],
         ['OS != "android" and OS != "ios"', {
@@ -1139,14 +1159,14 @@
           'target_name': 'web_ui_test_mojo_bindings',
           'type': 'static_library',
           'dependencies': [
-            '../mojo/public/mojo_public.gyp:mojo_cpp_bindings',
+            '../mojo/mojo_public.gyp:mojo_cpp_bindings',
           ],
           'sources': [
             'test/data/web_ui_test_mojo_bindings.mojom',
           ],
-          'includes': [ '../mojo/public/tools/bindings/mojom_bindings_generator.gypi' ],
+          'includes': [ '../mojo/mojom_bindings_generator.gypi' ],
           'export_dependent_settings': [
-            '../mojo/public/mojo_public.gyp:mojo_cpp_bindings',
+            '../mojo/mojo_public.gyp:mojo_cpp_bindings',
           ],
         },
         {
@@ -1172,11 +1192,11 @@
             '../ipc/ipc.gyp:test_support_ipc',
             '../media/media.gyp:media_test_support',
             '../media/media.gyp:shared_memory_support',
-            '../mojo/edk/mojo_edk.gyp:mojo_common_test_support',
-            '../mojo/edk/mojo_edk.gyp:mojo_system_impl',
             '../mojo/mojo_base.gyp:mojo_environment_chromium',
-            '../mojo/public/mojo_public.gyp:mojo_cpp_bindings',
-            '../mojo/public/mojo_public.gyp:mojo_js_bindings',
+            '../mojo/mojo_edk.gyp:mojo_common_test_support',
+            '../mojo/mojo_edk.gyp:mojo_system_impl',
+            '../mojo/mojo_public.gyp:mojo_cpp_bindings',
+            '../mojo/mojo_public.gyp:mojo_js_bindings',
             '../net/net.gyp:net_test_support',
             '../ppapi/ppapi_internal.gyp:ppapi_host',
             '../ppapi/ppapi_internal.gyp:ppapi_ipc',
@@ -1211,12 +1231,19 @@
           ],
           'sources': [
             'app/mojo/mojo_browsertest.cc',
+            'browser/accessibility/accessibility_event_recorder.cc',
+            'browser/accessibility/accessibility_event_recorder.h',
+            'browser/accessibility/accessibility_event_recorder_mac.mm',
+            'browser/accessibility/accessibility_event_recorder_win.cc',
             'browser/accessibility/accessibility_ipc_error_browsertest.cc',
             'browser/accessibility/accessibility_mode_browsertest.cc',
             'browser/accessibility/accessibility_win_browsertest.cc',
             'browser/accessibility/android_granularity_movement_browsertest.cc',
             'browser/accessibility/android_hit_testing_browsertest.cc',
             'browser/accessibility/cross_platform_accessibility_browsertest.cc',
+            'browser/accessibility/dump_accessibility_browsertest_base.cc',
+            'browser/accessibility/dump_accessibility_browsertest_base.h',
+            'browser/accessibility/dump_accessibility_events_browsertest.cc',
             'browser/accessibility/dump_accessibility_tree_browsertest.cc',
             'browser/accessibility/site_per_process_accessibility_browsertest.cc',
             'browser/battery_status/battery_monitor_impl_browsertest.cc',
@@ -1238,7 +1265,6 @@
             'browser/frame_host/frame_tree_browsertest.cc',
             'browser/frame_host/render_frame_host_manager_browsertest.cc',
             'browser/frame_host/navigation_controller_impl_browsertest.cc',
-            'browser/gpu/compositor_util_browsertest.cc',
             'browser/gpu/gpu_ipc_browsertests.cc',
             'browser/indexed_db/indexed_db_browsertest.cc',
             'browser/indexed_db/mock_browsertest_indexed_db_class_factory.cc',
@@ -1365,6 +1391,9 @@
             ['OS=="android"', {
               'sources': [
                 'shell/android/browsertests_apk/content_browser_tests_android.cc',
+              ],
+              'sources!': [
+                'browser/battery_status/battery_monitor_impl_browsertest.cc',
               ],
               'dependencies': [
                 'content_shell_jni_headers',
@@ -1521,7 +1550,7 @@
         },
       ],
     }],
-    ['(chromeos==1 or OS=="win" or OS=="android") and use_ozone==0', {
+    ['chromeos==1 or OS=="win" or OS=="android"', {
       'targets': [
           {
             'target_name': 'video_decode_accelerator_unittest',
@@ -1589,13 +1618,19 @@
                   '../ui/gfx/x/gfx_x11.gyp:gfx_x11',
                 ],
               }],
+              ['use_ozone==1 and chromeos==1', {
+                'dependencies': [
+                  '../ui/display/display.gyp:display', # Used by rendering_helper.cc
+                  '../ui/ozone/ozone.gyp:ozone',       # Used by rendering_helper.cc
+                ],
+              }],
             ],
             # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
             'msvs_disabled_warnings': [ 4267, ],
           },
         ]
     }],
-    ['chromeos==1 and use_x11 == 1 and target_arch != "arm"', {
+    ['chromeos==1 and target_arch != "arm"', {
       'targets': [
           {
             'target_name': 'vaapi_h264_decoder_unittest',
@@ -1603,7 +1638,6 @@
             'dependencies': [
               'content.gyp:content_common',
               '../base/base.gyp:base',
-              '../build/linux/system.gyp:x11',
               '../media/media.gyp:media',
               '../testing/gtest.gyp:gtest',
               '../third_party/libyuv/libyuv.gyp:libyuv',
@@ -1615,10 +1649,21 @@
             'include_dirs': [
               '<(DEPTH)/third_party/libva',
             ],
+            'conditions': [
+              ['use_x11==1', {
+                'dependencies': [
+                  '../build/linux/system.gyp:x11',
+                ]
+              }, {
+                'dependencies': [
+                  '../build/linux/system.gyp:libdrm',
+                ]
+              }],
+            ],
           },
         ]
     }],
-    ['chromeos==1 and (target_arch == "arm" or use_x11 == 1)', {
+    ['chromeos==1', {
       'targets': [
         {
           'target_name': 'video_encode_accelerator_unittest',
@@ -1647,6 +1692,11 @@
             ['use_x11==1', {
               'dependencies': [
                 '../ui/gfx/x/gfx_x11.gyp:gfx_x11',
+              ],
+            }],
+            ['use_ozone==1', {
+              'dependencies': [
+                '../ui/ozone/ozone.gyp:ozone',
               ],
             }],
           ],
@@ -1905,7 +1955,7 @@
             '../device/battery/battery.gyp:device_battery_javatests',
             '../media/media.gyp:media_java',
             '../media/media.gyp:media_test_support',
-            '../mojo/public/mojo_public.gyp:mojo_public_test_interfaces',
+            '../mojo/mojo_public.gyp:mojo_public_test_interfaces',
             '../net/net.gyp:net_java',
             '../net/net.gyp:net_javatests',
             '../net/net.gyp:net_java_test_support',

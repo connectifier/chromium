@@ -142,6 +142,10 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
   // to destruction.
   virtual void WillDestroy() {}
 
+  // This method is to be implemented by the derived class. This indicates
+  // whether zoom should propagate from the embedder to the guest content.
+  virtual bool ZoomPropagatesFromEmbedderToGuest() const;
+
   // This method is to be implemented by the derived class. Access to guest
   // views are determined by the availability of the internal extension API
   // used to implement the guest view.
@@ -166,12 +170,10 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
 
   // This creates a WebContents and initializes |this| GuestViewBase to use the
   // newly created WebContents.
-  void Init(const std::string& owner_extension_id,
-            const base::DictionaryValue& create_params,
+  void Init(const base::DictionaryValue& create_params,
             const WebContentsCreatedCallback& callback);
 
-  void InitWithWebContents(const std::string& owner_extension_id,
-                           content::WebContents* guest_web_contents);
+  void InitWithWebContents(content::WebContents* guest_web_contents);
 
   bool IsViewType(const char* const view_type) const {
     return !strcmp(GetViewType(), view_type);
@@ -206,6 +208,9 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
 
   // Returns the instance ID of this GuestViewBase.
   int guest_instance_id() const { return guest_instance_id_; }
+
+  // Returns the instance ID of the GuestViewBase's element.
+  int element_instance_id() const { return element_instance_id_; }
 
   // Returns the extension ID of the embedder.
   const std::string& owner_extension_id() const {
@@ -269,12 +274,11 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
 
   void SendQueuedEvents();
 
-  void CompleteInit(const std::string& owner_extension_id,
-                    const WebContentsCreatedCallback& callback,
+  void CompleteInit(const WebContentsCreatedCallback& callback,
                     content::WebContents* guest_web_contents);
 
-  void StartObservingOwnersZoomController();
-  void StopObservingOwnersZoomControllerIfNecessary();
+  void StartTrackingEmbedderZoomLevel();
+  void StopTrackingEmbedderZoomLevel();
 
   static void RegisterGuestViewTypes();
 
@@ -360,8 +364,6 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
 
   // Whether the guest view is inside a plugin document.
   bool is_full_page_plugin_;
-
-  bool observing_owners_zoom_controller_;
 
   // This is used to ensure pending tasks will not fire after this object is
   // destroyed.

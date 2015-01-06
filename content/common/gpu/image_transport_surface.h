@@ -16,9 +16,9 @@
 #include "ipc/ipc_listener.h"
 #include "ipc/ipc_message.h"
 #include "ui/events/latency_info.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/native_widget_types.h"
-#include "ui/gfx/rect.h"
-#include "ui/gfx/size.h"
 #include "ui/gl/gl_surface.h"
 
 struct AcceleratedSurfaceMsg_BufferPresented_Params;
@@ -200,6 +200,7 @@ class PassThroughImageTransportSurface
   // If updated vsync parameters can be determined, send this information to
   // the browser.
   virtual void SendVSyncUpdateIfAvailable();
+  void SwapBuffersCallBack();
 
   ImageTransportHelper* GetHelper() { return helper_.get(); }
 
@@ -207,6 +208,7 @@ class PassThroughImageTransportSurface
   scoped_ptr<ImageTransportHelper> helper_;
   bool did_set_swap_interval_;
   std::vector<ui::LatencyInfo> latency_info_;
+  base::WeakPtrFactory<PassThroughImageTransportSurface> weak_ptr_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(PassThroughImageTransportSurface);
 };

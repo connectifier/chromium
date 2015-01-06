@@ -119,11 +119,6 @@ class CONTENT_EXPORT Status {
   // Other errors
   // ------------------------------------
 
-  // No key data was provided when importing an spki, pkcs8, or jwk formatted
-  // key. This does not apply to raw format, since it is possible to have empty
-  // key data there.
-  static Status ErrorImportEmptyKeyData();
-
   // Tried importing a key using an unsupported format for the key type (for
   // instance importing an HMAC key using format=spki).
   static Status ErrorUnsupportedImportKeyFormat();
@@ -214,6 +209,9 @@ class CONTENT_EXPORT Status {
   // Attempted to generate an HMAC key using a key length of 0.
   static Status ErrorGenerateHmacKeyLengthZero();
 
+  // Attempted to import an HMAC key containing no data.
+  static Status ErrorHmacImportEmptyKey();
+
   // Attempted to derive an HMAC key with zero length.
   static Status ErrorGetHmacKeyLengthZero();
 
@@ -225,7 +223,7 @@ class CONTENT_EXPORT Status {
   // and algorithm.
   static Status ErrorCreateKeyBadUsages();
 
-  // No usages were specified when creating a secret or private key.
+  // No usages were specified when generating/importing a secret or private key.
   static Status ErrorCreateKeyEmptyUsages();
 
   // An EC key imported using SPKI/PKCS8 format had the wrong curve specified in

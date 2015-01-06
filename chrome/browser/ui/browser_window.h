@@ -11,7 +11,7 @@
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/ui/bookmarks/bookmark_bar.h"
 #include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/fullscreen/exclusive_access_bubble_type.h"
+#include "chrome/browser/ui/exclusive_access/exclusive_access_bubble_type.h"
 #include "chrome/browser/ui/host_desktop.h"
 #include "chrome/browser/ui/sync/one_click_signin_sync_starter.h"
 #include "components/content_settings/core/common/content_settings_types.h"
@@ -21,7 +21,6 @@
 #include "ui/gfx/native_widget_types.h"
 
 class Browser;
-class BrowserWindowTesting;
 class DownloadShelf;
 class FindBar;
 class GURL;
@@ -81,10 +80,6 @@ class BrowserWindow : public ui::BaseWindow {
 
   //////////////////////////////////////////////////////////////////////////////
   // Browser specific methods:
-
-  // Returns a pointer to the testing interface to the Browser window, or NULL
-  // if there is none.
-  virtual BrowserWindowTesting* GetBrowserWindowTesting() = 0;
 
   // Return the status bubble associated with the frame
   virtual StatusBubble* GetStatusBubble() = 0;

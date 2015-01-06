@@ -28,7 +28,7 @@
 #include "content/public/browser/web_contents.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/events/keycodes/keyboard_codes.h"
-#include "ui/gfx/rect_conversions.h"
+#include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/text_utils.h"
 
 #if defined(OS_ANDROID)
@@ -177,6 +177,13 @@ void PasswordGenerationPopupControllerImpl::Show(bool display_password) {
 
   if (!view_) {
     view_ = PasswordGenerationPopupView::Create(this);
+
+    // Treat popup as being hidden if creation fails.
+    if (!view_) {
+      Hide();
+      return;
+    }
+
     CalculateBounds();
     view_->Show();
   } else {

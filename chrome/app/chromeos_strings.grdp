@@ -443,7 +443,13 @@ Press any key to continue exploring.
     Share
   </message>
   <message name="IDS_FILE_BROWSER_CLOUD_IMPORT_BUTTON_LABEL" desc="Label for button that initiates media backup to the cloud.">
-    Import Photos &amp; Videos to Google Drive
+    Import photos &amp; videos to Google Drive
+  </message>
+  <message name="IDS_FILE_BROWSER_CLOUD_IMPORT_INSUFFICIENT_SPACE_BUTTON_LABEL" desc="Label for button that tells user there is not enough space to perform a cloud import.">
+    Insufficient space on your device!
+  </message>
+  <message name="IDS_FILE_BROWSER_CLOUD_IMPORT_SCANNING_BUTTON_LABEL" desc="Label for button showing that scanning is in progress...prior to being enabled when scanning is complete.">
+    Scanning your media...
   </message>
 
   <message name="IDS_FILE_BROWSER_COPY_FILE_NAME" desc="File Manager status message.">
@@ -635,10 +641,10 @@ Press any key to continue exploring.
     You are offline
   </message>
   <message name="IDS_FILE_BROWSER_OFFLINE_MESSAGE" desc="Message informing the user how to make the selected file available offline.">
-    To save this file for offline use, get back online and&lt;br&gt;select the <ph name="OFFLINE_CHECKBOX_NAME">'$1'<ex>'Available offline'</ex></ph> checkbox for this file.
+    To save this file for offline use, get back online, right-click the file, and select the <ph name="OFFLINE_CHECKBOX_NAME">'$1'<ex>'Available offline'</ex></ph> option.
   </message>
   <message name="IDS_FILE_BROWSER_OFFLINE_MESSAGE_PLURAL" desc="Message informing the user how to make multiple selected files available offline.">
-    To save these files for offline use, get back online and&lt;br&gt;select the <ph name="OFFLINE_CHECKBOX_NAME">'$1'<ex>'Available offline'</ex></ph> checkbox for these files.
+    To save these files for offline use, get back online, right-click the files, and select the <ph name="OFFLINE_CHECKBOX_NAME">'$1'<ex>'Available offline'</ex></ph> option.
   </message>
   <message name="IDS_FILE_BROWSER_HOSTED_OFFLINE_MESSAGE" desc="Message informing the user that the selected file is only available online.">
     You must be online to access this file.
@@ -1112,7 +1118,7 @@ Press any key to continue exploring.
     Disable calibrating the color of the display even if the display supports the feature.
   </message>
   <message name="IDS_FLAGS_USE_MEMORY_PRESSURE_NAME" desc="Name for the flag to enable memory pressure handling on ChromeOS.">
-    Enable memory pressure handling 
+    Enable memory pressure handling
   </message>
   <message name="IDS_FLAGS_USE_MEMORY_PRESSURE_DESCRIPTION" desc="Description for the flag to enable memory pressure handling on ChromeOS.">
     Enables enhanced memory pressure handling on ChromeOS.
@@ -1405,9 +1411,6 @@ Press any key to continue exploring.
   <message name="IDS_APP_START_BAILOUT_SHORTCUT_FORMAT" desc="Message displayed at the bottom of app launch splash screen to show user the shortcut key to bailout the launch.">
   Press Ctrl + Alt + S to switch to <ph name="IDS_SHORT_PRODUCT_OS_NAME">$1<ex>Chrome OS</ex></ph>
   </message>
-  <message name="IDS_KIOSK_MODE_LOGIN_MESSAGE">
-    Click to start
-  </message>
   <message name="IDS_LOGIN_CHANGE_PHOTO">
     Change picture
   </message>
@@ -1685,6 +1688,12 @@ Press any key to continue exploring.
   <message name="IDS_USER_IS_SUPERVISED_BY_NOTICE" desc="Text for notifications showing that this user is supervised">
     Usage and history of this user can be reviewed by the manager (<ph name="MANAGER_EMAIL">$1<ex>user@example.com</ex></ph>) on chrome.com.
   </message>
+  <message name="IDS_CHILD_USER_IS_MANAGED_BY_ONE_PARENT_NOTICE" desc="Text for notifications showing that this child user is managed by parent's account.">
+    This is an account for kids managed by <ph name="MANAGER_EMAIL">$1<ex>user@example.com</ex></ph>
+  </message>
+  <message name="IDS_CHILD_USER_IS_MANAGED_BY_TWO_PARENTS_NOTICE" desc="Text for notifications showing that this child user is managed by two parents' accounts.">
+    This is an account for kids managed by <ph name="FIRST_PARENT_EMAIL">$1<ex>first@example.com</ex></ph> and <ph name="SECOND_PARENT_EMAIL">$2<ex>second@example.com</ex></ph>
+  </message>
   <message name="IDS_SUPERVISED_USER_EXPIRED_TOKEN_WARNING" desc="Warning text that is shown on login screen trying to sign in as a supervised user that has expired token">
     This supervised user may have been deleted or disabled by the manager. Please contact the manager if you would like to continue signing in as this user.
   </message>
@@ -1933,6 +1942,9 @@ Press any key to continue exploring.
   </message>
   <message name="IDS_OPTIONS_SETTINGS_PRIMARY_MOUSE_RIGHT_DESCRIPTION" desc="In the settings tab, the text next to the checkbox to set the primary mouse button to the right button.">
     Swap primary mouse button
+  </message>
+  <message name="IDS_OPTIONS_SETTINGS_WAKE_ON_WIFI_DESCRIPTION" desc="In the settings tab, the text next to the checkbox for enabling quickly reconnecting to known Wi-Fi SSIDs.">
+    Keep Wi-Fi on during sleep
   </message>
   <message name="IDS_OPTIONS_SETTINGS_BLUETOOTH_DISABLE">
     Disable Bluetooth
@@ -2768,6 +2780,9 @@ Press any key to continue exploring.
   <message name="IDS_ENABLE_DEBUGGING_SCREEN_ROOTFS_REMOVE_MSG" desc="Text shown on enable debugging features screen below warning messages if device needs extra restart before powerwash.">
     A removal of rootfs protection and restart is required before enabling other debugging features.
   </message>
+  <message name="IDS_ENABLE_DEBUGGING_LEARN_MORE" desc="Learn more link text in the enable debugging features dialog.">
+    Learn more.
+  </message>
   <message name="IDS_ENABLE_DEBUGGING_REMOVE_ROOTFS_BUTTON" desc="Button for rootfs protection removal shown on enable debugging dialog.">
     Proceed
   </message>
@@ -2780,8 +2795,11 @@ Press any key to continue exploring.
   <message name="IDS_ENABLE_DEBUGGING_DONE_MESSAGE" desc="Completion message in dialog for enabling debugging features.">
     You have successfully enabled debugging features on this <ph name="IDS_SHORT_PRODUCT_NAME">$1<ex>Chrome</ex></ph> device.
   </message>
+  <message name="IDS_ENABLE_DEBUGGING_ERROR_TITLE" desc="Title message when enabling of debugging features fails.">
+    Something went wrong
+  </message>
   <message name="IDS_ENABLE_DEBUGGING_ERROR_MESSAGE" desc="Error message when enabling of debugging features fails.">
-    Something went wrong. The debugging features were not completely enabled on this <ph name="IDS_SHORT_PRODUCT_NAME">$1<ex>Chrome</ex></ph> device.
+    Debugging features were not completely enabled on this <ph name="IDS_SHORT_PRODUCT_NAME">$1<ex>Chrome</ex></ph> device.
   </message>
   <message name="IDS_ENABLE_DEBUGGING_ROOT_PASSWORD_LABEL" desc="Text for root password entry field label from enable debugging features dialog.">
    root password
@@ -2794,6 +2812,23 @@ Press any key to continue exploring.
   </message>
   <message name="IDS_ENABLE_DEBUGGING_EMPTY_ROOT_PASSWORD_LABEL" desc="Text for root password entry field label from enable debugging features dialog.">
     leave empty if you want to set the root password to the default test image value
+  </message>
+  <message name="IDS_ENABLE_DEBUGGING_HELP" desc="Help content of the enable debugging features dialog.">
+    <ph name="BEGIN_H3">&lt;h3&gt;</ph>Debugging Features<ph name="END_H3">&lt;/h3&gt;</ph>
+    <ph name="BR">&lt;br&gt;</ph>
+    You can enable the debugging features on your Chromebook in order to install and test custom code on your device.  This will allow you to:<ph name="BR">&lt;br&gt;</ph>
+    <ph name="BEGIN_LIST">&lt;ul&gt;</ph>
+      <ph name="LIST_ITEM">&lt;li&gt;</ph>Remove rootfs verification so you can modify OS files
+      <ph name="LIST_ITEM">&lt;li&gt;</ph>Enable SSH access to the device using the standard test keys so you can use tools such as <ph name="BEGIN_CODE">&lt;span style=&quot;color:grey;font-family:monospace&quot;&gt;</ph>&apos;cros flash&apos;<ph name="END_CODE">&lt;/span&gt;</ph> to access the device
+      <ph name="LIST_ITEM">&lt;li&gt;</ph>Enable booting from USB so you can install an OS image from a USB drive
+      <ph name="LIST_ITEM">&lt;li&gt;</ph>Set both the dev and the system root login password to a custom value so you can manually SSH into the device
+    <ph name="END_LIST">&lt;/ul&gt;</ph>
+    <ph name="BR">&lt;br&gt;</ph>
+    Once enabled, most of the debugging features will remain enabled even after performing a powerwash or wiping the data on an enterprise managed device.  To fully disable all debugging features, complete the Chrome OS recovery process (https://support.google.com/chromebook/answer/1080595).
+    <ph name="BR">&lt;br&gt;</ph>
+    <ph name="BR">&lt;br&gt;</ph>
+    For more information about the debugging features see:<ph name="BR">&lt;br&gt;</ph>
+    http://www.chromium.org/chromium-os/how-tos-and-troubleshooting/debugging-features
   </message>
 
   <message name="IDS_RESET_SCREEN_WARNING_MSG" desc="Warning text shown on reset screen above the exclamation icon.">
@@ -3841,9 +3876,6 @@ Battery full
   </message>
   <message name="IDS_CHROMEOS_ACC_LOGIN_SIGNIN_OFFRECORD" desc="Status when signing in incognito.">
     Entering as Guest.
-  </message>
-  <message name="IDS_CHROMEOS_ACC_LOGIN_SIGNIN_DEMOUSER" desc="Status when signing in the demo user.">
-    Entering Demo.
   </message>
   <message name="IDS_CHROMEOS_ACC_LOGIN_SIGNIN_PUBLIC_ACCOUNT" desc="Status when signing in into a public account.">
     Entering public session.
@@ -5707,37 +5739,81 @@ All users must sign out to continue.
   </message>
 
   <!-- About network UI display strings -->
-  <message name="IDS_NETWORK_TITLE" desc="Title of the page">
+  <message name="IDS_NETWORK_UI_TITLE" desc="Title of the page">
     Network
   </message>
-  <message name="IDS_NETWORK_AUTO_REFRESH" desc="A instruction of how to auto-refresh the page">
+  <message name="IDS_NETWORK_UI_AUTO_REFRESH" desc="Instructions for how to auto-refresh the page">
     Add a query param in URL to auto-refresh the page: chrome://network/?refresh=&lt;sec&gt;
   </message>
-  <message name="IDS_NETWORK_LOG_REFRESH" desc="Button to refresh network log">
+  <message name="IDS_NETWORK_UI_REFRESH" desc="Button label for refreshing networks">
+    Refresh Networks
+  </message>
+  <message name="IDS_NETWORK_UI_EXPAND" desc="Button label for expanding network properties">
+    Click '+' to get network properties
+  </message>
+  <message name="IDS_NETWORK_UI_PROPERTY_FORMAT" desc="Drowpdown label for network property format">
+    Property format:
+  </message>
+  <message name="IDS_NETWORK_UI_FORMAT_NORMAL" desc="Label in network property format dropdown for unmanaged ONC properties">
+    ONC
+  </message>
+  <message name="IDS_NETWORK_UI_FORMAT_MANAGED" desc="Label in network property format dropdown for managed ONC properties">
+    Managed ONC
+  </message>
+  <message name="IDS_NETWORK_UI_FORMAT_SHILL" desc="Label in network property format dropdown for Shill properties">
+    Shill
+  </message>
+  <message name="IDS_NETWORK_UI_VISIBLE_NETWORKS" desc="Label for list of visible networks">
+    Visible Networks:
+  </message>
+  <message name="IDS_NETWORK_UI_FAVORITE_NETWORKS" desc="Label for list of favorite networks">
+    Favorite Networks:
+  </message>
+
+  <message name="IDS_DEVICE_LOG_LINK_TEXT" desc="Message preceeding link to chrome://device-log">
+    For network logs, see: <ph name="DEVICE_LOG_LINK">&lt;a href="chrome://device-log"&gt;chrome://device-log&lt;/a&gt;</ph>
+  </message>
+
+  <message name="IDS_DEVICE_LOG_TITLE" desc="Title of the chrome://device-log page">
+    Device Log
+  </message>
+  <message name="IDS_DEVICE_AUTO_REFRESH" desc="Instructions for how to auto-refresh the page">
+    Add a query param in URL to auto-refresh the page: chrome://device-log/?refresh=&lt;sec&gt;
+  </message>
+  <message name="IDS_DEVICE_LOG_REFRESH" desc="Button to refresh device log">
     Refresh
   </message>
-  <message name="IDS_NETWORK_LOG_LEVEL_SHOW" desc="'Show' label before logging level checkboxes">
+  <message name="IDS_DEVICE_LOG_LEVEL_SHOW" desc="'Show' label before logging level checkboxes">
     Show:
   </message>
-  <message name="IDS_NETWORK_LOG_LEVEL_ERROR" desc="Error logging level checkbox">
+  <message name="IDS_DEVICE_LOG_LEVEL_ERROR" desc="Error logging level checkbox">
     Error
   </message>
-  <message name="IDS_NETWORK_LOG_LEVEL_USER" desc="User logging level checkbox">
+  <message name="IDS_DEVICE_LOG_LEVEL_USER" desc="User logging level checkbox">
     User
   </message>
-  <message name="IDS_NETWORK_LOG_LEVEL_EVENT" desc="Event logging level checkbox">
+  <message name="IDS_DEVICE_LOG_LEVEL_EVENT" desc="Event logging level checkbox">
     Event
   </message>
-  <message name="IDS_NETWORK_LOG_LEVEL_DEBUG" desc="Debug logging level checkbox">
+  <message name="IDS_DEVICE_LOG_LEVEL_DEBUG" desc="Debug logging level checkbox">
     Debug
   </message>
-  <message name="IDS_NETWORK_LOG_LEVEL_FILEINFO" desc="File info checkbox in network event log">
+  <message name="IDS_DEVICE_LOG_TYPE_LOGIN" desc="Checkbox to enable showing events of type LOGIN">
+    Login
+  </message>
+  <message name="IDS_DEVICE_LOG_TYPE_NETWORK" desc="Checkbox to enable showing events of type NETWORK">
+    Network
+  </message>
+  <message name="IDS_DEVICE_LOG_TYPE_POWER" desc="Checkbox to enable showing events of type POWER">
+    Power
+  </message>
+  <message name="IDS_DEVICE_LOG_FILEINFO" desc="File info checkbox in device event log">
     File Info
   </message>
-  <message name="IDS_NETWORK_LOG_LEVEL_TIME_DETAIL" desc="Detailed timestamps checkbox in network event log">
+  <message name="IDS_DEVICE_LOG_TIME_DETAIL" desc="Detailed timestamps checkbox in device event log">
     Detailed Timestamps
   </message>
-  <message name="IDS_NETWORK_LOG_ENTRY" desc="The log entry displayed in network event log table.">
+  <message name="IDS_DEVICE_LOG_ENTRY" desc="Format string for lines in chrome://device-log.">
     [<ph name="TIMESTAMP">$1<ex>Timestamp</ex></ph>]
     <ph name="FILE_INFO">$2<ex>file:123</ex></ph>
     <ph name="EVENT_NAME">$3<ex>Event Description</ex></ph>

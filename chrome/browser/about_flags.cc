@@ -119,22 +119,22 @@ void AddOsStrings(unsigned bitmask, base::ListValue* list) {
 }
 
 // Convert switch constants to proper CommandLine::StringType strings.
-CommandLine::StringType GetSwitchString(const std::string& flag) {
-  CommandLine cmd_line(CommandLine::NO_PROGRAM);
+base::CommandLine::StringType GetSwitchString(const std::string& flag) {
+  base::CommandLine cmd_line(base::CommandLine::NO_PROGRAM);
   cmd_line.AppendSwitch(flag);
   DCHECK_EQ(2U, cmd_line.argv().size());
   return cmd_line.argv()[1];
 }
 
 // Scoops flags from a command line.
-std::set<CommandLine::StringType> ExtractFlagsFromCommandLine(
-    const CommandLine& cmdline) {
-  std::set<CommandLine::StringType> flags;
+std::set<base::CommandLine::StringType> ExtractFlagsFromCommandLine(
+    const base::CommandLine& cmdline) {
+  std::set<base::CommandLine::StringType> flags;
   // First do the ones between --flag-switches-begin and --flag-switches-end.
-  CommandLine::StringVector::const_iterator first =
+  base::CommandLine::StringVector::const_iterator first =
       std::find(cmdline.argv().begin(), cmdline.argv().end(),
                 GetSwitchString(switches::kFlagSwitchesBegin));
-  CommandLine::StringVector::const_iterator last =
+  base::CommandLine::StringVector::const_iterator last =
       std::find(cmdline.argv().begin(), cmdline.argv().end(),
                 GetSwitchString(switches::kFlagSwitchesEnd));
   if (first != cmdline.argv().end() && last != cmdline.argv().end())
@@ -380,6 +380,16 @@ const Experiment::Choice kSSLVersionMinChoices[] = {
     switches::kSSLVersionTLSv11 },
   { IDS_FLAGS_SSL_VERSION_TLSV12, switches::kSSLVersionMin,
     switches::kSSLVersionTLSv12 },
+};
+
+const Experiment::Choice kFillOnAccountSelectChoices[] = {
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
+    autofill::switches::kDisableFillOnAccountSelect, "" },
+  { IDS_FLAGS_FILL_ON_ACCOUNT_SELECT_ENABLE_HIGHLIGHTING,
+    autofill::switches::kEnableFillOnAccountSelect, "" },
+  { IDS_FLAGS_FILL_ON_ACCOUNT_SELECT_ENABLE_NO_HIGHLIGHTING,
+    autofill::switches::kEnableFillOnAccountSelectNoHighlighting, "" },
 };
 
 // RECORDING USER METRICS FOR FLAGS:
@@ -731,7 +741,7 @@ const Experiment kExperiments[] = {
     "enable-gpu-rasterization",
     IDS_FLAGS_ENABLE_GPU_RASTERIZATION_NAME,
     IDS_FLAGS_ENABLE_GPU_RASTERIZATION_DESCRIPTION,
-    kOsAndroid,
+    kOsAll,
     MULTI_VALUE_TYPE(kEnableGpuRasterizationChoices)
   },
   {
@@ -1271,11 +1281,11 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(keyboard::switches::kEnableExperimentalInputViewFeatures)
   },
   {
-    "auto-virtual-keyboard",
-    IDS_FLAGS_AUTO_VIRTUAL_KEYBOARD_NAME,
-    IDS_FLAGS_AUTO_VIRTUAL_KEYBOARD_DESCRIPTION,
+    "disable-smart-virtual-keyboard",
+    IDS_FLAGS_DISABLE_SMART_VIRTUAL_KEYBOARD_NAME,
+    IDS_FLAGS_DISABLE_SMART_VIRTUAL_KEYBOARD_DESCRIPTION,
     kOsCrOS,
-    SINGLE_VALUE_TYPE(keyboard::switches::kAutoVirtualKeyboard)
+    SINGLE_VALUE_TYPE(keyboard::switches::kDisableSmartVirtualKeyboard)
   },
 #endif
   {
@@ -1438,11 +1448,11 @@ const Experiment kExperiments[] = {
 #endif
 #if defined(ENABLE_EXTENSIONS)
   {
-    "enable-worker-frame",
-    IDS_FLAGS_ENABLE_WORKER_FRAME_NAME,
-    IDS_FLAGS_ENABLE_WORKER_FRAME_DESCRIPTION,
+    "enable-surface-worker",
+    IDS_FLAGS_ENABLE_SURFACE_WORKER_NAME,
+    IDS_FLAGS_ENABLE_SURFACE_WORKER_DESCRIPTION,
     kOsDesktop,
-    SINGLE_VALUE_TYPE(extensions::switches::kEnableWorkerFrame)
+    SINGLE_VALUE_TYPE(extensions::switches::kEnableSurfaceWorker)
   },
 #endif
   {
@@ -1510,6 +1520,22 @@ const Experiment kExperiments[] = {
     kOsWin | kOsCrOS | kOsLinux | kOsMac,
     SINGLE_VALUE_TYPE(switches::kDisableNewBookmarkApps)
   },
+#if defined(OS_MACOSX)
+  {
+    "enable-hosted-app-shim-creation",
+    IDS_FLAGS_ENABLE_HOSTED_APP_SHIM_CREATION_NAME,
+    IDS_FLAGS_ENABLE_HOSTED_APP_SHIM_CREATION_DESCRIPTION,
+    kOsMac,
+    SINGLE_VALUE_TYPE(switches::kEnableHostedAppShimCreation)
+  },
+  {
+    "enable-hosted-app-quit-notification",
+    IDS_FLAGS_ENABLE_HOSTED_APP_QUIT_NOTIFICATION_NAME,
+    IDS_FLAGS_ENABLE_HOSTED_APP_QUIT_NOTIFICATION_DESCRIPTION,
+    kOsMac,
+    SINGLE_VALUE_TYPE(switches::kHostedAppQuitNotification)
+  },
+#endif
   {
     "enable-ephemeral-apps-in-webstore",
     IDS_FLAGS_ENABLE_EPHEMERAL_APPS_IN_WEBSTORE_NAME,
@@ -1903,6 +1929,15 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(extensions::switches::kEnableEmbeddedExtensionOptions)
   },
 #endif
+#if defined(USE_ASH)
+  {
+    "enable-web-app-frame",
+    IDS_FLAGS_ENABLE_WEB_APP_FRAME_NAME,
+    IDS_FLAGS_ENABLE_WEB_APP_FRAME_DESCRIPTION,
+    kOsWin | kOsCrOS,
+    SINGLE_VALUE_TYPE(switches::kEnableWebAppFrame)
+  },
+#endif
   {
     "enable-website-settings-manager",
     IDS_FLAGS_ENABLE_WEBSITE_SETTINGS_NAME,
@@ -1931,7 +1966,7 @@ const Experiment kExperiments[] = {
     "enable-extension-action-redesign",
     IDS_FLAGS_ENABLE_EXTENSION_ACTION_REDESIGN_NAME,
     IDS_FLAGS_ENABLE_EXTENSION_ACTION_REDESIGN_DESCRIPTION,
-    kOsWin | kOsLinux | kOsCrOS,
+    kOsDesktop,
     SINGLE_VALUE_TYPE(extensions::switches::kEnableExtensionActionRedesign)
   },
 #endif
@@ -2059,9 +2094,17 @@ const Experiment kExperiments[] = {
     IDS_FILL_ON_ACCOUNT_SELECT_NAME,
     IDS_FILL_ON_ACCOUNT_SELECT_DESCRIPTION,
     kOsAll,
-    ENABLE_DISABLE_VALUE_TYPE(autofill::switches::kEnableFillOnAccountSelect,
-                              autofill::switches::kDisableFillOnAccountSelect)
+    MULTI_VALUE_TYPE(kFillOnAccountSelectChoices)
   },
+#if defined(OS_CHROMEOS)
+  {
+    "enable-wifi-credential-sync",  // FLAGS:RECORD_UMA
+    IDS_FLAGS_ENABLE_WIFI_CREDENTIAL_SYNC_NAME,
+    IDS_FLAGS_ENABLE_WIFI_CREDENTIAL_SYNC_DESCRIPTION,
+    kOsCrOS,
+    SINGLE_VALUE_TYPE(switches::kEnableWifiCredentialSync)
+  },
+#endif
 
   // NOTE: Adding new command-line switches requires adding corresponding
   // entries to enum "LoginCustomFlags" in histograms.xml. See note in
@@ -2076,7 +2119,7 @@ class FlagsState {
  public:
   FlagsState() : needs_restart_(false) {}
   void ConvertFlagsToSwitches(FlagsStorage* flags_storage,
-                              CommandLine* command_line,
+                              base::CommandLine* command_line,
                               SentinelsMode sentinels);
   bool IsRestartNeededToCommitChanges();
   void SetExperimentEnabled(
@@ -2084,7 +2127,7 @@ class FlagsState {
       const std::string& internal_name,
       bool enable);
   void RemoveFlagsSwitches(
-      std::map<std::string, CommandLine::StringType>* switch_list);
+      std::map<std::string, base::CommandLine::StringType>* switch_list);
   void ResetAllFlags(FlagsStorage* flags_storage);
   void reset();
 
@@ -2266,7 +2309,7 @@ base::string16 Experiment::DescriptionForChoice(int index) const {
 }
 
 void ConvertFlagsToSwitches(FlagsStorage* flags_storage,
-                            CommandLine* command_line,
+                            base::CommandLine* command_line,
                             SentinelsMode sentinels) {
   FlagsState::GetInstance()->ConvertFlagsToSwitches(flags_storage,
                                                     command_line,
@@ -2274,12 +2317,12 @@ void ConvertFlagsToSwitches(FlagsStorage* flags_storage,
 }
 
 bool AreSwitchesIdenticalToCurrentCommandLine(
-    const CommandLine& new_cmdline,
-    const CommandLine& active_cmdline,
-    std::set<CommandLine::StringType>* out_difference) {
-  std::set<CommandLine::StringType> new_flags =
+    const base::CommandLine& new_cmdline,
+    const base::CommandLine& active_cmdline,
+    std::set<base::CommandLine::StringType>* out_difference) {
+  std::set<base::CommandLine::StringType> new_flags =
       ExtractFlagsFromCommandLine(new_cmdline);
-  std::set<CommandLine::StringType> active_flags =
+  std::set<base::CommandLine::StringType> active_flags =
       ExtractFlagsFromCommandLine(active_cmdline);
 
   bool result = false;
@@ -2367,7 +2410,7 @@ void SetExperimentEnabled(FlagsStorage* flags_storage,
 }
 
 void RemoveFlagsSwitches(
-    std::map<std::string, CommandLine::StringType>* switch_list) {
+    std::map<std::string, base::CommandLine::StringType>* switch_list) {
   FlagsState::GetInstance()->RemoveFlagsSwitches(switch_list);
 }
 
@@ -2454,7 +2497,7 @@ void SetFlagToSwitchMapping(const std::string& key,
 }
 
 void FlagsState::ConvertFlagsToSwitches(FlagsStorage* flags_storage,
-                                        CommandLine* command_line,
+                                        base::CommandLine* command_line,
                                         SentinelsMode sentinels) {
   if (command_line->HasSwitch(switches::kNoExperiments))
     return;
@@ -2592,7 +2635,7 @@ void FlagsState::SetExperimentEnabled(FlagsStorage* flags_storage,
 }
 
 void FlagsState::RemoveFlagsSwitches(
-    std::map<std::string, CommandLine::StringType>* switch_list) {
+    std::map<std::string, base::CommandLine::StringType>* switch_list) {
   for (const auto& entry : flags_switches_)
     switch_list->erase(entry.first);
 }

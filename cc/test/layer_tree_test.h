@@ -17,7 +17,7 @@ class WebGraphicsContext3D;
 }
 
 namespace cc {
-class ExternalBeginFrameSourceForTest;
+class FakeExternalBeginFrameSource;
 class FakeLayerTreeHostClient;
 class FakeOutputSurface;
 class LayerImpl;
@@ -35,6 +35,7 @@ class TestHooks : public AnimationDelegate {
 
   void ReadSettings(const LayerTreeSettings& settings);
 
+  virtual scoped_ptr<Rasterizer> CreateRasterizer(LayerTreeHostImpl* host_impl);
   virtual void CreateResourceAndTileTaskWorkerPool(
       LayerTreeHostImpl* host_impl,
       scoped_ptr<TileTaskWorkerPool>* tile_task_worker_pool,
@@ -43,7 +44,7 @@ class TestHooks : public AnimationDelegate {
   virtual void WillBeginImplFrameOnThread(LayerTreeHostImpl* host_impl,
                                           const BeginFrameArgs& args) {}
   virtual void BeginMainFrameAbortedOnThread(LayerTreeHostImpl* host_impl,
-                                             bool did_handle) {}
+                                             CommitEarlyOutReason reason) {}
   virtual void BeginCommitOnThread(LayerTreeHostImpl* host_impl) {}
   virtual void CommitCompleteOnThread(LayerTreeHostImpl* host_impl) {}
   virtual void WillActivateTreeOnThread(LayerTreeHostImpl* host_impl) {}
@@ -132,7 +133,7 @@ class TimeoutTask;
 // thread, but be aware that ending the test is an asynchronous process.
 class LayerTreeTest : public testing::Test, public TestHooks {
  public:
-  virtual ~LayerTreeTest();
+  ~LayerTreeTest() override;
 
   virtual void EndTest();
   void EndTestAfterDelayMs(int delay_milliseconds);
@@ -150,6 +151,11 @@ class LayerTreeTest : public testing::Test, public TestHooks {
 
   void DoBeginTest();
   void Timeout();
+
+  bool verify_property_trees() const { return verify_property_trees_; }
+  void set_verify_property_trees(bool verify_property_trees) {
+    verify_property_trees_ = verify_property_trees;
+  }
 
  protected:
   LayerTreeTest();
@@ -210,13 +216,12 @@ class LayerTreeTest : public testing::Test, public TestHooks {
 
   TestWebGraphicsContext3D* TestContext();
 
-
  private:
   LayerTreeSettings settings_;
   scoped_ptr<LayerTreeHostClientForTesting> client_;
   scoped_ptr<LayerTreeHost> layer_tree_host_;
   FakeOutputSurface* output_surface_;
-  ExternalBeginFrameSourceForTest* external_begin_frame_source_;
+  FakeExternalBeginFrameSource* external_begin_frame_source_;
 
   bool beginning_;
   bool end_when_begin_returns_;
@@ -225,6 +230,7 @@ class LayerTreeTest : public testing::Test, public TestHooks {
   bool started_;
   bool ended_;
   bool delegating_renderer_;
+  bool verify_property_trees_;
 
   int timeout_seconds_;
 

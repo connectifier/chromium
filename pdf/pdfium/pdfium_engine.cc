@@ -36,7 +36,6 @@
 #include "third_party/pdfium/fpdfsdk/include/fpdf_sysfontinfo.h"
 #include "third_party/pdfium/fpdfsdk/include/fpdf_transformpage.h"
 #include "third_party/pdfium/fpdfsdk/include/fpdfedit.h"
-#include "third_party/pdfium/fpdfsdk/include/fpdfoom.h"
 #include "third_party/pdfium/fpdfsdk/include/fpdfppo.h"
 #include "third_party/pdfium/fpdfsdk/include/fpdfsave.h"
 #include "third_party/pdfium/fpdfsdk/include/pdfwindow/PDFWindow.h"
@@ -136,10 +135,10 @@ struct PDFFontSubstitution {
 };
 
 PP_BrowserFont_Trusted_Weight WeightToBrowserFontTrustedWeight(int weight) {
-  COMPILE_ASSERT(PP_BROWSERFONT_TRUSTED_WEIGHT_100 == 0,
-                 PP_BrowserFont_Trusted_Weight_Min);
-  COMPILE_ASSERT(PP_BROWSERFONT_TRUSTED_WEIGHT_900 == 8,
-                 PP_BrowserFont_Trusted_Weight_Max);
+  static_assert(PP_BROWSERFONT_TRUSTED_WEIGHT_100 == 0,
+                "PP_BrowserFont_Trusted_Weight min");
+  static_assert(PP_BROWSERFONT_TRUSTED_WEIGHT_900 == 8,
+                "PP_BrowserFont_Trusted_Weight max");
   const int kMinimumWeight = 100;
   const int kMaximumWeight = 900;
   int normalized_weight =
@@ -289,19 +288,6 @@ FPDF_SYSFONTINFO g_font_info = {
   DeleteFont
 };
 #endif  // defined(OS_LINUX)
-
-void OOM_Handler(_OOM_INFO*) {
-  // Kill the process.  This is important for security, since the code doesn't
-  // NULL-check many memory allocations.  If a malloc fails, returns NULL, and
-  // the buffer is then used, it provides a handy mapping of memory starting at
-  // address 0 for an attacker to utilize.
-  abort();
-}
-
-OOM_INFO g_oom_info = {
-  1,
-  OOM_Handler
-};
 
 PDFiumEngine* g_engine_for_unsupported;
 
@@ -529,15 +515,14 @@ void FormatStringForOS(base::string16* text) {
 
 }  // namespace
 
-bool InitializeSDK(void* data) {
-  FPDF_InitLibrary(data);
+bool InitializeSDK() {
+  FPDF_InitLibrary();
 
 #if defined(OS_LINUX)
   // Font loading doesn't work in the renderer sandbox in Linux.
   FPDF_SetSystemFontInfo(&g_font_info);
 #endif
 
-  FSDK_SetOOMHandler(&g_oom_info);
   FSDK_SetUnSpObjProcessHandler(&g_unsuppored_info);
 
   return true;

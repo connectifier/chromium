@@ -27,6 +27,8 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "testing/perf/perf_test.h"
 #include "third_party/khronos/GLES2/gl2.h"
+#include "third_party/skia/include/gpu/GrContext.h"
+#include "third_party/skia/include/gpu/gl/GrGLInterface.h"
 
 namespace cc {
 namespace {
@@ -77,7 +79,15 @@ class PerfContextProvider : public ContextProvider {
   gpu::gles2::GLES2Interface* ContextGL() override { return context_gl_.get(); }
   gpu::ContextSupport* ContextSupport() override { return &support_; }
   class GrContext* GrContext() override {
-    return NULL;
+    if (gr_context_)
+      return gr_context_.get();
+
+    skia::RefPtr<const GrGLInterface> null_interface =
+        skia::AdoptRef(GrGLCreateNullInterface());
+    gr_context_ = skia::AdoptRef(GrContext::Create(
+        kOpenGL_GrBackend,
+        reinterpret_cast<GrBackendContext>(null_interface.get())));
+    return gr_context_.get();
   }
   bool IsContextLost() override { return false; }
   void VerifyContexts() override {}
@@ -91,6 +101,7 @@ class PerfContextProvider : public ContextProvider {
   ~PerfContextProvider() override {}
 
   scoped_ptr<PerfGLES2Interface> context_gl_;
+  skia::RefPtr<class GrContext> gr_context_;
   TestContextSupport support_;
 };
 
@@ -255,8 +266,7 @@ class TileTaskWorkerPoolPerfTest
       case TILE_TASK_WORKER_POOL_TYPE_GPU:
         Create3dOutputSurfaceAndResourceProvider();
         tile_task_worker_pool_ = GpuTileTaskWorkerPool::Create(
-            task_runner_.get(), context_provider_.get(),
-            resource_provider_.get(), false);
+            task_runner_.get(), task_graph_runner_.get());
         break;
       case TILE_TASK_WORKER_POOL_TYPE_BITMAP:
         CreateSoftwareOutputSurfaceAndResourceProvider();

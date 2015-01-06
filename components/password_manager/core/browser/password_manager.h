@@ -85,8 +85,9 @@ class PasswordManager : public LoginModel {
   // of 2 (see SavePassword).
   void ProvisionallySavePassword(const autofill::PasswordForm& form);
 
-  // Should be called when the user navigates the main frame.
-  void DidNavigateMainFrame(bool is_in_page);
+  // Should be called when the user navigates the main frame. Not called for
+  // in-page navigation.
+  void DidNavigateMainFrame();
 
   // Handles password forms being parsed.
   void OnPasswordFormsParsed(password_manager::PasswordManagerDriver* driver,
@@ -102,6 +103,12 @@ class PasswordManager : public LoginModel {
   virtual void OnPasswordFormSubmitted(
       password_manager::PasswordManagerDriver* driver,
       const autofill::PasswordForm& password_form);
+
+  // Called if |password_form| was filled upon in-page navigation. This often
+  // means history.pushState being called from JavaScript. If this causes false
+  // positive in password saving, update http://crbug.com/357696.
+  void OnInPageNavigation(password_manager::PasswordManagerDriver* driver,
+                          const autofill::PasswordForm& password_form);
 
   PasswordManagerClient* client() { return client_; }
 
@@ -148,6 +155,10 @@ class PasswordManager : public LoginModel {
   // the password), based on inspecting the state of
   // |provisional_save_manager_|.
   bool ShouldPromptUserToSavePassword() const;
+
+  // Called when we already decided that login was correct and we want to save
+  // password.
+  void AskUserOrSavePassword();
 
   // Checks for every from in |forms| whether |pending_login_managers_| already
   // contain a manager for that form. If not, adds a manager for each such form.
@@ -198,6 +209,9 @@ class PasswordManager : public LoginModel {
   // the recorded forms matches the login form from the previous page
   // (to see if the login was a failure), and clears the vector.
   std::vector<autofill::PasswordForm> all_visible_forms_;
+
+  // The user-visible URL from the last time a password was provisionally saved.
+  GURL main_frame_url_;
 
   DISALLOW_COPY_AND_ASSIGN(PasswordManager);
 };

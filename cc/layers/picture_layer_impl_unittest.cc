@@ -86,8 +86,7 @@ class PictureLayerImplTest : public testing::Test {
     host_impl_.SetViewportSize(gfx::Size(10000, 10000));
   }
 
-  virtual ~PictureLayerImplTest() {
-  }
+  ~PictureLayerImplTest() override {}
 
   void SetUp() override { InitializeRenderer(); }
 
@@ -209,6 +208,7 @@ class PictureLayerImplTest : public testing::Test {
       if (!tile_size.IsEmpty())
         pending_layer->set_fixed_tile_size(tile_size);
     }
+    pending_root->SetHasRenderSurface(true);
     // The bounds() just mirror the pile size.
     pending_layer->SetBounds(raster_source->GetSize());
     pending_layer->SetContentBounds(raster_source->GetSize());
@@ -219,7 +219,6 @@ class PictureLayerImplTest : public testing::Test {
 
     pending_layer_ = static_cast<FakePictureLayerImpl*>(
         host_impl_.pending_tree()->LayerById(id_));
-    pending_layer_->DoPostCommitInitializationIfNeeded();
 
     // Add tilings/tiles for the layer.
     host_impl_.pending_tree()->UpdateDrawProperties();
@@ -1190,7 +1189,7 @@ TEST_F(PictureLayerImplTest, DontAddLowResForSmallLayers) {
   EXPECT_EQ(mask->num_tilings(), 1u);
 }
 
-TEST_F(PictureLayerImplTest, HugeMasksDontGetTiles) {
+TEST_F(PictureLayerImplTest, HugeMasksGetScaledDown) {
   base::TimeTicks time_ticks;
   time_ticks += base::TimeDelta::FromMilliseconds(1);
   host_impl_.SetCurrentBeginFrameArgs(
@@ -1210,6 +1209,7 @@ TEST_F(PictureLayerImplTest, HugeMasksDontGetTiles) {
   mask_ptr->SetContentBounds(layer_bounds);
   mask_ptr->SetDrawsContent(true);
   pending_layer_->SetMaskLayer(mask_ptr.Pass());
+  pending_layer_->SetHasRenderSurface(true);
 
   time_ticks += base::TimeDelta::FromMilliseconds(1);
   host_impl_.SetCurrentBeginFrameArgs(
@@ -1237,7 +1237,7 @@ TEST_F(PictureLayerImplTest, HugeMasksDontGetTiles) {
   gfx::Size mask_texture_size;
   active_mask->GetContentsResourceId(&mask_resource_id, &mask_texture_size);
   EXPECT_NE(0u, mask_resource_id);
-  EXPECT_EQ(mask_texture_size, active_mask->bounds());
+  EXPECT_EQ(active_mask->bounds(), mask_texture_size);
 
   // Drop resources and recreate them, still the same.
   pending_mask->ReleaseResources();
@@ -1246,16 +1246,7 @@ TEST_F(PictureLayerImplTest, HugeMasksDontGetTiles) {
   active_mask->HighResTiling()->CreateAllTilesForTesting();
   EXPECT_EQ(1u, active_mask->HighResTiling()->AllTilesForTesting().size());
   EXPECT_NE(0u, mask_resource_id);
-  EXPECT_EQ(mask_texture_size, active_layer_->bounds());
-
-  // Drop resources and recreate them, still the same.
-  pending_mask->ReleaseResources();
-  active_mask->ReleaseResources();
-  SetupDrawPropertiesAndUpdateTiles(active_mask, 1.f, 1.f, 1.f, 1.f, false);
-  active_mask->HighResTiling()->CreateAllTilesForTesting();
-  EXPECT_EQ(1u, active_mask->HighResTiling()->AllTilesForTesting().size());
-  EXPECT_NE(0u, mask_resource_id);
-  EXPECT_EQ(mask_texture_size, active_mask->bounds());
+  EXPECT_EQ(active_mask->bounds(), mask_texture_size);
 
   // Resize larger than the max texture size.
   int max_texture_size = host_impl_.GetRendererCapabilities().max_texture_size;
@@ -1273,7 +1264,8 @@ TEST_F(PictureLayerImplTest, HugeMasksDontGetTiles) {
       CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
   host_impl_.pending_tree()->UpdateDrawProperties();
 
-  EXPECT_EQ(1.f, pending_mask->HighResTiling()->contents_scale());
+  // The mask tiling gets scaled down.
+  EXPECT_LT(pending_mask->HighResTiling()->contents_scale(), 1.f);
   EXPECT_EQ(1u, pending_mask->num_tilings());
 
   host_impl_.tile_manager()->InitializeTilesWithResourcesForTesting(
@@ -1281,27 +1273,52 @@ TEST_F(PictureLayerImplTest, HugeMasksDontGetTiles) {
 
   ActivateTree();
 
-  // Mask layers have a tiling, but there should be no tiles in it.
-  EXPECT_EQ(0u, active_mask->HighResTiling()->AllTilesForTesting().size());
-  // The mask resource is empty.
-  active_layer_->GetContentsResourceId(&mask_resource_id, &mask_texture_size);
-  EXPECT_EQ(0u, mask_resource_id);
+  // Mask layers have a tiling with a single tile in it.
+  EXPECT_EQ(1u, active_mask->HighResTiling()->AllTilesForTesting().size());
+  // The mask resource exists.
+  active_mask->GetContentsResourceId(&mask_resource_id, &mask_texture_size);
+  EXPECT_NE(0u, mask_resource_id);
+  gfx::Size expected_size = active_mask->bounds();
+  expected_size.SetToMin(gfx::Size(max_texture_size, max_texture_size));
+  EXPECT_EQ(expected_size, mask_texture_size);
 
   // Drop resources and recreate them, still the same.
   pending_mask->ReleaseResources();
   active_mask->ReleaseResources();
   SetupDrawPropertiesAndUpdateTiles(active_mask, 1.f, 1.f, 1.f, 1.f, false);
   active_mask->HighResTiling()->CreateAllTilesForTesting();
-  EXPECT_EQ(0u, active_mask->HighResTiling()->AllTilesForTesting().size());
-  active_mask->GetContentsResourceId(&mask_resource_id, &mask_texture_size);
-  EXPECT_EQ(0u, mask_resource_id);
+  EXPECT_EQ(1u, active_mask->HighResTiling()->AllTilesForTesting().size());
+  EXPECT_NE(0u, mask_resource_id);
+  EXPECT_EQ(expected_size, mask_texture_size);
 
   // Do another activate, the same holds.
   SetupPendingTree(huge_pile);
   ActivateTree();
-  EXPECT_EQ(0u, active_mask->HighResTiling()->AllTilesForTesting().size());
+  EXPECT_EQ(1u, active_mask->HighResTiling()->AllTilesForTesting().size());
   active_layer_->GetContentsResourceId(&mask_resource_id, &mask_texture_size);
+  EXPECT_EQ(expected_size, mask_texture_size);
   EXPECT_EQ(0u, mask_resource_id);
+
+  // Resize even larger, so that the scale would be smaller than the minimum
+  // contents scale. Then the layer should no longer have any tiling.
+  float min_contents_scale = host_impl_.settings().minimum_contents_scale;
+  gfx::Size extra_huge_bounds(max_texture_size / min_contents_scale + 1, 10);
+  scoped_refptr<FakePicturePileImpl> extra_huge_pile =
+      FakePicturePileImpl::CreateFilledPile(tile_size, extra_huge_bounds);
+
+  SetupPendingTree(extra_huge_pile);
+  pending_mask->SetBounds(extra_huge_bounds);
+  pending_mask->SetContentBounds(extra_huge_bounds);
+  pending_mask->SetRasterSourceOnPending(extra_huge_pile, Region());
+
+  EXPECT_FALSE(pending_mask->CanHaveTilings());
+
+  time_ticks += base::TimeDelta::FromMilliseconds(1);
+  host_impl_.SetCurrentBeginFrameArgs(
+      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.pending_tree()->UpdateDrawProperties();
+
+  EXPECT_EQ(0u, pending_mask->num_tilings());
 }
 
 TEST_F(PictureLayerImplTest, ScaledMaskLayer) {
@@ -1326,6 +1343,7 @@ TEST_F(PictureLayerImplTest, ScaledMaskLayer) {
   mask_ptr->SetContentBounds(layer_bounds);
   mask_ptr->SetDrawsContent(true);
   pending_layer_->SetMaskLayer(mask_ptr.Pass());
+  pending_layer_->SetHasRenderSurface(true);
 
   time_ticks += base::TimeDelta::FromMilliseconds(1);
   host_impl_.SetCurrentBeginFrameArgs(
@@ -1675,7 +1693,7 @@ TEST_F(NoLowResPictureLayerImplTest,
     if (viewport_for_tile_priority.Intersects(iter.geometry_rect())) {
       num_inside++;
       // Mark everything in viewport for tile priority as ready to draw.
-      ManagedTileState::DrawInfo& draw_info = tile->draw_info();
+      TileDrawInfo& draw_info = tile->draw_info();
       draw_info.SetSolidColorForTesting(SK_ColorRED);
     } else {
       num_outside++;
@@ -2077,7 +2095,6 @@ TEST_F(PictureLayerImplTest, ActivateUninitializedLayer) {
   // to sync from the active layer.
   float raster_page_scale = 10.f * pending_layer_->raster_page_scale();
   pending_layer_->set_raster_page_scale(raster_page_scale);
-  EXPECT_TRUE(pending_layer_->needs_post_commit_initialization());
 
   host_impl_.ActivateSyncTree();
 
@@ -2086,7 +2103,6 @@ TEST_F(PictureLayerImplTest, ActivateUninitializedLayer) {
 
   EXPECT_EQ(0u, active_layer_->num_tilings());
   EXPECT_EQ(raster_page_scale, active_layer_->raster_page_scale());
-  EXPECT_FALSE(active_layer_->needs_post_commit_initialization());
 }
 
 TEST_F(PictureLayerImplTest, ShareTilesOnNextFrame) {
@@ -2822,7 +2838,7 @@ TEST_F(PictureLayerImplTest, TilingSetRasterQueue) {
        tile_it != high_res_tiles.end();
        ++tile_it) {
     Tile* tile = *tile_it;
-    ManagedTileState::DrawInfo& draw_info = tile->draw_info();
+    TileDrawInfo& draw_info = tile->draw_info();
     draw_info.SetSolidColorForTesting(SK_ColorRED);
   }
 
@@ -3607,47 +3623,6 @@ TEST_F(PictureLayerImplTest, SharedQuadStateContainsMaxTilingScale) {
   EXPECT_EQ(gfx::Rect(0u, 0u, 2500u, 5000u).ToString(),
             render_pass->shared_quad_state_list.front()
                 ->visible_content_rect.ToString());
-}
-
-TEST_F(PictureLayerImplTest, UpdateTilesForMasksWithNoVisibleContent) {
-  gfx::Size tile_size(400, 400);
-  gfx::Size bounds(100000, 100);
-
-  host_impl_.CreatePendingTree();
-
-  scoped_ptr<LayerImpl> root = LayerImpl::Create(host_impl_.pending_tree(), 1);
-
-  scoped_ptr<FakePictureLayerImpl> layer_with_mask =
-      FakePictureLayerImpl::Create(host_impl_.pending_tree(), 2);
-  layer_with_mask->SetBounds(bounds);
-  layer_with_mask->SetContentBounds(bounds);
-
-  scoped_refptr<FakePicturePileImpl> pending_pile =
-      FakePicturePileImpl::CreateFilledPile(tile_size, bounds);
-  scoped_ptr<FakePictureLayerImpl> mask =
-      FakePictureLayerImpl::CreateMaskWithRasterSource(
-          host_impl_.pending_tree(), 3, pending_pile);
-  mask->SetBounds(bounds);
-  mask->SetContentBounds(bounds);
-  mask->SetDrawsContent(true);
-  layer_with_mask->SetMaskLayer(mask.Pass());
-
-  FakePictureLayerImpl* pending_mask =
-      static_cast<FakePictureLayerImpl*>(layer_with_mask->mask_layer());
-
-  scoped_ptr<FakePictureLayerImpl> child_of_layer_with_mask =
-      FakePictureLayerImpl::Create(host_impl_.pending_tree(), 4);
-  child_of_layer_with_mask->SetBounds(bounds);
-  child_of_layer_with_mask->SetContentBounds(bounds);
-  child_of_layer_with_mask->SetDrawsContent(true);
-  layer_with_mask->AddChild(child_of_layer_with_mask.Pass());
-  root->AddChild(layer_with_mask.Pass());
-
-  host_impl_.pending_tree()->SetRootLayer(root.Pass());
-
-  EXPECT_EQ(0u, pending_mask->num_tilings());
-  host_impl_.pending_tree()->UpdateDrawProperties();
-  EXPECT_NE(0u, pending_mask->num_tilings());
 }
 
 class PictureLayerImplTestWithDelegatingRenderer : public PictureLayerImplTest {

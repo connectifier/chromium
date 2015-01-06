@@ -27,56 +27,35 @@ typedef ServiceWorkerVersion::MessageCallback MessageCallback;
 class ServiceWorkerVersion::GetClientDocumentsCallback
     : public base::RefCounted<GetClientDocumentsCallback> {
  public:
-  GetClientDocumentsCallback(int request_id, int pending_requests)
+  GetClientDocumentsCallback(int request_id,
+                             ServiceWorkerVersion* version)
       : request_id_(request_id),
-        pending_requests_(pending_requests) {}
+        version_(version) {
+    DCHECK(version_);
+  }
+
   void AddClientInfo(int client_id, const ServiceWorkerClientInfo& info) {
     clients_.push_back(info);
     clients_.back().client_id = client_id;
   }
-  void DecrementPendingRequests(ServiceWorkerVersion* version) {
-    if (--pending_requests_ > 0)
-      return;
-    // Don't bother if it's no longer running.
-    if (version->running_status() == RUNNING) {
-      version->embedded_worker_->SendMessage(
+
+ private:
+  friend class base::RefCounted<GetClientDocumentsCallback>;
+
+  virtual ~GetClientDocumentsCallback() {
+    if (version_->running_status() == RUNNING) {
+      version_->embedded_worker_->SendMessage(
           ServiceWorkerMsg_DidGetClientDocuments(request_id_, clients_));
     }
   }
 
- private:
-  friend class base::RefCounted<GetClientDocumentsCallback>;
-  virtual ~GetClientDocumentsCallback() {}
-
   std::vector<ServiceWorkerClientInfo> clients_;
   int request_id_;
-  size_t pending_requests_;
+
+  // |version_| must outlive this callback.
+  ServiceWorkerVersion* version_;
 
   DISALLOW_COPY_AND_ASSIGN(GetClientDocumentsCallback);
-};
-
-class ServiceWorkerVersion::GetClientInfoCallback {
- public:
-  GetClientInfoCallback(
-      int client_id,
-      const scoped_refptr<GetClientDocumentsCallback>& callback)
-      : client_id_(client_id),
-        callback_(callback) {}
-
-  void OnSuccess(ServiceWorkerVersion* version,
-                 const ServiceWorkerClientInfo& info) {
-    callback_->AddClientInfo(client_id_, info);
-    callback_->DecrementPendingRequests(version);
-  }
-  void OnError(ServiceWorkerVersion* version) {
-    callback_->DecrementPendingRequests(version);
-  }
-
- private:
-  int client_id_;
-  scoped_refptr<GetClientDocumentsCallback> callback_;
-
-  DISALLOW_COPY_AND_ASSIGN(GetClientInfoCallback);
 };
 
 namespace {
@@ -153,6 +132,12 @@ void RunErrorMessageCallback(
     MessagePortService::GetInstance()->ClosePort(message_port_id);
   }
   callback.Run(status);
+}
+
+void RunErrorCrossOriginConnectCallback(
+    const ServiceWorkerVersion::CrossOriginConnectCallback& callback,
+    ServiceWorkerStatusCode status) {
+  callback.Run(status, false);
 }
 
 }  // namespace
@@ -428,7 +413,7 @@ void ServiceWorkerVersion::DispatchFetchEvent(
 void ServiceWorkerVersion::DispatchSyncEvent(const StatusCallback& callback) {
   DCHECK_EQ(ACTIVATED, status()) << status();
 
-  if (!CommandLine::ForCurrentProcess()->HasSwitch(
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableServiceWorkerSync)) {
     callback.Run(SERVICE_WORKER_ERROR_ABORT);
     return;
@@ -459,7 +444,7 @@ void ServiceWorkerVersion::DispatchNotificationClickEvent(
     const PlatformNotificationData& notification_data) {
   DCHECK_EQ(ACTIVATED, status()) << status();
 
-  if (!CommandLine::ForCurrentProcess()->HasSwitch(
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableExperimentalWebPlatformFeatures)) {
     callback.Run(SERVICE_WORKER_ERROR_ABORT);
     return;
@@ -492,7 +477,7 @@ void ServiceWorkerVersion::DispatchPushEvent(const StatusCallback& callback,
                                              const std::string& data) {
   DCHECK_EQ(ACTIVATED, status()) << status();
 
-  if (!CommandLine::ForCurrentProcess()->HasSwitch(
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableExperimentalWebPlatformFeatures)) {
     callback.Run(SERVICE_WORKER_ERROR_ABORT);
     return;
@@ -524,7 +509,7 @@ void ServiceWorkerVersion::DispatchGeofencingEvent(
     const blink::WebCircularGeofencingRegion& region) {
   DCHECK_EQ(ACTIVATED, status()) << status();
 
-  if (!CommandLine::ForCurrentProcess()->HasSwitch(
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableExperimentalWebPlatformFeatures)) {
     callback.Run(SERVICE_WORKER_ERROR_ABORT);
     return;
@@ -554,13 +539,74 @@ void ServiceWorkerVersion::DispatchGeofencingEvent(
   }
 }
 
+void ServiceWorkerVersion::DispatchCrossOriginConnectEvent(
+    const CrossOriginConnectCallback& callback,
+    const CrossOriginServiceWorkerClient& client) {
+  DCHECK_EQ(ACTIVATED, status()) << status();
+
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableExperimentalWebPlatformFeatures)) {
+    callback.Run(SERVICE_WORKER_ERROR_ABORT, false);
+    return;
+  }
+
+  if (running_status() != RUNNING) {
+    // Schedule calling this method after starting the worker.
+    StartWorker(
+        base::Bind(&RunTaskAfterStartWorker, weak_factory_.GetWeakPtr(),
+                   base::Bind(&RunErrorCrossOriginConnectCallback, callback),
+                   base::Bind(&self::DispatchCrossOriginConnectEvent,
+                              weak_factory_.GetWeakPtr(), callback, client)));
+    return;
+  }
+
+  int request_id = cross_origin_connect_callbacks_.Add(
+      new CrossOriginConnectCallback(callback));
+  ServiceWorkerStatusCode status = embedded_worker_->SendMessage(
+      ServiceWorkerMsg_CrossOriginConnectEvent(request_id, client));
+  if (status != SERVICE_WORKER_OK) {
+    cross_origin_connect_callbacks_.Remove(request_id);
+    RunSoon(base::Bind(callback, status, false));
+  }
+}
+
+void ServiceWorkerVersion::DispatchCrossOriginMessageEvent(
+    const CrossOriginServiceWorkerClient& client,
+    const base::string16& message,
+    const std::vector<int>& sent_message_port_ids,
+    const StatusCallback& callback) {
+  // Unlike in the case of DispatchMessageEvent, here the caller is assumed to
+  // have already put all the sent message ports on hold. So no need to do that
+  // here again.
+
+  if (running_status() != RUNNING) {
+    // Schedule calling this method after starting the worker.
+    StartWorker(base::Bind(
+        &RunTaskAfterStartWorker, weak_factory_.GetWeakPtr(), callback,
+        base::Bind(&self::DispatchCrossOriginMessageEvent,
+                   weak_factory_.GetWeakPtr(), client, message,
+                   sent_message_port_ids, callback)));
+    return;
+  }
+
+  MessagePortMessageFilter* filter =
+      embedded_worker_->message_port_message_filter();
+  std::vector<int> new_routing_ids;
+  filter->UpdateMessagePortsWithNewRoutes(sent_message_port_ids,
+                                          &new_routing_ids);
+  ServiceWorkerStatusCode status =
+      embedded_worker_->SendMessage(ServiceWorkerMsg_CrossOriginMessageToWorker(
+          client, message, sent_message_port_ids, new_routing_ids));
+  RunSoon(base::Bind(callback, status));
+}
 void ServiceWorkerVersion::AddControllee(
     ServiceWorkerProviderHost* provider_host) {
   DCHECK(!ContainsKey(controllee_map_, provider_host));
   int controllee_id = controllee_by_id_.Add(provider_host);
   controllee_map_[provider_host] = controllee_id;
-  if (stop_worker_timer_.IsRunning())
-    stop_worker_timer_.Stop();
+  // Reset the timer if it's running (so that it's kept alive a bit longer
+  // right after a new controllee is added).
+  ScheduleStopWorker();
 }
 
 void ServiceWorkerVersion::RemoveControllee(
@@ -576,7 +622,21 @@ void ServiceWorkerVersion::RemoveControllee(
     DoomInternal();
     return;
   }
-  ScheduleStopWorker();
+  // Schedule the stop-worker-timer if it's not running.
+  if (!stop_worker_timer_.IsRunning())
+    ScheduleStopWorker();
+}
+
+void ServiceWorkerVersion::AddStreamingURLRequestJob(
+    const ServiceWorkerURLRequestJob* request_job) {
+  DCHECK(streaming_url_request_jobs_.find(request_job) ==
+         streaming_url_request_jobs_.end());
+  streaming_url_request_jobs_.insert(request_job);
+}
+
+void ServiceWorkerVersion::RemoveStreamingURLRequestJob(
+    const ServiceWorkerURLRequestJob* request_job) {
+  streaming_url_request_jobs_.erase(request_job);
 }
 
 void ServiceWorkerVersion::AddListener(Listener* listener) {
@@ -608,7 +668,9 @@ void ServiceWorkerVersion::OnStarted() {
   DCHECK_EQ(RUNNING, running_status());
   DCHECK(cache_listener_.get());
   ScheduleStopWorker();
+
   // Fire all start callbacks.
+  scoped_refptr<ServiceWorkerVersion> protect(this);
   RunCallbacks(this, &start_callbacks_, SERVICE_WORKER_OK);
   FOR_EACH_OBSERVER(Listener, listeners_, OnWorkerStarted(this));
 }
@@ -643,12 +705,20 @@ void ServiceWorkerVersion::OnStopped(
                     ServiceWorkerResponse());
   RunIDMapCallbacks(&sync_callbacks_,
                     SERVICE_WORKER_ERROR_FAILED);
+  RunIDMapCallbacks(&notification_click_callbacks_,
+                    SERVICE_WORKER_ERROR_FAILED);
   RunIDMapCallbacks(&push_callbacks_,
                     SERVICE_WORKER_ERROR_FAILED);
   RunIDMapCallbacks(&geofencing_callbacks_,
                     SERVICE_WORKER_ERROR_FAILED);
+  RunIDMapCallbacks(&get_client_info_callbacks_,
+                    SERVICE_WORKER_ERROR_FAILED,
+                    ServiceWorkerClientInfo());
+  RunIDMapCallbacks(&cross_origin_connect_callbacks_,
+                    SERVICE_WORKER_ERROR_FAILED,
+                    false);
 
-  get_client_info_callbacks_.Clear();
+  streaming_url_request_jobs_.clear();
 
   FOR_EACH_OBSERVER(Listener, listeners_, OnWorkerStopped(this));
 
@@ -713,6 +783,8 @@ bool ServiceWorkerVersion::OnMessageReceived(const IPC::Message& message) {
                         OnPushEventFinished)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_GeofencingEventFinished,
                         OnGeofencingEventFinished)
+    IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_CrossOriginConnectEventFinished,
+                        OnCrossOriginConnectEventFinished)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_PostMessageToDocument,
                         OnPostMessageToDocument)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_FocusClient,
@@ -773,13 +845,15 @@ void ServiceWorkerVersion::OnGetClientDocuments(int request_id) {
     return;
   }
   scoped_refptr<GetClientDocumentsCallback> callback(
-      new GetClientDocumentsCallback(request_id, controllee_by_id_.size()));
+      new GetClientDocumentsCallback(request_id, this));
   ControlleeByIDMap::iterator it(&controllee_by_id_);
   TRACE_EVENT0("ServiceWorker",
                "ServiceWorkerVersion::OnGetClientDocuments");
   while (!it.IsAtEnd()) {
     int client_request_id = get_client_info_callbacks_.Add(
-        new GetClientInfoCallback(it.GetCurrentKey(), callback));
+        new GetClientInfoCallback(base::Bind(
+            &ServiceWorkerVersion::DidGetClientInfo,
+            weak_factory_.GetWeakPtr(), it.GetCurrentKey(), callback)));
     it.GetCurrentValue()->GetClientInfo(embedded_worker_->embedded_worker_id(),
                                         client_request_id);
     it.Advance();
@@ -795,7 +869,7 @@ void ServiceWorkerVersion::OnGetClientInfoSuccess(
     // The callback may already have been cleared by OnStopped, just ignore.
     return;
   }
-  callback->OnSuccess(this, info);
+  callback->Run(SERVICE_WORKER_OK, info);
   get_client_info_callbacks_.Remove(request_id);
 }
 
@@ -806,7 +880,7 @@ void ServiceWorkerVersion::OnGetClientInfoError(int request_id) {
     // The callback may already have been cleared by OnStopped, just ignore.
     return;
   }
-  callback->OnError(this);
+  callback->Run(SERVICE_WORKER_ERROR_FAILED, ServiceWorkerClientInfo());
   get_client_info_callbacks_.Remove(request_id);
 }
 
@@ -837,7 +911,9 @@ void ServiceWorkerVersion::OnActivateEventFinished(
 void ServiceWorkerVersion::OnInstallEventFinished(
     int request_id,
     blink::WebServiceWorkerEventResult result) {
-  DCHECK_EQ(INSTALLING, status()) << status();
+  // Status is REDUNDANT if the worker was doomed while handling the install
+  // event, and finished handling before being terminated.
+  DCHECK(status() == INSTALLING || status() == REDUNDANT) << status();
   TRACE_EVENT0("ServiceWorker",
                "ServiceWorkerVersion::OnInstallEventFinished");
 
@@ -941,6 +1017,24 @@ void ServiceWorkerVersion::OnGeofencingEventFinished(int request_id) {
   geofencing_callbacks_.Remove(request_id);
 }
 
+void ServiceWorkerVersion::OnCrossOriginConnectEventFinished(
+    int request_id,
+    bool accept_connection) {
+  TRACE_EVENT1("ServiceWorker",
+               "ServiceWorkerVersion::OnCrossOriginConnectEventFinished",
+               "Request id", request_id);
+  CrossOriginConnectCallback* callback =
+      cross_origin_connect_callbacks_.Lookup(request_id);
+  if (!callback) {
+    NOTREACHED() << "Got unexpected message: " << request_id;
+    return;
+  }
+
+  scoped_refptr<ServiceWorkerVersion> protect(this);
+  callback->Run(SERVICE_WORKER_OK, accept_connection);
+  cross_origin_connect_callbacks_.Remove(request_id);
+}
+
 void ServiceWorkerVersion::OnPostMessageToDocument(
     int client_id,
     const base::string16& message,
@@ -1006,10 +1100,17 @@ void ServiceWorkerVersion::DidSkipWaiting(int request_id) {
     embedded_worker_->SendMessage(ServiceWorkerMsg_DidSkipWaiting(request_id));
 }
 
+void ServiceWorkerVersion::DidGetClientInfo(
+    int client_id,
+    scoped_refptr<GetClientDocumentsCallback> callback,
+    ServiceWorkerStatusCode status,
+    const ServiceWorkerClientInfo& info) {
+  if (status == SERVICE_WORKER_OK)
+    callback->AddClientInfo(client_id, info);
+}
+
 void ServiceWorkerVersion::ScheduleStopWorker() {
-  // TODO(kinuko): Currently we don't schedule stop-time-worker when the SW has
-  // controllee, but we should change this default behavior (crbug.com/440259)
-  if (running_status() != RUNNING || HasControllee())
+  if (running_status() != RUNNING)
     return;
   if (stop_worker_timer_.IsRunning()) {
     stop_worker_timer_.Reset();
@@ -1042,7 +1143,10 @@ bool ServiceWorkerVersion::HasInflightRequests() const {
     !sync_callbacks_.IsEmpty() ||
     !notification_click_callbacks_.IsEmpty() ||
     !push_callbacks_.IsEmpty() ||
-    !geofencing_callbacks_.IsEmpty();
+    !geofencing_callbacks_.IsEmpty() ||
+    !get_client_info_callbacks_.IsEmpty() ||
+    !cross_origin_connect_callbacks_.IsEmpty() ||
+    !streaming_url_request_jobs_.empty();
 }
 
 void ServiceWorkerVersion::DoomInternal() {

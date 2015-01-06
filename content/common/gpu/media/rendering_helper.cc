@@ -19,8 +19,6 @@
 #include "ui/gl/gl_context.h"
 #include "ui/gl/gl_implementation.h"
 #include "ui/gl/gl_surface.h"
-#include "ui/gl/gl_surface_egl.h"
-#include "ui/gl/gl_surface_glx.h"
 
 #if defined(OS_WIN)
 #include <windows.h>
@@ -30,11 +28,23 @@
 #include "ui/gfx/x/x11_types.h"
 #endif
 
-#if !defined(OS_WIN) && defined(ARCH_CPU_X86_FAMILY)
+#if defined(ARCH_CPU_X86_FAMILY) && defined(USE_X11)
+#include "ui/gl/gl_surface_glx.h"
 #define GL_VARIANT_GLX 1
 #else
+#include "ui/gl/gl_surface_egl.h"
 #define GL_VARIANT_EGL 1
 #endif
+
+#if defined(USE_OZONE)
+#if defined(OS_CHROMEOS)
+#include "ui/display/chromeos/display_configurator.h"
+#endif  // defined(OS_CHROMEOS)
+#include "ui/ozone/public/ozone_platform.h"
+#include "ui/ozone/public/ui_thread_gpu.h"
+#include "ui/platform_window/platform_window.h"
+#include "ui/platform_window/platform_window_delegate.h"
+#endif  // defined(USE_OZONE)
 
 // Helper for Shader creation.
 static void CreateShader(GLuint program,
@@ -57,6 +67,54 @@ static void CreateShader(GLuint program,
 }
 
 namespace content {
+
+#if defined(USE_OZONE)
+
+class RenderingHelper::StubOzoneDelegate : public ui::PlatformWindowDelegate {
+ public:
+  StubOzoneDelegate() : accelerated_widget_(gfx::kNullAcceleratedWidget) {
+    ui_thread_gpu_.Initialize();
+    platform_window_ = ui::OzonePlatform::GetInstance()->CreatePlatformWindow(
+        this, gfx::Rect());
+  }
+  virtual ~StubOzoneDelegate() {}
+
+  void OnBoundsChanged(const gfx::Rect& new_bounds) override {}
+
+  void OnDamageRect(const gfx::Rect& damaged_region) override {}
+
+  void DispatchEvent(ui::Event* event) override {}
+
+  void OnCloseRequest() override {}
+  void OnClosed() override {}
+
+  void OnWindowStateChanged(ui::PlatformWindowState new_state) override {}
+
+  void OnLostCapture() override {};
+
+  void OnAcceleratedWidgetAvailable(gfx::AcceleratedWidget widget) override {
+    accelerated_widget_ = widget;
+  };
+
+  void OnActivationChanged(bool active) override {};
+
+  gfx::AcceleratedWidget accelerated_widget() const {
+    return accelerated_widget_;
+  }
+
+  gfx::Size GetSize() { return platform_window_->GetBounds().size(); }
+
+  ui::PlatformWindow* platform_window() const { return platform_window_.get(); }
+
+ private:
+  ui::UiThreadGpu ui_thread_gpu_;
+  scoped_ptr<ui::PlatformWindow> platform_window_;
+  gfx::AcceleratedWidget accelerated_widget_;
+
+  DISALLOW_COPY_AND_ASSIGN(StubOzoneDelegate);
+};
+
+#endif  // defined(USE_OZONE)
 
 RenderingHelperParams::RenderingHelperParams()
     : rendering_fps(0), warm_up_iterations(0), render_as_thumbnails(false) {
@@ -93,6 +151,9 @@ bool RenderingHelper::InitializeOneOff() {
 #else
   cmd_line->AppendSwitchASCII(switches::kUseGL, gfx::kGLImplementationEGLName);
 #endif
+#if defined(USE_OZONE)
+  ui::OzonePlatform::InitializeForUI();
+#endif
   return gfx::GLSurface::InitializeOneOff();
 }
 
@@ -127,16 +188,14 @@ void RenderingHelper::Initialize(const RenderingHelperParams& params,
   message_loop_ = base::MessageLoop::current();
 
 #if defined(OS_WIN)
-  screen_size_ =
-      gfx::Size(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
   window_ = CreateWindowEx(0,
                            L"Static",
                            L"VideoDecodeAcceleratorTest",
                            WS_OVERLAPPEDWINDOW | WS_VISIBLE,
                            0,
                            0,
-                           screen_size_.width(),
-                           screen_size_.height(),
+                           GetSystemMetrics(SM_CXSCREEN),
+                           GetSystemMetrics(SM_CYSCREEN),
                            NULL,
                            NULL,
                            NULL,
@@ -144,7 +203,6 @@ void RenderingHelper::Initialize(const RenderingHelperParams& params,
 #elif defined(USE_X11)
   Display* display = gfx::GetXDisplay();
   Screen* screen = DefaultScreenOfDisplay(display);
-  screen_size_ = gfx::Size(XWidthOfScreen(screen), XHeightOfScreen(screen));
 
   CHECK(display);
 
@@ -159,8 +217,8 @@ void RenderingHelper::Initialize(const RenderingHelperParams& params,
                           DefaultRootWindow(display),
                           0,
                           0,
-                          screen_size_.width(),
-                          screen_size_.height(),
+                          XWidthOfScreen(screen),
+                          XHeightOfScreen(screen),
                           0 /* border width */,
                           depth,
                           CopyFromParent /* class */,
@@ -170,15 +228,29 @@ void RenderingHelper::Initialize(const RenderingHelperParams& params,
   XStoreName(display, window_, "VideoDecodeAcceleratorTest");
   XSelectInput(display, window_, ExposureMask);
   XMapWindow(display, window_);
+#elif defined(USE_OZONE)
+  platform_window_delegate_.reset(new RenderingHelper::StubOzoneDelegate());
+  window_ = platform_window_delegate_->accelerated_widget();
+#if defined(OS_CHROMEOS)
+  display_configurator_.reset(new ui::DisplayConfigurator());
+  display_configurator_->Init(true);
+  display_configurator_->ForceInitialConfigure(0);
+  platform_window_delegate_->platform_window()->SetBounds(
+      gfx::Rect(display_configurator_->framebuffer_size()));
+#else
+  platform_window_delegate_->platform_window()->SetBounds(gfx::Rect(800, 600));
+#endif
 #else
 #error unknown platform
 #endif
   CHECK(window_ != gfx::kNullAcceleratedWidget);
 
   gl_surface_ = gfx::GLSurface::CreateViewGLSurface(window_);
+  screen_size_ = gl_surface_->GetSize();
+
   gl_context_ = gfx::GLContext::CreateGLContext(
       NULL, gl_surface_.get(), gfx::PreferIntegratedGpu);
-  gl_context_->MakeCurrent(gl_surface_.get());
+  CHECK(gl_context_->MakeCurrent(gl_surface_.get()));
 
   CHECK_GT(params.window_sizes.size(), 0U);
   videos_.resize(params.window_sizes.size());
@@ -304,14 +376,26 @@ void RenderingHelper::Initialize(const RenderingHelperParams& params,
   glEnableVertexAttribArray(tc_location);
   glVertexAttribPointer(tc_location, 2, GL_FLOAT, GL_FALSE, 0, kTextureCoords);
 
-  if (frame_duration_ != base::TimeDelta())
-    WarmUpRendering(params.warm_up_iterations);
+  if (frame_duration_ != base::TimeDelta()) {
+    int warm_up_iterations = params.warm_up_iterations;
+#if defined(USE_OZONE)
+    // On Ozone the VSyncProvider can't provide a vsync interval until
+    // we render at least a frame, so we warm up with at least one
+    // frame.
+    // On top of this, we want to make sure all the buffers backing
+    // the GL surface are cleared, otherwise we can see the previous
+    // test's last frames, so we set warm up iterations to 2, to clear
+    // the front and back buffers.
+    warm_up_iterations = std::max(2, warm_up_iterations);
+#endif
+    WarmUpRendering(warm_up_iterations);
+  }
 
   // It's safe to use Unretained here since |rendering_thread_| will be stopped
   // in VideoDecodeAcceleratorTest.TearDown(), while the |rendering_helper_| is
   // a member of that class. (See video_decode_accelerator_unittest.cc.)
   gfx::VSyncProvider* vsync_provider = gl_surface_->GetVSyncProvider();
-  if (vsync_provider)
+  if (vsync_provider && frame_duration_ != base::TimeDelta())
     vsync_provider->GetVSyncParameters(base::Bind(
         &RenderingHelper::UpdateVSyncParameters, base::Unretained(this), done));
   else
@@ -323,7 +407,7 @@ void RenderingHelper::Initialize(const RenderingHelperParams& params,
 // several frames here to warm up the rendering.
 void RenderingHelper::WarmUpRendering(int warm_up_iterations) {
   unsigned int texture_id;
-  scoped_ptr<GLubyte[]> emptyData(new GLubyte[screen_size_.GetArea() * 2]);
+  scoped_ptr<GLubyte[]> emptyData(new GLubyte[screen_size_.GetArea() * 2]());
   glGenTextures(1, &texture_id);
   glBindTexture(GL_TEXTURE_2D, texture_id);
   glTexImage2D(GL_TEXTURE_2D,
@@ -344,6 +428,10 @@ void RenderingHelper::WarmUpRendering(int warm_up_iterations) {
 
 void RenderingHelper::UnInitialize(base::WaitableEvent* done) {
   CHECK_EQ(base::MessageLoop::current(), message_loop_);
+
+#if defined(USE_OZONE) && defined(OS_CHROMEOS)
+  display_configurator_->PrepareForExit();
+#endif
 
   render_task_.Cancel();
 
@@ -467,7 +555,11 @@ void RenderingHelper::DeleteTexture(uint32 texture_id) {
   CHECK_EQ(static_cast<int>(glGetError()), GL_NO_ERROR);
 }
 
-void* RenderingHelper::GetGLContext() {
+scoped_refptr<gfx::GLContext> RenderingHelper::GetGLContext() {
+  return gl_context_;
+}
+
+void* RenderingHelper::GetGLContextHandle() {
   return gl_context_->GetHandle();
 }
 
@@ -489,12 +581,14 @@ void RenderingHelper::Clear() {
 #if defined(OS_WIN)
   if (window_)
     DestroyWindow(window_);
-#else
+#elif defined(USE_X11)
   // Destroy resources acquired in Initialize, in reverse-acquisition order.
   if (window_) {
     CHECK(XUnmapWindow(gfx::GetXDisplay(), window_));
     CHECK(XDestroyWindow(gfx::GetXDisplay(), window_));
   }
+#elif defined(USE_OZONE)
+  platform_window_delegate_.reset();
 #endif
   window_ = gfx::kNullAcceleratedWidget;
 }

@@ -34,7 +34,7 @@
 #include "v8/include/v8.h"
 
 #if defined(OS_MACOSX)
-#include "base/mac/mac_util.h"
+#include "base/mac/foundation_util.h"
 #include "base/mac/scoped_nsautorelease_pool.h"
 #endif
 
@@ -106,7 +106,8 @@ TestBlinkWebUnitTestSupport::TestBlinkWebUnitTestSupport() {
   SetThemeEngine(NULL);
 #endif
 
-  CommandLine::ForCurrentProcess()->AppendSwitch(switches::kEnableFileCookies);
+  base::CommandLine::ForCurrentProcess()->AppendSwitch(
+      switches::kEnableFileCookies);
 
   // Test shell always exposes the GC.
   std::string flags("--expose-gc");

@@ -71,14 +71,17 @@ class ShellExtensionsBrowserClient : public ExtensionsBrowserClient {
       ExtensionFunctionRegistry* registry) const override;
   scoped_ptr<RuntimeAPIDelegate> CreateRuntimeAPIDelegate(
       content::BrowserContext* context) const override;
-  ComponentExtensionResourceManager* GetComponentExtensionResourceManager()
-      override;
+  const ComponentExtensionResourceManager*
+  GetComponentExtensionResourceManager() override;
   void BroadcastEventToRenderers(const std::string& event_name,
                                  scoped_ptr<base::ListValue> args) override;
   net::NetLog* GetNetLog() override;
   ExtensionCache* GetExtensionCache() override;
   bool IsBackgroundUpdateAllowed() override;
   bool IsMinBrowserVersionSupported(const std::string& min_version) override;
+
+  // Sets the API client.
+  void SetAPIClientForTest(ExtensionsAPIClient* api_client);
 
  private:
   // The single BrowserContext for app_shell. Not owned.

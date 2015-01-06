@@ -14,11 +14,20 @@ namespace {
 class StubInputController : public InputController {
  public:
   StubInputController();
-  virtual ~StubInputController();
+  ~StubInputController() override;
 
   // InputController:
   bool HasMouse() override;
   bool HasTouchpad() override;
+  bool IsCapsLockEnabled() override;
+  void SetCapsLockEnabled(bool enabled) override;
+  void SetNumLockEnabled(bool enabled) override;
+  bool IsAutoRepeatEnabled() override;
+  void SetAutoRepeatEnabled(bool enabled) override;
+  void SetAutoRepeatRate(const base::TimeDelta& delay,
+                         const base::TimeDelta& interval) override;
+  void GetAutoRepeatRate(base::TimeDelta* delay,
+                         base::TimeDelta* interval) override;
   void SetTouchpadSensitivity(int value) override;
   void SetTapToClick(bool enabled) override;
   void SetThreeFingerClick(bool enabled) override;
@@ -26,6 +35,7 @@ class StubInputController : public InputController {
   void SetNaturalScroll(bool enabled) override;
   void SetMouseSensitivity(int value) override;
   void SetPrimaryButtonRight(bool right) override;
+  void SetTapToClickPaused(bool state) override;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(StubInputController);
@@ -45,6 +55,36 @@ bool StubInputController::HasMouse() {
 bool StubInputController::HasTouchpad() {
   NOTIMPLEMENTED();
   return false;
+}
+
+bool StubInputController::IsCapsLockEnabled() {
+  return false;
+}
+
+void StubInputController::SetCapsLockEnabled(bool enabled) {
+  NOTIMPLEMENTED();
+}
+
+void StubInputController::SetNumLockEnabled(bool enabled) {
+  NOTIMPLEMENTED();
+}
+
+bool StubInputController::IsAutoRepeatEnabled() {
+  return true;
+}
+
+void StubInputController::SetAutoRepeatEnabled(bool enabled) {
+  NOTIMPLEMENTED();
+}
+
+void StubInputController::SetAutoRepeatRate(const base::TimeDelta& delay,
+                                            const base::TimeDelta& interval) {
+  NOTIMPLEMENTED();
+}
+
+void StubInputController::GetAutoRepeatRate(base::TimeDelta* delay,
+                                            base::TimeDelta* interval) {
+  NOTIMPLEMENTED();
 }
 
 void StubInputController::SetTouchpadSensitivity(int value) {
@@ -72,6 +112,10 @@ void StubInputController::SetMouseSensitivity(int value) {
 }
 
 void StubInputController::SetPrimaryButtonRight(bool right) {
+  NOTIMPLEMENTED();
+}
+
+void StubInputController::SetTapToClickPaused(bool state) {
   NOTIMPLEMENTED();
 }
 

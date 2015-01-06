@@ -12,6 +12,7 @@
 #include "chrome/browser/chromeos/login/enrollment/auto_enrollment_controller.h"
 #include "chrome/browser/chromeos/ownership/owner_settings_service_chromeos.h"
 #include "chrome/browser/chromeos/policy/device_cloud_policy_store_chromeos.h"
+#include "chrome/browser/chromeos/policy/enrollment_status_chromeos.h"
 #include "chrome/browser/chromeos/policy/proto/chrome_device_policy.pb.h"
 #include "chrome/browser/chromeos/policy/server_backed_state_keys_broker.h"
 #include "chrome/browser/chromeos/profiles/profile_helper.h"
@@ -261,7 +262,7 @@ void EnrollmentHandlerChromeOS::HandlePolicyValidationResult(
     device_id_ = validator->policy_data()->device_id();
     request_token_ = validator->policy_data()->request_token();
 
-    if (CommandLine::ForCurrentProcess()->HasSwitch(
+    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
             chromeos::switches::kEnterpriseEnrollmentSkipRobotAuth)) {
       // For test purposes we allow enrollment to succeed without proper robot
       // account and use the provided value as a token.

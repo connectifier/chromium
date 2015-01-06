@@ -97,8 +97,8 @@
 #include "ui/base/clipboard/clipboard.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/gfx/favicon_size.h"
-#include "ui/gfx/point.h"
-#include "ui/gfx/size.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/text_elider.h"
 
 #if defined(ENABLE_PRINTING)
@@ -1724,7 +1724,8 @@ void RenderViewContextMenu::NotifyURLOpened(
 bool RenderViewContextMenu::IsDevCommandEnabled(int id) const {
   if (id == IDC_CONTENT_CONTEXT_INSPECTELEMENT ||
       id == IDC_CONTENT_CONTEXT_INSPECTBACKGROUNDPAGE) {
-    const CommandLine* command_line = CommandLine::ForCurrentProcess();
+    const base::CommandLine* command_line =
+        base::CommandLine::ForCurrentProcess();
     if (!GetPrefs(browser_context_)
              ->GetBoolean(prefs::kWebKitJavascriptEnabled) ||
         command_line->HasSwitch(switches::kDisableJavaScript))

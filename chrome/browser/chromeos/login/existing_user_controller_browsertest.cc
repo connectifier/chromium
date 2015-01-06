@@ -158,7 +158,7 @@ class ExistingUserControllerTest : public policy::DevicePolicyCrosBrowserTest {
         .Times(1);
   }
 
-  virtual void SetUpCommandLine(CommandLine* command_line) override {
+  virtual void SetUpCommandLine(base::CommandLine* command_line) override {
     command_line->AppendSwitch(switches::kLoginManager);
   }
 
@@ -177,9 +177,6 @@ class ExistingUserControllerTest : public policy::DevicePolicyCrosBrowserTest {
         .Times(AnyNumber())
         .WillRepeatedly(Return(false));
     EXPECT_CALL(*mock_user_manager_, IsLoggedInAsGuest())
-        .Times(AnyNumber())
-        .WillRepeatedly(Return(false));
-    EXPECT_CALL(*mock_user_manager_, IsLoggedInAsDemoUser())
         .Times(AnyNumber())
         .WillRepeatedly(Return(false));
     EXPECT_CALL(*mock_user_manager_, IsLoggedInAsPublicAccount())
@@ -346,14 +343,6 @@ IN_PROC_BROWSER_TEST_F(ExistingUserControllerUntrustedTest,
                        GuestLoginForbidden) {
   existing_user_controller()->Login(
       UserContext(user_manager::USER_TYPE_GUEST, std::string()),
-      SigninSpecifics());
-}
-
-IN_PROC_BROWSER_TEST_F(ExistingUserControllerUntrustedTest,
-                       RetailModeLoginForbidden) {
-  existing_user_controller()->Login(
-      UserContext(user_manager::USER_TYPE_RETAIL_MODE,
-                  chromeos::login::kRetailModeUserName),
       SigninSpecifics());
 }
 

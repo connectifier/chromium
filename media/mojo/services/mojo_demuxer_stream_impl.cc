@@ -43,10 +43,25 @@ void MojoDemuxerStreamImpl::OnBufferReady(
     } else if (stream_->type() == media::DemuxerStream::VIDEO) {
       client()->OnVideoDecoderConfigChanged(
           mojo::VideoDecoderConfig::From(stream_->video_decoder_config()));
+    } else {
+      NOTREACHED() << "Unsupported config change encountered for type: "
+                   << stream_->type();
     }
+
+    callback.Run(mojo::DemuxerStream::STATUS_CONFIG_CHANGED,
+                 mojo::MediaDecoderBufferPtr());
+    return;
   }
 
+  if (status == media::DemuxerStream::kAborted) {
+    callback.Run(mojo::DemuxerStream::STATUS_ABORTED,
+                 mojo::MediaDecoderBufferPtr());
+    return;
+  }
+
+  DCHECK_EQ(status, media::DemuxerStream::kOk);
   if (!buffer->end_of_stream()) {
+    DCHECK_GT(buffer->data_size(), 0);
     // Serialize the data section of the DecoderBuffer into our pipe.
     uint32_t num_bytes = buffer->data_size();
     CHECK_EQ(WriteDataRaw(stream_pipe_.get(), buffer->data(), &num_bytes,

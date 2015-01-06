@@ -68,10 +68,6 @@ class DataReductionProxyParams {
   // a promotion for the data reduction proxy.
   static bool IsIncludedInPromoFieldTrial();
 
-  // Returns true if this client is part of a field trial that uses preconnect
-  // hinting.
-  static bool IsIncludedInPreconnectHintingFieldTrial();
-
   // Returns true if this client is part of a field trial that bypasses the
   // proxy if the request resource type is on the critical path (e.g. HTML).
   static bool IsIncludedInCriticalPathBypassFieldTrial();
@@ -89,6 +85,11 @@ class DataReductionProxyParams {
   // response code is expected to have a data reduction proxy via header, but
   // the data reduction proxy via header is missing.
   static bool IsIncludedInRemoveMissingViaHeaderOtherBypassFieldTrial();
+
+  // Returns true if this client is part of the field trial that should display
+  // a promotion for the data reduction proxy on Android One devices.
+  static bool IsIncludedInAndroidOnePromoFieldTrial(
+      const char* build_fingerprint);
 
   // Constructs configuration parameters. If |kAllowed|, then the standard
   // data reduction proxy configuration is allowed to be used. If

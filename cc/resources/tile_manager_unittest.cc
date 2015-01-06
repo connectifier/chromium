@@ -6,6 +6,7 @@
 #include "cc/resources/raster_tile_priority_queue.h"
 #include "cc/resources/tile.h"
 #include "cc/resources/tile_priority.h"
+#include "cc/test/begin_frame_args_test.h"
 #include "cc/test/fake_impl_proxy.h"
 #include "cc/test/fake_layer_tree_host_impl.h"
 #include "cc/test/fake_output_surface.h"
@@ -114,6 +115,7 @@ class TileManagerTilePriorityQueueTest : public testing::Test {
       pending_layer =
           FakePictureLayerImpl::CreateWithRasterSource(pending_tree, id_, pile);
       pending_layer->SetDrawsContent(true);
+      pending_layer->SetHasRenderSurface(true);
     }
     // The bounds() just mirror the pile size.
     pending_layer->SetBounds(pending_layer->raster_source()->GetSize());
@@ -121,7 +123,9 @@ class TileManagerTilePriorityQueueTest : public testing::Test {
 
     pending_layer_ = static_cast<FakePictureLayerImpl*>(
         host_impl_.pending_tree()->LayerById(id_));
-    pending_layer_->DoPostCommitInitializationIfNeeded();
+
+    // Add tilings/tiles for the layer.
+    host_impl_.pending_tree()->UpdateDrawProperties();
   }
 
   TileManager* tile_manager() { return host_impl_.tile_manager(); }
@@ -144,9 +148,6 @@ TEST_F(TileManagerTilePriorityQueueTest, RasterTilePriorityQueue) {
   const gfx::Size layer_bounds(1000, 1000);
   host_impl_.SetViewportSize(layer_bounds);
   SetupDefaultTrees(layer_bounds);
-
-  active_layer_->CreateDefaultTilingsAndTiles();
-  pending_layer_->CreateDefaultTilingsAndTiles();
 
   RasterTilePriorityQueue queue;
   host_impl_.BuildRasterQueue(&queue, SAME_PRIORITY_FOR_BOTH_TREES);
@@ -326,36 +327,31 @@ TEST_F(TileManagerTilePriorityQueueTest, RasterTilePriorityQueue) {
 }
 
 TEST_F(TileManagerTilePriorityQueueTest, ActivationComesBeforeEventually) {
-  SetupDefaultTrees(gfx::Size(1000, 1000));
+  base::TimeTicks time_ticks;
+  time_ticks += base::TimeDelta::FromMilliseconds(1);
+  host_impl_.SetCurrentBeginFrameArgs(
+      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
 
-  active_layer_->CreateDefaultTilingsAndTiles();
-  pending_layer_->CreateDefaultTilingsAndTiles();
+  gfx::Size layer_bounds(1000, 1000);
+  SetupDefaultTrees(layer_bounds);
 
   // Create a pending child layer.
   gfx::Size tile_size(256, 256);
   scoped_refptr<FakePicturePileImpl> pending_pile =
-      FakePicturePileImpl::CreateFilledPile(tile_size, gfx::Size(1000, 1000));
+      FakePicturePileImpl::CreateFilledPile(tile_size, layer_bounds);
   scoped_ptr<FakePictureLayerImpl> pending_child =
       FakePictureLayerImpl::CreateWithRasterSource(host_impl_.pending_tree(),
                                                    id_ + 1, pending_pile);
-  pending_layer_->AddChild(pending_child.Pass());
-  FakePictureLayerImpl* pending_child_raw = static_cast<FakePictureLayerImpl*>(
-      host_impl_.pending_tree()->LayerById(id_ + 1));
-  ASSERT_TRUE(pending_child_raw);
-
+  FakePictureLayerImpl* pending_child_raw = pending_child.get();
   pending_child_raw->SetDrawsContent(true);
-  pending_child_raw->DoPostCommitInitializationIfNeeded();
-  pending_child_raw->CreateDefaultTilingsAndTiles();
-  ASSERT_TRUE(pending_child_raw->HighResTiling());
+  pending_layer_->AddChild(pending_child.Pass());
 
   // Set a small viewport, so we have soon and eventually tiles.
-  gfx::Rect viewport(200, 200);
-  active_layer_->draw_properties().visible_content_rect = viewport;
-  active_layer_->UpdateTiles(Occlusion(), false);
-  pending_layer_->draw_properties().visible_content_rect = viewport;
-  pending_layer_->UpdateTiles(Occlusion(), false);
-  pending_child_raw->draw_properties().visible_content_rect = viewport;
-  pending_child_raw->UpdateTiles(Occlusion(), false);
+  host_impl_.SetViewportSize(gfx::Size(200, 200));
+  time_ticks += base::TimeDelta::FromMilliseconds(1);
+  host_impl_.SetCurrentBeginFrameArgs(
+      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.pending_tree()->UpdateDrawProperties();
 
   RasterTilePriorityQueue queue;
   host_impl_.SetRequiresHighResToDraw();
@@ -386,9 +382,6 @@ TEST_F(TileManagerTilePriorityQueueTest, EvictionTilePriorityQueue) {
   const gfx::Size layer_bounds(1000, 1000);
   host_impl_.SetViewportSize(layer_bounds);
   SetupDefaultTrees(layer_bounds);
-
-  active_layer_->CreateDefaultTilingsAndTiles();
-  pending_layer_->CreateDefaultTilingsAndTiles();
 
   EvictionTilePriorityQueue empty_queue;
   host_impl_.BuildEvictionQueue(&empty_queue, SAME_PRIORITY_FOR_BOTH_TREES);
@@ -422,7 +415,7 @@ TEST_F(TileManagerTilePriorityQueueTest, EvictionTilePriorityQueue) {
     EXPECT_TRUE(tile);
     EXPECT_EQ(TilePriority::NOW, tile->priority(ACTIVE_TREE).priority_bin);
     EXPECT_EQ(TilePriority::NOW, tile->priority(PENDING_TREE).priority_bin);
-    EXPECT_TRUE(tile->HasResources());
+    EXPECT_TRUE(tile->HasResource());
     smoothness_tiles.insert(tile);
     queue.Pop();
   }
@@ -488,7 +481,7 @@ TEST_F(TileManagerTilePriorityQueueTest, EvictionTilePriorityQueue) {
   while (!queue.IsEmpty()) {
     Tile* tile = queue.Top();
     EXPECT_TRUE(tile);
-    EXPECT_TRUE(tile->HasResources());
+    EXPECT_TRUE(tile->HasResource());
 
     if (!last_tile)
       last_tile = tile;
@@ -563,6 +556,11 @@ TEST_F(TileManagerTilePriorityQueueTest, EvictionTilePriorityQueue) {
 
 TEST_F(TileManagerTilePriorityQueueTest,
        EvictionTilePriorityQueueWithOcclusion) {
+  base::TimeTicks time_ticks;
+  time_ticks += base::TimeDelta::FromMilliseconds(1);
+  host_impl_.SetCurrentBeginFrameArgs(
+      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+
   gfx::Size tile_size(102, 102);
   gfx::Size layer_bounds(1000, 1000);
 
@@ -571,7 +569,6 @@ TEST_F(TileManagerTilePriorityQueueTest,
   scoped_refptr<FakePicturePileImpl> pending_pile =
       FakePicturePileImpl::CreateFilledPile(tile_size, layer_bounds);
   SetupPendingTree(pending_pile);
-  pending_layer_->CreateDefaultTilingsAndTiles();
 
   scoped_ptr<FakePictureLayerImpl> pending_child =
       FakePictureLayerImpl::CreateWithRasterSource(host_impl_.pending_tree(), 2,
@@ -581,8 +578,11 @@ TEST_F(TileManagerTilePriorityQueueTest,
   FakePictureLayerImpl* pending_child_layer =
       static_cast<FakePictureLayerImpl*>(pending_layer_->children()[0]);
   pending_child_layer->SetDrawsContent(true);
-  pending_child_layer->DoPostCommitInitializationIfNeeded();
-  pending_child_layer->CreateDefaultTilingsAndTiles();
+
+  time_ticks += base::TimeDelta::FromMilliseconds(1);
+  host_impl_.SetCurrentBeginFrameArgs(
+      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.pending_tree()->UpdateDrawProperties();
 
   std::set<Tile*> all_tiles;
   size_t tile_count = 0;
@@ -679,28 +679,39 @@ TEST_F(TileManagerTilePriorityQueueTest,
 
 TEST_F(TileManagerTilePriorityQueueTest,
        EvictionTilePriorityQueueWithTransparentLayer) {
+  base::TimeTicks time_ticks;
+  time_ticks += base::TimeDelta::FromMilliseconds(1);
+  host_impl_.SetCurrentBeginFrameArgs(
+      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+
   gfx::Size tile_size(102, 102);
   gfx::Size layer_bounds(1000, 1000);
 
   scoped_refptr<FakePicturePileImpl> pending_pile =
       FakePicturePileImpl::CreateFilledPile(tile_size, layer_bounds);
   SetupPendingTree(pending_pile);
-  pending_layer_->CreateDefaultTilingsAndTiles();
 
   scoped_ptr<FakePictureLayerImpl> pending_child =
       FakePictureLayerImpl::CreateWithRasterSource(host_impl_.pending_tree(), 2,
                                                    pending_pile);
+  FakePictureLayerImpl* pending_child_layer = pending_child.get();
   pending_layer_->AddChild(pending_child.Pass());
 
   // Create a fully transparent child layer so that its tile priorities are not
   // considered to be valid.
-  FakePictureLayerImpl* pending_child_layer =
-      static_cast<FakePictureLayerImpl*>(pending_layer_->children()[0]);
   pending_child_layer->SetDrawsContent(true);
-  pending_child_layer->CreateDefaultTilingsAndTiles();
+
+  time_ticks += base::TimeDelta::FromMilliseconds(1);
+  host_impl_.SetCurrentBeginFrameArgs(
+      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.pending_tree()->UpdateDrawProperties();
+
   pending_child_layer->SetOpacity(0.0);
-  pending_child_layer->layer_tree_impl()->UpdateDrawProperties();
-  pending_child_layer->DoPostCommitInitializationIfNeeded();
+
+  time_ticks += base::TimeDelta::FromMilliseconds(1);
+  host_impl_.SetCurrentBeginFrameArgs(
+      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.pending_tree()->UpdateDrawProperties();
 
   // Renew all of the tile priorities.
   gfx::Rect viewport(layer_bounds);
@@ -780,9 +791,6 @@ TEST_F(TileManagerTilePriorityQueueTest, RasterTilePriorityQueueEmptyLayers) {
   host_impl_.SetViewportSize(layer_bounds);
   SetupDefaultTrees(layer_bounds);
 
-  active_layer_->CreateDefaultTilingsAndTiles();
-  pending_layer_->CreateDefaultTilingsAndTiles();
-
   RasterTilePriorityQueue queue;
   host_impl_.BuildRasterQueue(&queue, SAME_PRIORITY_FOR_BOTH_TREES);
   EXPECT_FALSE(queue.IsEmpty());
@@ -804,7 +812,6 @@ TEST_F(TileManagerTilePriorityQueueTest, RasterTilePriorityQueueEmptyLayers) {
     scoped_ptr<FakePictureLayerImpl> pending_layer =
         FakePictureLayerImpl::Create(host_impl_.pending_tree(), id_ + i);
     pending_layer->SetDrawsContent(true);
-    pending_layer->DoPostCommitInitializationIfNeeded();
     pending_layer->set_has_valid_tile_priorities(true);
     pending_layer_->AddChild(pending_layer.Pass());
   }
@@ -829,9 +836,6 @@ TEST_F(TileManagerTilePriorityQueueTest, EvictionTilePriorityQueueEmptyLayers) {
   host_impl_.SetViewportSize(layer_bounds);
   SetupDefaultTrees(layer_bounds);
 
-  active_layer_->CreateDefaultTilingsAndTiles();
-  pending_layer_->CreateDefaultTilingsAndTiles();
-
   RasterTilePriorityQueue raster_queue;
   host_impl_.BuildRasterQueue(&raster_queue, SAME_PRIORITY_FOR_BOTH_TREES);
   EXPECT_FALSE(raster_queue.IsEmpty());
@@ -855,7 +859,6 @@ TEST_F(TileManagerTilePriorityQueueTest, EvictionTilePriorityQueueEmptyLayers) {
     scoped_ptr<FakePictureLayerImpl> pending_layer =
         FakePictureLayerImpl::Create(host_impl_.pending_tree(), id_ + i);
     pending_layer->SetDrawsContent(true);
-    pending_layer->DoPostCommitInitializationIfNeeded();
     pending_layer->set_has_valid_tile_priorities(true);
     pending_layer_->AddChild(pending_layer.Pass());
   }

@@ -78,8 +78,8 @@
 #include "ui/gfx/android/view_configuration.h"
 #include "ui/gfx/display.h"
 #include "ui/gfx/geometry/dip_util.h"
+#include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/screen.h"
-#include "ui/gfx/size_conversions.h"
 #include "ui/touch_selection/touch_selection_controller.h"
 
 namespace content {
@@ -284,7 +284,8 @@ scoped_ptr<OverscrollControllerAndroid> CreateOverscrollController(
 }
 
 ui::GestureProvider::Config CreateGestureProviderConfig() {
-  ui::GestureProvider::Config config = ui::DefaultGestureProviderConfig();
+  ui::GestureProvider::Config config = ui::GetGestureProviderConfig(
+      ui::GestureProviderConfigType::CURRENT_PLATFORM);
   config.disable_click_delay =
       base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kDisableClickDelay);
@@ -790,11 +791,13 @@ bool RenderWidgetHostViewAndroid::OnTouchEvent(
   if (stylus_text_selector_.OnTouchEvent(event))
     return true;
 
-  if (!gesture_provider_.OnTouchEvent(event))
+  auto result = gesture_provider_.OnTouchEvent(event);
+  if (!result.succeeded)
     return false;
 
   if (host_->ShouldForwardTouchEvent()) {
-    blink::WebTouchEvent web_event = CreateWebTouchEventFromMotionEvent(event);
+    blink::WebTouchEvent web_event =
+        CreateWebTouchEventFromMotionEvent(event, result.did_generate_scroll);
     host_->ForwardTouchEventWithLatencyInfo(web_event,
                                             CreateLatencyInfo(web_event));
   } else {
@@ -968,7 +971,8 @@ void RenderWidgetHostViewAndroid::CopyFromCompositingSurface(
                  start_time,
                  readback_layer,
                  callback));
-  request->set_area(src_subrect_in_pixel);
+  if (!src_subrect_in_pixel.IsEmpty())
+    request->set_area(src_subrect_in_pixel);
   readback_layer->RequestCopyOfOutput(request.Pass());
 }
 
@@ -1282,6 +1286,20 @@ void RenderWidgetHostViewAndroid::SynchronousCopyContents(
     const gfx::Size& dst_size_in_pixel,
     ReadbackRequestCallback& callback,
     const SkColorType color_type) {
+  gfx::Size input_size_in_pixel;
+  if (src_subrect_in_pixel.IsEmpty())
+    input_size_in_pixel = content_size_in_layer_;
+  else
+    input_size_in_pixel = src_subrect_in_pixel.size();
+
+  gfx::Size output_size_in_pixel;
+  if (dst_size_in_pixel.IsEmpty())
+    output_size_in_pixel = input_size_in_pixel;
+  else
+    output_size_in_pixel = dst_size_in_pixel;
+  int output_width = output_size_in_pixel.width();
+  int output_height = output_size_in_pixel.height();
+
   SynchronousCompositor* compositor =
       SynchronousCompositorImpl::FromID(host_->GetProcess()->GetID(),
                                         host_->GetRoutingID());
@@ -1291,14 +1309,14 @@ void RenderWidgetHostViewAndroid::SynchronousCopyContents(
   }
 
   SkBitmap bitmap;
-  bitmap.allocPixels(SkImageInfo::Make(dst_size_in_pixel.width(),
-                                       dst_size_in_pixel.height(),
+  bitmap.allocPixels(SkImageInfo::Make(output_width,
+                                       output_height,
                                        color_type,
                                        kPremul_SkAlphaType));
   SkCanvas canvas(bitmap);
   canvas.scale(
-      (float)dst_size_in_pixel.width() / (float)src_subrect_in_pixel.width(),
-      (float)dst_size_in_pixel.height() / (float)src_subrect_in_pixel.height());
+      (float)output_width / (float)input_size_in_pixel.width(),
+      (float)output_height / (float)input_size_in_pixel.height());
   compositor->DemandDrawSw(&canvas);
   callback.Run(bitmap, READBACK_SUCCESS);
 }
@@ -1802,9 +1820,15 @@ void RenderWidgetHostViewAndroid::PrepareTextureCopyOutputResult(
   if (!result->HasTexture() || result->IsEmpty() || result->size().IsEmpty())
     return;
 
+  gfx::Size output_size_in_pixel;
+  if (dst_size_in_pixel.IsEmpty())
+    output_size_in_pixel = result->size();
+  else
+    output_size_in_pixel = dst_size_in_pixel;
+
   scoped_ptr<SkBitmap> bitmap(new SkBitmap);
-  if (!bitmap->tryAllocPixels(SkImageInfo::Make(dst_size_in_pixel.width(),
-                                                dst_size_in_pixel.height(),
+  if (!bitmap->tryAllocPixels(SkImageInfo::Make(output_size_in_pixel.width(),
+                                                output_size_in_pixel.height(),
                                                 color_type,
                                                 kOpaque_SkAlphaType))) {
     return;
@@ -1832,7 +1856,7 @@ void RenderWidgetHostViewAndroid::PrepareTextureCopyOutputResult(
       texture_mailbox.sync_point(),
       result->size(),
       gfx::Rect(result->size()),
-      dst_size_in_pixel,
+      output_size_in_pixel,
       pixels,
       color_type,
       base::Bind(&CopyFromCompositingSurfaceFinished,

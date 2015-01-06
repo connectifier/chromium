@@ -90,7 +90,6 @@ Scheduler::Scheduler(
       layer_tree_host_id_(layer_tree_host_id),
       task_runner_(task_runner),
       power_monitor_(power_monitor),
-      begin_retro_frame_posted_(false),
       state_machine_(scheduler_settings),
       inside_process_scheduled_actions_(false),
       inside_action_(SchedulerStateMachine::ACTION_NONE),
@@ -260,9 +259,10 @@ void Scheduler::NotifyReadyToCommit() {
   ProcessScheduledActions();
 }
 
-void Scheduler::BeginMainFrameAborted(bool did_handle) {
-  TRACE_EVENT0("cc", "Scheduler::BeginMainFrameAborted");
-  state_machine_.BeginMainFrameAborted(did_handle);
+void Scheduler::BeginMainFrameAborted(CommitEarlyOutReason reason) {
+  TRACE_EVENT1("cc", "Scheduler::BeginMainFrameAborted", "reason",
+               CommitEarlyOutReasonToString(reason));
+  state_machine_.BeginMainFrameAborted(reason);
   ProcessScheduledActions();
 }
 
@@ -272,10 +272,9 @@ void Scheduler::DidPrepareTiles() {
 
 void Scheduler::DidLoseOutputSurface() {
   TRACE_EVENT0("cc", "Scheduler::DidLoseOutputSurface");
-  state_machine_.DidLoseOutputSurface();
-  if (frame_source_->NeedsBeginFrames())
-    frame_source_->SetNeedsBeginFrames(false);
   begin_retro_frame_args_.clear();
+  begin_retro_frame_task_.Cancel();
+  state_machine_.DidLoseOutputSurface();
   ProcessScheduledActions();
 }
 
@@ -312,41 +311,29 @@ void Scheduler::SetupNextBeginFrameIfNeeded() {
   if (!task_runner_.get())
     return;
 
-  bool needs_begin_frame = state_machine_.BeginFrameNeeded();
-
-  bool at_end_of_deadline =
-      (state_machine_.begin_impl_frame_state() ==
-       SchedulerStateMachine::BEGIN_IMPL_FRAME_STATE_INSIDE_DEADLINE);
-
-  bool should_call_set_needs_begin_frame =
-      // Always request the BeginFrame immediately if it wasn't needed before.
-      (needs_begin_frame && !frame_source_->NeedsBeginFrames()) ||
-      // Only stop requesting BeginFrames after a deadline.
-      (!needs_begin_frame && frame_source_->NeedsBeginFrames() &&
-       at_end_of_deadline);
-
-  if (should_call_set_needs_begin_frame) {
-    frame_source_->SetNeedsBeginFrames(needs_begin_frame);
+  if (state_machine_.ShouldSetNeedsBeginFrames(
+          frame_source_->NeedsBeginFrames())) {
+    frame_source_->SetNeedsBeginFrames(state_machine_.BeginFrameNeeded());
   }
 
-  if (at_end_of_deadline) {
+  if (state_machine_.begin_impl_frame_state() ==
+      SchedulerStateMachine::BEGIN_IMPL_FRAME_STATE_INSIDE_DEADLINE) {
     frame_source_->DidFinishFrame(begin_retro_frame_args_.size());
   }
 
   PostBeginRetroFrameIfNeeded();
-  SetupPollingMechanisms(needs_begin_frame);
+  SetupPollingMechanisms();
 }
 
 // We may need to poll when we can't rely on BeginFrame to advance certain
 // state or to avoid deadlock.
-void Scheduler::SetupPollingMechanisms(bool needs_begin_frame) {
+void Scheduler::SetupPollingMechanisms() {
   bool needs_advance_commit_state_timer = false;
   // Setup PollForAnticipatedDrawTriggers if we need to monitor state but
   // aren't expecting any more BeginFrames. This should only be needed by
   // the synchronous compositor when BeginFrameNeeded is false.
   if (state_machine_.ShouldPollForAnticipatedDrawTriggers()) {
     DCHECK(!state_machine_.SupportsProactiveBeginFrame());
-    DCHECK(!needs_begin_frame);
     if (poll_for_draw_triggers_task_.IsCancelled()) {
       poll_for_draw_triggers_task_.Reset(poll_for_draw_triggers_closure_);
       base::TimeDelta delay = begin_impl_frame_args_.IsValid()
@@ -426,7 +413,8 @@ bool Scheduler::OnBeginFrameMixInDelegate(const BeginFrameArgs& args) {
     should_defer_begin_frame = false;
   } else {
     should_defer_begin_frame =
-        !begin_retro_frame_args_.empty() || begin_retro_frame_posted_ ||
+        !begin_retro_frame_args_.empty() ||
+        !begin_retro_frame_task_.IsCancelled() ||
         !frame_source_->NeedsBeginFrames() ||
         (state_machine_.begin_impl_frame_state() !=
          SchedulerStateMachine::BEGIN_IMPL_FRAME_STATE_IDLE);
@@ -446,7 +434,7 @@ bool Scheduler::OnBeginFrameMixInDelegate(const BeginFrameArgs& args) {
 void Scheduler::SetChildrenNeedBeginFrames(bool children_need_begin_frames) {
   DCHECK(settings_.forward_begin_frames_to_children);
   state_machine_.SetChildrenNeedBeginFrames(children_need_begin_frames);
-  DCHECK_EQ(state_machine_.NextAction(), SchedulerStateMachine::ACTION_NONE);
+  ProcessScheduledActions();
 }
 
 // BeginRetroFrame is called for BeginFrames that we've deferred because
@@ -454,13 +442,12 @@ void Scheduler::SetChildrenNeedBeginFrames(bool children_need_begin_frames) {
 void Scheduler::BeginRetroFrame() {
   TRACE_EVENT0("cc", "Scheduler::BeginRetroFrame");
   DCHECK(!settings_.using_synchronous_renderer_compositor);
-  DCHECK(begin_retro_frame_posted_);
-  begin_retro_frame_posted_ = false;
+  DCHECK(!begin_retro_frame_args_.empty());
+  DCHECK(!begin_retro_frame_task_.IsCancelled());
+  DCHECK_EQ(state_machine_.begin_impl_frame_state(),
+            SchedulerStateMachine::BEGIN_IMPL_FRAME_STATE_IDLE);
 
-  // If there aren't any retroactive BeginFrames, then we've lost the
-  // OutputSurface and should abort.
-  if (begin_retro_frame_args_.empty())
-    return;
+  begin_retro_frame_task_.Cancel();
 
   // Discard expired BeginRetroFrames
   // Today, we should always end up with at most one un-expired BeginRetroFrame
@@ -507,7 +494,7 @@ void Scheduler::PostBeginRetroFrameIfNeeded() {
   if (!frame_source_->NeedsBeginFrames())
     return;
 
-  if (begin_retro_frame_args_.empty() || begin_retro_frame_posted_)
+  if (begin_retro_frame_args_.empty() || !begin_retro_frame_task_.IsCancelled())
     return;
 
   // begin_retro_frame_args_ should always be empty for the
@@ -518,8 +505,9 @@ void Scheduler::PostBeginRetroFrameIfNeeded() {
       SchedulerStateMachine::BEGIN_IMPL_FRAME_STATE_IDLE)
     return;
 
-  begin_retro_frame_posted_ = true;
-  task_runner_->PostTask(FROM_HERE, begin_retro_frame_closure_);
+  begin_retro_frame_task_.Reset(begin_retro_frame_closure_);
+
+  task_runner_->PostTask(FROM_HERE, begin_retro_frame_task_.callback());
 }
 
 // BeginImplFrame starts a compositor frame that will wait up until a deadline
@@ -754,8 +742,9 @@ void Scheduler::AsValueInto(base::debug::TracedValue* state) const {
                    estimated_parent_draw_time_.InMillisecondsF());
   state->SetBoolean("last_set_needs_begin_frame_",
                     frame_source_->NeedsBeginFrames());
-  state->SetBoolean("begin_retro_frame_posted_", begin_retro_frame_posted_);
   state->SetInteger("begin_retro_frame_args_", begin_retro_frame_args_.size());
+  state->SetBoolean("begin_retro_frame_task_",
+                    !begin_retro_frame_task_.IsCancelled());
   state->SetBoolean("begin_impl_frame_deadline_task_",
                     !begin_impl_frame_deadline_task_.IsCancelled());
   state->SetBoolean("poll_for_draw_triggers_task_",

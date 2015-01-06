@@ -4,9 +4,9 @@
 
 import json
 import os
+import unittest
 
-from telemetry import benchmark
-from telemetry.core import exceptions
+from telemetry import decorators
 from telemetry.core import wpr_modes
 from telemetry.page import page as page_module
 from telemetry.page import page_set
@@ -89,7 +89,7 @@ class PageTestUnitTest(page_test_test_case.PageTestTestCase):
 
   # This test is disabled because it runs against live sites, and needs to be
   # fixed. crbug.com/179038
-  @benchmark.Disabled
+  @decorators.Disabled
   def testRecordAndReplay(self):
     test_archive = '/tmp/google.wpr'
     google_url = 'http://www.google.com/'
@@ -148,3 +148,32 @@ class PageTestUnitTest(page_test_test_case.PageTestTestCase):
     measurement = PageTestWithAction()
     self.RunMeasurement(measurement, ps, options=self._options)
     self.assertTrue(page.run_test_action_called)
+
+
+class MultiTabPageTestUnitTest(unittest.TestCase):
+  def testNoTabForPageReturnsFalse(self):
+    class PageTestWithoutTabForPage(page_test.PageTest):
+      def ValidateAndMeasurePage(self, *_):
+        pass
+    test = PageTestWithoutTabForPage()
+    self.assertFalse(test.is_multi_tab_test)
+
+  def testHasTabForPageReturnsTrue(self):
+    class PageTestWithTabForPage(page_test.PageTest):
+      def ValidateAndMeasurePage(self, *_):
+        pass
+      def TabForPage(self, *_):
+        pass
+    test = PageTestWithTabForPage()
+    self.assertTrue(test.is_multi_tab_test)
+
+  def testHasTabForPageInAncestor(self):
+    class PageTestWithTabForPage(page_test.PageTest):
+      def ValidateAndMeasurePage(self, *_):
+        pass
+      def TabForPage(self, *_):
+        pass
+    class PageTestWithTabForPageInParent(PageTestWithTabForPage):
+      pass
+    test = PageTestWithTabForPageInParent()
+    self.assertTrue(test.is_multi_tab_test)

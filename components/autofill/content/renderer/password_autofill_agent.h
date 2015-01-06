@@ -148,10 +148,6 @@ class PasswordAutofillAgent : public content::RenderFrameObserver {
     void DidStopLoading() override;
     void DidStartProvisionalLoad(blink::WebLocalFrame* frame) override;
     void FrameDetached(blink::WebFrame* frame) override;
-    void WillSendSubmitEvent(blink::WebLocalFrame* frame,
-                             const blink::WebFormElement& form) override;
-    void WillSubmitForm(blink::WebLocalFrame* frame,
-                        const blink::WebFormElement& form) override;
 
    private:
     PasswordAutofillAgent* agent_;
@@ -159,31 +155,21 @@ class PasswordAutofillAgent : public content::RenderFrameObserver {
     DISALLOW_COPY_AND_ASSIGN(LegacyPasswordAutofillAgent);
   };
   friend class LegacyPasswordAutofillAgent;
-  FRIEND_TEST_ALL_PREFIXES(
-      PasswordAutofillAgentTest,
-      RememberLastNonEmptyUsernameAndPasswordOnSubmit_ScriptCleared);
-  FRIEND_TEST_ALL_PREFIXES(
-      PasswordAutofillAgentTest,
-      RememberLastNonEmptyUsernameAndPasswordOnSubmit_UserCleared);
-  FRIEND_TEST_ALL_PREFIXES(
-      PasswordAutofillAgentTest,
-      RememberLastNonEmptyUsernameAndPasswordOnSubmit_New);
 
   // RenderFrameObserver:
   bool OnMessageReceived(const IPC::Message& message) override;
   void DidFinishDocumentLoad() override;
   void DidFinishLoad() override;
   void FrameWillClose() override;
+  void DidCommitProvisionalLoad(bool is_new_navigation) override;
+  void WillSendSubmitEvent(const blink::WebFormElement& form) override;
+  void WillSubmitForm(const blink::WebFormElement& form) override;
 
   // Legacy RenderViewObserver:
   void DidStartLoading();
   void DidStopLoading();
   void LegacyDidStartProvisionalLoad(blink::WebLocalFrame* frame);
   void FrameDetached(blink::WebFrame* frame);
-  void WillSendSubmitEvent(blink::WebLocalFrame* frame,
-                           const blink::WebFormElement& form);
-  void WillSubmitForm(blink::WebLocalFrame* frame,
-                      const blink::WebFormElement& form);
 
   // RenderView IPC handlers:
   void OnFillPasswordForm(int key, const PasswordFormFillData& form_data);
@@ -193,6 +179,12 @@ class PasswordAutofillAgent : public content::RenderFrameObserver {
   // If |only_visible| is true, only forms visible in the layout are sent.
   void SendPasswordForms(bool only_visible);
 
+  // Instructs the browser to show a pop-up suggesting which credentials could
+  // be filled. |show_in_password_field| should indicate whether the pop-up is
+  // to be shown on the password field instead of on the username field. If the
+  // username exists, it should be passed as |user_input|. If there is no
+  // username, pass the password field in |user_input|. In the latter case, no
+  // username value will be shown in the pop-up.
   bool ShowSuggestionPopup(const PasswordFormFillData& fill_data,
                            const blink::WebInputElement& user_input,
                            bool show_all,
@@ -202,7 +194,9 @@ class PasswordAutofillAgent : public content::RenderFrameObserver {
   // passed in element can be either a username element or a password element.
   // If a PasswordInfo was found, returns |true| and also assigns the
   // corresponding username WebInputElement and PasswordInfo into
-  // username_element and pasword_info, respectively.
+  // username_element and pasword_info, respectively. Note, that
+  // |username_element->isNull()| can be true for forms without a username
+  // field.
   bool FindPasswordInfoForElement(
       const blink::WebInputElement& element,
       const blink::WebInputElement** username_element,
@@ -252,6 +246,11 @@ class PasswordAutofillAgent : public content::RenderFrameObserver {
   // Set if the user might be submitting a password form on the current page,
   // but the submit may still fail (i.e. doesn't pass JavaScript validation).
   scoped_ptr<PasswordForm> provisionally_saved_form_;
+
+  // Contains the most recent text that user typed in input elements. Used for
+  // storing username/password before JavaScript changes them.
+  std::map<const blink::WebInputElement, blink::WebString>
+      user_modified_elements_;
 
   PasswordValueGatekeeper gatekeeper_;
 

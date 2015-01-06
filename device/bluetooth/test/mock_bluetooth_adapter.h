@@ -33,7 +33,6 @@ class MockBluetoothAdapter : public BluetoothAdapter {
 
   virtual bool IsInitialized() const { return true; }
 
-  MOCK_METHOD0(DeleteOnCorrectThread, void());
   MOCK_METHOD1(AddObserver, void(BluetoothAdapter::Observer*));
   MOCK_METHOD1(RemoveObserver, void(BluetoothAdapter::Observer*));
   MOCK_CONST_METHOD0(GetAddress, std::string());
@@ -79,6 +78,7 @@ class MockBluetoothAdapter : public BluetoothAdapter {
                     const CreateServiceErrorCallback& error_callback));
 
  protected:
+  void DeleteOnCorrectThread() const override;
   virtual void AddDiscoverySession(const base::Closure& callback,
                                    const ErrorCallback& error_callback);
   virtual void RemoveDiscoverySession(const base::Closure& callback,

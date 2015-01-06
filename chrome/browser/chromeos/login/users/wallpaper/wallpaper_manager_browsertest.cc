@@ -34,11 +34,12 @@
 #include "components/user_manager/user_manager.h"
 #include "content/public/test/test_utils.h"
 #include "ui/aura/env.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/image/image_skia.h"
-#include "ui/gfx/point.h"
-#include "ui/gfx/rect.h"
 
 using wallpaper::WallpaperLayout;
+using wallpaper::WallpaperInfo;
 using wallpaper::WALLPAPER_LAYOUT_CENTER;
 using wallpaper::WALLPAPER_LAYOUT_CENTER_CROPPED;
 using wallpaper::WALLPAPER_LAYOUT_STRETCH;
@@ -49,9 +50,9 @@ namespace chromeos {
 namespace {
 
 int kLargeWallpaperWidth = 256;
-int kLargeWallpaperHeight = chromeos::kLargeWallpaperMaxHeight;
+int kLargeWallpaperHeight = wallpaper::kLargeWallpaperMaxHeight;
 int kSmallWallpaperWidth = 256;
-int kSmallWallpaperHeight = chromeos::kSmallWallpaperMaxHeight;
+int kSmallWallpaperHeight = wallpaper::kSmallWallpaperMaxHeight;
 
 const char kTestUser1[] = "test1@domain.com";
 const char kTestUser1Hash[] = "test1@domain.com-hash";
@@ -76,7 +77,7 @@ class WallpaperManagerBrowserTest : public InProcessBrowserTest {
     UpdateDisplay("800x600");
   }
 
-  virtual void SetUpCommandLine(CommandLine* command_line) override {
+  virtual void SetUpCommandLine(base::CommandLine* command_line) override {
     command_line->AppendSwitch(switches::kLoginManager);
     command_line->AppendSwitchASCII(switches::kLoginProfile, "user");
   }
@@ -159,13 +160,9 @@ IN_PROC_BROWSER_TEST_F(WallpaperManagerBrowserTest,
   LogIn(kTestUser1, kTestUser1Hash);
   std::string id = base::Int64ToString(base::Time::Now().ToInternalValue());
   base::FilePath small_wallpaper_path = GetCustomWallpaperPath(
-      kSmallWallpaperSubDir,
-      kTestUser1Hash,
-      id);
+      wallpaper::kSmallWallpaperSubDir, kTestUser1Hash, id);
   base::FilePath large_wallpaper_path = GetCustomWallpaperPath(
-      kLargeWallpaperSubDir,
-      kTestUser1Hash,
-      id);
+      wallpaper::kLargeWallpaperSubDir, kTestUser1Hash, id);
 
   // Saves the small/large resolution wallpapers to small/large custom
   // wallpaper paths.
@@ -253,9 +250,7 @@ IN_PROC_BROWSER_TEST_F(WallpaperManagerBrowserTest,
   // Change wallpaper to a custom wallpaper.
   std::string id = base::Int64ToString(base::Time::Now().ToInternalValue());
   base::FilePath small_wallpaper_path = GetCustomWallpaperPath(
-      kSmallWallpaperSubDir,
-      kTestUser1Hash,
-      id);
+      wallpaper::kSmallWallpaperSubDir, kTestUser1Hash, id);
   ASSERT_TRUE(wallpaper_manager_test_utils::WriteJPEGFile(
       small_wallpaper_path,
       kSmallWallpaperWidth,
@@ -353,7 +348,7 @@ IN_PROC_BROWSER_TEST_F(WallpaperManagerBrowserTest,
 class WallpaperManagerBrowserTestNoAnimation
     : public WallpaperManagerBrowserTest {
  public:
-  virtual void SetUpCommandLine(CommandLine* command_line) override {
+  virtual void SetUpCommandLine(base::CommandLine* command_line) override {
     command_line->AppendSwitch(switches::kLoginManager);
     command_line->AppendSwitchASCII(switches::kLoginProfile, "user");
     command_line->AppendSwitch(chromeos::switches::kDisableLoginAnimations);
@@ -416,7 +411,7 @@ IN_PROC_BROWSER_TEST_F(WallpaperManagerBrowserTestNoAnimation,
 class WallpaperManagerBrowserTestCrashRestore
     : public WallpaperManagerBrowserTest {
  public:
-  virtual void SetUpCommandLine(CommandLine* command_line) override {
+  virtual void SetUpCommandLine(base::CommandLine* command_line) override {
     command_line->AppendSwitch(chromeos::switches::kDisableLoginAnimations);
     command_line->AppendSwitch(chromeos::switches::kDisableBootAnimation);
     command_line->AppendSwitchASCII(switches::kLoginUser, kTestUser1);
@@ -432,15 +427,21 @@ IN_PROC_BROWSER_TEST_F(WallpaperManagerBrowserTestCrashRestore,
 
 // Test for crbug.com/270278. It simulates a browser crash and verifies if user
 // wallpaper is loaded.
+// Fails on the MSAN bots. See http://crbug.com/444477
+#if defined(MEMORY_SANITIZER)
+#define MAYBE_RestoreWallpaper DISABLED_RestoreWallpaper
+#else
+#define MAYBE_RestoreWallpaper RestoreWallpaper
+#endif
 IN_PROC_BROWSER_TEST_F(WallpaperManagerBrowserTestCrashRestore,
-                       RestoreWallpaper) {
+                       MAYBE_RestoreWallpaper) {
   EXPECT_EQ(1, LoadedWallpapers());
 }
 
 class WallpaperManagerBrowserTestCacheUpdate
     : public WallpaperManagerBrowserTest {
  public:
-  virtual void SetUpCommandLine(CommandLine* command_line) override {
+  virtual void SetUpCommandLine(base::CommandLine* command_line) override {
     command_line->AppendSwitchASCII(switches::kLoginUser, kTestUser1);
     command_line->AppendSwitchASCII(switches::kLoginProfile, "user");
   }
@@ -460,13 +461,9 @@ IN_PROC_BROWSER_TEST_F(WallpaperManagerBrowserTestCacheUpdate,
   std::string id = base::Int64ToString(base::Time::Now().ToInternalValue());
   WallpaperManager* wallpaper_manager = WallpaperManager::Get();
   base::FilePath small_wallpaper_path = GetCustomWallpaperPath(
-      kSmallWallpaperSubDir,
-      kTestUser1Hash,
-      id);
+      wallpaper::kSmallWallpaperSubDir, kTestUser1Hash, id);
   base::FilePath large_wallpaper_path = GetCustomWallpaperPath(
-      kLargeWallpaperSubDir,
-      kTestUser1Hash,
-      id);
+      wallpaper::kLargeWallpaperSubDir, kTestUser1Hash, id);
 
   // Saves the small/large resolution wallpapers to small/large custom
   // wallpaper paths.

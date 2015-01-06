@@ -280,11 +280,11 @@ const char kDomAutomationController[]       = "dom-automation";
 // Enable antialiasing on 2d canvas clips (as opposed to draw operations)
 const char kEnable2dCanvasClipAntialiasing[] = "enable-2d-canvas-clip-aa";
 
-// Enable partially decoding jpeg images using the GPU.
-// At least YUV decoding will be accelerated when using this flag.
+// Disable partially decoding jpeg images using the GPU.
+// At least YUV decoding will be accelerated when not using this flag.
 // Has no effect unless GPU rasterization is enabled.
-const char kEnableAcceleratedJpegDecoding[] =
-    "enable-accelerated-jpeg-decoding";
+const char kDisableAcceleratedJpegDecoding[] =
+    "disable-accelerated-jpeg-decoding";
 
 // Enable bleeding-edge code to make Chrome draw content faster. The changes
 // behind this path are very likely to break lots of content.
@@ -830,8 +830,16 @@ const char kUseImageTextureTarget[] = "use-image-texture-target";
 // Set when Chromium should use a mobile user agent.
 const char kUseMobileUserAgent[] = "use-mobile-user-agent";
 
+// Use normal priority for tile task worker threads.  Otherwise they may
+// be run at background priority on some platforms.
+const char kUseNormalPriorityForTileTaskWorkerThreads[] =
+    "use-normal-priority-for-tile-task-worker-threads";
+
 // Use the new surfaces system to handle compositor delegation.
 const char kUseSurfaces[] = "use-surfaces";
+
+// Disable the use of the new surfaces system to handle compositor delegation.
+const char kDisableSurfaces[] = "disable-surfaces";
 
 // On POSIX only: the contents of this flag are prepended to the utility
 // process command line. Useful values might be "valgrind" or "xterm -e gdb
@@ -874,9 +882,6 @@ const char kDisableWebRtcEncryption[]      = "disable-webrtc-encryption";
 
 // Disables HW encode acceleration for WebRTC.
 const char kDisableWebRtcHWEncoding[]       = "disable-webrtc-hw-encoding";
-
-// Enables VP8 HW encode acceleration for WebRTC.
-const char kEnableWebRtcHWVp8Encoding[]     = "enable-webrtc-hw-vp8-encoding";
 
 // Enables H264 HW encode acceleration for WebRTC.
 const char kEnableWebRtcHWH264Encoding[]    = "enable-webrtc-hw-h264-encoding";
@@ -928,7 +933,7 @@ const char kDisableWebAudio[]               = "disable-webaudio";
 // Disables panel fitting (used for mirror mode).
 const char kDisablePanelFitting[]           = "disable-panel-fitting";
 
-// Enables VA-API accelerated video encode.
+// Disables VA-API accelerated video encode.
 const char kDisableVaapiAcceleratedVideoEncode[] =
     "disable-vaapi-accelerated-video-encode";
 #endif
@@ -982,7 +987,7 @@ const char kEnablePluginPowerSaver[] = "enable-plugin-power-saver";
 bool IsWin32kRendererLockdownEnabled() {
   const std::string group_name =
       base::FieldTrialList::FindFullName("Win32kLockdown");
-  const base::CommandLine* cmd_line = CommandLine::ForCurrentProcess();
+  const base::CommandLine* cmd_line = base::CommandLine::ForCurrentProcess();
   if (cmd_line->HasSwitch(kEnableWin32kRendererLockDown))
     return true;
   if (cmd_line->HasSwitch(kDisableWin32kRendererLockDown))

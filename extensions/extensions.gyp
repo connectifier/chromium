@@ -15,7 +15,7 @@
       # generated cpp files must be listed explicitly in extensions_common
       'type': 'none',
       'includes': [
-        '../mojo/public/tools/bindings/mojom_bindings_generator.gypi',
+        '../mojo/mojom_bindings_generator.gypi',
       ],
       'sources': [
         'common/mojo/keep_alive.mojom',
@@ -338,6 +338,11 @@
         'browser/api/app_window/app_window_api.h',
         'browser/api/async_api_function.cc',
         'browser/api/async_api_function.h',
+        'browser/api/audio/audio_api.cc',
+        'browser/api/audio/audio_api.h',
+        'browser/api/audio/audio_service.h',
+        'browser/api/audio/audio_service_chromeos.cc',
+        'browser/api/audio/audio_service_linux.cc',
         'browser/api/bluetooth/bluetooth_api.cc',
         'browser/api/bluetooth/bluetooth_api.h',
         'browser/api/bluetooth/bluetooth_api_pairing_delegate.cc',
@@ -673,6 +678,10 @@
         'browser/guest_view/mime_handler_view/mime_handler_view_guest_delegate.h',
         'browser/guest_view/mime_handler_view/mime_handler_view_guest.cc',
         'browser/guest_view/mime_handler_view/mime_handler_view_guest.h',
+        'browser/guest_view/surface_worker/surface_worker_constants.cc',
+        'browser/guest_view/surface_worker/surface_worker_constants.h',
+        'browser/guest_view/surface_worker/surface_worker_guest.cc',
+        'browser/guest_view/surface_worker/surface_worker_guest.h',
         'browser/guest_view/web_view/javascript_dialog_helper.cc',
         'browser/guest_view/web_view/javascript_dialog_helper.h',
         'browser/guest_view/web_view/web_view_constants.cc',
@@ -689,10 +698,6 @@
         'browser/guest_view/web_view/web_view_permission_helper_delegate.h',
         'browser/guest_view/web_view/web_view_renderer_state.cc',
         'browser/guest_view/web_view/web_view_renderer_state.h',
-        'browser/guest_view/worker_frame/worker_frame_constants.cc',
-        'browser/guest_view/worker_frame/worker_frame_constants.h',
-        'browser/guest_view/worker_frame/worker_frame_guest.cc',
-        'browser/guest_view/worker_frame/worker_frame_guest.h',
         'browser/image_loader.cc',
         'browser/image_loader.h',
         'browser/image_loader_factory.cc',
@@ -798,7 +803,10 @@
             '../components/components.gyp:storage_monitor',
           ],
         }],
-        ['OS == "linux" and chromeos == 1', {
+        ['chromeos == 1', {
+          'dependencies': [
+            '../chromeos/chromeos.gyp:chromeos',
+          ],
           'sources': [
             'browser/api/vpn_provider/vpn_provider_api.cc',
             'browser/api/vpn_provider/vpn_provider_api.h',
@@ -833,6 +841,11 @@
             }],
           ],
         }],
+        ['OS != "linux"', {
+          'sources': [
+            'browser/api/audio/audio_service.cc',
+          ]
+        }],
       ],
       # Disable c4267 warnings until we fix size_t to int truncations.
       'msvs_disabled_warnings': [ 4267, ],
@@ -845,7 +858,7 @@
         'extensions_resources.gyp:extensions_resources',
         '../content/content.gyp:content_resources',
         '../gin/gin.gyp:gin',
-        '../mojo/public/mojo_public.gyp:mojo_js_bindings',
+        '../mojo/mojo_public.gyp:mojo_js_bindings',
         '../third_party/WebKit/public/blink.gyp:blink',
       ],
       'include_dirs': [
@@ -961,10 +974,10 @@
         'renderer/resources/uncaught_exception_handler.js',
         'renderer/resources/unload_event.js',
         'renderer/resources/utils.js',
+        'renderer/resources/extensions/surface_worker.js',
         'renderer/resources/extensions/web_view.js',
         'renderer/resources/extensions/web_view_events.js',
         'renderer/resources/extensions/web_view_experimental.js',
-        'renderer/resources/extensions/worker_frame.js',
         'renderer/resources/web_request_custom_bindings.js',
         'renderer/resources/web_request_internal_custom_bindings.js',
         'renderer/runtime_custom_bindings.cc',
@@ -1135,7 +1148,7 @@
               '<(SHARED_INTERMEDIATE_DIR)/ui/resources/ui_resources_100_percent.pak',
               '<(SHARED_INTERMEDIATE_DIR)/ui/strings/app_locale_settings_en-US.pak',
               '<(SHARED_INTERMEDIATE_DIR)/ui/strings/ui_strings_en-US.pak',
-              '<(SHARED_INTERMEDIATE_DIR)/webkit/devtools_resources.pak',
+              '<(SHARED_INTERMEDIATE_DIR)/blink/devtools_resources.pak',
             ],
             'pak_output': '<(PRODUCT_DIR)/extensions_shell_and_test.pak',
           },
@@ -1155,10 +1168,10 @@
         '../device/bluetooth/bluetooth.gyp:device_bluetooth_mocks',
         '../device/serial/serial.gyp:device_serial',
         '../device/serial/serial.gyp:device_serial_test_util',
-        '../mojo/edk/mojo_edk.gyp:mojo_js_lib',
-        '../mojo/edk/mojo_edk.gyp:mojo_system_impl',
         '../mojo/mojo_base.gyp:mojo_environment_chromium',
-        '../mojo/public/mojo_public.gyp:mojo_cpp_bindings',
+        '../mojo/mojo_edk.gyp:mojo_js_lib',
+        '../mojo/mojo_edk.gyp:mojo_system_impl',
+        '../mojo/mojo_public.gyp:mojo_cpp_bindings',
         '../testing/gmock.gyp:gmock',
         '../testing/gtest.gyp:gtest',
         '../third_party/leveldatabase/leveldatabase.gyp:leveldatabase',

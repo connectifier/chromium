@@ -26,13 +26,14 @@ class PrefService;
 
 namespace autofill {
 
-class AutofillMetrics;
 class AutofillPopupDelegate;
 class AutofillWebDataService;
+class CardUnmaskDelegate;
 class CreditCard;
 class FormStructure;
 class PersonalDataManager;
 struct FormData;
+struct Suggestion;
 
 // A client interface that needs to be supplied to the Autofill component by the
 // embedder.
@@ -78,7 +79,9 @@ class AutofillClient {
 
   // A user has attempted to use a masked card. Prompt them for further
   // information to proceed.
-  virtual void ShowUnmaskPrompt() = 0;
+  virtual void ShowUnmaskPrompt(const CreditCard& card,
+                                base::WeakPtr<CardUnmaskDelegate> delegate) = 0;
+  virtual void OnUnmaskVerificationResult(bool success) = 0;
 
   // Run |save_card_callback| if the credit card should be imported as personal
   // data. |metric_logger| can be used to log user actions.
@@ -106,10 +109,7 @@ class AutofillClient {
   virtual void ShowAutofillPopup(
       const gfx::RectF& element_bounds,
       base::i18n::TextDirection text_direction,
-      const std::vector<base::string16>& values,
-      const std::vector<base::string16>& labels,
-      const std::vector<base::string16>& icons,
-      const std::vector<int>& identifiers,
+      const std::vector<Suggestion>& suggestions,
       base::WeakPtr<AutofillPopupDelegate> delegate) = 0;
 
   // Update the data list values shown by the Autofill popup, if visible.

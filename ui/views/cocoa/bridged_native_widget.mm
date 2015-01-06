@@ -4,6 +4,8 @@
 
 #import "ui/views/cocoa/bridged_native_widget.h"
 
+#import <objc/runtime.h>
+
 #include "base/logging.h"
 #include "base/mac/mac_util.h"
 #import "base/mac/sdk_forward_declarations.h"
@@ -15,6 +17,7 @@
 #include "ui/gfx/geometry/dip_util.h"
 #import "ui/gfx/mac/coordinate_conversion.h"
 #include "ui/gfx/screen.h"
+#import "ui/views/cocoa/cocoa_mouse_capture.h"
 #import "ui/views/cocoa/bridged_content_view.h"
 #import "ui/views/cocoa/views_nswindow_delegate.h"
 #include "ui/views/widget/native_widget_mac.h"
@@ -25,6 +28,8 @@
 #include "ui/views/widget/widget.h"
 
 namespace {
+
+int kWindowPropertiesKey;
 
 float GetDeviceScaleFactorFromView(NSView* view) {
   gfx::Display display =
@@ -191,6 +196,38 @@ void BridgedNativeWidget::SetVisibilityState(WindowVisibilityState new_state) {
   NotifyVisibilityChangeDown();
 }
 
+void BridgedNativeWidget::AcquireCapture() {
+  DCHECK(!HasCapture());
+  if (!window_visible_)
+    return;  // Capture on hidden windows is disallowed.
+
+  mouse_capture_.reset(new CocoaMouseCapture(this));
+}
+
+void BridgedNativeWidget::ReleaseCapture() {
+  mouse_capture_.reset();
+}
+
+bool BridgedNativeWidget::HasCapture() {
+  return mouse_capture_ && mouse_capture_->IsActive();
+}
+
+void BridgedNativeWidget::SetNativeWindowProperty(const char* name,
+                                                  void* value) {
+  NSString* key = [NSString stringWithUTF8String:name];
+  if (value) {
+    [GetWindowProperties() setObject:[NSValue valueWithPointer:value]
+                              forKey:key];
+  } else {
+    [GetWindowProperties() removeObjectForKey:key];
+  }
+}
+
+void* BridgedNativeWidget::GetNativeWindowProperty(const char* name) const {
+  NSString* key = [NSString stringWithUTF8String:name];
+  return [[GetWindowProperties() objectForKey:key] pointerValue];
+}
+
 void BridgedNativeWidget::OnWindowWillClose() {
   if (parent_)
     parent_->RemoveChildWindow(this);
@@ -294,6 +331,10 @@ void BridgedNativeWidget::OnVisibilityChangedTo(bool new_visibility) {
   if (window_visible_)
     wants_to_be_visible_ = true;
 
+  // Capture on hidden windows is not permitted.
+  if (!window_visible_)
+    mouse_capture_.reset();
+
   // TODO(tapted): Investigate whether we want this for Mac. This is what Aura
   // does, and it is what tests expect. However, because layer drawing is
   // asynchronous (and things like deminiaturize in AppKit are not), it can
@@ -380,6 +421,17 @@ void BridgedNativeWidget::DispatchKeyEventPostIME(const ui::KeyEvent& key) {
   native_widget_mac_->GetWidget()->OnKeyEvent(const_cast<ui::KeyEvent*>(&key));
   if (!key.handled())
     focus_manager_->OnKeyEvent(key);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// BridgedNativeWidget, CocoaMouseCaptureDelegate:
+
+void BridgedNativeWidget::PostCapturedEvent(NSEvent* event) {
+  [bridged_view_ processCapturedMouseEvent:event];
+}
+
+void BridgedNativeWidget::OnMouseCaptureLost() {
+  native_widget_mac_->GetWidget()->OnMouseCaptureLost();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -575,6 +627,17 @@ void BridgedNativeWidget::UpdateLayerProperties() {
   float scale_factor = GetDeviceScaleFactorFromView(compositor_superview_);
   compositor_->SetScaleAndSize(scale_factor,
                                ConvertSizeToPixel(scale_factor, size_in_dip));
+}
+
+NSMutableDictionary* BridgedNativeWidget::GetWindowProperties() const {
+  NSMutableDictionary* properties = objc_getAssociatedObject(
+      window_, &kWindowPropertiesKey);
+  if (!properties) {
+    properties = [NSMutableDictionary dictionary];
+    objc_setAssociatedObject(window_, &kWindowPropertiesKey,
+                             properties, OBJC_ASSOCIATION_RETAIN);
+  }
+  return properties;
 }
 
 }  // namespace views

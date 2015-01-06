@@ -4,11 +4,8 @@
 
 #include "content/child/webcrypto/webcrypto_util.h"
 
-#include <set>
-
 #include "base/logging.h"
 #include "base/numerics/safe_math.h"
-#include "base/strings/stringprintf.h"
 #include "content/child/webcrypto/status.h"
 #include "third_party/WebKit/public/platform/WebCryptoAlgorithm.h"
 #include "third_party/WebKit/public/platform/WebCryptoAlgorithmParams.h"
@@ -57,82 +54,6 @@ Status GetShaBlockSizeBits(const blink::WebCryptoAlgorithm& algorithm,
 }
 
 }  // namespace
-
-struct JwkToWebCryptoUsage {
-  const char* const jwk_key_op;
-  const blink::WebCryptoKeyUsage webcrypto_usage;
-};
-
-// Keep this ordered according to the definition
-// order of WebCrypto's "recognized key usage
-// values".
-//
-// This is not required for spec compliance,
-// however it makes the ordering of key_ops match
-// that of WebCrypto's Key.usages.
-const JwkToWebCryptoUsage kJwkWebCryptoUsageMap[] = {
-    {"encrypt", blink::WebCryptoKeyUsageEncrypt},
-    {"decrypt", blink::WebCryptoKeyUsageDecrypt},
-    {"sign", blink::WebCryptoKeyUsageSign},
-    {"verify", blink::WebCryptoKeyUsageVerify},
-    {"deriveKey", blink::WebCryptoKeyUsageDeriveKey},
-    {"deriveBits", blink::WebCryptoKeyUsageDeriveBits},
-    {"wrapKey", blink::WebCryptoKeyUsageWrapKey},
-    {"unwrapKey", blink::WebCryptoKeyUsageUnwrapKey}};
-
-bool JwkKeyOpToWebCryptoUsage(const std::string& key_op,
-                              blink::WebCryptoKeyUsage* usage) {
-  for (size_t i = 0; i < arraysize(kJwkWebCryptoUsageMap); ++i) {
-    if (kJwkWebCryptoUsageMap[i].jwk_key_op == key_op) {
-      *usage = kJwkWebCryptoUsageMap[i].webcrypto_usage;
-      return true;
-    }
-  }
-  return false;
-}
-
-// Composes a Web Crypto usage mask from an array of JWK key_ops values.
-Status GetWebCryptoUsagesFromJwkKeyOps(const base::ListValue* key_ops,
-                                       blink::WebCryptoKeyUsageMask* usages) {
-  // This set keeps track of all unrecognized key_ops values.
-  std::set<std::string> unrecognized_usages;
-
-  *usages = 0;
-  for (size_t i = 0; i < key_ops->GetSize(); ++i) {
-    std::string key_op;
-    if (!key_ops->GetString(i, &key_op)) {
-      return Status::ErrorJwkMemberWrongType(
-          base::StringPrintf("key_ops[%d]", static_cast<int>(i)), "string");
-    }
-
-    blink::WebCryptoKeyUsage usage;
-    if (JwkKeyOpToWebCryptoUsage(key_op, &usage)) {
-      // Ensure there are no duplicate usages.
-      if (*usages & usage)
-        return Status::ErrorJwkDuplicateKeyOps();
-      *usages |= usage;
-    }
-
-    // Reaching here means the usage was unrecognized. Such usages are skipped
-    // over, however they are kept track of in a set to ensure there were no
-    // duplicates.
-    if (!unrecognized_usages.insert(key_op).second)
-      return Status::ErrorJwkDuplicateKeyOps();
-  }
-  return Status::Success();
-}
-
-// Composes a JWK key_ops List from a Web Crypto usage mask.
-// Note: Caller must assume ownership of returned instance.
-base::ListValue* CreateJwkKeyOpsFromWebCryptoUsages(
-    blink::WebCryptoKeyUsageMask usages) {
-  base::ListValue* jwk_key_ops = new base::ListValue();
-  for (size_t i = 0; i < arraysize(kJwkWebCryptoUsageMap); ++i) {
-    if (usages & kJwkWebCryptoUsageMap[i].webcrypto_usage)
-      jwk_key_ops->AppendString(kJwkWebCryptoUsageMap[i].jwk_key_op);
-  }
-  return jwk_key_ops;
-}
 
 blink::WebCryptoAlgorithm CreateAlgorithm(blink::WebCryptoAlgorithmId id) {
   return blink::WebCryptoAlgorithm::adoptParamsAndCreate(id, NULL);
@@ -231,18 +152,18 @@ Status GetHmacImportKeyLengthBits(
     const blink::WebCryptoHmacImportParams* params,
     unsigned int key_data_byte_length,
     unsigned int* keylen_bits) {
+  if (key_data_byte_length == 0)
+    return Status::ErrorHmacImportEmptyKey();
+
   // Make sure that the key data's length can be represented in bits without
   // overflow.
-  unsigned int data_keylen_bits = 0;
-  {
-    base::CheckedNumeric<unsigned int> keylen_bits(key_data_byte_length);
-    keylen_bits *= 8;
+  base::CheckedNumeric<unsigned int> checked_keylen_bits(key_data_byte_length);
+  checked_keylen_bits *= 8;
 
-    if (!keylen_bits.IsValid())
-      return Status::ErrorDataTooLarge();
+  if (!checked_keylen_bits.IsValid())
+    return Status::ErrorDataTooLarge();
 
-    data_keylen_bits = keylen_bits.ValueOrDie();
-  }
+  unsigned int data_keylen_bits = checked_keylen_bits.ValueOrDie();
 
   // Determine how many bits of the input to use.
   *keylen_bits = data_keylen_bits;
@@ -250,9 +171,8 @@ Status GetHmacImportKeyLengthBits(
     // The requested bit length must be:
     //   * No longer than the input data length
     //   * At most 7 bits shorter.
-    if (NumBitsToBytes(params->optionalLengthBits()) != key_data_byte_length) {
+    if (NumBitsToBytes(params->optionalLengthBits()) != key_data_byte_length)
       return Status::ErrorHmacImportBadLength();
-    }
     *keylen_bits = params->optionalLengthBits();
   }
 
@@ -271,7 +191,11 @@ Status VerifyAesKeyLengthForImport(unsigned int keylen_bytes) {
 }
 
 Status CheckKeyCreationUsages(blink::WebCryptoKeyUsageMask all_possible_usages,
-                              blink::WebCryptoKeyUsageMask actual_usages) {
+                              blink::WebCryptoKeyUsageMask actual_usages,
+                              bool allow_empty_usages) {
+  if (!allow_empty_usages && actual_usages == 0)
+    return Status::ErrorCreateKeyEmptyUsages();
+
   if (!ContainsKeyUsages(all_possible_usages, actual_usages))
     return Status::ErrorCreateKeyBadUsages();
   return Status::Success();
@@ -311,15 +235,17 @@ Status VerifyUsagesBeforeImportAsymmetricKey(
     blink::WebCryptoKeyUsageMask usages) {
   switch (format) {
     case blink::WebCryptoKeyFormatSpki:
-      return CheckKeyCreationUsages(all_public_key_usages, usages);
+      return CheckKeyCreationUsages(all_public_key_usages, usages, true);
     case blink::WebCryptoKeyFormatPkcs8:
-      return CheckKeyCreationUsages(all_private_key_usages, usages);
+      return CheckKeyCreationUsages(all_private_key_usages, usages, false);
     case blink::WebCryptoKeyFormatJwk: {
       // The JWK could represent either a public key or private key. The usages
       // must make sense for one of the two. The usages will be checked again by
       // ImportKeyJwk() once the key type has been determined.
-      if (CheckKeyCreationUsages(all_public_key_usages, usages).IsError() &&
-          CheckKeyCreationUsages(all_private_key_usages, usages).IsError()) {
+      if (CheckKeyCreationUsages(
+              all_public_key_usages, usages, true).IsError() &&
+          CheckKeyCreationUsages(
+              all_private_key_usages, usages, false).IsError()) {
         return Status::ErrorCreateKeyBadUsages();
       }
       return Status::Success();
@@ -388,7 +314,7 @@ Status GetUsagesForGenerateAsymmetricKey(
     blink::WebCryptoKeyUsageMask* public_usages,
     blink::WebCryptoKeyUsageMask* private_usages) {
   Status status = CheckKeyCreationUsages(all_public_usages | all_private_usages,
-                                         combined_usages);
+                                         combined_usages, true);
   if (status.IsError())
     return status;
 

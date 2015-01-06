@@ -41,7 +41,6 @@ static_library("ui") {
     "//chrome:strings",
     "//chrome/app/resources:platform_locale_settings",
     "//chrome/app/theme:theme_resources",
-    "//chrome/browser/history:in_memory_url_index_cache_proto",
     "//chrome/browser/net:cert_logger_proto",
     "//chrome/common",
     "//chrome/common/net",
@@ -49,12 +48,13 @@ static_library("ui") {
     "//components/auto_login_parser",
     "//components/dom_distiller/webui",
     "//components/feedback/proto",
+    "//components/history/core/browser:proto",
     "//components/invalidation",
-    "//components/omaha_client",
     "//components/onc",
     "//components/password_manager/core/browser",
     "//components/resources",
     "//components/strings",
+    "//components/update_client",
     "//content/public/browser",
     "//content/public/common",
     "//crypto",
@@ -80,6 +80,15 @@ static_library("ui") {
 
   if (!is_ios) {
     sources += rebase_path(gypi_values.chrome_browser_ui_non_ios_sources,
+                           ".",
+                           "//chrome")
+    sources += rebase_path(gypi_values.chrome_browser_ui_global_error_sources,
+                           ".",
+                           "//chrome")
+    sources += rebase_path(gypi_values.chrome_browser_ui_omnibox_sources,
+                           ".",
+                           "//chrome")
+    sources += rebase_path(gypi_values.chrome_browser_ui_toolbar_model_sources,
                            ".",
                            "//chrome")
     deps += [
@@ -129,7 +138,14 @@ static_library("ui") {
     sources += rebase_path(gypi_values.chrome_browser_ui_non_mobile_sources,
                            ".",
                            "//chrome")
-    deps += [ "//device/bluetooth" ]
+    sources +=
+        rebase_path(gypi_values.chrome_browser_ui_omnibox_non_mobile_sources,
+                    ".",
+                    "//chrome")
+    deps += [
+      "//device/bluetooth",
+      "//components/copresence",
+    ]
   }
 
   if (enable_basic_printing || enable_print_preview) {
@@ -216,7 +232,7 @@ static_library("ui") {
   } else {  # Not athena.
     if (!is_android) {
       sources += rebase_path(
-              gypi_values.chrome_browser_ui_non_athena_non_android_sources,
+              gypi_values.chrome_browser_ui_non_athena_non_mobile_sources,
               ".",
               "//chrome")
     }
@@ -327,20 +343,11 @@ static_library("ui") {
                            "//chrome")
 
     defines += [ "CHROME_BUILD_ID=" + android_chrome_build_id ]
-  } else {  # Non-Android.
-    sources += rebase_path(gypi_values.chrome_browser_ui_non_android_sources,
-                           ".",
-                           "//chrome")
   }
 
   if (is_mac) {
     sources +=
         rebase_path(gypi_values.chrome_browser_ui_mac_sources, ".", "//chrome")
-    sources -= [
-      # Mac has its own way of drawing tabs.
-      "tabs/tab_resources.cc",
-      "tabs/tab_resources.h",
-    ]
     deps += [
       "//third_party/google_toolbox_for_mac",
       ":generate_localizer",
@@ -497,12 +504,12 @@ source_set("test_support") {
     "cocoa/find_bar/find_bar_host_unittest_util_cocoa.mm",
     "cocoa/run_loop_testing.h",
     "cocoa/run_loop_testing.mm",
+    "exclusive_access/fullscreen_controller_state_test.cc",
+    "exclusive_access/fullscreen_controller_state_test.h",
+    "exclusive_access/fullscreen_controller_state_tests.h",
+    "exclusive_access/fullscreen_controller_test.cc",
+    "exclusive_access/fullscreen_controller_test.h",
     "find_bar/find_bar_host_unittest_util.h",
-    "fullscreen/fullscreen_controller_state_test.cc",
-    "fullscreen/fullscreen_controller_state_test.h",
-    "fullscreen/fullscreen_controller_state_tests.h",
-    "fullscreen/fullscreen_controller_test.cc",
-    "fullscreen/fullscreen_controller_test.h",
     "login/login_prompt_test_utils.cc",
     "login/login_prompt_test_utils.h",
     "passwords/manage_passwords_ui_controller_mock.cc",

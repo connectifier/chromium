@@ -138,8 +138,8 @@ struct FormFieldData;
 //   status             Server's status of this card.
 //                      TODO(brettw) define constants for this.
 //   name_on_card
-//   type               Type of the credit card.
-//                      TODO(brettw) define constants for this.
+//   type               Type of the credit card. This is one of the
+//                      kSyncCardType* strings.
 //   last_four          Last four digits of the card number. For de-duping
 //                      with locally stored cards and generating descriptions.
 //   exp_month          Expiration month: 1-12
@@ -263,8 +263,15 @@ class AutofillTable : public WebDatabaseTable {
   // Retrieves a profile with guid |guid|.  The caller owns |profile|.
   bool GetAutofillProfile(const std::string& guid, AutofillProfile** profile);
 
-  // Retrieves all profiles in the database.  Caller owns the returned profiles.
+  // Retrieves local/server profiles in the database. Caller owns the returned
+  // profiles.
   virtual bool GetAutofillProfiles(std::vector<AutofillProfile*>* profiles);
+  virtual bool GetAutofillServerProfiles(
+      std::vector<AutofillProfile*>* profiles);
+
+  // Sets the server profiles. All old profiles are deleted and replaced with
+  // the given ones.
+  void SetAutofillServerProfiles(const std::vector<AutofillProfile>& profiles);
 
   // Records a single credit card in the credit_cards table.
   bool AddCreditCard(const CreditCard& credit_card);
@@ -280,9 +287,21 @@ class AutofillTable : public WebDatabaseTable {
   // |credit_card_id|.
   bool GetCreditCard(const std::string& guid, CreditCard** credit_card);
 
-  // Retrieves all credit cards in the database.  Caller owns the returned
-  // credit cards.
+  // Retrieves the local/server credit cards in the database. Caller owns the
+  // returned credit cards.
   virtual bool GetCreditCards(std::vector<CreditCard*>* credit_cards);
+  virtual bool GetServerCreditCards(std::vector<CreditCard*>* credit_cards);
+
+  // Replaces all server credit cards with the given vector. Unmasked cards
+  // present in the new list will be preserved (even if the input is MASKED).
+  void SetServerCreditCards(const std::vector<CreditCard>& credit_cards);
+
+  // Cards synced from the server may be "masked" (only last 4 digits
+  // available) or "unmasked" (everything is available). These functions set
+  // that state.
+  bool UnmaskServerCreditCard(const std::string& id,
+                              const base::string16& full_number);
+  bool MaskServerCreditCard(const std::string& id);
 
   // Removes rows from autofill_profiles and credit_cards if they were created
   // on or after |delete_begin| and strictly before |delete_end|.  Returns the

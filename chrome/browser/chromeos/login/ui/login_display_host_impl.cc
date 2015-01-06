@@ -25,7 +25,6 @@
 #include "chrome/browser/chromeos/first_run/drive_first_run_controller.h"
 #include "chrome/browser/chromeos/first_run/first_run.h"
 #include "chrome/browser/chromeos/input_method/input_method_util.h"
-#include "chrome/browser/chromeos/kiosk_mode/kiosk_mode_settings.h"
 #include "chrome/browser/chromeos/language_preferences.h"
 #include "chrome/browser/chromeos/login/demo_mode/demo_app_launcher.h"
 #include "chrome/browser/chromeos/login/enrollment/auto_enrollment_controller.h"
@@ -43,6 +42,7 @@
 #include "chrome/browser/chromeos/mobile_config.h"
 #include "chrome/browser/chromeos/net/delay_network_call.h"
 #include "chrome/browser/chromeos/policy/browser_policy_connector_chromeos.h"
+#include "chrome/browser/chromeos/policy/enrollment_config.h"
 #include "chrome/browser/chromeos/system/input_device_settings.h"
 #include "chrome/browser/chromeos/ui/focus_ring_controller.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
@@ -76,9 +76,9 @@
 #include "ui/compositor/scoped_layer_animation_settings.h"
 #include "ui/events/event_utils.h"
 #include "ui/gfx/display.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/screen.h"
-#include "ui/gfx/size.h"
 #include "ui/gfx/transform.h"
 #include "ui/keyboard/keyboard_controller.h"
 #include "ui/keyboard/keyboard_util.h"
@@ -329,8 +329,9 @@ LoginDisplayHostImpl::LoginDisplayHostImpl(const gfx::Rect& background_bounds)
 
   bool is_registered = StartupUtils::IsDeviceRegistered();
   bool zero_delay_enabled = WizardController::IsZeroDelayEnabled();
-  bool disable_boot_animation = CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kDisableBootAnimation);
+  bool disable_boot_animation =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kDisableBootAnimation);
 
   waiting_for_wallpaper_load_ = !zero_delay_enabled &&
                                 (!is_registered || !disable_boot_animation);
@@ -350,9 +351,10 @@ LoginDisplayHostImpl::LoginDisplayHostImpl(const gfx::Rect& background_bounds)
       kHiddenWebUIInitializationDefault && !zero_delay_enabled;
 
   // Check if WebUI init type is overriden.
-  if (CommandLine::ForCurrentProcess()->HasSwitch(switches::kAshWebUIInit)) {
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kAshWebUIInit)) {
     const std::string override_type =
-        CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+        base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
             switches::kAshWebUIInit);
     if (override_type == kWebUIInitParallel)
       initialize_webui_hidden_ = true;
@@ -363,10 +365,6 @@ LoginDisplayHostImpl::LoginDisplayHostImpl(const gfx::Rect& background_bounds)
   // Always postpone WebUI initialization on first boot, otherwise we miss
   // initial animation.
   if (!StartupUtils::IsOobeCompleted())
-    initialize_webui_hidden_ = false;
-
-  // There is no wallpaper for KioskMode, don't initialize the webui hidden.
-  if (chromeos::KioskModeSettings::Get()->IsKioskModeEnabled())
     initialize_webui_hidden_ = false;
 
 #if !defined(USE_ATHENA)
@@ -672,8 +670,6 @@ void LoginDisplayHostImpl::StartSignInScreen(
   GetOobeUI()->ShowSigninScreen(context,
                                 webui_login_display_,
                                 webui_login_display_);
-  if (chromeos::KioskModeSettings::Get()->IsKioskModeEnabled())
-    SetStatusAreaVisible(false);
   TRACE_EVENT_ASYNC_STEP_INTO0("ui",
                                "ShowLoginWebUI",
                                kShowLoginWebUIid,
@@ -953,7 +949,7 @@ void LoginDisplayHostImpl::ScheduleWorkspaceAnimation() {
     return;
   }
 
-  if (!CommandLine::ForCurrentProcess()->HasSwitch(
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kDisableLoginAnimations))
     ash::Shell::GetInstance()->DoInitialWorkspaceAnimation();
 #endif
@@ -1185,7 +1181,7 @@ void ShowLoginWizard(const std::string& first_screen_name) {
         prefs->GetBoolean(prefs::kOwnerTapToClickEnabled));
   }
   system::InputDeviceSettings::Get()->SetNaturalScroll(
-      CommandLine::ForCurrentProcess()->HasSwitch(
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kNaturalScrollDefault));
 #endif
 
@@ -1209,14 +1205,11 @@ void ShowLoginWizard(const std::string& first_screen_name) {
   }
 
   // Check whether we need to execute OOBE flow.
-  bool oobe_complete = StartupUtils::IsOobeCompleted();
-  policy::BrowserPolicyConnectorChromeOS* connector =
-      g_browser_process->platform_part()->browser_policy_connector_chromeos();
-  bool enrollment_screen_wanted =
-      WizardController::ShouldRecoverEnrollment() ||
-      (WizardController::ShouldAutoStartEnrollment() && oobe_complete &&
-       !connector->IsEnterpriseManaged());
-  if (enrollment_screen_wanted && first_screen_name.empty()) {
+  const policy::EnrollmentConfig enrollment_config =
+      g_browser_process->platform_part()
+          ->browser_policy_connector_chromeos()
+          ->GetPrescribedEnrollmentConfig();
+  if (enrollment_config.should_enroll() && first_screen_name.empty()) {
     // Shows networks screen instead of enrollment screen to resume the
     // interrupted auto start enrollment flow because enrollment screen does
     // not handle flaky network. See http://crbug.com/332572
@@ -1232,7 +1225,7 @@ void ShowLoginWizard(const std::string& first_screen_name) {
   }
 
   bool show_login_screen =
-      (first_screen_name.empty() && oobe_complete) ||
+      (first_screen_name.empty() && StartupUtils::IsOobeCompleted()) ||
       first_screen_name == WizardController::kLoginScreenName;
 
   if (show_login_screen) {

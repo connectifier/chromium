@@ -69,7 +69,7 @@
 #import "chrome/browser/ui/cocoa/toolbar/toolbar_controller.h"
 #import "chrome/browser/ui/cocoa/translate/translate_bubble_controller.h"
 #include "chrome/browser/ui/cocoa/website_settings/permission_bubble_cocoa.h"
-#include "chrome/browser/ui/fullscreen/fullscreen_controller.h"
+#include "chrome/browser/ui/exclusive_access/fullscreen_controller.h"
 #include "chrome/browser/ui/location_bar/location_bar.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_delegate.h"
@@ -587,7 +587,8 @@ using content::WebContents;
   [self saveWindowPositionIfNeeded];
 
   bool fast_tab_closing_enabled =
-      CommandLine::ForCurrentProcess()->HasSwitch(switches::kEnableFastUnload);
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableFastUnload);
 
   if (!browser_->tab_strip_model()->empty()) {
     // Tab strip isn't empty.  Hide the frame (so it appears to have closed

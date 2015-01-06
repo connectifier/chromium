@@ -12,35 +12,62 @@
 #include "base/strings/utf_string_conversions.h"
 #include "components/autofill/core/browser/autofill_driver.h"
 #include "components/autofill/core/browser/popup_item_ids.h"
+#include "components/autofill/core/browser/suggestion.h"
 #include "components/autofill/core/common/autofill_constants.h"
 #include "components/autofill/core/common/autofill_data_validation.h"
 #include "components/password_manager/core/browser/password_manager_client.h"
 #include "components/password_manager/core/browser/password_manager_driver.h"
 #include "components/strings/grit/components_strings.h"
+#include "grit/components_strings.h"
 #include "ui/base/l10n/l10n_util.h"
 
 namespace password_manager {
 
 namespace {
 
+// Tests if |username| and |suggestion| are the same. This is different from the
+// usual string operator== in that an empty username will only match the
+// (non-empty) description of the empty username, used in the suggestions UI.
+bool CompareUsernameSuggestion(const base::string16& username,
+                               const base::string16& suggestion) {
+  if (username.empty()) {
+    return suggestion ==
+           l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_EMPTY_LOGIN);
+  }
+  return username == suggestion;
+}
+
+// Returns |username| unless it is empty. For an empty |username| returns a
+// localised string saying this username is empty. Use this for displaying the
+// usernames to the user.
+base::string16 ReplaceEmptyUsername(const base::string16& username) {
+  if (username.empty())
+    return l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_EMPTY_LOGIN);
+  return username;
+}
+
 // This function attempts to fill |suggestions| and |realms| form |fill_data|
 // based on |current_username|. Unless |show_all| is true, it only picks
 // suggestions where the username has |current_username| as a prefix.
 void GetSuggestions(const autofill::PasswordFormFillData& fill_data,
                     const base::string16& current_username,
-                    std::vector<base::string16>* suggestions,
-                    std::vector<base::string16>* realms,
+                    std::vector<autofill::Suggestion>* suggestions,
                     bool show_all) {
   if (show_all ||
       StartsWith(fill_data.username_field.value, current_username, false)) {
-    suggestions->push_back(fill_data.username_field.value);
-    realms->push_back(base::UTF8ToUTF16(fill_data.preferred_realm));
+    autofill::Suggestion suggestion(
+        ReplaceEmptyUsername(fill_data.username_field.value));
+    suggestion.label = base::UTF8ToUTF16(fill_data.preferred_realm);
+    suggestion.frontend_id = autofill::POPUP_ITEM_ID_PASSWORD_ENTRY;
+    suggestions->push_back(suggestion);
   }
 
   for (const auto& login : fill_data.additional_logins) {
     if (show_all || StartsWith(login.first, current_username, false)) {
-      suggestions->push_back(login.first);
-      realms->push_back(base::UTF8ToUTF16(login.second.realm));
+      autofill::Suggestion suggestion(ReplaceEmptyUsername(login.first));
+      suggestion.label = base::UTF8ToUTF16(login.second.realm);
+      suggestion.frontend_id = autofill::POPUP_ITEM_ID_PASSWORD_ENTRY;
+      suggestions->push_back(suggestion);
     }
   }
 
@@ -48,8 +75,11 @@ void GetSuggestions(const autofill::PasswordFormFillData& fill_data,
     for (size_t i = 0; i < usernames.second.size(); ++i) {
       if (show_all ||
           StartsWith(usernames.second[i], current_username, false)) {
-        suggestions->push_back(usernames.second[i]);
-        realms->push_back(base::UTF8ToUTF16(usernames.first.realm));
+        autofill::Suggestion suggestion(
+            ReplaceEmptyUsername(usernames.second[i]));
+        suggestion.label = base::UTF8ToUTF16(usernames.first.realm);
+        suggestion.frontend_id = autofill::POPUP_ITEM_ID_PASSWORD_ENTRY;
+        suggestions->push_back(suggestion);
       }
     }
   }
@@ -113,8 +143,7 @@ void PasswordAutofillManager::OnShowPasswordSuggestions(
     const base::string16& typed_username,
     int options,
     const gfx::RectF& bounds) {
-  std::vector<base::string16> suggestions;
-  std::vector<base::string16> realms;
+  std::vector<autofill::Suggestion> suggestions;
   LoginToPasswordInfoMap::const_iterator fill_data_it =
       login_to_password_info_.find(key);
   if (fill_data_it == login_to_password_info_.end()) {
@@ -122,9 +151,8 @@ void PasswordAutofillManager::OnShowPasswordSuggestions(
     NOTREACHED();
     return;
   }
-  GetSuggestions(fill_data_it->second, typed_username, &suggestions, &realms,
+  GetSuggestions(fill_data_it->second, typed_username, &suggestions,
                  options & autofill::SHOW_ALL);
-  DCHECK_EQ(suggestions.size(), realms.size());
 
   form_data_key_ = key;
 
@@ -133,27 +161,19 @@ void PasswordAutofillManager::OnShowPasswordSuggestions(
     return;
   }
 
-  std::vector<base::string16> empty(suggestions.size());
-  std::vector<int> password_ids(suggestions.size(),
-                                autofill::POPUP_ITEM_ID_PASSWORD_ENTRY);
   if (options & autofill::IS_PASSWORD_FIELD) {
-    base::string16 password_field_suggestions_title = l10n_util::GetStringUTF16(
-        IDS_AUTOFILL_PASSWORD_FIELD_SUGGESTIONS_TITLE);
-    suggestions.insert(suggestions.begin(), password_field_suggestions_title);
-    realms.insert(realms.begin(), base::string16());
-    empty.insert(empty.begin(), base::string16());
-    password_ids.insert(password_ids.begin(), autofill::POPUP_ITEM_ID_TITLE);
+    autofill::Suggestion password_field_suggestions(l10n_util::GetStringUTF16(
+        IDS_AUTOFILL_PASSWORD_FIELD_SUGGESTIONS_TITLE));
+    password_field_suggestions.frontend_id = autofill::POPUP_ITEM_ID_TITLE;
+    suggestions.insert(suggestions.begin(), password_field_suggestions);
   }
   autofill_client_->ShowAutofillPopup(bounds,
                                       text_direction,
                                       suggestions,
-                                      realms,
-                                      empty,
-                                      password_ids,
                                       weak_ptr_factory_.GetWeakPtr());
 }
 
-void PasswordAutofillManager::Reset() {
+void PasswordAutofillManager::DidNavigateMainFrame() {
   login_to_password_info_.clear();
 }
 
@@ -210,7 +230,8 @@ bool PasswordAutofillManager::GetPasswordForUsername(
   // fetch the actual password. See crbug.com/178358 for more context.
 
   // Look for any suitable matches to current field text.
-  if (fill_data.username_field.value == current_username) {
+  if (CompareUsernameSuggestion(fill_data.username_field.value,
+                                current_username)) {
     *password = fill_data.password_field.value;
     return true;
   }
@@ -220,7 +241,7 @@ bool PasswordAutofillManager::GetPasswordForUsername(
            fill_data.additional_logins.begin();
        iter != fill_data.additional_logins.end();
        ++iter) {
-    if (iter->first == current_username) {
+    if (CompareUsernameSuggestion(iter->first, current_username)) {
       *password = iter->second.password;
       return true;
     }
@@ -231,7 +252,8 @@ bool PasswordAutofillManager::GetPasswordForUsername(
        usernames_iter != fill_data.other_possible_usernames.end();
        ++usernames_iter) {
     for (size_t i = 0; i < usernames_iter->second.size(); ++i) {
-      if (usernames_iter->second[i] == current_username) {
+      if (CompareUsernameSuggestion(usernames_iter->second[i],
+                                    current_username)) {
         *password = usernames_iter->first.password;
         return true;
       }

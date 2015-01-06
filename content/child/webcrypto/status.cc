@@ -126,10 +126,6 @@ Status Status::ErrorJwkDuplicateKeyOps() {
                 "duplicate usages.");
 }
 
-Status Status::ErrorImportEmptyKeyData() {
-  return Status(blink::WebCryptoErrorTypeData, "No key data was provided");
-}
-
 Status Status::ErrorUnsupportedImportKeyFormat() {
   return Status(blink::WebCryptoErrorTypeNotSupported,
                 "Unsupported import key format for algorithm");
@@ -156,7 +152,7 @@ Status Status::ErrorGenerateAesKeyLength() {
 }
 
 Status Status::ErrorAes192BitUnsupported() {
-  return Status(blink::WebCryptoErrorTypeNotSupported,
+  return Status(blink::WebCryptoErrorTypeOperation,
                 "192-bit AES keys are not supported");
 }
 
@@ -186,12 +182,12 @@ Status Status::ErrorAesCtrInputTooLongCounterRepeated() {
 }
 
 Status Status::ErrorDataTooLarge() {
-  return Status(blink::WebCryptoErrorTypeData,
+  return Status(blink::WebCryptoErrorTypeOperation,
                 "The provided data is too large");
 }
 
 Status Status::ErrorDataTooSmall() {
-  return Status(blink::WebCryptoErrorTypeData,
+  return Status(blink::WebCryptoErrorTypeOperation,
                 "The provided data is too small");
 }
 
@@ -222,7 +218,7 @@ Status Status::ErrorInvalidAesKwDataLength() {
 }
 
 Status Status::ErrorGenerateKeyPublicExponent() {
-  return Status(blink::WebCryptoErrorTypeData,
+  return Status(blink::WebCryptoErrorTypeOperation,
                 "The \"publicExponent\" must be either 3 or 65537");
 }
 
@@ -231,7 +227,7 @@ Status Status::ErrorImportRsaEmptyModulus() {
 }
 
 Status Status::ErrorGenerateRsaUnsupportedModulus() {
-  return Status(blink::WebCryptoErrorTypeNotSupported,
+  return Status(blink::WebCryptoErrorTypeOperation,
                 "The modulus length must be a multiple of 8 bits and >= 256 "
                 "and <= 16384");
 }
@@ -249,6 +245,11 @@ Status Status::ErrorKeyNotExtractable() {
 Status Status::ErrorGenerateHmacKeyLengthZero() {
   return Status(blink::WebCryptoErrorTypeOperation,
                 "HMAC key length must not be zero");
+}
+
+Status Status::ErrorHmacImportEmptyKey() {
+  return Status(blink::WebCryptoErrorTypeData,
+                "HMAC key data must not be empty");
 }
 
 Status Status::ErrorGetHmacKeyLengthZero() {

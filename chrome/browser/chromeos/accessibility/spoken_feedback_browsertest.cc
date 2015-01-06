@@ -238,7 +238,7 @@ class SpokenFeedbackTest
   SpokenFeedbackTest() {}
   virtual ~SpokenFeedbackTest() {}
 
-  virtual void SetUpCommandLine(CommandLine* command_line) override {
+  virtual void SetUpCommandLine(base::CommandLine* command_line) override {
     if (GetParam() == kTestAsGuestUser) {
       command_line->AppendSwitch(chromeos::switches::kGuestSession);
       command_line->AppendSwitch(::switches::kIncognito);
@@ -265,7 +265,7 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, FocusToolbar) {
   chrome::ExecuteCommand(browser(), IDC_FOCUS_TOOLBAR);
   EXPECT_TRUE(
       MatchPattern(speech_monitor_.GetNextUtterance(),
-                   "about:blank about:blank*Toolbar toolbar Reload Button"));
+                   "about:blank*toolbar Reload Button"));
 }
 
 IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TypeInOmnibox) {
@@ -364,7 +364,8 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, NavigateSystemTray) {
       MatchPattern(speech_monitor_.GetNextUtterance(), "*Bluetooth* Button"));
 }
 
-IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, ScreenBrightness) {
+// See http://crbug.com/443608
+IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, DISABLED_ScreenBrightness) {
   EnableChromeVox();
 
   EXPECT_TRUE(PerformAcceleratorAction(ash::BRIGHTNESS_UP));
@@ -390,7 +391,7 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, OverviewMode) {
 
   EXPECT_TRUE(PerformAcceleratorAction(ash::TOGGLE_OVERVIEW));
   EXPECT_EQ("Edit text", speech_monitor_.GetNextUtterance());
-  EXPECT_EQ("Entered window overview mode, window",
+  EXPECT_EQ("Alert Entered window overview mode",
             speech_monitor_.GetNextUtterance());
 
   SendKeyPress(ui::VKEY_TAB);
@@ -527,7 +528,7 @@ class GuestSpokenFeedbackTest : public LoggedInSpokenFeedbackTest {
   GuestSpokenFeedbackTest() {}
   virtual ~GuestSpokenFeedbackTest() {}
 
-  virtual void SetUpCommandLine(CommandLine* command_line) override {
+  virtual void SetUpCommandLine(base::CommandLine* command_line) override {
     command_line->AppendSwitch(chromeos::switches::kGuestSession);
     command_line->AppendSwitch(::switches::kIncognito);
     command_line->AppendSwitchASCII(chromeos::switches::kLoginProfile, "user");
@@ -546,7 +547,7 @@ IN_PROC_BROWSER_TEST_F(GuestSpokenFeedbackTest, FocusToolbar) {
 
   EXPECT_TRUE(
       MatchPattern(speech_monitor_.GetNextUtterance(),
-                   "about:blank about:blank*Toolbar toolbar Reload Button"));
+                   "about:blank*toolbar Reload Button"));
 }
 
 //
@@ -558,7 +559,7 @@ class OobeSpokenFeedbackTest : public InProcessBrowserTest {
   OobeSpokenFeedbackTest() {}
   virtual ~OobeSpokenFeedbackTest() {}
 
-  virtual void SetUpCommandLine(CommandLine* command_line) override {
+  virtual void SetUpCommandLine(base::CommandLine* command_line) override {
     command_line->AppendSwitch(chromeos::switches::kLoginManager);
     command_line->AppendSwitch(chromeos::switches::kForceLoginManagerInTests);
     command_line->AppendSwitchASCII(chromeos::switches::kLoginProfile, "user");

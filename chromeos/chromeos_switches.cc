@@ -4,6 +4,8 @@
 
 #include "chromeos/chromeos_switches.h"
 
+#include "base/command_line.h"
+
 namespace chromeos {
 namespace switches {
 
@@ -24,6 +26,15 @@ const char kDbusStub[] = "dbus-stub";
 // Comma-spearated list of dbus clients that should be unstubbed.
 // See chromeos/dbus/dbus_client_bundle.cc for the names of the dbus clients.
 const char kDbusUnstubClients[] = "dbus-unstub-clients";
+
+// Indicates that the wallpaper images specified by
+// kAshDefaultWallpaper{Large,Small} are OEM-specific (i.e. they are not
+// downloadable from Google).
+const char kDefaultWallpaperIsOem[] = "default-wallpaper-is-oem";
+
+// Default wallpaper to use (as paths to trusted, non-user-writable JPEG files).
+const char kDefaultWallpaperLarge[] = "default-wallpaper-large";
+const char kDefaultWallpaperSmall[] = "default-wallpaper-small";
 
 // Time before a machine at OOBE is considered derelict.
 const char kDerelictDetectionTimeout[] = "derelict-detection-timeout";
@@ -67,6 +78,9 @@ const char kDisableRollbackOption[] = "disable-rollback-option";
 
 // Disables volume adjust sound.
 const char kDisableVolumeAdjustSound[] = "disable-volume-adjust-sound";
+
+// Disables wake on wifi features.
+const char kDisableWakeOnWifi[] = "disable-wake-on-wifi";
 
 // Disables notifications about captive portals in session.
 const char kDisableNetworkPortalNotification[] =
@@ -158,6 +172,11 @@ const char kForceLoginManagerInTests[] = "force-login-manager-in-tests";
 // mode. Should completely disable extensions, sync and bookmarks.
 const char kGuestSession[] = "bwsi";
 
+// Wallpaper to use in guest mode (as paths to trusted, non-user-writable JPEG
+// files).
+const char kGuestWallpaperLarge[] = "guest-wallpaper-large";
+const char kGuestWallpaperSmall[] = "guest-wallpaper-small";
+
 // If true, the Chromebook has a Chrome OS keyboard. Don't use the flag for
 // Chromeboxes.
 const char kHasChromeOSKeyboard[] = "has-chromeos-keyboard";
@@ -177,9 +196,6 @@ const char kHostPairingOobe[] = "host-pairing-oobe";
 // turn on multi-profile feature on ChromeOS.
 const char kIgnoreUserProfileMappingForTests[] =
     "ignore-user-profile-mapping-for-tests";
-
-// Path for the screensaver used in Kiosk mode
-const char kKioskModeScreensaverPath[] = "kiosk-mode-screensaver-path";
 
 // Enables Chrome-as-a-login-manager behavior.
 const char kLoginManager[] = "login-manager";
@@ -267,6 +283,10 @@ const char kArtifactsDir[] = "artifacts-dir";
 // Bypass proxy for captive portal authorization.
 const char kEnableCaptivePortalBypassProxy[] =
     "enable-captive-portal-bypass-proxy";
+
+bool WakeOnWifiEnabled() {
+  return !base::CommandLine::ForCurrentProcess()->HasSwitch(kDisableWakeOnWifi);
+}
 
 }  // namespace switches
 }  // namespace chromeos

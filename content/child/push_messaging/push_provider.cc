@@ -13,7 +13,6 @@
 #include "content/child/thread_safe_sender.h"
 #include "content/child/worker_task_runner.h"
 #include "content/common/push_messaging_messages.h"
-#include "third_party/WebKit/public/platform/WebPushError.h"
 #include "third_party/WebKit/public/platform/WebPushRegistration.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 
@@ -45,12 +44,6 @@ PushProvider::PushProvider(ThreadSafeSender* thread_safe_sender,
 }
 
 PushProvider::~PushProvider() {
-  STLDeleteContainerPairSecondPointers(registration_callbacks_.begin(),
-                                       registration_callbacks_.end());
-  registration_callbacks_.clear();
-  STLDeleteContainerPairSecondPointers(permission_status_callbacks_.begin(),
-                                       permission_status_callbacks_.end());
-  permission_status_callbacks_.clear();
   g_push_provider_tls.Pointer()->Set(nullptr);
 }
 
@@ -77,10 +70,38 @@ void PushProvider::registerPushMessaging(
   DCHECK(service_worker_registration);
   DCHECK(callbacks);
   int request_id = push_dispatcher_->GenerateRequestId(CurrentWorkerId());
-  registration_callbacks_[request_id] = callbacks;
+  registration_callbacks_.AddWithID(callbacks, request_id);
   int64 service_worker_registration_id =
       GetServiceWorkerRegistrationId(service_worker_registration);
   thread_safe_sender_->Send(new PushMessagingHostMsg_RegisterFromWorker(
+      request_id, service_worker_registration_id));
+}
+
+void PushProvider::unregister(
+    blink::WebServiceWorkerRegistration* service_worker_registration,
+    blink::WebPushUnregisterCallbacks* callbacks) {
+  DCHECK(service_worker_registration);
+  DCHECK(callbacks);
+
+  int request_id = push_dispatcher_->GenerateRequestId(CurrentWorkerId());
+  unregister_callbacks_.AddWithID(callbacks, request_id);
+
+  int64 service_worker_registration_id =
+      GetServiceWorkerRegistrationId(service_worker_registration);
+  thread_safe_sender_->Send(new PushMessagingHostMsg_Unregister(
+      request_id, service_worker_registration_id));
+}
+
+void PushProvider::getRegistration(
+    blink::WebServiceWorkerRegistration* service_worker_registration,
+    blink::WebPushRegistrationCallbacks* callbacks) {
+  DCHECK(service_worker_registration);
+  DCHECK(callbacks);
+  int request_id = push_dispatcher_->GenerateRequestId(CurrentWorkerId());
+  registration_callbacks_.AddWithID(callbacks, request_id);
+  int64 service_worker_registration_id =
+      GetServiceWorkerRegistrationId(service_worker_registration);
+  thread_safe_sender_->Send(new PushMessagingHostMsg_GetRegistration(
       request_id, service_worker_registration_id));
 }
 
@@ -90,7 +111,7 @@ void PushProvider::getPermissionStatus(
   DCHECK(service_worker_registration);
   DCHECK(callbacks);
   int request_id = push_dispatcher_->GenerateRequestId(CurrentWorkerId());
-  permission_status_callbacks_[request_id] = callbacks;
+  permission_status_callbacks_.AddWithID(callbacks, request_id);
   int64 service_worker_registration_id =
       GetServiceWorkerRegistrationId(service_worker_registration);
   thread_safe_sender_->Send(new PushMessagingHostMsg_GetPermissionStatus(
@@ -104,6 +125,14 @@ bool PushProvider::OnMessageReceived(const IPC::Message& message) {
                         OnRegisterFromWorkerSuccess);
     IPC_MESSAGE_HANDLER(PushMessagingMsg_RegisterFromWorkerError,
                         OnRegisterFromWorkerError);
+    IPC_MESSAGE_HANDLER(PushMessagingMsg_UnregisterSuccess,
+                        OnUnregisterSuccess);
+    IPC_MESSAGE_HANDLER(PushMessagingMsg_UnregisterError,
+                        OnUnregisterError);
+    IPC_MESSAGE_HANDLER(PushMessagingMsg_GetRegistrationSuccess,
+                        OnGetRegistrationSuccess);
+    IPC_MESSAGE_HANDLER(PushMessagingMsg_GetRegistrationError,
+                        OnGetRegistrationError);
     IPC_MESSAGE_HANDLER(PushMessagingMsg_GetPermissionStatusSuccess,
                         OnGetPermissionStatusSuccess);
     IPC_MESSAGE_HANDLER(PushMessagingMsg_GetPermissionStatusError,
@@ -118,57 +147,116 @@ void PushProvider::OnRegisterFromWorkerSuccess(
     int request_id,
     const GURL& endpoint,
     const std::string& registration_id) {
-  const auto& it = registration_callbacks_.find(request_id);
-  if (it == registration_callbacks_.end())
+  blink::WebPushRegistrationCallbacks* callbacks =
+      registration_callbacks_.Lookup(request_id);
+  if (!callbacks)
     return;
-
-  scoped_ptr<blink::WebPushRegistrationCallbacks> callbacks(it->second);
-  registration_callbacks_.erase(it);
 
   scoped_ptr<blink::WebPushRegistration> registration(
       new blink::WebPushRegistration(
           blink::WebString::fromUTF8(endpoint.spec()),
           blink::WebString::fromUTF8(registration_id)));
   callbacks->onSuccess(registration.release());
+
+  registration_callbacks_.Remove(request_id);
 }
 
 void PushProvider::OnRegisterFromWorkerError(int request_id,
                                              PushRegistrationStatus status) {
-  const auto& it = registration_callbacks_.find(request_id);
-  if (it == registration_callbacks_.end())
+  blink::WebPushRegistrationCallbacks* callbacks =
+      registration_callbacks_.Lookup(request_id);
+  if (!callbacks)
     return;
-
-  scoped_ptr<blink::WebPushRegistrationCallbacks> callbacks(it->second);
-  registration_callbacks_.erase(it);
 
   scoped_ptr<blink::WebPushError> error(new blink::WebPushError(
       blink::WebPushError::ErrorTypeAbort,
       blink::WebString::fromUTF8(PushRegistrationStatusToString(status))));
   callbacks->onError(error.release());
+
+  registration_callbacks_.Remove(request_id);
+}
+
+void PushProvider::OnUnregisterSuccess(int request_id, bool did_unregister) {
+  blink::WebPushUnregisterCallbacks* callbacks =
+      unregister_callbacks_.Lookup(request_id);
+  if (!callbacks)
+    return;
+
+  callbacks->onSuccess(&did_unregister);
+
+  unregister_callbacks_.Remove(request_id);
+}
+
+void PushProvider::OnUnregisterError(
+    int request_id,
+    blink::WebPushError::ErrorType error_type,
+    const std::string& error_message) {
+  blink::WebPushUnregisterCallbacks* callbacks =
+      unregister_callbacks_.Lookup(request_id);
+  if (!callbacks)
+    return;
+
+  scoped_ptr<blink::WebPushError> error(new blink::WebPushError(
+      error_type, blink::WebString::fromUTF8(error_message)));
+  callbacks->onError(error.release());
+
+  unregister_callbacks_.Remove(request_id);
+}
+
+void PushProvider::OnGetRegistrationSuccess(
+    int request_id,
+    const GURL& endpoint,
+    const std::string& registration_id) {
+  blink::WebPushRegistrationCallbacks* callbacks =
+      registration_callbacks_.Lookup(request_id);
+  if (!callbacks)
+    return;
+
+  scoped_ptr<blink::WebPushRegistration> registration(
+      new blink::WebPushRegistration(
+          blink::WebString::fromUTF8(endpoint.spec()),
+          blink::WebString::fromUTF8(registration_id)));
+  callbacks->onSuccess(registration.release());
+
+  registration_callbacks_.Remove(request_id);
+}
+
+void PushProvider::OnGetRegistrationError(
+    int request_id,
+    PushGetRegistrationStatus status) {
+  blink::WebPushRegistrationCallbacks* callbacks =
+      registration_callbacks_.Lookup(request_id);
+  if (!callbacks)
+    return;
+
+  // We are only expecting an error if we can't find a registration.
+  callbacks->onSuccess(nullptr);
+
+  registration_callbacks_.Remove(request_id);
 }
 
 void PushProvider::OnGetPermissionStatusSuccess(
     int request_id,
     blink::WebPushPermissionStatus status) {
-  const auto& it = permission_status_callbacks_.find(request_id);
-  if (it == permission_status_callbacks_.end())
+  blink::WebPushPermissionStatusCallbacks* callbacks =
+      permission_status_callbacks_.Lookup(request_id);
+  if (!callbacks)
     return;
 
-  scoped_ptr<blink::WebPushPermissionStatusCallbacks> callbacks(it->second);
-  permission_status_callbacks_.erase(it);
-
   callbacks->onSuccess(&status);
+
+  permission_status_callbacks_.Remove(request_id);
 }
 
 void PushProvider::OnGetPermissionStatusError(int request_id) {
-  const auto& it = permission_status_callbacks_.find(request_id);
-  if (it == permission_status_callbacks_.end())
+  blink::WebPushPermissionStatusCallbacks* callbacks =
+      permission_status_callbacks_.Lookup(request_id);
+  if (!callbacks)
     return;
 
-  scoped_ptr<blink::WebPushPermissionStatusCallbacks> callbacks(it->second);
-  permission_status_callbacks_.erase(it);
-
   callbacks->onError();
+
+  permission_status_callbacks_.Remove(request_id);
 }
 
 }  // namespace content

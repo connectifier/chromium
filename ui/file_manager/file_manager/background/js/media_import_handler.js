@@ -6,59 +6,77 @@
 var importer = importer || {};
 
 /**
- * Handler for importing media from removable devices into the user's Drive.
+ * Interface providing access to information about active import processes.
  *
- * @constructor
- * @struct
- *
- * @param {!FileOperationManager} fileOperationManager
- * @param {!importer.MediaScanner} scanner
+ * @interface
  */
-importer.MediaImportHandler = function(fileOperationManager, scanner) {
-  /** @private {!FileOperationManager} */
-  this.fileOperationManager_ = fileOperationManager;
-
-  /** @private {!importer.MediaScanner} */
-  this.scanner_ = scanner;
-
-  /**
-   * If there is an active scan, this field will be set to a non-null value.
-   * @type {?importer.ScanResult}
-   */
-  this.activeScanResult_ = null;
-};
+importer.ImportRunner = function() {};
 
 /**
- * @typedef {function():(!DirectoryEntry|!Promise<!DirectoryEntry>)}
- */
-importer.MediaImportHandler.DestinationFactory;
-
-/**
- * Import all media found in a given subdirectory tree.
- * @param {!DirectoryEntry} source The directory to import media from.
+ * Imports all media identified by scanResult.
+ *
+ * @param {!importer.ScanResult} scanResult
  * @param {!importer.MediaImportHandler.DestinationFactory=} opt_destination A
  *     function that returns the directory into which media will be imported.
  *     The function will be executed only when the import task actually runs.
  * @return {!importer.MediaImportHandler.ImportTask} The resulting import task.
  */
-importer.MediaImportHandler.prototype.importMedia =
-    function(source, opt_destination) {
+importer.ImportRunner.prototype.importFromScanResult;
 
-  var scanResult = this.scanner_.scan([source]);
-  this.activeScanResult_ = scanResult;
-  scanResult.whenFinished()
-      .then(
-          function() {
-            this.activeScanResult_ = null;
-          }.bind(this));
+/**
+ * Handler for importing media from removable devices into the user's Drive.
+ *
+ * @constructor
+ * @implements {importer.ImportRunner}
+ * @struct
+ *
+ * @param {!FileOperationManager} fileOperationManager
+ * @param {!importer.HistoryLoader} historyLoader
+ */
+importer.MediaImportHandler = function(fileOperationManager, historyLoader) {
+  /** @private {!FileOperationManager} */
+  this.fileOperationManager_ = fileOperationManager;
+
+  /** @private {!importer.HistoryLoader} */
+  this.historyLoader_ = historyLoader;
+
+  /** @private {!importer.TaskQueue} */
+  this.queue_ = new importer.TaskQueue();
+
+  /** @private {number} */
+  this.nextTaskId_ = 0;
+};
+
+/**
+ * @typedef {function():(!Promise<!DirectoryEntry>)}
+ */
+importer.MediaImportHandler.DestinationFactory;
+
+/** @override */
+importer.MediaImportHandler.prototype.importFromScanResult =
+    function(scanResult, opt_destination) {
 
   var destination = opt_destination ||
       importer.MediaImportHandler.defaultDestination.getImportDestination;
-  return new importer.MediaImportHandler.ImportTask(
+
+  var task = new importer.MediaImportHandler.ImportTask(
+      this.generateTaskId_(),
       this.fileOperationManager_,
+      this.historyLoader_,
       scanResult,
-      source,
       destination);
+
+  this.queue_.queueTask(task);
+
+  return task;
+};
+
+/**
+ * Generates unique task IDs.
+ * @private
+ */
+importer.MediaImportHandler.prototype.generateTaskId_ = function() {
+  return 'media-import' + this.nextTaskId_++;
 };
 
 /**
@@ -69,52 +87,141 @@ importer.MediaImportHandler.prototype.importMedia =
  * TODO(kenobi): Add a proper implementation that doesn't use
  * FileOperationManager, but instead actually performs the copy using the
  * fileManagerPrivate API directly.
+ * TODO(kenobi): Add task cancellation.
  *
  * @constructor
+ * @extends {importer.TaskQueue.BaseTask}
  * @struct
  *
+ * @param {string} taskId
  * @param {!FileOperationManager} fileOperationManager
+ * @param {!importer.HistoryLoader} historyLoader
  * @param {!importer.ScanResult} scanResult
- * @param {!DirectoryEntry} source Source dir containing media for import.
  * @param {!importer.MediaImportHandler.DestinationFactory} destination A
  *     function that returns the directory into which media will be imported.
  */
-importer.MediaImportHandler.ImportTask =
-    function(fileOperationManager, scanResult, source, destination) {
-  /** @private {!DirectoryEntry} */
-  this.source_ = source;
+importer.MediaImportHandler.ImportTask = function(
+    taskId,
+    fileOperationManager,
+    historyLoader,
+    scanResult,
+    destination) {
 
-  // Call fileOperationManager.requestTaskCancel to cancel this task.
-  // TODO(kenobi): Add task cancellation.
-  this.taskId_ = fileOperationManager.generateTaskId();
+  importer.TaskQueue.BaseTask.call(this, taskId);
+  /** @private {string} */
+  this.taskId_ = taskId;
 
-  Promise.all([
-    destination(),
-    scanResult.whenFinished()
-  ]).then(
-      function(args) {
-        /** @type {!DirectoryEntry} */
-        var destinationDir = args[0];
+  /** @private {!importer.MediaImportHandler.DestinationFactory} */
+  this.getDestination_ = destination;
 
-        /** @type {!importer.ScanResult} */
-        var scanResult = args[1];
+  /** @private {!importer.ScanResult} */
+  this.scanResult_ = scanResult;
 
-        fileOperationManager.paste(
-            scanResult.getFileEntries(),
-            destinationDir,
-            /* isMove */ false,
-            /* opt_taskId */ this.taskId_);
-      }.bind(this));
+  /** @private {!FileOperationManager} */
+  this.fileOperationManager_ = fileOperationManager;
+
+  /** @private {!importer.HistoryLoader} */
+  this.historyLoader_ = historyLoader;
+
+  /** @private {DirectoryEntry} */
+  this.destination_ = null;
 };
 
-/** @struct */
-importer.MediaImportHandler.ImportTask.prototype = {
-  /**
-   * @return {string} The task ID.
-   */
-  get taskId() {
-    return this.taskId_;
-  }
+/**
+ * Extends importer.TaskQueue.Task
+ */
+importer.MediaImportHandler.ImportTask.prototype.__proto__ =
+    importer.TaskQueue.BaseTask.prototype;
+
+/** @override */
+importer.MediaImportHandler.ImportTask.prototype.run = function() {
+
+  // Wait for the scan to finish, then get the destination entry, then start the
+  // import.
+  this.scanResult_.whenFinal()
+      .then(this.getDestination_.bind(this))
+      .then(this.importTo_.bind(this));
+};
+
+/**
+ * Initiates an import to the given location.  This should only be called once
+ * the scan result indicates that it is ready.
+ * @param {!DirectoryEntry} destination
+ * @private
+ */
+importer.MediaImportHandler.ImportTask.prototype.importTo_ =
+    function(destination) {
+  this.destination_ = destination;
+  AsyncUtil.forEach(
+      this.scanResult_.getFileEntries(),
+      this.importOne_.bind(this),
+      this.onSuccess_.bind(this));
+};
+
+/**
+ * @param {function()} completionCallback Called after this operation is
+ *     complete.
+ * @param {!FileEntry} entry The entry to import.
+ * @param {number} index The entry's index in the scan results.
+ * @private
+ */
+importer.MediaImportHandler.ImportTask.prototype.importOne_ =
+    function(completionCallback, entry, index) {
+  // TODO(kenobi): Check for cancellation.
+  fileOperationUtil.copyTo(
+      entry,
+      this.destination_,
+      entry.name,  // TODO(kenobi): account for duplicate filename
+      this.onEntryChanged_.bind(this),
+      this.onProgress_.bind(this),
+      function() {
+        completionCallback();
+        this.markAsCopied_(entry);
+      }.bind(this),
+      this.onError_.bind(this));
+};
+
+/**
+ * A callback to notify listeners when a file has been copied.
+ * @param {Entry} source
+ * @param {Entry} destination
+ */
+importer.MediaImportHandler.ImportTask.prototype.onEntryChanged_ =
+    function(source, destination) {
+  // TODO(kenobi): Add code to notify observers when entries are created.
+};
+
+/**
+ * @param {Entry} entry
+ * @param {number} processedBytes
+ * @private
+ */
+importer.MediaImportHandler.ImportTask.prototype.onProgress_ =
+    function(entry, processedBytes) {
+  this.notify(importer.TaskQueue.UpdateType.PROGRESS);
+};
+
+/** @param {!FileEntry} entry */
+importer.MediaImportHandler.ImportTask.prototype.markAsCopied_ =
+    function(entry) {
+  this.historyLoader_.getHistory().then(
+      /** @param {!importer.ImportHistory} history */
+      function(history) {
+        history.markImported(entry, importer.Destination.GOOGLE_DRIVE);
+      });
+};
+
+/** @private */
+importer.MediaImportHandler.ImportTask.prototype.onSuccess_ = function() {
+  this.notify(importer.TaskQueue.UpdateType.SUCCESS);
+};
+
+/**
+ * @param {DOMError} error
+ * @private
+ */
+importer.MediaImportHandler.ImportTask.prototype.onError_ = function(error) {
+  this.notify(importer.TaskQueue.UpdateType.ERROR);
 };
 
 /**
@@ -194,4 +301,35 @@ importer.MediaImportHandler.defaultDestination.getImportDestination =
   var defaultDestination = importer.MediaImportHandler.defaultDestination;
   return defaultDestination.getDriveRoot_()
       .then(defaultDestination.getOrCreateImportDestination_);
+};
+
+/**
+ * Sends events for progress updates and creation of file entries.
+ *
+ * TODO: File entry-related events might need to be handled via callback and not
+ * events - see crbug.com/358491
+ *
+ * @constructor
+ * @extends {cr.EventTarget}
+ */
+importer.MediaImportHandler.EventRouter = function() {
+};
+
+/**
+ * Extends cr.EventTarget.
+ */
+importer.MediaImportHandler.EventRouter.prototype.__proto__ =
+    cr.EventTarget.prototype;
+
+/**
+ * @param {!importer.MediaImportHandler.ImportTask} task
+ */
+importer.MediaImportHandler.EventRouter.prototype.sendUpdate = function(task) {
+};
+
+/**
+ * @param {!FileEntry} entry The new entry.
+ */
+importer.MediaImportHandler.EventRouter.prototype.sendEntryCreated =
+    function(entry) {
 };

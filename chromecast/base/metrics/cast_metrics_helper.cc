@@ -136,13 +136,28 @@ void CastMetricsHelper::UpdateCurrentAppInfo(const std::string& app_id,
 void CastMetricsHelper::LogMediaPlay() {
   MAKE_SURE_THREAD(LogMediaPlay);
   RecordSimpleAction(EncodeAppInfoIntoMetricsName(
-      "MediaPlay", app_id_, session_id_, sdk_version_));
+      "MediaPlay",
+      app_id_.empty() ? app_name_ : app_id_,
+      session_id_,
+      sdk_version_));
 }
 
 void CastMetricsHelper::LogMediaPause() {
   MAKE_SURE_THREAD(LogMediaPause);
   RecordSimpleAction(EncodeAppInfoIntoMetricsName(
-      "MediaPause", app_id_, session_id_, sdk_version_));
+      "MediaPause",
+      app_id_.empty() ? app_name_ : app_id_,
+      session_id_,
+      sdk_version_));
+}
+
+void CastMetricsHelper::LogTimeToFirstPaint() {
+  MAKE_SURE_THREAD(LogTimeToFirstPaint);
+  base::TimeDelta launch_time = base::TimeTicks::Now() - app_start_time_;
+  const std::string uma_name(GetMetricsNameWithAppName("Startup",
+                                                       "TimeToFirstPaint"));
+  LogMediumTimeHistogramEvent(uma_name, launch_time);
+  LOG(INFO) << uma_name << " is " << launch_time.InSecondsF() << " seconds.";
 }
 
 void CastMetricsHelper::LogTimeToDisplayVideo() {

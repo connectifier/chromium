@@ -614,13 +614,6 @@
       # Enable hole punching for the protected video.
       'video_hole%': 0,
 
-      # Temporary hack to allow us to unify blink's definitions of load
-      # completion. blink uses a crazy set of constraints to determine load
-      # completion, but only actually requires them for layout tests. However,
-      # we need to maintain all the old behaviors while the plumbing is put in
-      # place on both sides of the repo boundary.
-      'enable_load_completion_hacks%': 0,
-
       # Automatically select platforms under ozone. Turn this off to
       # build only explicitly selected platforms.
       'ozone_auto_platforms%': 1,
@@ -638,6 +631,9 @@
       'use_lto%': 0,
       # Enable LTO on code compiled with -O2.
       'use_lto_o2%': 0,
+
+      # Libxkbcommon usage.
+      'use_xkbcommon%': 0,
 
       'conditions': [
         # A flag for POSIX platforms
@@ -704,13 +700,6 @@
           'use_dbus%': 1,
         }, {
           'use_dbus%': 0,
-        }],
-
-        # Libxkbcommon usage.
-        ['use_ozone==1 and embedded==0', {
-          'use_xkbcommon%': 1,
-        }, {
-          'use_xkbcommon%': 0,
         }],
 
         # We always use skia text rendering in Aura on Windows, since GDI
@@ -1008,9 +997,9 @@
         # TODO(baixo): Enable v8_use_external_startup_data
         # http://crbug.com/421063
         ['android_webview_build==0 and android_webview_telemetry_build==0 and chromecast==0 and chromeos==0 and (OS=="android" or OS=="linux" or OS=="mac")', {
-          'v8_use_external_startup_data': 1,
+          'v8_use_external_startup_data%': 1,
         }, {
-          'v8_use_external_startup_data': 0,
+          'v8_use_external_startup_data%': 0,
         }],
       ],
 
@@ -1213,9 +1202,8 @@
     'use_lto%': '<(use_lto)',
     'use_lto_o2%': '<(use_lto_o2)',
     'video_hole%': '<(video_hole)',
-    'enable_load_completion_hacks%': '<(enable_load_completion_hacks)',
     'support_pre_M6_history_database%': '<(support_pre_M6_history_database)',
-    'v8_use_external_startup_data': '<(v8_use_external_startup_data)',
+    'v8_use_external_startup_data%': '<(v8_use_external_startup_data)',
 
     # Whether or not we are building the Athena shell.
     'use_athena%': '0',
@@ -2149,6 +2137,18 @@
         'clang_chrome_plugins_flags': [
           '<!@(<(DEPTH)/tools/clang/scripts/plugin_flags.sh)'
         ],
+        'conditions': [
+          # TODO(dcheng): https://crbug.com/417463 -- work to enable this flag
+          # on all platforms is currently underway.
+          ['OS=="linux" and chromeos==0', {
+            'clang_chrome_plugins_flags': [
+              '-Xclang',
+              '-plugin-arg-find-bad-constructs',
+              '-Xclang',
+              'strict-virtual-specifiers',
+            ],
+          }],
+        ],
       }],
       ['asan==1 or msan==1 or lsan==1 or tsan==1', {
         'clang%': 1,
@@ -2165,9 +2165,7 @@
         'clang%': 1,
       }],
       ['asan==1 and OS=="mac"', {
-        # TODO(glider): we do not strip ASan binaries until the dynamic ASan
-        # runtime is fully adopted. See http://crbug.com/242503.
-        'mac_strip_release': 0,
+        'mac_strip_release': 1,
       }],
       ['tsan==1', {
         'use_custom_libcxx%': 1,
@@ -2985,9 +2983,6 @@
       ['video_hole==1', {
         'defines': ['VIDEO_HOLE=1'],
       }],
-      ['enable_load_completion_hacks==1', {
-        'defines': ['ENABLE_LOAD_COMPLETION_HACKS=1'],
-      }],
       ['v8_use_external_startup_data==1', {
        'defines': ['V8_USE_EXTERNAL_STARTUP_DATA'],
       }],
@@ -3388,6 +3383,14 @@
                 # We still want the false setting above to avoid having
                 # "/Oy /Oy-" and warnings about overriding.
                 'AdditionalOptions': ['/Oy-'],
+              }],
+              ['asan==0', {
+                # Put data in separate COMDATs. This allows the linker
+                # to put bit-identical constants at the same address even if
+                # they're unrelated constants, which saves binary size.
+                # This optimization can't be used when ASan is enabled because
+                # it is not compatible with the ASan ODR checker.
+                'AdditionalOptions': ['/Gw'],
               }],
             ],
             'AdditionalOptions': [
@@ -4391,7 +4394,7 @@
               }],
             ],
             'conditions': [
-              ['release_valgrind_build==0', {
+              ['release_valgrind_build==0 and order_profiling==0', {
                 'target_conditions': [
                   ['_toolset=="target"', {
                     'ldflags': [
@@ -4690,7 +4693,7 @@
                   }],
                 ],
               }],
-              ['target_arch == "arm"', {
+              ['target_arch == "arm" and order_profiling==0', {
                 'ldflags': [
                   # Enable identical code folding to reduce size.
                   '-Wl,--icf=safe',
@@ -5062,16 +5065,6 @@
                 ],
               },
             ],
-            'conditions': [
-              ['asan==1', {
-                'variables': {
-                 'asan_saves_file': 'asan.saves',
-                },
-                'xcode_settings': {
-                  'CHROMIUM_STRIP_SAVE_FILE': '<(asan_saves_file)',
-                },
-              }],
-            ],
             'target_conditions': [
               ['mac_pie==1 and release_valgrind_build==0', {
                 # Turn on position-independence (ASLR) for executables. When
@@ -5102,23 +5095,23 @@
                       'DEBUG_INFORMATION_FORMAT': 'dwarf-with-dsym',
                       'DEPLOYMENT_POSTPROCESSING': 'YES',
                       'STRIP_INSTALLED_PRODUCT': 'YES',
-                      'target_conditions': [
-                        ['_type=="shared_library" or _type=="loadable_module"', {
-                          # The Xcode default is to strip debugging symbols
-                          # only (-S).  Local symbols should be stripped as
-                          # well, which will be handled by -x.  Xcode will
-                          # continue to insert -S when stripping even when
-                          # additional flags are added with STRIPFLAGS.
-                          'STRIPFLAGS': '-x',
-                        }],  # _type=="shared_library" or _type=="loadable_module"
-                        ['_type=="executable"', {
-                          'conditions': [
-                            ['asan==1', {
-                              'STRIPFLAGS': '-s $(CHROMIUM_STRIP_SAVE_FILE)',
-                            }]
-                          ],
-                        }],  # _type=="executable" and asan==1
-                      ],  # target_conditions
+                      'conditions': [
+                        # Only strip non-ASan builds.
+                        ['asan==0', {
+                          'target_conditions': [
+                            ['_type=="shared_library" or _type=="loadable_module"', {
+                              # The Xcode default is to strip debugging symbols
+                              # only (-S).  Local symbols should be stripped as
+                              # well, which will be handled by -x.  Xcode will
+                              # continue to insert -S when stripping even when
+                              # additional flags are added with STRIPFLAGS.
+                              'STRIPFLAGS': '-x',
+                            }],  # _type=="shared_library" or _type=="loadable_module"
+                          ],  # target_conditions
+                        }, {  # asan != 0
+                          'STRIPFLAGS': '-S',
+                        }],
+                      ],
                     },  # xcode_settings
                   },  # configuration "Release"
                 },  # configurations
@@ -5281,6 +5274,11 @@
                 'VCLinkerTool': {
                   # Set /LTCG for the official builds.
                   'LinkTimeCodeGeneration': '1',
+                  'AdditionalOptions': [
+                    # Set the number of LTCG code-gen threads to eight.
+                    # The default is four. This gives a 5-10% link speedup.
+                    '/cgthreads:8',
+                  ],
                 },
               },
               'target_conditions': [

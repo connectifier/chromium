@@ -104,8 +104,8 @@ ChromePasswordManagerClient::~ChromePasswordManagerClient() {
 }
 
 bool ChromePasswordManagerClient::IsAutomaticPasswordSavingEnabled() const {
-  return CommandLine::ForCurrentProcess()->HasSwitch(
-      password_manager::switches::kEnableAutomaticPasswordSaving) &&
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
+             password_manager::switches::kEnableAutomaticPasswordSaving) &&
          chrome::VersionInfo::GetChannel() ==
              chrome::VersionInfo::CHANNEL_UNKNOWN;
 }
@@ -208,15 +208,19 @@ bool ChromePasswordManagerClient::PromptUserToSavePassword(
 }
 
 bool ChromePasswordManagerClient::PromptUserToChooseCredentials(
-    const std::vector<autofill::PasswordForm*>& forms,
+    const std::vector<autofill::PasswordForm*>& local_forms,
+    const std::vector<autofill::PasswordForm*>& federated_forms,
     base::Callback<void(const password_manager::CredentialInfo&)> callback) {
-  // Take ownership of all the password form objects in the |results| vector.
-  ScopedVector<autofill::PasswordForm> entries;
-  entries.assign(forms.begin(), forms.end());
+  // Take ownership of all the password form objects in the forms vectors.
+  ScopedVector<autofill::PasswordForm> local_entries;
+  local_entries.assign(local_forms.begin(), local_forms.end());
+  ScopedVector<autofill::PasswordForm> federated_entries;
+  federated_entries.assign(federated_forms.begin(), federated_forms.end());
+
   ManagePasswordsUIController* manage_passwords_ui_controller =
       ManagePasswordsUIController::FromWebContents(web_contents());
-  return manage_passwords_ui_controller->OnChooseCredentials(entries.Pass(),
-                                                             callback);
+  return manage_passwords_ui_controller->OnChooseCredentials(
+      local_entries.Pass(), federated_entries.Pass(), callback);
 }
 
 void ChromePasswordManagerClient::AutomaticPasswordSave(
@@ -501,7 +505,7 @@ bool ChromePasswordManagerClient::IsTheHotNewBubbleUIEnabled() {
 #if !defined(USE_AURA) && !defined(OS_MACOSX)
   return false;
 #endif
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(switches::kDisableSavePasswordBubble))
     return false;
 
@@ -516,7 +520,7 @@ bool ChromePasswordManagerClient::IsTheHotNewBubbleUIEnabled() {
 }
 
 bool ChromePasswordManagerClient::EnabledForSyncSignin() {
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(
           password_manager::switches::kDisableManagerForSyncSignin))
     return false;
@@ -535,7 +539,7 @@ void ChromePasswordManagerClient::SetUpAutofillSyncState() {
   std::string group_name =
       base::FieldTrialList::FindFullName("AutofillSyncCredential");
 
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(
           password_manager::switches::kAllowAutofillSyncCredential)) {
     autofill_sync_state_ = ALLOW_SYNC_CREDENTIALS;
@@ -561,4 +565,8 @@ void ChromePasswordManagerClient::SetUpAutofillSyncState() {
     // Allow by default.
     autofill_sync_state_ = ALLOW_SYNC_CREDENTIALS;
   }
+}
+
+const GURL& ChromePasswordManagerClient::GetMainFrameURL() {
+  return web_contents()->GetVisibleURL();
 }

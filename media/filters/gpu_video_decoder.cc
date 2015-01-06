@@ -117,7 +117,7 @@ static bool IsCodedSizeSupported(const gfx::Size& coded_size) {
   // V4L2VideoDecodeAccelerator.
   base::CPU cpu;
   bool hw_large_video_support =
-      CommandLine::ForCurrentProcess()->HasSwitch(
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kIgnoreResolutionLimitsForAcceleratedVideoDecode) ||
       ((cpu.vendor_name() == "GenuineIntel") && cpu.model() >= 55);
   bool os_large_video_support = true;
@@ -400,12 +400,6 @@ static void ReadPixelsSync(
     uint32 texture_id,
     const gfx::Rect& visible_rect,
     const SkBitmap& pixels) {
-#if defined(OS_MACOSX)
-  // For Mac OS X, just return black. http://crbug.com/425708.
-  pixels.eraseARGB(0, 0, 0, 0);
-  return;
-#endif
-
   base::WaitableEvent event(true, false);
   if (!factories->GetTaskRunner()->PostTask(FROM_HERE,
                                             base::Bind(&ReadPixelsSyncInner,

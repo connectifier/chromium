@@ -6,7 +6,7 @@
 
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_list_observer.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/rect.h"
 
 
 // Helpers --------------------------------------------------------------------
@@ -98,10 +98,6 @@ bool TestBrowserWindow::IsAlwaysOnTop() const {
 }
 
 gfx::NativeWindow TestBrowserWindow::GetNativeWindow() const {
-  return NULL;
-}
-
-BrowserWindowTesting* TestBrowserWindow::GetBrowserWindowTesting() {
   return NULL;
 }
 

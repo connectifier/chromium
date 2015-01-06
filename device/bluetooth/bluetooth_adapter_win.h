@@ -103,7 +103,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterWin
   virtual ~BluetoothAdapterWin();
 
   // BluetoothAdapter:
-  virtual void DeleteOnCorrectThread() const { delete this; }
+  void DeleteOnCorrectThread() const override;
   virtual void AddDiscoverySession(
       const base::Closure& callback,
       const ErrorCallback& error_callback) override;

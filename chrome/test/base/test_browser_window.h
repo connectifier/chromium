@@ -41,7 +41,6 @@ class TestBrowserWindow : public BrowserWindow {
   bool IsAlwaysOnTop() const override;
   void SetAlwaysOnTop(bool always_on_top) override {}
   gfx::NativeWindow GetNativeWindow() const override;
-  BrowserWindowTesting* GetBrowserWindowTesting() override;
   StatusBubble* GetStatusBubble() override;
   void UpdateTitleBar() override {}
   void BookmarkBarStateChanged(
@@ -167,7 +166,6 @@ class TestBrowserWindow : public BrowserWindow {
     void UpdateContentSettingsIcons() override {}
     void UpdateManagePasswordsIconAndBubble() override {}
     void UpdatePageActions() override {}
-    void InvalidatePageActions() override {}
     void UpdateBookmarkStarVisibility() override {}
     bool ShowPageActionPopup(const extensions::Extension* extension,
                              bool grant_active_tab) override;

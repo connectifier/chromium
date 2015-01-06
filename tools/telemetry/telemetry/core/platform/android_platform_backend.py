@@ -24,6 +24,7 @@ from telemetry.core.platform.power_monitor import android_temperature_monitor
 from telemetry.core.platform.power_monitor import monsoon_power_monitor
 from telemetry.core.platform.power_monitor import power_monitor_controller
 from telemetry.core.platform.profiler import android_prebuilt_profiler_helper
+from telemetry.timeline import trace_data as trace_data_module
 from telemetry.util import exception_formatter
 
 util.AddDirToPythonPath(util.GetChromiumSrcDir(),
@@ -100,10 +101,10 @@ class AndroidPlatformBackend(
   def adb(self):
     return self._adb
 
-  def IsRawDisplayFrameRateSupported(self):
-    return True
+  def IsDisplayTracingSupported(self):
+    return bool(self.GetOSVersionName() >= 'J')
 
-  def StartRawDisplayFrameRateMeasurement(self):
+  def StartDisplayTracing(self):
     assert not self._surface_stats_collector
     # Clear any leftover data from previous timed out tests
     self._raw_display_frame_rate_measurements = []
@@ -111,22 +112,29 @@ class AndroidPlatformBackend(
         surface_stats_collector.SurfaceStatsCollector(self._device)
     self._surface_stats_collector.Start()
 
-  def StopRawDisplayFrameRateMeasurement(self):
+  def StopDisplayTracing(self):
     if not self._surface_stats_collector:
       return
 
-    self._surface_stats_collector.Stop()
-    for r in self._surface_stats_collector.GetResults():
-      self._raw_display_frame_rate_measurements.append(
-          platform.Platform.RawDisplayFrameRateMeasurement(
-              r.name, r.value, r.unit))
-
+    refresh_period, timestamps = self._surface_stats_collector.Stop()
+    pid = self._surface_stats_collector.GetSurfaceFlingerPid()
     self._surface_stats_collector = None
-
-  def GetRawDisplayFrameRateMeasurements(self):
-    ret = self._raw_display_frame_rate_measurements
-    self._raw_display_frame_rate_measurements = []
-    return ret
+    # TODO(sullivan): should this code be inline, or live elsewhere?
+    events = []
+    for ts in timestamps:
+      events.append({
+        'cat': 'SurfaceFlinger',
+        'name': 'vsync_before',
+        'ts': ts,
+        'pid': pid,
+        'tid': pid,
+        'args': {'data': {
+          'frame_count': 1,
+          'refresh_period': refresh_period,
+        }}
+      })
+    return trace_data_module.TraceData({
+      trace_data_module.SURFACE_FLINGER_PART.raw_field_name: events})
 
   def SetFullPerformanceModeEnabled(self, enabled):
     if not self._enable_performance_mode:
@@ -218,7 +226,7 @@ class AndroidPlatformBackend(
     cache = cache_control.CacheControl(self._device)
     cache.DropRamCaches()
 
-  def FlushSystemCacheForDirectory(self, directory, ignoring=None):
+  def FlushSystemCacheForDirectory(self, directory):
     raise NotImplementedError()
 
   def FlushDnsCache(self):

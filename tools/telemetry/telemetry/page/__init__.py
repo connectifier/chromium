@@ -15,7 +15,7 @@ from telemetry.util import path
 def _UpdateCredentials(credentials_path):
   # Attempt to download the credentials file.
   try:
-    cloud_storage.GetIfChanged(credentials_path)
+    cloud_storage.GetIfChanged(credentials_path, cloud_storage.PUBLIC_BUCKET)
   except (cloud_storage.CredentialsError, cloud_storage.PermissionError,
           cloud_storage.CloudStorageError) as e:
     logging.warning('Cannot retrieve credential file %s due to cloud storage '
@@ -24,12 +24,14 @@ def _UpdateCredentials(credentials_path):
 
 class Page(user_story.UserStory):
   def __init__(self, url, page_set=None, base_dir=None, name='',
-               credentials_path=None, labels=None, startup_url=''):
+               credentials_path=None, labels=None, startup_url='',
+               make_javascript_deterministic=True):
     self._url = url
 
     super(Page, self).__init__(
         shared_page_state.SharedPageState, name=name, labels=labels,
-        is_local=self._scheme in ['file', 'chrome', 'about'])
+        is_local=self._scheme in ['file', 'chrome', 'about'],
+        make_javascript_deterministic=make_javascript_deterministic)
 
     self._page_set = page_set
     # Default value of base_dir is the directory of the file that defines the
@@ -95,6 +97,15 @@ class Page(user_story.UserStory):
 
   def RunNavigateSteps(self, action_runner):
     action_runner.NavigateToPage(self)
+
+  def RunPageInteractions(self, action_runner):
+    """Override this to define custom interactions with the page.
+    e.g:
+      def RunPageInteractions(self, action_runner):
+        action_runner.ScrollPage()
+        action_runner.TapElement(text='Next')
+    """
+    pass
 
   def CanRunOnBrowser(self, browser_info):
     """Override this to returns whether this page can be run on specific

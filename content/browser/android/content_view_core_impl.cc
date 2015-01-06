@@ -54,9 +54,9 @@
 #include "ui/base/android/view_android.h"
 #include "ui/base/android/window_android.h"
 #include "ui/gfx/android/java_bitmap.h"
+#include "ui/gfx/geometry/size_conversions.h"
+#include "ui/gfx/geometry/size_f.h"
 #include "ui/gfx/screen.h"
-#include "ui/gfx/size_conversions.h"
-#include "ui/gfx/size_f.h"
 
 using base::android::AttachCurrentThread;
 using base::android::ConvertJavaStringToUTF16;
@@ -1036,6 +1036,8 @@ void ContentViewCoreImpl::FlingStart(JNIEnv* env, jobject obj, jlong time_ms,
 void ContentViewCoreImpl::FlingCancel(JNIEnv* env, jobject obj, jlong time_ms) {
   WebGestureEvent event = MakeGestureEvent(
       WebInputEvent::GestureFlingCancel, time_ms, 0, 0);
+  event.data.flingCancel.preventBoosting = true;
+
   SendGestureEvent(event);
 }
 

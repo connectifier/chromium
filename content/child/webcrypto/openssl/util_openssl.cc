@@ -6,12 +6,15 @@
 
 #include <openssl/evp.h>
 #include <openssl/pkcs12.h>
+#include <openssl/rand.h>
 
 #include "base/stl_util.h"
 #include "content/child/webcrypto/crypto_data.h"
+#include "content/child/webcrypto/generate_key_result.h"
 #include "content/child/webcrypto/openssl/key_openssl.h"
 #include "content/child/webcrypto/platform_crypto.h"
 #include "content/child/webcrypto/status.h"
+#include "content/child/webcrypto/webcrypto_util.h"
 #include "crypto/openssl_util.h"
 
 namespace content {
@@ -131,6 +134,40 @@ Status AeadEncryptDecrypt(EncryptOrDecrypt mode,
   return Status::Success();
 }
 
+Status GenerateWebCryptoSecretKey(const blink::WebCryptoKeyAlgorithm& algorithm,
+                                  bool extractable,
+                                  blink::WebCryptoKeyUsageMask usages,
+                                  unsigned int keylen_bits,
+                                  GenerateKeyResult* result) {
+  crypto::OpenSSLErrStackTracer err_tracer(FROM_HERE);
+
+  unsigned int keylen_bytes = NumBitsToBytes(keylen_bits);
+  std::vector<unsigned char> random_bytes(keylen_bytes, 0);
+
+  if (keylen_bytes > 0) {
+    if (!(RAND_bytes(&random_bytes[0], keylen_bytes)))
+      return Status::OperationError();
+    TruncateToBitLength(keylen_bits, &random_bytes);
+  }
+
+  result->AssignSecretKey(blink::WebCryptoKey::create(
+      new SymKeyOpenSsl(CryptoData(random_bytes)),
+      blink::WebCryptoKeyTypeSecret, extractable, algorithm, usages));
+
+  return Status::Success();
+}
+
+Status CreateWebCryptoSecretKey(const CryptoData& key_data,
+                                const blink::WebCryptoKeyAlgorithm& algorithm,
+                                bool extractable,
+                                blink::WebCryptoKeyUsageMask usages,
+                                blink::WebCryptoKey* key) {
+  *key = blink::WebCryptoKey::create(new SymKeyOpenSsl(key_data),
+                                     blink::WebCryptoKeyTypeSecret, extractable,
+                                     algorithm, usages);
+  return Status::Success();
+}
+
 Status CreateWebCryptoPublicKey(crypto::ScopedEVP_PKEY public_key,
                                 const blink::WebCryptoKeyAlgorithm& algorithm,
                                 bool extractable,
@@ -170,9 +207,6 @@ Status CreateWebCryptoPrivateKey(crypto::ScopedEVP_PKEY private_key,
 Status ImportUnverifiedPkeyFromSpki(const CryptoData& key_data,
                                     int expected_pkey_id,
                                     crypto::ScopedEVP_PKEY* pkey) {
-  if (!key_data.byte_length())
-    return Status::ErrorImportEmptyKeyData();
-
   crypto::OpenSSLErrStackTracer err_tracer(FROM_HERE);
 
   const uint8_t* ptr = key_data.bytes();
@@ -189,9 +223,6 @@ Status ImportUnverifiedPkeyFromSpki(const CryptoData& key_data,
 Status ImportUnverifiedPkeyFromPkcs8(const CryptoData& key_data,
                                      int expected_pkey_id,
                                      crypto::ScopedEVP_PKEY* pkey) {
-  if (!key_data.byte_length())
-    return Status::ErrorImportEmptyKeyData();
-
   crypto::OpenSSLErrStackTracer err_tracer(FROM_HERE);
 
   const uint8_t* ptr = key_data.bytes();

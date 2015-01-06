@@ -54,13 +54,17 @@ class CONTENT_EXPORT ServiceWorkerStorage
                                   registration)> FindRegistrationCallback;
   typedef base::Callback<
       void(const std::vector<ServiceWorkerRegistrationInfo>& registrations)>
-          GetAllRegistrationInfosCallback;
+          GetRegistrationsInfosCallback;
   typedef base::Callback<
       void(ServiceWorkerStatusCode status, bool are_equal)>
           CompareCallback;
   typedef base::Callback<
       void(const std::string& data, ServiceWorkerStatusCode status)>
           GetUserDataCallback;
+  typedef base::Callback<void(
+      const std::vector<std::pair<int64, std::string>>& user_data,
+      ServiceWorkerStatusCode status)>
+          GetUserDataForAllRegistrationsCallback;
 
   ~ServiceWorkerStorage() override;
 
@@ -96,8 +100,13 @@ class CONTENT_EXPORT ServiceWorkerStorage
 
   ServiceWorkerRegistration* GetUninstallingRegistration(const GURL& scope);
 
+  // Returns info about all stored and initially installing registrations for
+  // a given origin.
+  void GetRegistrationsForOrigin(
+      const GURL& origin, const GetRegistrationsInfosCallback& callback);
+
   // Returns info about all stored and initially installing registrations.
-  void GetAllRegistrations(const GetAllRegistrationInfosCallback& callback);
+  void GetAllRegistrations(const GetRegistrationsInfosCallback& callback);
 
   // Commits |registration| with the installed but not activated |version|
   // to storage, overwritting any pre-existing registration data for the scope.
@@ -154,6 +163,11 @@ class CONTENT_EXPORT ServiceWorkerStorage
   void ClearUserData(int64 registration_id,
                      const std::string& key,
                      const StatusCallback& callback);
+  // Returns all registrations that have user data with a particular key, as
+  // well as that user data.
+  void GetUserDataForAllRegistrations(
+      const std::string& key,
+      const GetUserDataForAllRegistrationsCallback& callback);
 
   // Deletes the storage and starts over.
   void DeleteAndStartOver(const StatusCallback& callback);
@@ -244,6 +258,10 @@ class CONTENT_EXPORT ServiceWorkerStorage
   typedef base::Callback<void(
       const std::string& data,
       ServiceWorkerDatabase::Status)> GetUserDataInDBCallback;
+  typedef base::Callback<void(
+      const std::vector<std::pair<int64, std::string>>& user_data,
+      ServiceWorkerDatabase::Status)>
+      GetUserDataForAllRegistrationsInDBCallback;
   typedef base::Callback<void(const std::vector<int64>& resource_ids,
                               ServiceWorkerDatabase::Status status)>
       GetResourcesCallback;
@@ -282,9 +300,10 @@ class CONTENT_EXPORT ServiceWorkerStorage
       const ServiceWorkerDatabase::RegistrationData& data,
       const ResourceList& resources,
       ServiceWorkerDatabase::Status status);
-  void DidGetAllRegistrations(
-      const GetAllRegistrationInfosCallback& callback,
+  void DidGetRegistrations(
+      const GetRegistrationsInfosCallback& callback,
       RegistrationList* registrations,
+      const GURL& origin_filter,
       ServiceWorkerDatabase::Status status);
   void DidStoreRegistration(
       const StatusCallback& callback,
@@ -311,6 +330,10 @@ class CONTENT_EXPORT ServiceWorkerStorage
       ServiceWorkerDatabase::Status status);
   void DidDeleteUserData(
       const StatusCallback& callback,
+      ServiceWorkerDatabase::Status status);
+  void DidGetUserDataForAllRegistrations(
+      const GetUserDataForAllRegistrationsCallback& callback,
+      const std::vector<std::pair<int64, std::string>>& user_data,
       ServiceWorkerDatabase::Status status);
   void ReturnFoundRegistration(
       const FindRegistrationCallback& callback,
@@ -389,6 +412,11 @@ class CONTENT_EXPORT ServiceWorkerStorage
       int64 registration_id,
       const std::string& key,
       const GetUserDataInDBCallback& callback);
+  static void GetUserDataForAllRegistrationsInDB(
+      ServiceWorkerDatabase* database,
+      scoped_refptr<base::SequencedTaskRunner> original_task_runner,
+      const std::string& key,
+      const GetUserDataForAllRegistrationsInDBCallback& callback);
   static void DeleteAllDataForOriginsFromDB(
       ServiceWorkerDatabase* database,
       const std::set<GURL>& origins);

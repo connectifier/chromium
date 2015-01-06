@@ -122,8 +122,9 @@ component("aura") {
     sources -= [ "input_state_lookup.cc" ]
 
     deps += [
-      "//ui/metro_viewer",
       "//ipc",
+      "//ui/metro_viewer",
+      "//ui/platform_window/win:win_window",
     ]
   }
 
@@ -181,26 +182,23 @@ source_set("test_support") {
     "//ui/events:test_support",
     "//ui/gfx",
     "//ui/gfx/geometry",
-    "//ui/gfx/x",
     "//ui/wm",
   ]
 
   if (is_win) {
+    sources += [ "test/ui_controls_factory_aurawin.cc" ]
+
     cflags = [ "/wd4267" ]  # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
   }
 
-  if (use_aura) {
-    if (is_win) {
-      sources += [ "test/ui_controls_factory_aurawin.cc" ]
-    }
+  if (use_x11) {
+    sources += [
+      "test/ui_controls_factory_aurax11.cc",
+      "test/x11_event_sender.cc",
+      "test/x11_event_sender.h",
+    ]
 
-    if (use_x11) {
-      sources += [
-        "test/ui_controls_factory_aurax11.cc",
-        "test/x11_event_sender.cc",
-        "test/x11_event_sender.h",
-      ]
-    }
+    deps += [ "//ui/gfx/x" ]
   }
 }
 

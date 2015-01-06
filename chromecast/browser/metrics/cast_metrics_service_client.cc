@@ -42,8 +42,9 @@ scoped_ptr<CastMetricsServiceClient> CastMetricsServiceClient::Create(
 
 void CastMetricsServiceClient::SetMetricsClientId(
     const std::string& client_id) {
+  client_id_ = client_id;
   LOG(INFO) << "Metrics client ID set: " << client_id;
-  PlatformSetClientID(client_id);
+  PlatformSetClientID(cast_service_, client_id);
 }
 
 void CastMetricsServiceClient::StoreClientInfo(
@@ -72,7 +73,7 @@ scoped_ptr< ::metrics::ClientInfo> CastMetricsServiceClient::LoadClientInfo() {
     // else the device was just FDR'ed, pass through.
   }
 
-  const std::string client_id(GetPlatformClientID());
+  const std::string client_id(GetPlatformClientID(cast_service_));
   if (!client_id.empty() && base::IsValidGUID(client_id)) {
     client_info->client_id = client_id;
     return client_info.Pass();
@@ -109,15 +110,15 @@ bool CastMetricsServiceClient::GetBrand(std::string* brand_code) {
 }
 
 ::metrics::SystemProfileProto::Channel CastMetricsServiceClient::GetChannel() {
-  return GetPlatformReleaseChannel();
+  return GetPlatformReleaseChannel(cast_service_);
 }
 
 std::string CastMetricsServiceClient::GetVersionString() {
-  return GetPlatformVersionString();
+  return GetPlatformVersionString(cast_service_);
 }
 
 void CastMetricsServiceClient::OnLogUploadComplete() {
-  PlatformOnLogUploadComplete();
+  PlatformOnLogUploadComplete(cast_service_);
 }
 
 void CastMetricsServiceClient::StartGatheringMetrics(
@@ -171,21 +172,34 @@ CastMetricsServiceClient::CastMetricsServiceClient(
     base::TaskRunner* io_task_runner,
     PrefService* pref_service,
     net::URLRequestContextGetter* request_context)
-    : pref_service_(pref_service),
-      metrics_state_manager_(::metrics::MetricsStateManager::Create(
-          pref_service,
-          base::Bind(&CastMetricsServiceClient::IsReportingEnabled,
-                     base::Unretained(this)),
-          base::Bind(&CastMetricsServiceClient::StoreClientInfo,
-                     base::Unretained(this)),
-          base::Bind(&CastMetricsServiceClient::LoadClientInfo,
-                     base::Unretained(this)))),
-      metrics_service_(new ::metrics::MetricsService(
-          metrics_state_manager_.get(),
-          this,
-          pref_service)),
+    : io_task_runner_(io_task_runner),
+      pref_service_(pref_service),
+      cast_service_(NULL),
       metrics_service_loop_(base::MessageLoopProxy::current()),
       request_context_(request_context) {
+}
+
+CastMetricsServiceClient::~CastMetricsServiceClient() {
+}
+
+void CastMetricsServiceClient::Initialize(CastService* cast_service) {
+  DCHECK(cast_service);
+  DCHECK(!cast_service_);
+  cast_service_ = cast_service;
+
+  metrics_state_manager_ = ::metrics::MetricsStateManager::Create(
+      pref_service_,
+      base::Bind(&CastMetricsServiceClient::IsReportingEnabled,
+                 base::Unretained(this)),
+      base::Bind(&CastMetricsServiceClient::StoreClientInfo,
+                 base::Unretained(this)),
+      base::Bind(&CastMetricsServiceClient::LoadClientInfo,
+                 base::Unretained(this)));
+  metrics_service_.reset(new ::metrics::MetricsService(
+      metrics_state_manager_.get(),
+      this,
+      pref_service_));
+
   // Always create a client id as it may also be used by crash reporting,
   // (indirectly) included in feedback, and can be queried during setup.
   // For UMA and crash reporting, associated opt-in settings will control
@@ -208,11 +222,11 @@ CastMetricsServiceClient::CastMetricsServiceClient(
   }
   metrics_service_->RegisterMetricsProvider(
       scoped_ptr< ::metrics::MetricsProvider>(
-          new ::metrics::NetworkMetricsProvider(io_task_runner)));
+          new ::metrics::NetworkMetricsProvider(io_task_runner_)));
   metrics_service_->RegisterMetricsProvider(
       scoped_ptr< ::metrics::MetricsProvider>(
           new ::metrics::ProfilerMetricsProvider));
-  RegisterPlatformMetricsProviders(metrics_service_.get());
+  RegisterPlatformMetricsProviders(metrics_service_.get(), cast_service_);
 
   metrics_service_->InitializeMetricsRecordingState();
 
@@ -227,11 +241,8 @@ CastMetricsServiceClient::CastMetricsServiceClient(
 #endif  // defined(OS_LINUX)
 }
 
-CastMetricsServiceClient::~CastMetricsServiceClient() {
-}
-
 bool CastMetricsServiceClient::IsReportingEnabled() {
-  return PlatformIsReportingEnabled();
+  return PlatformIsReportingEnabled(cast_service_);
 }
 
 }  // namespace metrics

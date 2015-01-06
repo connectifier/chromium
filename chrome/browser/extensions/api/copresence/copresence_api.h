@@ -37,6 +37,7 @@ class CopresenceService final : public BrowserContextKeyedAPI,
   ~CopresenceService() override;
 
   // BrowserContextKeyedAPI implementation.
+  static const bool kServiceHasOwnInstanceInIncognito = true;
   void Shutdown() override;
 
   // These accessors will always return an object (except during shutdown).
@@ -126,7 +127,7 @@ class CopresenceSetAuthTokenFunction : public ChromeUIThreadExtensionFunction {
                              COPRESENCE_SETAUTHTOKEN);
 
  protected:
-  virtual ~CopresenceSetAuthTokenFunction() {}
+  ~CopresenceSetAuthTokenFunction() override {}
   ExtensionFunction::ResponseAction Run() override;
 };
 

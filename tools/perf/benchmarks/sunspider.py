@@ -75,7 +75,8 @@ DESCRIPTIONS = {
 
 class _SunspiderMeasurement(page_test.PageTest):
   def __init__(self):
-    super(_SunspiderMeasurement, self).__init__()
+    super(_SunspiderMeasurement, self).__init__(
+        action_name_to_run='RunPageInteractions')
     self._power_metric = None
 
   def CustomizeBrowserOptions(self, options):
@@ -125,14 +126,17 @@ class _SunspiderMeasurement(page_test.PageTest):
 
 
 class Sunspider(benchmark.Benchmark):
-  """Apple's SunSpider JavaScript benchmark."""
+  """Apple's SunSpider JavaScript benchmark.
+
+  http://www.webkit.org/perf/sunspider/sunspider.html
+  """
   test = _SunspiderMeasurement
 
   def CreatePageSet(self, options):
     ps = page_set.PageSet(
         archive_data_file='../page_sets/data/sunspider.json',
-        make_javascript_deterministic=False,
         file_path=os.path.abspath(__file__),
         bucket=page_set.PARTNER_BUCKET)
-    ps.AddUserStory(page_module.Page(_URL, ps, ps.base_dir))
+    ps.AddUserStory(page_module.Page(
+        _URL, ps, ps.base_dir, make_javascript_deterministic=False))
     return ps

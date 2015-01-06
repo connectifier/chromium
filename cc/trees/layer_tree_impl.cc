@@ -534,6 +534,7 @@ bool LayerTreeImpl::UpdateDrawProperties() {
         settings().can_use_lcd_text, settings().layers_always_allowed_lcd_text,
         can_render_to_separate_surface,
         settings().layer_transforms_should_scale_layer_contents,
+        settings().verify_property_trees,
         &render_surface_layer_list_, render_surface_layer_list_id_);
     LayerTreeHostCommon::CalculateDrawProperties(&inputs);
   }
@@ -559,6 +560,7 @@ bool LayerTreeImpl::UpdateDrawProperties() {
     typedef LayerIterator<LayerImpl> LayerIteratorType;
     LayerIteratorType end = LayerIteratorType::End(&render_surface_layer_list_);
     size_t layers_updated_count = 0;
+    bool tile_priorities_updated = false;
     for (LayerIteratorType it =
              LayerIteratorType::Begin(&render_surface_layer_list_);
          it != end;
@@ -573,8 +575,8 @@ bool LayerTreeImpl::UpdateDrawProperties() {
                             : Occlusion();
 
       if (it.represents_itself()) {
-        layer->UpdateTiles(occlusion_in_content_space,
-                           resourceless_software_draw);
+        tile_priorities_updated |= layer->UpdateTiles(
+            occlusion_in_content_space, resourceless_software_draw);
         ++layers_updated_count;
       }
 
@@ -585,19 +587,23 @@ bool LayerTreeImpl::UpdateDrawProperties() {
       }
 
       if (layer->mask_layer()) {
-        layer->mask_layer()->UpdateTiles(occlusion_in_content_space,
-                                         resourceless_software_draw);
+        tile_priorities_updated |= layer->mask_layer()->UpdateTiles(
+            occlusion_in_content_space, resourceless_software_draw);
         ++layers_updated_count;
       }
       if (layer->replica_layer() && layer->replica_layer()->mask_layer()) {
-        layer->replica_layer()->mask_layer()->UpdateTiles(
-            occlusion_in_content_space, resourceless_software_draw);
+        tile_priorities_updated |=
+            layer->replica_layer()->mask_layer()->UpdateTiles(
+                occlusion_in_content_space, resourceless_software_draw);
         ++layers_updated_count;
       }
 
       if (occlusion_tracker)
         occlusion_tracker->LeaveLayer(it);
     }
+
+    if (tile_priorities_updated)
+      DidModifyTilePriorities();
 
     TRACE_EVENT_END1("cc", "LayerTreeImpl::UpdateTilePriorities",
                      "layers_updated_count", layers_updated_count);
@@ -1080,10 +1086,7 @@ bool LayerTreeImpl::IsUIResourceOpaque(UIResourceId uid) const {
 }
 
 void LayerTreeImpl::ProcessUIResourceRequestQueue() {
-  while (ui_resource_request_queue_.size() > 0) {
-    UIResourceRequest req = ui_resource_request_queue_.front();
-    ui_resource_request_queue_.pop_front();
-
+  for (const auto& req : ui_resource_request_queue_) {
     switch (req.GetType()) {
       case UIResourceRequest::UIResourceCreate:
         layer_tree_host_impl_->CreateUIResource(req.GetId(), req.GetBitmap());
@@ -1096,6 +1099,7 @@ void LayerTreeImpl::ProcessUIResourceRequestQueue() {
         break;
     }
   }
+  ui_resource_request_queue_.clear();
 
   // If all UI resource evictions were not recreated by processing this queue,
   // then another commit is required.

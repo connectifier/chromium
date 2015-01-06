@@ -12,9 +12,9 @@
 #include "content/browser/renderer_host/render_widget_host_view_aura.h"
 #include "ui/aura/window_observer.h"
 #include "ui/base/touch/touch_editing_controller.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/native_widget_types.h"
-#include "ui/gfx/point.h"
-#include "ui/gfx/rect.h"
 
 namespace ui {
 class Accelerator;

@@ -108,9 +108,9 @@ class WebstoreProviderTest : public InProcessBrowserTest {
     test_server_->RegisterRequestHandler(
         base::Bind(&WebstoreProviderTest::HandleRequest,
                    base::Unretained(this)));
-    CommandLine::ForCurrentProcess()->AppendSwitchASCII(
+    base::CommandLine::ForCurrentProcess()->AppendSwitchASCII(
         ::switches::kAppsGalleryURL, test_server_->base_url().spec());
-    CommandLine::ForCurrentProcess()->AppendSwitch(
+    base::CommandLine::ForCurrentProcess()->AppendSwitch(
         switches::kEnableExperimentalAppList);
 
     webstore_provider_.reset(new WebstoreProvider(
@@ -129,7 +129,7 @@ class WebstoreProviderTest : public InProcessBrowserTest {
 
   void RunQuery(const std::string& query,
                 const std::string& mock_server_response) {
-    webstore_provider_->Start(base::UTF8ToUTF16(query));
+    webstore_provider_->Start(false, base::UTF8ToUTF16(query));
 
     if (webstore_provider_->webstore_search_ && !mock_server_response.empty()) {
       mock_server_response_ = mock_server_response;

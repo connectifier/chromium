@@ -20,6 +20,7 @@
 #include "components/password_manager/core/common/password_manager_pref_names.h"
 #include "components/password_manager/core/common/password_manager_switches.h"
 #include "components/pref_registry/pref_registry_syncable.h"
+#include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 
 #if defined(OS_WIN)
 #include "base/prefs/pref_registry_simple.h"
@@ -70,7 +71,7 @@ bool ShouldDropSyncCredential() {
   std::string group_name =
       base::FieldTrialList::FindFullName("PasswordManagerDropSyncCredential");
 
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(switches::kEnableDropSyncCredential))
     return true;
 
@@ -95,6 +96,16 @@ bool URLsEqualUpToHttpHttpsSubstitution(const GURL& a, const GURL& b) {
     return URLsEqualUpToScheme(a, b);
 
   return false;
+}
+
+// Helper UMA reporting function for differences in URLs during form submission.
+void RecordWhetherTargetDomainDiffers(const GURL& src, const GURL& target) {
+  bool target_domain_differs =
+      !net::registry_controlled_domains::SameDomainOrHost(
+          src, target,
+          net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES);
+  UMA_HISTOGRAM_BOOLEAN("PasswordManager.SubmitNavigatesToDifferentDomain",
+                        target_domain_differs);
 }
 
 }  // namespace
@@ -309,6 +320,11 @@ void PasswordManager::ProvisionallySavePassword(const PasswordForm& form) {
   }
   manager->ProvisionallySave(provisionally_saved_form, action);
   provisional_save_manager_.swap(manager);
+
+  // Cache the user-visible URL (i.e., the one seen in the omnibox). Once the
+  // post-submit navigation concludes, we compare the landing URL against the
+  // cached and report the difference through UMA.
+  main_frame_url_ = client_->GetMainFrameURL();
 }
 
 void PasswordManager::RecordFailure(ProvisionalSaveFailure failure,
@@ -375,11 +391,8 @@ void PasswordManager::RemoveObserver(LoginModelObserver* observer) {
   observers_.RemoveObserver(observer);
 }
 
-void PasswordManager::DidNavigateMainFrame(bool is_in_page) {
-  // Clear data after main frame navigation if the navigation was to a
-  // different page.
-  if (!is_in_page)
-    pending_login_managers_.clear();
+void PasswordManager::DidNavigateMainFrame() {
+  pending_login_managers_.clear();
 }
 
 void PasswordManager::OnPasswordFormSubmitted(
@@ -542,25 +555,56 @@ void PasswordManager::OnPasswordFormsRendered(
     // automatically save the login data. We prompt when the user hasn't
     // already given consent, either through previously accepting the infobar
     // or by having the browser generate the password.
-    provisional_save_manager_->SubmitPassed();
+    AskUserOrSavePassword();
+  }
+}
 
-    if (ShouldPromptUserToSavePassword()) {
+void PasswordManager::OnInPageNavigation(
+    password_manager::PasswordManagerDriver* driver,
+    const PasswordForm& password_form) {
+  scoped_ptr<BrowserSavePasswordProgressLogger> logger;
+  if (client_->IsLoggingActive()) {
+    logger.reset(new BrowserSavePasswordProgressLogger(client_));
+    logger->LogMessage(Logger::STRING_ON_IN_PAGE_NAVIGATION);
+  }
+
+  ProvisionallySavePassword(password_form);
+
+  if (!provisional_save_manager_) {
+    if (logger) {
+      logger->LogMessage(Logger::STRING_NO_PROVISIONAL_SAVE_MANAGER);
+    }
+    return;
+  }
+  AskUserOrSavePassword();
+}
+
+void PasswordManager::AskUserOrSavePassword() {
+  scoped_ptr<BrowserSavePasswordProgressLogger> logger;
+  if (client_->IsLoggingActive()) {
+    logger.reset(new BrowserSavePasswordProgressLogger(client_));
+    logger->LogMessage(Logger::STRING_ON_ASK_USER_OR_SAVE_PASSWORD);
+  }
+  provisional_save_manager_->SubmitPassed();
+
+  RecordWhetherTargetDomainDiffers(main_frame_url_, client_->GetMainFrameURL());
+
+  if (ShouldPromptUserToSavePassword()) {
+    if (logger)
+      logger->LogMessage(Logger::STRING_DECISION_ASK);
+    if (client_->PromptUserToSavePassword(provisional_save_manager_.Pass())) {
       if (logger)
-        logger->LogMessage(Logger::STRING_DECISION_ASK);
-      if (client_->PromptUserToSavePassword(provisional_save_manager_.Pass())) {
-        if (logger)
-          logger->LogMessage(Logger::STRING_SHOW_PASSWORD_PROMPT);
-      }
+        logger->LogMessage(Logger::STRING_SHOW_PASSWORD_PROMPT);
+    }
+  } else {
+    if (logger)
+      logger->LogMessage(Logger::STRING_DECISION_SAVE);
+    provisional_save_manager_->Save();
+
+    if (provisional_save_manager_->HasGeneratedPassword()) {
+      client_->AutomaticPasswordSave(provisional_save_manager_.Pass());
     } else {
-      if (logger)
-        logger->LogMessage(Logger::STRING_DECISION_SAVE);
-      provisional_save_manager_->Save();
-
-      if (provisional_save_manager_->HasGeneratedPassword()) {
-        client_->AutomaticPasswordSave(provisional_save_manager_.Pass());
-      } else {
-        provisional_save_manager_.reset();
-      }
+      provisional_save_manager_.reset();
     }
   }
 }

@@ -404,7 +404,7 @@ ImageView.prototype.load =
   }
 
   /**
-   * @param {ImageView.LoadType} loadType A load type.
+   * @param {!ImageView.LoadType} loadType A load type.
    * @param {(HTMLCanvasElement|HTMLImageElement)} canvas A canvas.
    */
   function displayThumbnail(loadType, canvas) {
@@ -435,7 +435,7 @@ ImageView.prototype.load =
   }
 
   /**
-   * @param {ImageView.LoadType} loadType Load type.
+   * @param {!ImageView.LoadType} loadType Load type.
    * @param {Entry} contentEntry A content entry.
    * @param {boolean} previewShown A preview is shown or not.
    * @param {number} delay Load delay.
@@ -462,7 +462,7 @@ ImageView.prototype.load =
   }
 
   /**
-   * @param {ImageView.LoadType} loadType Load type.
+   * @param {!ImageView.LoadType} loadType Load type.
    * @param {boolean} previewShown A preview is shown or not.
    * @param {!(HTMLCanvasElement|HTMLImageElement)} content A content.
    * @param {string=} opt_error Error message.
@@ -653,12 +653,16 @@ ImageView.prototype.replace = function(
       ImageUtil.setAttribute(newScreenImage, 'fade', false);
       ImageUtil.setAttribute(oldScreenImage, 'fade', true);
       var reverse = opt_effect.getReverse();
-      assert(reverse);
-      this.setTransform_(oldScreenImage, oldViewport, reverse);
-      setTimeout(function() {
+      if (reverse) {
+        this.setTransform_(oldScreenImage, oldViewport, reverse);
+        setTimeout(function() {
+          if (oldScreenImage.parentNode)
+            oldScreenImage.parentNode.removeChild(oldScreenImage);
+        }, reverse.getSafeInterval());
+      } else {
         if (oldScreenImage.parentNode)
           oldScreenImage.parentNode.removeChild(oldScreenImage);
-      }, reverse.getSafeInterval());
+      }
     }
   }.bind(this), 0);
 };
@@ -698,7 +702,7 @@ ImageView.prototype.createZoomEffect = function(screenRect) {
  * the new image to visualize the operation.
  *
  * @param {!HTMLCanvasElement} canvas New content canvas.
- * @param {!ImageRect} imageCropRect The crop rectangle in image coordinates.
+ * @param {ImageRect} imageCropRect The crop rectangle in image coordinates.
  *     Null for rotation operations.
  * @param {number} rotate90 Rotation angle in 90 degree increments.
  * @return {number} Animation duration.
@@ -717,7 +721,7 @@ ImageView.prototype.replaceAndAnimate = function(
   var effect = rotate90 ?
       new ImageView.Effect.Rotate(rotate90 > 0) :
       new ImageView.Effect.Zoom(
-          oldImageBounds.width, oldImageBounds.height, imageCropRect);
+          oldImageBounds.width, oldImageBounds.height, assert(imageCropRect));
 
   this.setTransform_(newScreenImage, this.viewport_, effect, 0 /* instant */);
 
@@ -745,7 +749,8 @@ ImageView.prototype.animateAndReplace = function(canvas, imageCropRect) {
   var oldScreenImage = this.screenImage_;
   this.replaceContent_(canvas);
   var newScreenImage = this.screenImage_;
-  var setFade = ImageUtil.setAttribute.bind(null, newScreenImage, 'fade');
+  var setFade = ImageUtil.setAttribute.bind(null, assert(newScreenImage),
+      'fade');
   setFade(true);
   oldScreenImage.parentNode.insertBefore(newScreenImage, oldScreenImage);
   var effect = new ImageView.Effect.Zoom(

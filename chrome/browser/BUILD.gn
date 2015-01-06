@@ -59,7 +59,6 @@ static_library("browser") {
     "//chrome/app:generated_resources_map",
     "//chrome/app/resources:platform_locale_settings",
     "//chrome/app/theme:theme_resources",
-    "//chrome/browser/history:in_memory_url_index_cache_proto",
     "//chrome/browser/net:cert_logger_proto",
     "//chrome/browser/net:probe_message_proto",
     "//chrome/browser/ui",
@@ -83,6 +82,7 @@ static_library("browser") {
     "//components/google/core/browser",
     "//components/handoff",
     "//components/history/core/browser",
+    "//components/history/core/browser:proto",
     "//components/history/core/common",
     "//components/infobars/core",
     "//components/invalidation",
@@ -92,7 +92,6 @@ static_library("browser") {
     "//components/metrics/proto:proto",
     "//components/navigation_metrics",
     "//components/network_time",
-    "//components/omaha_client",
     "//components/omnibox",
     "//components/os_crypt",
     "//components/password_manager/core/browser",
@@ -113,11 +112,13 @@ static_library("browser") {
     "//components/translate/core/browser",
     "//components/translate/core/common",
     "//components/ui/zoom:ui_zoom",
+    "//components/update_client",
     "//components/url_fixer",
     "//components/user_prefs",
     "//components/variations",
     "//components/variations/net",
     "//components/webdata/common",
+    "//components/webdata_services",
     "//components/web_resource",
     "//content/public/browser",
     "//content/public/common",
@@ -313,6 +314,7 @@ static_library("browser") {
       "//chrome/browser/sync_file_system/drive_backend:sync_file_system_drive_proto",
       "//chrome/common/extensions/api",
       "//chrome/common/extensions/api:api_registration",
+      "//components/proximity_auth/cryptauth",
       "//extensions/components/javascript_dialog_extensions_client",
     ]
     sources += rebase_path(gypi_values.chrome_browser_extensions_sources,
@@ -788,10 +790,15 @@ grit("resources") {
 action("about_credits") {
   script = "//tools/licenses.py"
 
-  # TODO(phajdan.jr): input dependencies so this can be regenerated
-  # automatically when one of the credits changes. The way this should work is
-  # that licenses.py should write a .d file listing the input dependencies (see
-  # "depfile" in GN).
+  inputs = [
+    # This is not a complete list. TODO(phajdan.jr, dbeam): licenses.py needs to
+    # generate a .d file with all the licenses/credits that about:credits uses.
+    # Then about:credits will automatically rebuild when one of them changes.
+    # See: depfile in gn's documentation (gn help depfile).
+    "resources/about_credits.tmpl",
+    "resources/about_credits_entry.tmpl",
+  ]
+
   outputs = [
     about_credits_file,
   ]

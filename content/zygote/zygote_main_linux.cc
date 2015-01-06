@@ -134,8 +134,8 @@ static void ProxyLocaltimeCallToBrowser(time_t input, struct tm* output,
   Pickle reply(reinterpret_cast<char*>(reply_buf), r);
   PickleIterator iter(reply);
   std::string result, timezone;
-  if (!reply.ReadString(&iter, &result) ||
-      !reply.ReadString(&iter, &timezone) ||
+  if (!iter.ReadString(&result) ||
+      !iter.ReadString(&timezone) ||
       result.size() != sizeof(struct tm)) {
     memset(output, 0, sizeof(struct tm));
     return;
@@ -451,7 +451,8 @@ static bool EnterSuidSandbox(sandbox::SetuidSandboxClient* setuid_sandbox,
   // Note: a non-dumpable process can't be debugged. To debug sandbox-related
   // issues, one can specify --allow-sandbox-debugging to let the process be
   // dumpable.
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
   if (!command_line.HasSwitch(switches::kAllowSandboxDebugging)) {
     prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
     if (prctl(PR_GET_DUMPABLE, 0, 0, 0, 0)) {
@@ -575,8 +576,12 @@ bool ZygoteMain(const MainFunctionParams& params,
   fds_to_close_post_fork.push_back(sancov_socket_fds[1]);
 #endif
 
-  // This will pre-initialize the various sandboxes that need it.
-  linux_sandbox->PreinitializeSandbox();
+  // Skip pre-initializing sandbox under --no-sandbox for crbug.com/444900.
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kNoSandbox)) {
+    // This will pre-initialize the various sandboxes that need it.
+    linux_sandbox->PreinitializeSandbox();
+  }
 
   const bool must_enable_setuid_sandbox =
       linux_sandbox->setuid_sandbox_client()->IsSuidSandboxChild();

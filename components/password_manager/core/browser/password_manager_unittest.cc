@@ -432,9 +432,6 @@ TEST_F(PasswordManagerTest, FormSubmitAfterNavigateInPage) {
   manager()->OnPasswordFormsRendered(&driver_, observed,
                                      true);  // The initial layout.
 
-  // Simulate navigating in the page.
-  manager()->DidNavigateMainFrame(true);
-
   // Simulate submitting the password.
   OnPasswordFormSubmitted(form);
 
@@ -479,7 +476,7 @@ TEST_F(PasswordManagerTest, FormSubmitWithFormOnPreviousPage) {
   manager()->OnPasswordFormsRendered(&driver_, observed, true);
 
   // Now navigate to a second page.
-  manager()->DidNavigateMainFrame(false);
+  manager()->DidNavigateMainFrame();
 
   // This page contains a form with the same markup, but on a different
   // URL.
@@ -915,6 +912,31 @@ TEST_F(PasswordManagerTest, FillPasswordOnManyFrames) {
   MockPasswordManagerDriver driver_b;
   EXPECT_CALL(driver_b, FillPasswordForm(_)).Times(1);
   manager()->OnPasswordFormsParsed(&driver_b, observed);
+}
+
+TEST_F(PasswordManagerTest, InPageNavigation) {
+  // Test that observing a newly submitted form shows the save password bar on
+  // call in page navigation.
+  std::vector<PasswordForm*> result;  // Empty password store.
+  EXPECT_CALL(driver_, FillPasswordForm(_)).Times(Exactly(0));
+  EXPECT_CALL(*store_.get(), GetLogins(_, _, _))
+      .WillOnce(DoAll(WithArg<2>(InvokeConsumer(result)), Return()));
+  std::vector<PasswordForm> observed;
+  PasswordForm form(MakeSimpleForm());
+  observed.push_back(form);
+  // The initial load.
+  manager()->OnPasswordFormsParsed(&driver_, observed);
+  // The initial layout.
+  manager()->OnPasswordFormsRendered(&driver_, observed, true);
+
+  // And the form submit contract is to call ProvisionallySavePassword.
+  manager()->ProvisionallySavePassword(form);
+
+  scoped_ptr<PasswordFormManager> form_to_save;
+  EXPECT_CALL(client_, PromptUserToSavePasswordPtr(_))
+      .WillOnce(WithArg<0>(SaveToScopedPtr(&form_to_save)));
+
+  manager()->OnInPageNavigation(&driver_, form);
 }
 
 }  // namespace password_manager

@@ -29,6 +29,7 @@
 #include "gpu/command_buffer/service/image_factory.h"
 #include "gpu/command_buffer/service/mailbox_manager_impl.h"
 #include "gpu/command_buffer/service/sync_point_manager.h"
+#include "gpu/command_buffer/service/valuebuffer_manager.h"
 #include "ipc/ipc_channel.h"
 #include "ipc/message_filter.h"
 #include "ui/gl/gl_context.h"
@@ -110,7 +111,7 @@ class GpuChannelMessageFilter : public IPC::MessageFilter {
     }
 
     if (message.type() == GpuCommandBufferMsg_InsertSyncPoint::ID) {
-      Tuple1<bool> retire;
+      Tuple<bool> retire;
       IPC::Message* reply = IPC::SyncMessage::GenerateReply(&message);
       if (!GpuCommandBufferMsg_InsertSyncPoint::ReadSendParam(&message,
                                                               &retire)) {
@@ -118,7 +119,7 @@ class GpuChannelMessageFilter : public IPC::MessageFilter {
         Send(reply);
         return true;
       }
-      if (!future_sync_points_ && !retire.a) {
+      if (!future_sync_points_ && !get<0>(retire)) {
         LOG(ERROR) << "Untrusted contexts can't create future sync points";
         reply->set_reply_error();
         Send(reply);
@@ -133,7 +134,7 @@ class GpuChannelMessageFilter : public IPC::MessageFilter {
                      gpu_channel_,
                      sync_point_manager_,
                      message.routing_id(),
-                     retire.a,
+                     get<0>(retire),
                      sync_point));
       handled = true;
     }
@@ -425,10 +426,14 @@ GpuChannel::GpuChannel(GpuChannelManager* gpu_channel_manager,
   const base::CommandLine* command_line =
       base::CommandLine::ForCurrentProcess();
   log_messages_ = command_line->HasSwitch(switches::kLogPluginMessages);
+
+  subscription_ref_set_ = new gpu::gles2::SubscriptionRefSet();
+  subscription_ref_set_->AddObserver(this);
 }
 
 GpuChannel::~GpuChannel() {
   STLDeleteElements(&deferred_messages_);
+  subscription_ref_set_->RemoveObserver(this);
   if (preempting_flag_.get())
     preempting_flag_->Reset();
 }
@@ -512,6 +517,16 @@ bool GpuChannel::Send(IPC::Message* message) {
   return channel_->Send(message);
 }
 
+void GpuChannel::OnAddSubscription(unsigned int target) {
+  gpu_channel_manager()->Send(
+      new GpuHostMsg_AddSubscription(client_id_, target));
+}
+
+void GpuChannel::OnRemoveSubscription(unsigned int target) {
+  gpu_channel_manager()->Send(
+      new GpuHostMsg_RemoveSubscription(client_id_, target));
+}
+
 void GpuChannel::RequeueMessage() {
   DCHECK(currently_processing_message_);
   deferred_messages_.push_front(
@@ -581,6 +596,7 @@ CreateCommandBufferResult GpuChannel::CreateViewCommandBuffer(
                                share_group,
                                window,
                                mailbox_manager_.get(),
+                               subscription_ref_set_.get(),
                                pending_valuebuffer_state_.get(),
                                gfx::Size(),
                                disallowed_features_,
@@ -740,6 +756,7 @@ void GpuChannel::OnCreateOffscreenCommandBuffer(
       share_group,
       gfx::GLSurfaceHandle(),
       mailbox_manager_.get(),
+      subscription_ref_set_.get(),
       pending_valuebuffer_state_.get(),
       size,
       disallowed_features_,

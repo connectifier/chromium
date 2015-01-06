@@ -74,10 +74,10 @@
 //
 //<include src="../../common/js/async_util.js">
 //<include src="../../common/js/file_type.js">
-//<include src="../../common/js/importer_common.js">
 //<include src="../../common/js/volume_manager_common.js">
 //<include src="../../common/js/util.js">
 //<include src="../../common/js/progress_center_common.js">
+//<include src="../../common/js/importer_common.js">
 //
 //<include src="ui/combobutton.js">
 //<include src="ui/commandbutton.js">
@@ -87,6 +87,7 @@
 //<include src="app_state_controller.js">
 //<include src="cws_container_client.js">
 //<include src="dialog_action_controller.js">
+//<include src="dialog_type.js">
 //<include src="directory_contents.js">
 //<include src="directory_model.js">
 //<include src="file_manager.js">
@@ -97,6 +98,7 @@
 //<include src="file_watcher.js">
 //<include src="folder_shortcuts_data_model.js">
 //<include src="gear_menu_controller.js">
+//<include src="import_controller.js">
 //<include src="launch_param.js">
 //<include src="metadata/metadata_cache.js">
 //<include src="metadata_update_controller.js">

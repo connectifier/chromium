@@ -39,11 +39,11 @@
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/themes/theme_syncable_service.h"
-#include "chrome/browser/webdata/autocomplete_syncable_service.h"
 #include "chrome/browser/webdata/web_data_service_factory.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/chrome_version_info.h"
 #include "chrome/common/pref_names.h"
+#include "components/autofill/core/browser/webdata/autocomplete_syncable_service.h"
 #include "components/autofill/core/browser/webdata/autofill_profile_syncable_service.h"
 #include "components/autofill/core/browser/webdata/autofill_webdata_service.h"
 #include "components/dom_distiller/core/dom_distiller_service.h"
@@ -81,6 +81,8 @@
 #endif
 
 #if defined(ENABLE_SUPERVISED_USERS)
+#include "chrome/browser/supervised_user/supervised_user_service.h"
+#include "chrome/browser/supervised_user/supervised_user_service_factory.h"
 #include "chrome/browser/supervised_user/supervised_user_settings_service.h"
 #include "chrome/browser/supervised_user/supervised_user_settings_service_factory.h"
 #include "chrome/browser/supervised_user/supervised_user_shared_settings_service.h"
@@ -88,11 +90,17 @@
 #include "chrome/browser/supervised_user/supervised_user_sync_data_type_controller.h"
 #include "chrome/browser/supervised_user/supervised_user_sync_service.h"
 #include "chrome/browser/supervised_user/supervised_user_sync_service_factory.h"
+#include "chrome/browser/supervised_user/supervised_user_whitelist_service.h"
 #endif
 
 #if defined(ENABLE_SPELLCHECK)
 #include "chrome/browser/spellchecker/spellcheck_factory.h"
 #include "chrome/browser/spellchecker/spellcheck_service.h"
+#endif
+
+#if defined(OS_CHROMEOS)
+#include "components/wifi_sync/wifi_credential_syncable_service.h"
+#include "components/wifi_sync/wifi_credential_syncable_service_factory.h"
 #endif
 
 using browser_sync::AutofillDataTypeController;
@@ -129,7 +137,7 @@ using sync_driver::UIDataTypeController;
 namespace {
 
 syncer::ModelTypeSet GetDisabledTypesFromCommandLine(
-    const CommandLine& command_line) {
+    const base::CommandLine& command_line) {
   syncer::ModelTypeSet disabled_types;
   std::string disabled_types_str =
       command_line.GetSwitchValueASCII(switches::kDisableSyncTypes);
@@ -138,7 +146,7 @@ syncer::ModelTypeSet GetDisabledTypesFromCommandLine(
 }
 
 syncer::ModelTypeSet GetEnabledTypesFromCommandLine(
-    const CommandLine& command_line) {
+    const base::CommandLine& command_line) {
   syncer::ModelTypeSet enabled_types;
   return enabled_types;
 }
@@ -147,14 +155,15 @@ syncer::ModelTypeSet GetEnabledTypesFromCommandLine(
 
 ProfileSyncComponentsFactoryImpl::ProfileSyncComponentsFactoryImpl(
     Profile* profile,
-    CommandLine* command_line,
+    base::CommandLine* command_line,
     const GURL& sync_service_url,
     OAuth2TokenService* token_service,
     net::URLRequestContextGetter* url_request_context_getter)
     : profile_(profile),
       command_line_(command_line),
       web_data_service_(WebDataServiceFactory::GetAutofillWebDataForProfile(
-          profile_, Profile::EXPLICIT_ACCESS)),
+          profile_,
+          Profile::EXPLICIT_ACCESS)),
       sync_service_url_(sync_service_url),
       token_service_(token_service),
       url_request_context_getter_(url_request_context_getter),
@@ -283,6 +292,11 @@ void ProfileSyncComponentsFactoryImpl::RegisterCommonDataTypes(
           syncer::SUPERVISED_USER_SETTINGS,
           this,
           profile_));
+  pss->RegisterDataTypeController(
+      new SupervisedUserSyncDataTypeController(
+          syncer::SUPERVISED_USER_WHITELISTS,
+          this,
+          profile_));
 #endif
 }
 
@@ -392,6 +406,18 @@ void ProfileSyncComponentsFactoryImpl::RegisterDesktopDataTypes(
           this,
           profile_));
 #endif
+
+#if defined(OS_CHROMEOS)
+  if (command_line_->HasSwitch(switches::kEnableWifiCredentialSync) &&
+      !disabled_types.Has(syncer::WIFI_CREDENTIALS)) {
+    pss->RegisterDataTypeController(
+        new UIDataTypeController(
+            BrowserThread::GetMessageLoopProxyForThread(BrowserThread::UI),
+            base::Bind(&ChromeReportUnrecoverableError),
+            syncer::WIFI_CREDENTIALS,
+            this));
+  }
+#endif
 }
 
 DataTypeManager* ProfileSyncComponentsFactoryImpl::CreateDataTypeManager(
@@ -447,7 +473,7 @@ base::WeakPtr<syncer::SyncableService> ProfileSyncComponentsFactoryImpl::
       if (!web_data_service_.get())
         return base::WeakPtr<syncer::SyncableService>();
       if (type == syncer::AUTOFILL) {
-        return AutocompleteSyncableService::FromWebDataService(
+        return autofill::AutocompleteSyncableService::FromWebDataService(
             web_data_service_.get())->AsWeakPtr();
       } else {
         return autofill::AutofillProfileSyncableService::FromWebDataService(
@@ -504,6 +530,10 @@ base::WeakPtr<syncer::SyncableService> ProfileSyncComponentsFactoryImpl::
     case syncer::SUPERVISED_USER_SHARED_SETTINGS:
       return SupervisedUserSharedSettingsServiceFactory::GetForBrowserContext(
           profile_)->AsWeakPtr();
+    case syncer::SUPERVISED_USER_WHITELISTS:
+      return SupervisedUserServiceFactory::GetForProfile(profile_)
+          ->GetWhitelistService()
+          ->AsWeakPtr();
 #endif
     case syncer::ARTICLES: {
       dom_distiller::DomDistillerService* service =
@@ -528,6 +558,11 @@ base::WeakPtr<syncer::SyncableService> ProfileSyncComponentsFactoryImpl::
       return base::WeakPtr<syncer::SyncableService>();
 #endif
     }
+#if defined(OS_CHROMEOS)
+    case syncer::WIFI_CREDENTIALS:
+      return wifi_sync::WifiCredentialSyncableServiceFactory::
+          GetForBrowserContext(profile_)->AsWeakPtr();
+#endif
     default:
       // The following datatypes still need to be transitioned to the
       // syncer::SyncableService API:

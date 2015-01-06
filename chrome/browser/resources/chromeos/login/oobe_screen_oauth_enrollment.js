@@ -132,6 +132,7 @@ login.createScreen('OAuthEnrollmentScreen', 'oauth-enrollment', function() {
     onBeforeShow: function(data) {
       var url = data.signin_url;
       url += '?gaiaUrl=' + encodeURIComponent(data.gaiaUrl);
+      url += '&needPassword=0';
       this.signInUrl_ = url;
       var modes = ['manual', 'forced', 'recovery'];
       for (var i = 0; i < modes.length; ++i) {
@@ -230,6 +231,10 @@ login.createScreen('OAuthEnrollmentScreen', 'oauth-enrollment', function() {
               msg.domain);
         }
         this.classList.toggle('saml', msg.isSAML);
+      }
+
+      if (msg.method == 'resetAuthFlow') {
+        this.classList.remove('saml');
       }
 
       if (msg.method == 'loginUILoaded' && this.currentStep_ == STEP_SIGNIN) {

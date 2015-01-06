@@ -13,6 +13,7 @@
       'app_runtime.idl',
       'app_view_guest_internal.json',
       'app_window.idl',
+      'audio.idl',
       'bluetooth.idl',
       'bluetooth_low_energy.idl',
       'bluetooth_private.json',
@@ -36,6 +37,7 @@
       'sockets_tcp_server.idl',
       'sockets_udp.idl',
       'storage.json',
+      'surface_worker_internal.json',
       'system_cpu.idl',
       'system_display.idl',
       'system_memory.idl',
@@ -45,8 +47,7 @@
       'usb.idl',
       'virtual_keyboard_private.json',
       'web_request.json',
-      'web_view_internal.json',
-      'worker_frame_internal.json'
+      'web_view_internal.json'
     ],
     # ChromeOS-specific schemas.
     'chromeos_schema_files': [

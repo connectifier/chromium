@@ -121,7 +121,6 @@ class WebHitTestResult;
 
 namespace content {
 
-class BrowserPluginManager;
 class DevToolsAgent;
 class DocumentState;
 class HistoryController;
@@ -166,6 +165,7 @@ class CONTENT_EXPORT RenderViewImpl
   // |proxy_routing_id| is specified, so a RenderFrameProxy can be created for
   // this RenderView's main RenderFrame.
   static RenderViewImpl* Create(const ViewMsg_New_Params& params,
+                                CompositorDependencies* compositor_deps,
                                 bool was_created_by_renderer);
 
   // Used by content_layouttest_support to hook into the creation of
@@ -203,9 +203,6 @@ class CONTENT_EXPORT RenderViewImpl
   HistoryController* history_controller() {
     return history_controller_.get();
   }
-
-  // Lazily initialize this view's BrowserPluginManager and return it.
-  BrowserPluginManager* GetBrowserPluginManager();
 
   // Functions to add and remove observers for this object.
   void AddObserver(RenderViewObserver* observer);
@@ -522,6 +519,7 @@ class CONTENT_EXPORT RenderViewImpl
   explicit RenderViewImpl(const ViewMsg_New_Params& params);
 
   void Initialize(const ViewMsg_New_Params& params,
+                  CompositorDependencies* compositor_deps,
                   bool was_created_by_renderer);
   void SetScreenMetricsEmulationParameters(float device_scale_factor,
                                            const gfx::Point& root_layer_offset,
@@ -960,9 +958,6 @@ class CONTENT_EXPORT RenderViewImpl
   // The speech recognition dispatcher attached to this view, lazily
   // initialized.
   SpeechRecognitionDispatcher* speech_recognition_dispatcher_;
-
-  // BrowserPluginManager attached to this view; lazily initialized.
-  scoped_refptr<BrowserPluginManager> browser_plugin_manager_;
 
   DevToolsAgent* devtools_agent_;
 

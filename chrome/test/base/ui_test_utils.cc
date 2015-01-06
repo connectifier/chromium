@@ -70,7 +70,7 @@
 #include "net/test/python_utils.h"
 #include "net/url_request/url_request_context.h"
 #include "net/url_request/url_request_context_getter.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/rect.h"
 
 #if defined(USE_AURA)
 #include "ash/shell.h"
@@ -175,11 +175,7 @@ void NavigateToURL(Browser* browser, const GURL& url) {
                                BROWSER_TEST_WAIT_FOR_NAVIGATION);
 }
 
-// Navigates the specified tab (via |disposition|) of |browser| to |url|,
-// blocking until the |number_of_navigations| specified complete.
-// |disposition| indicates what tab the download occurs in, and
-// |browser_test_flags| controls what to wait for before continuing.
-static void NavigateToURLWithDispositionBlockUntilNavigationsComplete(
+void NavigateToURLWithDispositionBlockUntilNavigationsComplete(
     Browser* browser,
     const GURL& url,
     int number_of_navigations,
@@ -279,7 +275,7 @@ bool GetRelativeBuildDirectory(base::FilePath* build_dir) {
   // built files (nexes, etc).  TestServer expects a path relative to the source
   // root.
   base::FilePath exe_dir =
-      CommandLine::ForCurrentProcess()->GetProgram().DirName();
+      base::CommandLine::ForCurrentProcess()->GetProgram().DirName();
   base::FilePath src_dir;
   if (!PathService::Get(base::DIR_SOURCE_ROOT, &src_dir))
     return false;

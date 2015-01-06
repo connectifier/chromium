@@ -18,6 +18,11 @@
     ],
   },
   'targets': [
+    # TODO(gunsch): Remove these fake targets once they're either added or no
+    # longer referenced from internal code.
+    {'target_name': 'cast_media_audio', 'type': 'none'},
+    {'target_name': 'cast_port_impl', 'type': 'none'},
+
     {
       'target_name': 'cast_base',
       'type': '<(component)',
@@ -174,6 +179,10 @@
         'common/pref_names.h',
         'renderer/cast_content_renderer_client.cc',
         'renderer/cast_content_renderer_client.h',
+        'renderer/cast_media_load_deferrer.cc',
+        'renderer/cast_media_load_deferrer.h',
+        'renderer/cast_render_process_observer.cc',
+        'renderer/cast_render_process_observer.h',
         'renderer/key_systems_cast.cc',
         'renderer/key_systems_cast.h',
       ],
@@ -410,6 +419,43 @@
             }],
           ]
         },  # end of target 'cast_crash_client'
+        {
+          'target_name': 'cast_shell_media',
+          'type': '<(component)',
+          'dependencies': [
+            'media/media.gyp:cast_media',
+            '../content/content.gyp:content',
+            '../ipc/ipc.gyp:ipc',
+          ],
+          'sources': [
+            'browser/media/cma_message_filter_host.cc',
+            'browser/media/cma_message_filter_host.h',
+            'browser/media/cma_message_loop.cc',
+            'browser/media/cma_message_loop.h',
+            'browser/media/media_pipeline_host.cc',
+            'browser/media/media_pipeline_host.h',
+            'common/media/cma_ipc_common.h',
+            'common/media/cma_messages.h',
+            'common/media/cma_message_generator.cc',
+            'common/media/cma_message_generator.h',
+            'common/media/cma_param_traits.cc',
+            'common/media/cma_param_traits.h',
+            'common/media/shared_memory_chunk.cc',
+            'common/media/shared_memory_chunk.h',
+            'renderer/media/audio_pipeline_proxy.cc',
+            'renderer/media/audio_pipeline_proxy.h',
+            'renderer/media/cma_media_renderer_factory.cc',
+            'renderer/media/cma_media_renderer_factory.h',
+            'renderer/media/cma_message_filter_proxy.cc',
+            'renderer/media/cma_message_filter_proxy.h',
+            'renderer/media/media_channel_proxy.cc',
+            'renderer/media/media_channel_proxy.h',
+            'renderer/media/media_pipeline_proxy.cc',
+            'renderer/media/media_pipeline_proxy.h',
+            'renderer/media/video_pipeline_proxy.cc',
+            'renderer/media/video_pipeline_proxy.h',
+          ],
+        },  # end of target 'cast_shell_media'
         # This target contains all of the primary code of |cast_shell|, except
         # for |main|. This allows end-to-end tests using |cast_shell|.
         # This also includes all targets that cannot be built on Android.
@@ -419,6 +465,7 @@
           'dependencies': [
             'cast_crash_client',
             'cast_net',
+            'cast_shell_media',
             'cast_shell_common',
             'media/media.gyp:cast_media',
             '../ui/aura/aura.gyp:aura_test_support',

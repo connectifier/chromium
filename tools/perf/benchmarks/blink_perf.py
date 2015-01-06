@@ -64,7 +64,8 @@ def CreatePageSetFromPath(path, skipped_file):
 class _BlinkPerfMeasurement(page_test.PageTest):
   """Tuns a blink performance test and reports the results."""
   def __init__(self):
-    super(_BlinkPerfMeasurement, self).__init__('')
+    super(_BlinkPerfMeasurement, self).__init__(
+        action_name_to_run='RunPageInteractions')
     with open(os.path.join(os.path.dirname(__file__),
                            'blink_perf.js'), 'r') as f:
       self._blink_perf_js = f.read()
@@ -78,6 +79,8 @@ class _BlinkPerfMeasurement(page_test.PageTest):
         '--enable-experimental-web-platform-features',
         '--disable-gesture-requirement-for-media-playback'
     ])
+    if 'content-shell' in options.browser_type:
+      options.AppendExtraBrowserArgs('--expose-internals-for-testing')
 
   def ValidateAndMeasurePage(self, page, tab, results):
     tab.WaitForJavaScriptExpression('testRunner.isDone', 600)
@@ -127,6 +130,16 @@ class BlinkPerfBindings(benchmark.Benchmark):
 
   def CreatePageSet(self, options):
     path = os.path.join(BLINK_PERF_BASE_DIR, 'Bindings')
+    return CreatePageSetFromPath(path, SKIPPED_FILE)
+
+
+@benchmark.Enabled('content-shell')
+class BlinkPerfBlinkGC(benchmark.Benchmark):
+  tag = 'blink_gc'
+  test = _BlinkPerfMeasurement
+
+  def CreatePageSet(self, options):
+    path = os.path.join(BLINK_PERF_BASE_DIR, 'BlinkGC')
     return CreatePageSetFromPath(path, SKIPPED_FILE)
 
 

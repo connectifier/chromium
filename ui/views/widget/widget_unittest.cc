@@ -19,8 +19,8 @@
 #include "ui/events/event_processor.h"
 #include "ui/events/event_utils.h"
 #include "ui/events/test/event_generator.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/gfx/native_widget_types.h"
-#include "ui/gfx/point.h"
 #include "ui/views/bubble/bubble_delegate.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/test/test_views_delegate.h"
@@ -233,6 +233,22 @@ TEST_F(WidgetTest, WidgetInitParams) {
   // Widgets are not transparent by default.
   Widget::InitParams init1;
   EXPECT_EQ(Widget::InitParams::INFER_OPACITY, init1.opacity);
+}
+
+TEST_F(WidgetTest, NativeWindowProperty) {
+  const char* key = "foo";
+  int value = 3;
+
+  Widget* widget = CreateTopLevelPlatformWidget();
+  EXPECT_EQ(nullptr, widget->GetNativeWindowProperty(key));
+
+  widget->SetNativeWindowProperty(key, &value);
+  EXPECT_EQ(&value, widget->GetNativeWindowProperty(key));
+
+  widget->SetNativeWindowProperty(key, nullptr);
+  EXPECT_EQ(nullptr, widget->GetNativeWindowProperty(key));
+
+  widget->CloseNow();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -26,6 +26,10 @@
 #include "extensions/common/one_shot_event.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
+#if defined(OS_CHROMEOS)
+#include "chromeos/audio/cras_audio_handler.h"
+#endif
+
 namespace {
 
 class MockAudioHistoryHandler : public HotwordAudioHistoryHandler {
@@ -133,8 +137,19 @@ class HotwordServiceTest :
       base::CommandLine::ForCurrentProcess()->AppendSwitch(
           switches::kDisableExperimentalHotwording);
     }
+#if defined(OS_CHROMEOS)
+    // Tests on chromeos need to have the handler initialized.
+    chromeos::CrasAudioHandler::InitializeForTesting();
+#endif
 
     extensions::ExtensionServiceTestBase::SetUp();
+  }
+
+  void TearDown() override {
+#if defined(OS_CHROMEOS)
+    DCHECK(chromeos::CrasAudioHandler::IsInitialized());
+    chromeos::CrasAudioHandler::Shutdown();
+#endif
   }
 
   base::FieldTrialList field_trial_list_;
@@ -216,19 +231,6 @@ TEST_P(HotwordServiceTest, IsHotwordAllowedLocale) {
   Profile* otr_profile = profile->GetOffTheRecordProfile();
   SetApplicationLocale(otr_profile, "en");
   EXPECT_FALSE(HotwordServiceFactory::IsHotwordAllowed(otr_profile));
-}
-
-TEST_P(HotwordServiceTest, AudioLoggingPrefSetCorrectly) {
-  TestingProfile::Builder profile_builder;
-  scoped_ptr<TestingProfile> profile = profile_builder.Build();
-
-  HotwordService* hotword_service =
-      HotwordServiceFactory::GetForProfile(profile.get());
-  EXPECT_TRUE(hotword_service != NULL);
-
-  // If it's a fresh profile, although the default value is true,
-  // it should return false if the preference has never been set.
-  EXPECT_FALSE(hotword_service->IsOptedIntoAudioLogging());
 }
 
 TEST_P(HotwordServiceTest, ShouldReinstallExtension) {

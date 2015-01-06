@@ -15,6 +15,7 @@
 #include "ui/events/ozone/evdev/event_converter_evdev_impl.h"
 #include "ui/events/ozone/evdev/keyboard_evdev.h"
 #include "ui/events/ozone/evdev/mouse_button_map_evdev.h"
+#include "ui/events/ozone/layout/keyboard_layout_engine_manager.h"
 
 namespace ui {
 
@@ -100,7 +101,8 @@ class EventConverterEvdevImplTest : public testing::Test {
         base::Bind(&EventConverterEvdevImplTest::DispatchEventForTest,
                    base::Unretained(this));
     keyboard_.reset(new ui::KeyboardEvdev(
-        modifiers_.get(), callback));
+        modifiers_.get(),
+        ui::KeyboardLayoutEngineManager::GetKeyboardLayoutEngine(), callback));
     device_.reset(new ui::MockEventConverterEvdevImpl(
         events_in_, modifiers_.get(), button_map_.get(), cursor_.get(),
         keyboard_.get(), callback));
@@ -206,7 +208,7 @@ TEST_F(EventConverterEvdevImplTest, KeyRepeat) {
   };
 
   dev->ProcessEvents(mock_kernel_queue, arraysize(mock_kernel_queue));
-  EXPECT_EQ(4u, size());
+  EXPECT_EQ(2u, size());
 
   ui::KeyEvent* event;
 
@@ -216,16 +218,6 @@ TEST_F(EventConverterEvdevImplTest, KeyRepeat) {
   EXPECT_EQ(0, event->flags());
 
   event = dispatched_event(1);
-  EXPECT_EQ(ui::ET_KEY_PRESSED, event->type());
-  EXPECT_EQ(ui::VKEY_BACK, event->key_code());
-  EXPECT_EQ(0, event->flags());
-
-  event = dispatched_event(2);
-  EXPECT_EQ(ui::ET_KEY_PRESSED, event->type());
-  EXPECT_EQ(ui::VKEY_BACK, event->key_code());
-  EXPECT_EQ(0, event->flags());
-
-  event = dispatched_event(3);
   EXPECT_EQ(ui::ET_KEY_RELEASED, event->type());
   EXPECT_EQ(ui::VKEY_BACK, event->key_code());
   EXPECT_EQ(0, event->flags());

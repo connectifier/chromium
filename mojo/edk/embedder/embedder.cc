@@ -44,7 +44,7 @@ system::ChannelId MakeChannel(
     return 0;
   }
 
-  channel->AttachAndRunEndpoint(channel_endpoint, true);
+  channel->SetBootstrapEndpoint(channel_endpoint);
 
   DCHECK(internal::g_channel_manager);
   return internal::g_channel_manager->AddChannel(
@@ -206,6 +206,12 @@ MojoResult PassWrappedPlatformHandle(MojoHandle platform_handle_wrapper_handle,
           ->PassPlatformHandle()
           .Pass();
   return MOJO_RESULT_OK;
+}
+
+MojoResult AsyncWait(MojoHandle handle,
+                     MojoHandleSignals signals,
+                     base::Callback<void(MojoResult)> callback) {
+  return internal::g_core->AsyncWait(handle, signals, callback);
 }
 
 }  // namespace embedder

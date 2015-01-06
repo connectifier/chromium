@@ -19,6 +19,7 @@ LOCAL_SRC_FILES += \
     ../net/android/java/src/org/chromium/net/IRemoteAndroidKeyStoreCallbacks.aidl \
     ../net/android/java/src/org/chromium/net/IRemoteAndroidKeyStore.aidl \
     $(call all-java-files-under, ../base/android/java/src) \
+    $(call all-java-files-under, ../device/battery/android/java/src) \
     $(call all-java-files-under, ../media/base/android/java/src) \
     $(call all-java-files-under, ../mojo/android/system/src) \
     $(call all-java-files-under, ../mojo/public/java/bindings/src) \
@@ -66,11 +67,16 @@ $(call intermediates-dir-for,GYP,shared)/enums/base_java_library_load_from_apk_s
 $(call intermediates-dir-for,GYP,shared)/enums/base_java_memory_pressure_level/org/chromium/base/MemoryPressureLevel.java \
 $(call intermediates-dir-for,GYP,shared)/enums/media_android_imageformat/org/chromium/media/AndroidImageFormat.java \
 $(call intermediates-dir-for,GYP,shared)/enums/page_transition_types_java/org/chromium/ui/base/PageTransition.java \
-$(call intermediates-dir-for,GYP,shared)/enums/system_ui_resource_type_java/org/chromium/ui/base/SystemUIResourceType.java \
+$(call intermediates-dir-for,GYP,shared)/enums/system_ui_resource_type_java/org/chromium/ui/resources/SystemUIResourceType.java \
 $(call intermediates-dir-for,GYP,shared)/enums/text_input_type_java/org/chromium/ui/base/ime/TextInputType.java \
 $(call intermediates-dir-for,GYP,shared)/enums/touch_device_types_java/org/chromium/ui/base/HoverType.java \
 $(call intermediates-dir-for,GYP,shared)/enums/touch_device_types_java/org/chromium/ui/base/PointerType.java \
 $(call intermediates-dir-for,GYP,shared)/templates/net_errors_java/org/chromium/net/NetError.java \
+$(call intermediates-dir-for,GYP,shared)/java_mojo/device_battery_mojo_bindings/src/org/chromium/mojom/device/BatteryMonitor.java \
+$(call intermediates-dir-for,GYP,shared)/java_mojo/device_battery_mojo_bindings/src/org/chromium/mojom/device/BatteryMonitor_Internal.java \
+$(call intermediates-dir-for,GYP,shared)/java_mojo/device_battery_mojo_bindings/src/org/chromium/mojom/device/BatteryStatus.java \
+$(call intermediates-dir-for,GYP,shared)/java_mojo/device_battery_mojo_bindings/src/org/chromium/mojom/device/BatteryStatusObserver.java \
+$(call intermediates-dir-for,GYP,shared)/java_mojo/device_battery_mojo_bindings/src/org/chromium/mojom/device/BatteryStatusObserver_Internal.java
 
 # content dependencies on java components that are provided by the system on
 # android

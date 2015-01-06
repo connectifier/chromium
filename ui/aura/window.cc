@@ -10,6 +10,7 @@
 #include "base/bind_helpers.h"
 #include "base/callback.h"
 #include "base/logging.h"
+#include "base/profiler/scoped_tracker.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
@@ -383,9 +384,9 @@ gfx::Rect Window::GetBoundsInRootWindow() const {
   //             do for now.
   if (!GetRootWindow())
     return bounds();
-  gfx::Point origin = bounds().origin();
-  ConvertPointToTarget(parent_, GetRootWindow(), &origin);
-  return gfx::Rect(origin, bounds().size());
+  gfx::Rect bounds_in_root(bounds().size());
+  ConvertRectToTarget(this, GetRootWindow(), &bounds_in_root);
+  return bounds_in_root;
 }
 
 gfx::Rect Window::GetBoundsInScreen() const {
@@ -922,6 +923,10 @@ void Window::SetBoundsInternal(const gfx::Rect& new_bounds) {
 }
 
 void Window::SetVisible(bool visible) {
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/440919 is fixed.
+  tracked_objects::ScopedTracker tracking_profile(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION("440919 Window::SetVisible"));
+
   if ((layer() && visible == layer()->GetTargetVisibility()) ||
       (!layer() && visible == visible_))
     return;  // No change.

@@ -86,6 +86,7 @@ class TiledLayerTest : public testing::Test {
         occlusion_(nullptr) {
     settings_.max_partial_texture_updates = std::numeric_limits<size_t>::max();
     settings_.layer_transforms_should_scale_layer_contents = true;
+    settings_.verify_property_trees = true;
   }
 
   void SetUp() override {
@@ -118,7 +119,7 @@ class TiledLayerTest : public testing::Test {
         new FakeLayerTreeHostImpl(proxy_, shared_bitmap_manager_.get()));
   }
 
-  virtual ~TiledLayerTest() {
+  ~TiledLayerTest() override {
     ResourceManagerClearAllMemory(resource_manager_.get(),
                                   resource_provider_.get());
 

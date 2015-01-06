@@ -8,19 +8,6 @@
 var remoting = remoting || {};
 
 /**
- * Display the user's email address and allow access to the rest of the app,
- * including parsing URL parameters.
- *
- * @param {string} email The user's email address.
- * @return {void} Nothing.
- */
-remoting.onEmailAvailable = function(email, fullName) {
-  document.getElementById('current-email').innerText = email;
-  document.getElementById('get-started-it2me').disabled = false;
-  document.getElementById('get-started-me2me').disabled = false;
-};
-
-/**
  * Initialize the host list.
  */
 remoting.initHostlist_ = function() {
@@ -96,6 +83,23 @@ remoting.initHostlist_ = function() {
     remoting.initHomeScreenUi();
   }
   remoting.hostList.load(onLoad);
+}
+
+/**
+ * Returns whether Host mode is supported on this platform for It2me.
+ * TODO(kelvinp): Remove this function once It2me is enabled on Chrome OS (See
+ * crbug.com/429860).
+ *
+ * @return {Promise} Resolves to true if Host mode is supported.
+ */
+function isHostModeSupported_() {
+  if (!remoting.platformIsChromeOS()) {
+    return Promise.resolve(true);
+  }
+  // Sharing on Chrome OS is currently behind a flag.
+  // isInstalled() will return false if the flag is disabled.
+  var hostInstaller = new remoting.HostInstaller();
+  return hostInstaller.isInstalled();
 }
 
 /**
@@ -177,12 +181,31 @@ remoting.updateLocalHostState = function() {
 };
 
 /**
- * Entry point ('load' handler) for Remote Desktop (CRD) webapp.
+ * Entry point for test code. In order to make test and production
+ * code as similar as possible, the same entry point is used for
+ * production code, but since production code should never have
+ * 'source' set to 'test', it continue with initialization
+ * immediately. As a fail-safe, the mechanism by which initialization
+ * completes when under test is controlled by a simple UI, making it
+ * possible to use the app even if the previous assumption fails to
+ * hold in some corner cases.
  */
-remoting.initDesktopRemoting = function() {
+remoting.startDesktopRemotingForTesting = function() {
+  var urlParams = getUrlParameters_();
+  if (urlParams['source'] === 'test') {
+    document.getElementById('browser-test-continue-init').addEventListener(
+        'click', remoting.startDesktopRemoting, false);
+    document.getElementById('browser-test-deferred-init').hidden = false;
+  } else {
+    remoting.startDesktopRemoting();
+  }
+}
+
+
+remoting.startDesktopRemoting = function() {
   remoting.app = new remoting.Application();
   var desktop_remoting = new remoting.DesktopRemoting(remoting.app);
-  remoting.app.init();
+  remoting.app.start();
 };
 
-window.addEventListener('load', remoting.initDesktopRemoting, false);
+window.addEventListener('load', remoting.startDesktopRemotingForTesting, false);

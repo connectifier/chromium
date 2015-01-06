@@ -212,11 +212,8 @@ bool IsSupportedDevToolsURL(const GURL& url, base::FilePath* path) {
 
 class DebugDevToolsInterceptor : public net::URLRequestInterceptor {
  public:
-  DebugDevToolsInterceptor() {}
-  virtual ~DebugDevToolsInterceptor() {}
-
   // net::URLRequestInterceptor implementation.
-  virtual net::URLRequestJob* MaybeInterceptRequest(
+  net::URLRequestJob* MaybeInterceptRequest(
       net::URLRequest* request,
       net::NetworkDelegate* network_delegate) const override {
     base::FilePath path;
@@ -463,10 +460,6 @@ void ProfileIOData::InitializeOnUIThread(Profile* profile) {
 
   scoped_refptr<base::MessageLoopProxy> io_message_loop_proxy =
       BrowserThread::GetMessageLoopProxyForThread(BrowserThread::IO);
-#if defined(ENABLE_PRINTING)
-  printing_enabled_.Init(prefs::kPrintingEnabled, pref_service);
-  printing_enabled_.MoveToThread(io_message_loop_proxy);
-#endif
 
   chrome_http_user_agent_settings_.reset(
       new ChromeHttpUserAgentSettings(pref_service));
@@ -1021,7 +1014,8 @@ void ProfileIOData::Init(
 
   IOThread* const io_thread = profile_params_->io_thread;
   IOThread::Globals* const io_thread_globals = io_thread->globals();
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
 
   // TODO(vadimt): Remove ScopedTracker below once crbug.com/436671 is fixed.
   tracked_objects::ScopedTracker tracking_profile1(
@@ -1256,7 +1250,6 @@ void ProfileIOData::ShutdownOnUIThread(
   enable_metrics_.Destroy();
 #endif
   safe_browsing_enabled_.Destroy();
-  printing_enabled_.Destroy();
   sync_disabled_.Destroy();
   signin_allowed_.Destroy();
   network_prediction_options_.Destroy();

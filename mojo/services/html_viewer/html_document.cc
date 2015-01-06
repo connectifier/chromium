@@ -6,11 +6,14 @@
 
 #include "base/bind.h"
 #include "base/location.h"
+#include "base/memory/scoped_ptr.h"
 #include "base/message_loop/message_loop_proxy.h"
 #include "base/single_thread_task_runner.h"
 #include "base/stl_util.h"
 #include "base/strings/string_util.h"
 #include "base/thread_task_runner_handle.h"
+#include "media/blink/webencryptedmediaclient_impl.h"
+#include "media/cdm/default_cdm_factory.h"
 #include "mojo/public/cpp/application/connect.h"
 #include "mojo/public/cpp/system/data_pipe.h"
 #include "mojo/public/interfaces/application/shell.mojom.h"
@@ -20,8 +23,8 @@
 #include "mojo/services/html_viewer/webmediaplayer_factory.h"
 #include "mojo/services/html_viewer/webstoragenamespace_impl.h"
 #include "mojo/services/html_viewer/weburlloader_impl.h"
-#include "mojo/services/public/cpp/view_manager/view.h"
-#include "mojo/services/public/interfaces/surfaces/surfaces_service.mojom.h"
+#include "mojo/services/surfaces/public/interfaces/surfaces_service.mojom.h"
+#include "mojo/services/view_manager/public/cpp/view.h"
 #include "skia/ext/refptr.h"
 #include "third_party/WebKit/public/platform/Platform.h"
 #include "third_party/WebKit/public/platform/WebHTTPHeaderVisitor.h"
@@ -38,7 +41,14 @@
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkDevice.h"
 
-namespace mojo {
+using mojo::AxProvider;
+using mojo::Rect;
+using mojo::ServiceProviderPtr;
+using mojo::URLResponsePtr;
+using mojo::View;
+using mojo::ViewManager;
+
+namespace html_viewer {
 namespace {
 
 void ConfigureSettings(blink::WebSettings* settings) {
@@ -49,18 +59,18 @@ void ConfigureSettings(blink::WebSettings* settings) {
   settings->setJavaScriptEnabled(true);
 }
 
-Target WebNavigationPolicyToNavigationTarget(
+mojo::Target WebNavigationPolicyToNavigationTarget(
     blink::WebNavigationPolicy policy) {
   switch (policy) {
     case blink::WebNavigationPolicyCurrentTab:
-      return TARGET_SOURCE_NODE;
+      return mojo::TARGET_SOURCE_NODE;
     case blink::WebNavigationPolicyNewBackgroundTab:
     case blink::WebNavigationPolicyNewForegroundTab:
     case blink::WebNavigationPolicyNewWindow:
     case blink::WebNavigationPolicyNewPopup:
-      return TARGET_NEW_NODE;
+      return mojo::TARGET_NEW_NODE;
     default:
-      return TARGET_DEFAULT;
+      return mojo::TARGET_DEFAULT;
   }
 }
 
@@ -88,16 +98,17 @@ bool CanNavigateLocally(blink::WebFrame* frame,
 HTMLDocument::HTMLDocument(
     mojo::ServiceProviderPtr provider,
     URLResponsePtr response,
-    Shell* shell,
+    mojo::Shell* shell,
     scoped_refptr<base::MessageLoopProxy> compositor_thread,
     WebMediaPlayerFactory* web_media_player_factory)
     : response_(response.Pass()),
       shell_(shell),
-      web_view_(NULL),
-      root_(NULL),
+      web_view_(nullptr),
+      root_(nullptr),
       view_manager_client_factory_(shell_, this),
       compositor_thread_(compositor_thread),
-      web_media_player_factory_(web_media_player_factory) {
+      web_media_player_factory_(web_media_player_factory),
+      web_encrypted_media_client_(nullptr) {
   exported_services_.AddService(this);
   exported_services_.AddService(&view_manager_client_factory_);
   WeakBindToPipe(&exported_services_, provider.PassMessagePipe());
@@ -114,10 +125,9 @@ HTMLDocument::~HTMLDocument() {
 }
 
 void HTMLDocument::OnEmbed(
-    ViewManager* view_manager,
     View* root,
-    ServiceProviderImpl* embedee_service_provider_impl,
-    scoped_ptr<ServiceProvider> embedder_service_provider) {
+    mojo::ServiceProviderImpl* embedee_service_provider_impl,
+    scoped_ptr<mojo::ServiceProvider> embedder_service_provider) {
   root_ = root;
   embedder_service_provider_ = embedder_service_provider.Pass();
   navigator_host_.set_service_provider(embedder_service_provider_.get());
@@ -129,8 +139,8 @@ void HTMLDocument::OnEmbed(
   root_->AddObserver(this);
 }
 
-void HTMLDocument::Create(ApplicationConnection* connection,
-                          InterfaceRequest<AxProvider> request) {
+void HTMLDocument::Create(mojo::ApplicationConnection* connection,
+                          mojo::InterfaceRequest<AxProvider> request) {
   if (!web_view_)
     return;
   ax_provider_impls_.insert(
@@ -168,14 +178,14 @@ void HTMLDocument::initializeLayerTreeView() {
   ServiceProviderPtr surfaces_service_provider;
   shell_->ConnectToApplication("mojo:surfaces_service",
                                GetProxy(&surfaces_service_provider));
-  SurfacesServicePtr surfaces_service;
+  mojo::SurfacesServicePtr surfaces_service;
   ConnectToService(surfaces_service_provider.get(), &surfaces_service);
 
   ServiceProviderPtr gpu_service_provider;
   // TODO(jamesr): Should be mojo:gpu_service
   shell_->ConnectToApplication("mojo:native_viewport_service",
                                GetProxy(&gpu_service_provider));
-  GpuPtr gpu_service;
+  mojo::GpuPtr gpu_service;
   ConnectToService(gpu_service_provider.get(), &gpu_service);
   web_layer_tree_view_impl_.reset(new WebLayerTreeViewImpl(
       compositor_thread_, surfaces_service.Pass(), gpu_service.Pass()));
@@ -189,8 +199,7 @@ blink::WebMediaPlayer* HTMLDocument::createMediaPlayer(
     blink::WebLocalFrame* frame,
     const blink::WebURL& url,
     blink::WebMediaPlayerClient* client) {
-  return web_media_player_factory_->CreateMediaPlayer(frame, url, client,
-                                                      shell_);
+  return createMediaPlayer(frame, url, client, nullptr);
 }
 
 blink::WebMediaPlayer* HTMLDocument::createMediaPlayer(
@@ -198,7 +207,8 @@ blink::WebMediaPlayer* HTMLDocument::createMediaPlayer(
     const blink::WebURL& url,
     blink::WebMediaPlayerClient* client,
     blink::WebContentDecryptionModule* initial_cdm) {
-  return createMediaPlayer(frame, url, client);
+  return web_media_player_factory_->CreateMediaPlayer(frame, url, client,
+                                                      initial_cdm, shell_);
 }
 
 blink::WebFrame* HTMLDocument::createChildFrame(
@@ -233,9 +243,11 @@ blink::WebNavigationPolicy HTMLDocument::decidePolicyForNavigation(
   if (CanNavigateLocally(frame, request))
     return default_policy;
 
-  navigator_host_->RequestNavigate(
-      WebNavigationPolicyToNavigationTarget(default_policy),
-      URLRequest::From(request).Pass());
+  if (navigator_host_.get()) {
+    navigator_host_->RequestNavigate(
+        WebNavigationPolicyToNavigationTarget(default_policy),
+        mojo::URLRequest::From(request).Pass());
+  }
 
   return blink::WebNavigationPolicyIgnore;
 }
@@ -251,7 +263,16 @@ void HTMLDocument::didNavigateWithinPage(
     blink::WebLocalFrame* frame,
     const blink::WebHistoryItem& history_item,
     blink::WebHistoryCommitType commit_type) {
-  navigator_host_->DidNavigateLocally(history_item.urlString().utf8());
+  if (navigator_host_.get())
+    navigator_host_->DidNavigateLocally(history_item.urlString().utf8());
+}
+
+blink::WebEncryptedMediaClient* HTMLDocument::encryptedMediaClient() {
+  if (!web_encrypted_media_client_) {
+    web_encrypted_media_client_ = new media::WebEncryptedMediaClientImpl(
+        make_scoped_ptr(new media::DefaultCdmFactory()));
+  }
+  return web_encrypted_media_client_;
 }
 
 void HTMLDocument::OnViewBoundsChanged(View* view,
@@ -267,11 +288,11 @@ void HTMLDocument::OnViewDestroyed(View* view) {
   root_ = nullptr;
 }
 
-void HTMLDocument::OnViewInputEvent(View* view, const EventPtr& event) {
+void HTMLDocument::OnViewInputEvent(View* view, const mojo::EventPtr& event) {
   scoped_ptr<blink::WebInputEvent> web_event =
       event.To<scoped_ptr<blink::WebInputEvent>>();
   if (web_event)
     web_view_->handleInputEvent(*web_event);
 }
 
-}  // namespace mojo
+}  // namespace html_viewer

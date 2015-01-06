@@ -133,11 +133,14 @@ bool BrowserAccessibilityAndroid::IsCheckable() const {
 }
 
 bool BrowserAccessibilityAndroid::IsChecked() const {
-  return HasState(ui::AX_STATE_CHECKED);
+  return (HasState(ui::AX_STATE_CHECKED) || HasState(ui::AX_STATE_PRESSED));
 }
 
 bool BrowserAccessibilityAndroid::IsClickable() const {
-  return (PlatformIsLeaf() && !GetText().empty());
+  if (!PlatformIsLeaf())
+    return false;
+
+  return IsFocusable() || !GetText().empty();
 }
 
 bool BrowserAccessibilityAndroid::IsCollection() const {

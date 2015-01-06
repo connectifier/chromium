@@ -237,74 +237,16 @@ class PluginFaviconMessageObserver : public WebContentsObserver {
   DISALLOW_COPY_AND_ASSIGN(PluginFaviconMessageObserver);
 };
 
-// Ensures that RenderFrameDeleted and RenderFrameCreated are called in a
-// consistent manner.
-class FrameLifetimeConsistencyChecker : public WebContentsObserver {
- public:
-  explicit FrameLifetimeConsistencyChecker(WebContentsImpl* web_contents)
-      : WebContentsObserver(web_contents) {
-    RenderViewCreated(web_contents->GetRenderViewHost());
-    RenderFrameCreated(web_contents->GetMainFrame());
-  }
-
-  void RenderFrameCreated(RenderFrameHost* render_frame_host) override {
-    std::pair<int, int> routing_pair =
-        std::make_pair(render_frame_host->GetProcess()->GetID(),
-                       render_frame_host->GetRoutingID());
-    bool was_live_already = !live_routes_.insert(routing_pair).second;
-    bool was_used_before = deleted_routes_.count(routing_pair) != 0;
-
-    if (was_live_already) {
-      FAIL() << "RenderFrameCreated called more than once for routing pair: "
-             << Format(render_frame_host);
-    } else if (was_used_before) {
-      FAIL() << "RenderFrameCreated called for routing pair "
-             << Format(render_frame_host) << " that was previously deleted.";
-    }
-  }
-
-  void RenderFrameDeleted(RenderFrameHost* render_frame_host) override {
-    std::pair<int, int> routing_pair =
-        std::make_pair(render_frame_host->GetProcess()->GetID(),
-                       render_frame_host->GetRoutingID());
-    bool was_live = live_routes_.erase(routing_pair);
-    bool was_dead_already = !deleted_routes_.insert(routing_pair).second;
-
-    if (was_dead_already) {
-      FAIL() << "RenderFrameDeleted called more than once for routing pair "
-             << Format(render_frame_host);
-    } else if (!was_live) {
-      FAIL() << "RenderFrameDeleted called for routing pair "
-             << Format(render_frame_host)
-             << " for which RenderFrameCreated was never called";
-    }
-  }
-
- private:
-  std::string Format(RenderFrameHost* render_frame_host) {
-    return base::StringPrintf(
-        "(%d, %d -> %s )",
-        render_frame_host->GetProcess()->GetID(),
-        render_frame_host->GetRoutingID(),
-        render_frame_host->GetSiteInstance()->GetSiteURL().spec().c_str());
-  }
-  std::set<std::pair<int, int> > live_routes_;
-  std::set<std::pair<int, int> > deleted_routes_;
-};
-
 }  // namespace
 
-class RenderFrameHostManagerTest
-    : public RenderViewHostImplTestHarness {
+class RenderFrameHostManagerTest : public RenderViewHostImplTestHarness {
  public:
   void SetUp() override {
     RenderViewHostImplTestHarness::SetUp();
     WebUIControllerFactory::RegisterFactory(&factory_);
-    lifetime_checker_.reset(new FrameLifetimeConsistencyChecker(contents()));
   }
 
   void TearDown() override {
-    lifetime_checker_.reset();
     RenderViewHostImplTestHarness::TearDown();
     WebUIControllerFactory::UnregisterFactoryForTesting(&factory_);
   }
@@ -425,7 +367,6 @@ class RenderFrameHostManagerTest
 
  private:
   RenderFrameHostManagerTestWebUIControllerFactory factory_;
-  scoped_ptr<FrameLifetimeConsistencyChecker> lifetime_checker_;
 };
 
 // Tests that when you navigate from a chrome:// url to another page, and
@@ -1830,7 +1771,8 @@ TEST_F(RenderFrameHostManagerTest,
 // Test that a pending RenderFrameHost in a non-root frame tree node is properly
 // deleted when the node is detached. Motivated by http://crbug.com/441357
 TEST_F(RenderFrameHostManagerTest, DetachPendingChild) {
-  CommandLine::ForCurrentProcess()->AppendSwitch(switches::kSitePerProcess);
+  base::CommandLine::ForCurrentProcess()->AppendSwitch(
+      switches::kSitePerProcess);
 
   const GURL kUrl1("http://www.google.com/");
   const GURL kUrl2("http://webkit.org/");
@@ -1902,7 +1844,7 @@ TEST_F(RenderFrameHostManagerTest, DetachPendingChild) {
 #if 0
   // TODO(nick): Currently a proxy to the removed frame lingers in the parent.
   // Enable this assert below once the proxies to the subframe are correctly
-  // cleaned up after detach.
+  // cleaned up after detach. http://crbug.com/444955.
   ASSERT_TRUE(site_instance->HasOneRef())
       << "This SiteInstance should be destroyable now.";
 #endif

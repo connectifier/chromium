@@ -586,16 +586,8 @@ void RenderFrameHostImpl::OnFrameFocused() {
   frame_tree_->SetFocusedFrame(frame_tree_node_);
 }
 
-void RenderFrameHostImpl::OnOpenURL(
-    const FrameHostMsg_OpenURL_Params& params) {
-  GURL validated_url(params.url);
-  GetProcess()->FilterURL(false, &validated_url);
-
-  TRACE_EVENT1("navigation", "RenderFrameHostImpl::OnOpenURL",
-               "url", validated_url.possibly_invalid_spec());
-  frame_tree_node_->navigator()->RequestOpenURL(
-      this, validated_url, params.referrer, params.disposition,
-      params.should_replace_current_entry, params.user_gesture);
+void RenderFrameHostImpl::OnOpenURL(const FrameHostMsg_OpenURL_Params& params) {
+  OpenURL(params, GetSiteInstance());
 }
 
 void RenderFrameHostImpl::OnDocumentOnLoadCompleted(
@@ -761,7 +753,9 @@ void RenderFrameHostImpl::OnDeferredAfterResponseStarted(
     delegate_->DidDeferAfterResponseStarted(transition_data);
 }
 
-void RenderFrameHostImpl::SwapOut(RenderFrameProxyHost* proxy) {
+void RenderFrameHostImpl::SwapOut(
+    RenderFrameProxyHost* proxy,
+    bool is_loading) {
   // The end of this event is in OnSwapOutACK when the RenderFrame has completed
   // the operation and sends back an IPC message.
   // The trace event may not end properly if the ACK times out.  We expect this
@@ -789,7 +783,7 @@ void RenderFrameHostImpl::SwapOut(RenderFrameProxyHost* proxy) {
   }
 
   if (IsRenderFrameLive()) {
-    Send(new FrameMsg_SwapOut(routing_id_, proxy_routing_id,
+    Send(new FrameMsg_SwapOut(routing_id_, proxy_routing_id, is_loading,
                               replication_state));
   }
 
@@ -1013,7 +1007,7 @@ void RenderFrameHostImpl::OnUpdateEncoding(const std::string& encoding_name) {
 void RenderFrameHostImpl::OnBeginNavigation(
     const FrameHostMsg_BeginNavigation_Params& params,
     const CommonNavigationParams& common_params) {
-  CHECK(CommandLine::ForCurrentProcess()->HasSwitch(
+  CHECK(base::CommandLine::ForCurrentProcess()->HasSwitch(
       switches::kEnableBrowserSideNavigation));
   frame_tree_node()->navigator()->OnBeginNavigation(
       frame_tree_node(), params, common_params);
@@ -1301,8 +1295,17 @@ void RenderFrameHostImpl::NavigateToURL(const GURL& url) {
   Navigate(params);
 }
 
-void RenderFrameHostImpl::OpenURL(const FrameHostMsg_OpenURL_Params& params) {
-  OnOpenURL(params);
+void RenderFrameHostImpl::OpenURL(const FrameHostMsg_OpenURL_Params& params,
+                                  SiteInstance* source_site_instance) {
+  GURL validated_url(params.url);
+  GetProcess()->FilterURL(false, &validated_url);
+
+  TRACE_EVENT1("navigation", "RenderFrameHostImpl::OpenURL", "url",
+               validated_url.possibly_invalid_spec());
+  frame_tree_node_->navigator()->RequestOpenURL(
+      this, validated_url, source_site_instance, params.referrer,
+      params.disposition, params.should_replace_current_entry,
+      params.user_gesture);
 }
 
 void RenderFrameHostImpl::Stop() {

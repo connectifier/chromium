@@ -325,6 +325,8 @@ component("base") {
       "ime/chromeos/extension_ime_util.h",
       "ime/chromeos/fake_ime_keyboard.cc",
       "ime/chromeos/fake_ime_keyboard.h",
+      "ime/chromeos/fake_input_method_delegate.cc",
+      "ime/chromeos/fake_input_method_delegate.h",
       "ime/chromeos/ime_bridge.cc",
       "ime/chromeos/ime_bridge.h",
       "ime/chromeos/ime_keyboard.cc",
@@ -602,7 +604,10 @@ component("base") {
       "cursor/ozone/bitmap_cursor_factory_ozone.h",
     ]
 
-    deps += [ "//ui/ozone:ozone_base" ]
+    deps += [
+      "//ui/ozone:ozone_base",
+      "//ui/events/ozone:events_ozone_layout",
+    ]
   }
 
   if (!toolkit_views) {
@@ -638,10 +643,7 @@ component("base") {
   }
 
   if (is_android && is_android_webview_build) {
-    deps += [
-      #TODO(GYP): port this component to GN.
-      #"//ui/android:ui_java",
-    ]
+    deps += [ "//ui/android:ui_java" ]
   }
 
   if (is_android && !use_aura) {
@@ -825,6 +827,10 @@ if (!is_android) {
         "dragdrop/os_exchange_data_win_unittest.cc",
         "win/hwnd_subclass_unittest.cc",
         "win/open_file_name_win_unittest.cc",
+      ]
+      sources -= [
+        "dragdrop/os_exchange_data_provider_aurax11_unittest.cc",
+        "x/selection_requestor_unittest.cc",
       ]
 
       ldflags = [

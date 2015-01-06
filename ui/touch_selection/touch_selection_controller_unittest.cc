@@ -24,8 +24,9 @@ class MockTouchHandleDrawable : public TouchHandleDrawable {
   void SetOrientation(TouchHandleOrientation orientation) override {}
   void SetAlpha(float alpha) override {}
   void SetFocus(const gfx::PointF& position) override {}
-  bool IntersectsWith(const gfx::RectF& rect) const override {
-    return *intersects_rect_;
+  gfx::RectF GetVisibleBounds() const override {
+    return *intersects_rect_ ? gfx::RectF(-1000, -1000, 2000, 2000)
+                             : gfx::RectF(-1000, -1000, 0, 0);
   }
 
  private:
@@ -78,7 +79,7 @@ class TouchSelectionControllerTest : public testing::Test,
     selection_end_ = extent;
   }
 
-  virtual void MoveRangeSelectionExtent(const gfx::PointF& extent) override {
+  void MoveRangeSelectionExtent(const gfx::PointF& extent) override {
     selection_moved_ = true;
     selection_end_ = extent;
   }

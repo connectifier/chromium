@@ -109,6 +109,9 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
        PermissionMessage::kCopresence},
       {APIPermission::kCopresencePrivate, "copresencePrivate"},
       {APIPermission::kCryptotokenPrivate, "cryptotokenPrivate"},
+      {APIPermission::kDataReductionProxy, "dataReductionProxy",
+       APIPermissionInfo::kFlagImpliesFullURLAccess |
+           APIPermissionInfo::kFlagCannotBeOptional},
       {APIPermission::kDocumentScan,
        "documentScan",
        APIPermissionInfo::kFlagNone,
@@ -403,7 +406,6 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
        APIPermissionInfo::kFlagCannotBeOptional},
       {APIPermission::kPointerLock, "pointerLock"},
       {APIPermission::kPrinterProvider, "printerProvider"},
-      {APIPermission::kAudio, "audio"},
       {APIPermission::kCastStreaming, "cast.streaming"},
       {APIPermission::kBrowser, "browser"},
       {APIPermission::kInterceptAllKeys,

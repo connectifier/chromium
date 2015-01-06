@@ -9,9 +9,9 @@
 #include "base/tracked_objects.h"
 #include "base/win/metro.h"
 #include "base/win/win_util.h"
-#include "ui/gfx/point.h"
-#include "ui/gfx/rect.h"
-#include "ui/gfx/size.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/size.h"
 
 namespace gfx {
 
