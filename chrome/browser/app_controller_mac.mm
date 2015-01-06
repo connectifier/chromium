@@ -75,6 +75,7 @@
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/startup/startup_browser_creator_impl.h"
 #include "chrome/browser/ui/user_manager.h"
+#include "chrome/browser/web_applications/web_app_mac.h"
 #include "chrome/common/chrome_paths_internal.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/cloud_print/cloud_print_class_mac.h"
@@ -95,11 +96,14 @@
 #include "content/public/browser/plugin_service.h"
 #include "content/public/browser/user_metrics.h"
 #include "extensions/browser/extension_system.h"
+#include "extensions/browser/extension_registry.h"
 #include "net/base/filename_util.h"
 #include "ui/base/cocoa/focus_window_set.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/l10n_util_mac.h"
 
+using apps::AppShimHandler;
+using apps::ExtensionAppShimHandler;
 using base::UserMetricsAction;
 using content::BrowserContext;
 using content::BrowserThread;
@@ -426,6 +430,11 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
   // sessions.
   if (!browser_shutdown::IsTryingToQuit() && quitWithAppsController_.get() &&
       !quitWithAppsController_->ShouldQuit()) {
+    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+            switches::kHostedAppQuitNotification)) {
+      return NO;
+    }
+
     content::NotificationService::current()->Notify(
         chrome::NOTIFICATION_CLOSE_ALL_BROWSERS_REQUEST,
         content::NotificationService::AllSources(),
@@ -1157,9 +1166,9 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
       break;
     case IDC_SHOW_SYNC_SETUP:
       if (Browser* browser = ActivateBrowser(lastProfile)) {
-        chrome::ShowBrowserSignin(browser, signin::SOURCE_MENU);
+        chrome::ShowBrowserSignin(browser, signin_metrics::SOURCE_MENU);
       } else {
-        chrome::OpenSyncSetupWindow(lastProfile, signin::SOURCE_MENU);
+        chrome::OpenSyncSetupWindow(lastProfile, signin_metrics::SOURCE_MENU);
       }
       break;
     case IDC_TASK_MANAGER:
@@ -1218,6 +1227,17 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
     std::set<NSWindow*> browserWindows;
     for (chrome::BrowserIterator iter; !iter.done(); iter.Next()) {
       Browser* browser = *iter;
+      // When focusing Chrome, don't focus any browser windows associated with
+      // a currently running app shim, so ignore them.
+      if (browser && browser->is_app()) {
+        extensions::ExtensionRegistry* registry =
+            extensions::ExtensionRegistry::Get(browser->profile());
+        const extensions::Extension* extension = registry->GetExtensionById(
+            web_app::GetExtensionIdFromApplicationName(browser->app_name()),
+            extensions::ExtensionRegistry::ENABLED);
+        if (extension->is_hosted_app())
+          continue;
+      }
       browserWindows.insert(browser->window()->GetNativeWindow());
     }
     if (!browserWindows.empty()) {
@@ -1364,9 +1384,9 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
   if (!profile_manager)
     return NULL;
 
-  return profile_manager->GetProfile(GetStartupProfilePath(
-      profile_manager->user_data_dir(),
-      *CommandLine::ForCurrentProcess()));
+  return profile_manager->GetProfile(
+      GetStartupProfilePath(profile_manager->user_data_dir(),
+                            *base::CommandLine::ForCurrentProcess()));
 }
 
 - (Profile*)safeLastProfileForNewWindows {
@@ -1406,7 +1426,7 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
     browser->window()->Show();
   }
 
-  CommandLine dummy(CommandLine::NO_PROGRAM);
+  base::CommandLine dummy(base::CommandLine::NO_PROGRAM);
   chrome::startup::IsFirstRun first_run = first_run::IsChromeFirstRun() ?
       chrome::startup::IS_FIRST_RUN : chrome::startup::IS_NOT_FIRST_RUN;
   StartupBrowserCreatorImpl launch(base::FilePath(), dummy, first_run);

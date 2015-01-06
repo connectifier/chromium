@@ -64,6 +64,10 @@ class Range;
 class Rect;
 }
 
+namespace media {
+class WebEncryptedMediaClientImpl;
+}
+
 namespace content {
 
 class ChildFrameCompositingHelper;
@@ -320,6 +324,7 @@ class CONTENT_EXPORT RenderFrameImpl
       const blink::WebURL& url,
       blink::WebMediaPlayerClient* client,
       blink::WebContentDecryptionModule* initial_cdm);
+  // TODO(jrummell): remove once blink uses encryptedMediaClient().
   virtual blink::WebContentDecryptionModule* createContentDecryptionModule(
       blink::WebLocalFrame* frame,
       const blink::WebSecurityOrigin& security_origin,
@@ -463,6 +468,7 @@ class CONTENT_EXPORT RenderFrameImpl
       blink::WebLocalFrame* frame,
       blink::WebRTCPeerConnectionHandler* handler);
   virtual blink::WebUserMediaClient* userMediaClient();
+  virtual blink::WebEncryptedMediaClient* encryptedMediaClient();
   virtual blink::WebMIDIClient* webMIDIClient();
   virtual bool willCheckAndDispatchMessageEvent(
       blink::WebLocalFrame* source_frame,
@@ -550,6 +556,7 @@ class CONTENT_EXPORT RenderFrameImpl
   // content/common/*_messages.h for the message that the function is handling.
   void OnBeforeUnload();
   void OnSwapOut(int proxy_routing_id,
+                 bool is_loading,
                  const FrameReplicationState& replicated_frame_state);
   void OnStop();
   void OnShowContextMenu(const gfx::Point& location);
@@ -580,6 +587,7 @@ class CONTENT_EXPORT RenderFrameImpl
   void OnSetCompositionFromExistingText(
       int start, int end,
       const std::vector<blink::WebCompositionUnderline>& underlines);
+  void OnExecuteNoValueEditCommand(const std::string& name);
   void OnExtendSelectionAndDelete(int before, int after);
   void OnReload(bool ignore_cache);
   void OnTextSurroundingSelectionRequest(size_t max_length);
@@ -672,12 +680,9 @@ class CONTENT_EXPORT RenderFrameImpl
   // the return value is false, the navigation should be abandoned.
   bool PrepareRenderViewForNavigation(
       const GURL& url,
-      FrameMsg_Navigate_Type::Value navigate_type,
-      const PageState& state,
       bool check_for_stale_navigation,
       bool is_history_navigation,
       int current_history_list_offset,
-      int32 page_id,
       bool* is_reload,
       blink::WebURLRequest::CachePolicy* cache_policy);
 
@@ -775,6 +780,9 @@ class CONTENT_EXPORT RenderFrameImpl
 
   // Destroyed via the RenderFrameObserver::OnDestruct() mechanism.
   UserMediaClientImpl* web_user_media_client_;
+
+  // EncryptedMediaClient attached to this frame; lazily initialized.
+  media::WebEncryptedMediaClientImpl* web_encrypted_media_client_;
 
   // MidiClient attached to this frame; lazily initialized.
   MidiDispatcher* midi_dispatcher_;

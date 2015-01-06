@@ -51,6 +51,39 @@ enum PushRegistrationStatus {
   PUSH_REGISTRATION_STATUS_LAST = PUSH_REGISTRATION_STATUS_SUCCESS_FROM_CACHE
 };
 
+// Push unregistration success / error codes for internal use & reporting.
+enum PushUnregistrationStatus {
+  // The unregistration was successful.
+  PUSH_UNREGISTRATION_STATUS_SUCCESS_UNREGISTER,
+
+  // The registration was not registered.
+  PUSH_UNREGISTRATION_STATUS_SUCCESS_WAS_NOT_REGISTERED,
+
+  // The unregistration did not happen because of a network error.
+  PUSH_UNREGISTRATION_STATUS_NETWORK_ERROR,
+
+  // The unregistration did not happen because of a miscellaneous error.
+  PUSH_UNREGISTRATION_STATUS_UNKNOWN_ERROR,
+};
+
+// Push get registration success / error codes for internal use.
+enum PushGetRegistrationStatus {
+  // Getting the registration was successful.
+  PUSH_GETREGISTRATION_STATUS_SUCCESS,
+
+  // Getting the registration failed because there is no push registration.
+  PUSH_GETREGISTRATION_STATUS_REGISTRATION_NOT_FOUND,
+
+  // Getting the registration failed because of a service worker error.
+  PUSH_GETREGISTRATION_STATUS_SERVICE_WORKER_ERROR,
+
+  // When making changes, update PUSH_GETREGISTRATION_STATUS_LAST below.
+
+  // Used for IPC message range checks.
+  PUSH_GETREGISTRATION_STATUS_LAST =
+      PUSH_GETREGISTRATION_STATUS_SERVICE_WORKER_ERROR
+};
+
 // Push message delivery success / error codes for internal use.
 enum PushDeliveryStatus {
   // The message was successfully delivered.

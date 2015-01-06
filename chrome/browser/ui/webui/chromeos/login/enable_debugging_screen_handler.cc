@@ -11,15 +11,18 @@
 #include "base/prefs/pref_service.h"
 #include "base/values.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/chromeos/login/help_app_launcher.h"
+#include "chrome/browser/chromeos/login/ui/login_web_dialog.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/webui/chromeos/login/oobe_ui.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chromeos/chromeos_switches.h"
+#include "chromeos/dbus/cryptohome_client.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/dbus/debug_daemon_client.h"
 #include "chromeos/dbus/power_manager_client.h"
+#include "ui/base/l10n/l10n_util.h"
 
 namespace {
 
@@ -47,19 +50,18 @@ void EnableDebuggingScreenHandler::PrepareToShow() {
 }
 
 void EnableDebuggingScreenHandler::ShowWithParams() {
-  base::DictionaryValue debugging_screen_params;
-#if defined(OFFICIAL_BUILD)
-  debugging_screen_params.SetBoolean("isOfficialBuild", true);
-#endif
-  ShowScreen(kEnableDebuggingScreen, &debugging_screen_params);
+  ShowScreen(kEnableDebuggingScreen, NULL);
 
   UpdateUIState(UI_STATE_WAIT);
 
-  chromeos::DebugDaemonClient* client =
-      chromeos::DBusThreadManager::Get()->GetDebugDaemonClient();
-  client->WaitForServiceToBeAvailable(
-      base::Bind(&EnableDebuggingScreenHandler::OnServiceAvailabilityChecked,
-                 weak_ptr_factory_.GetWeakPtr()));
+  DVLOG(1) << "Showing enable debugging screen.";
+
+  // Wait for cryptohomed before checking debugd. See http://crbug.com/440506.
+  chromeos::CryptohomeClient* client =
+      chromeos::DBusThreadManager::Get()->GetCryptohomeClient();
+  client->WaitForServiceToBeAvailable(base::Bind(
+      &EnableDebuggingScreenHandler::OnCryptohomeDaemonAvailabilityChecked,
+      weak_ptr_factory_.GetWeakPtr()));
 }
 
 void EnableDebuggingScreenHandler::Show() {
@@ -87,7 +89,6 @@ void EnableDebuggingScreenHandler::DeclareLocalizedValues(
                IDS_ENABLE_DEBUGGING_SCREEN_TITLE);
   builder->Add("enableDebuggingScreenAccessibleTitle",
                IDS_ENABLE_DEBUGGING_SCREEN_TITLE);
-  builder->Add("enableDebuggingScreenIconTitle", IDS_EXCLAMATION_ICON_TITLE);
   builder->Add("enableDebuggingCancelButton", IDS_CANCEL);
   builder->Add("enableDebuggingOKButton", IDS_OK);
   builder->Add("enableDebuggingRemoveButton",
@@ -96,6 +97,8 @@ void EnableDebuggingScreenHandler::DeclareLocalizedValues(
                IDS_ENABLE_DEBUGGING_ENABLE_BUTTON);
   builder->Add("enableDebuggingRemveRootfsMessage",
                IDS_ENABLE_DEBUGGING_SCREEN_ROOTFS_REMOVE_MSG);
+  builder->Add("enableDebuggingLearnMore",
+               IDS_ENABLE_DEBUGGING_LEARN_MORE);
   builder->Add("enableDebuggingSetupMessage",
                IDS_ENABLE_DEBUGGING_SETUP_MESSAGE);
   builder->Add("enableDebuggingWaitMessage",
@@ -106,6 +109,8 @@ void EnableDebuggingScreenHandler::DeclareLocalizedValues(
   builder->AddF("enableDebuggingDoneMessage",
                 IDS_ENABLE_DEBUGGING_DONE_MESSAGE,
                 IDS_SHORT_PRODUCT_NAME);
+  builder->Add("enableDebuggingErrorTitle",
+                IDS_ENABLE_DEBUGGING_ERROR_TITLE);
   builder->AddF("enableDebuggingErrorMessage",
                 IDS_ENABLE_DEBUGGING_ERROR_MESSAGE,
                 IDS_SHORT_PRODUCT_NAME);
@@ -175,8 +180,27 @@ void EnableDebuggingScreenHandler::HandleOnSetup(
                  weak_ptr_factory_.GetWeakPtr()));
 }
 
-void EnableDebuggingScreenHandler::OnServiceAvailabilityChecked(
+void EnableDebuggingScreenHandler::OnCryptohomeDaemonAvailabilityChecked(
     bool service_is_available) {
+  DVLOG(1) << "Enable-debugging-screen: cryptohomed availability="
+           << service_is_available;
+  if (!service_is_available) {
+    LOG(ERROR) << "Crypthomed is not available.";
+    UpdateUIState(UI_STATE_ERROR);
+    return;
+  }
+
+  chromeos::DebugDaemonClient* client =
+      chromeos::DBusThreadManager::Get()->GetDebugDaemonClient();
+  client->WaitForServiceToBeAvailable(base::Bind(
+      &EnableDebuggingScreenHandler::OnDebugDaemonServiceAvailabilityChecked,
+      weak_ptr_factory_.GetWeakPtr()));
+}
+
+void EnableDebuggingScreenHandler::OnDebugDaemonServiceAvailabilityChecked(
+    bool service_is_available) {
+  DVLOG(1) << "Enable-debugging-screen: debugd availability="
+           << service_is_available;
   if (!service_is_available) {
     LOG(ERROR) << "Debug daemon is not available.";
     UpdateUIState(UI_STATE_ERROR);
@@ -205,7 +229,6 @@ void EnableDebuggingScreenHandler::OnRemoveRootfsVerification(bool success) {
   chromeos::DBusThreadManager::Get()->GetPowerManagerClient()->RequestRestart();
 }
 
-
 void EnableDebuggingScreenHandler::OnEnableDebuggingFeatures(bool success) {
   if (!success) {
     UpdateUIState(UI_STATE_ERROR);
@@ -215,9 +238,11 @@ void EnableDebuggingScreenHandler::OnEnableDebuggingFeatures(bool success) {
   UpdateUIState(UI_STATE_DONE);
 }
 
-
 void EnableDebuggingScreenHandler::OnQueryDebuggingFeatures(bool success,
                                                             int features_flag) {
+  DVLOG(1) << "Enable-debugging-screen: OnQueryDebuggingFeatures"
+           << ", success=" << success
+           << ", features=" << features_flag;
   if (!success || features_flag == DebugDaemonClient::DEV_FEATURES_DISABLED) {
     UpdateUIState(UI_STATE_ERROR);
     return;
@@ -239,7 +264,9 @@ void EnableDebuggingScreenHandler::OnQueryDebuggingFeatures(bool success,
 
 void EnableDebuggingScreenHandler::UpdateUIState(
     EnableDebuggingScreenHandler::UIState state) {
-  if (state == UI_STATE_ERROR || state == UI_STATE_DONE) {
+  if (state == UI_STATE_SETUP ||
+      state == UI_STATE_ERROR ||
+      state == UI_STATE_DONE) {
     PrefService* prefs = g_browser_process->local_state();
     prefs->ClearPref(prefs::kDebuggingFeaturesRequested);
     prefs->CommitPendingWrite();
@@ -252,9 +279,17 @@ void EnableDebuggingScreenHandler::UpdateUIState(
 
 void EnableDebuggingScreenHandler::HandleOnLearnMore() {
   VLOG(1) << "Trying to view the help article about debugging features.";
-  if (!help_app_.get())
-    help_app_ = new HelpAppLauncher(GetNativeWindow());
-  help_app_->ShowHelpTopic(HelpAppLauncher::HELP_ENABLE_DEBUGGING);
+  const std::string help_content =
+      l10n_util::GetStringUTF8(IDS_ENABLE_DEBUGGING_HELP);
+  const GURL data_url = GURL("data:text/html;charset=utf-8," + help_content);
+
+  LoginWebDialog* dialog = new LoginWebDialog(
+      Profile::FromWebUI(web_ui()),
+      NULL,
+      GetNativeWindow(),
+      l10n_util::GetStringUTF16(IDS_ENABLE_DEBUGGING_SCREEN_TITLE),
+      data_url);
+  dialog->Show();
 }
 
 }  // namespace chromeos

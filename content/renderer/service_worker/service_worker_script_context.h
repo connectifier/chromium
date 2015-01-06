@@ -26,6 +26,7 @@
 
 namespace blink {
 struct WebCircularGeofencingRegion;
+struct WebCrossOriginServiceWorkerClient;
 class WebServiceWorkerContextProxy;
 }
 
@@ -35,6 +36,7 @@ class Message;
 
 namespace content {
 
+struct CrossOriginServiceWorkerClient;
 class EmbeddedWorkerContextClient;
 struct PlatformNotificationData;
 
@@ -64,10 +66,15 @@ class ServiceWorkerScriptContext {
   void DidHandlePushEvent(int request_id,
                           blink::WebServiceWorkerEventResult result);
   void DidHandleSyncEvent(int request_id);
+  void DidHandleCrossOriginConnectEvent(int request_id, bool accept_connection);
   void GetClientDocuments(
       blink::WebServiceWorkerClientsCallbacks* callbacks);
   void PostMessageToDocument(
       int client_id,
+      const base::string16& message,
+      scoped_ptr<blink::WebMessagePortChannelArray> channels);
+  void PostCrossOriginMessageToClient(
+      const blink::WebCrossOriginServiceWorkerClient& client,
       const base::string16& message,
       scoped_ptr<blink::WebMessagePortChannelArray> channels);
   void FocusClient(int client_id,
@@ -106,9 +113,16 @@ class ServiceWorkerScriptContext {
                          blink::WebGeofencingEventType event_type,
                          const std::string& region_id,
                          const blink::WebCircularGeofencingRegion& region);
+  void OnCrossOriginConnectEvent(int request_id,
+                                 const CrossOriginServiceWorkerClient& client);
   void OnPostMessage(const base::string16& message,
                      const std::vector<int>& sent_message_port_ids,
                      const std::vector<int>& new_routing_ids);
+  void OnCrossOriginMessageToWorker(
+      const CrossOriginServiceWorkerClient& client,
+      const base::string16& message,
+      const std::vector<int>& sent_message_port_ids,
+      const std::vector<int>& new_routing_ids);
   void OnDidGetClientDocuments(
       int request_id, const std::vector<ServiceWorkerClientInfo>& clients);
   void OnFocusClientResponse(int request_id, bool result);

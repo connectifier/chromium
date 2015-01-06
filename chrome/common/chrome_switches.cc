@@ -304,6 +304,9 @@ const char kDisableOutOfProcessPdf[]        = "disable-out-of-process-pdf";
 const char kDisablePasswordManagerReauthentication[] =
     "disable-password-manager-reauthentication";
 
+// Disable the new material UI - requires out of process PDF plugin.
+const char kDisablePdfMaterialUI[]          = "disable-pdf-material-ui";
+
 // Enables searching for people from the apps list search box.
 const char kDisablePeopleSearch[]           = "disable-people-search";
 
@@ -516,6 +519,9 @@ const char kEnableOutOfProcessPdf[]         = "enable-out-of-process-pdf";
 // Enables panels (always on-top docked pop-up windows).
 const char kEnablePanels[]                  = "enable-panels";
 
+// Enable the new material UI - requires out of process PDF plugin.
+const char kEnablePdfMaterialUI[]           = "enable-pdf-material-ui";
+
 // Enables presenting plugin placeholder content as shadow DOM.
 const char kEnablePluginPlaceholderShadowDom[] =
     "enable-plugin-placeholder-shadow-dom";
@@ -628,8 +634,15 @@ const char kEnableTranslateNewUX[]         = "enable-translate-new-ux";
 const char kEnableUserAlternateProtocolPorts[] =
     "enable-user-controlled-alternate-protocol-ports";
 
+// Enables a new "web app" style frame for hosted apps (including bookmark
+// apps).
+extern const char kEnableWebAppFrame[] = "enable-web-app-frame";
+
 // Enables the Website Settings page on the Settings page.
 const char kEnableWebsiteSettingsManager[]  = "enable-website-settings-manager";
+
+// Enables synchronizing WiFi credentials across devices, using Chrome Sync.
+const char kEnableWifiCredentialSync[]      = "enable-wifi-credential-sync";
 
 // Explicitly allows additional ports using a comma-separated list of port
 // numbers.
@@ -1241,11 +1254,6 @@ const char kWinHttpProxyResolver[]          = "winhttp-proxy-resolver";
 // resulted in a browser startup.
 const char kWinJumplistAction[]             = "win-jumplist-action";
 
-#if defined(ENABLE_PLUGIN_INSTALLATION)
-// Specifies a custom URL for fetching plug-ins metadata. Used for testing.
-const char kPluginsMetadataServerURL[]      = "plugins-metadata-server-url";
-#endif
-
 #if defined(OS_ANDROID)
 // Disables support for playing videos on Chromecast devices.
 const char kDisableCast[]                    = "disable-cast";
@@ -1302,10 +1310,17 @@ const char kMigrateDataDirForSxS[]          = "migrate-data-dir-for-sxs";
 // Prevents Chrome from quitting when Chrome Apps are open.
 const char kAppsKeepChromeAliveInTests[]    = "apps-keep-chrome-alive-in-tests";
 
+// Shows a notification when quitting Chrome with hosted apps running. Default
+// behavior is to also quit all hosted apps.
+const char kHostedAppQuitNotification[] = "enable-hosted-app-quit-notification";
+
 // Forcibly disables Lion-style on newer OSes, to allow developers to test the
 // older, SnowLeopard-style fullscreen.
 const char kDisableSystemFullscreenForTesting[] =
     "disable-system-fullscreen-for-testing";
+
+// Enables app shim creation for hosted apps on Mac.
+const char kEnableHostedAppShimCreation[] = "enable-hosted-app-shim-creation";
 
 // A process type (switches::kProcessType) that relaunches the browser. See
 // chrome/browser/mac/relauncher.h.
@@ -1360,15 +1375,27 @@ const char kFileManagerExtensionPath[]      = "filemgr-ext-path";
 
 bool AboutInSettingsEnabled() {
   return SettingsWindowEnabled() &&
-      !CommandLine::ForCurrentProcess()->HasSwitch(
-          ::switches::kDisableAboutInSettings);
+         !base::CommandLine::ForCurrentProcess()->HasSwitch(
+             ::switches::kDisableAboutInSettings);
 }
 
 bool OutOfProcessPdfEnabled() {
-  if (CommandLine::ForCurrentProcess()->HasSwitch(kEnableOutOfProcessPdf))
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kEnableOutOfProcessPdf))
     return true;
 
-  if (CommandLine::ForCurrentProcess()->HasSwitch(kDisableOutOfProcessPdf))
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          kDisableOutOfProcessPdf))
+    return false;
+
+  // Default.
+  return false;
+}
+
+bool PdfMaterialUIEnabled() {
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kEnablePdfMaterialUI))
+    return true;
+
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kDisablePdfMaterialUI))
     return false;
 
   // Default.
@@ -1377,17 +1404,17 @@ bool OutOfProcessPdfEnabled() {
 
 bool SettingsWindowEnabled() {
 #if defined(OS_CHROMEOS)
-  return !CommandLine::ForCurrentProcess()->HasSwitch(
+  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
       ::switches::kDisableSettingsWindow);
 #else
-  return CommandLine::ForCurrentProcess()->HasSwitch(
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
       ::switches::kEnableSettingsWindow);
 #endif
 }
 
 #if defined(OS_CHROMEOS)
 bool PowerOverlayEnabled() {
-  return CommandLine::ForCurrentProcess()->HasSwitch(
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
       ::switches::kEnablePowerOverlay);
 }
 #endif

@@ -72,11 +72,11 @@
 #include "ui/gfx/display.h"
 #include "ui/gfx/frame_time.h"
 #include "ui/gfx/geometry/dip_util.h"
-#include "ui/gfx/point.h"
-#include "ui/gfx/rect_conversions.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/rect_conversions.h"
+#include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/scoped_ns_graphics_context_save_gstate_mac.h"
 #include "ui/gfx/screen.h"
-#include "ui/gfx/size_conversions.h"
 #include "ui/gl/gl_switches.h"
 
 using content::BrowserAccessibility;
@@ -600,7 +600,6 @@ void RenderWidgetHostViewMac::EnsureBrowserCompositorView() {
     browser_compositor_->compositor()->SetRootLayer(
         root_layer_.get());
     browser_compositor_->accelerated_widget_mac()->SetNSView(this);
-    browser_compositor_->compositor()->SetVisible(true);
     browser_compositor_state_ = BrowserCompositorSuspended;
   }
 
@@ -636,7 +635,6 @@ void RenderWidgetHostViewMac::DestroyBrowserCompositorView() {
   // Destroy the BrowserCompositorView to transition Suspended -> Destroyed.
   if (browser_compositor_state_ == BrowserCompositorSuspended) {
     browser_compositor_->accelerated_widget_mac()->ResetNSView();
-    browser_compositor_->compositor()->SetVisible(false);
     browser_compositor_->compositor()->SetScaleAndSize(1.0, gfx::Size(0, 0));
     browser_compositor_->compositor()->SetRootLayer(NULL);
     BrowserCompositorMac::Recycle(browser_compositor_.Pass());
@@ -2015,8 +2013,11 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
   // Do not forward key up events unless preceded by a matching key down,
   // otherwise we might get an event from releasing the return key in the
   // omnibox (http://crbug.com/338736).
-  if ([theEvent type] == NSKeyUp && [theEvent keyCode] != lastKeyCode_)
-    return;
+  if ([theEvent type] == NSKeyUp) {
+    auto numErased = keyDownCodes_.erase([theEvent keyCode]);
+    if (numErased < 1)
+      return;
+  }
 
   // We only handle key down events and just simply forward other events.
   if ([theEvent type] != NSKeyDown) {
@@ -2029,7 +2030,7 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
     return;
   }
 
-  lastKeyCode_ = [theEvent keyCode];
+  keyDownCodes_.insert([theEvent keyCode]);
 
   base::scoped_nsobject<RenderWidgetHostViewCocoa> keepSelfAlive([self retain]);
 

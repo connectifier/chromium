@@ -61,6 +61,7 @@ class WebTouchEvent;
 }
 
 namespace cc {
+struct InputHandlerScrollResult;
 class OutputSurface;
 class SwapPromise;
 }
@@ -70,6 +71,7 @@ class Range;
 }
 
 namespace content {
+class CompositorDependencies;
 class ExternalPopupMenu;
 class FrameSwapMessageQueue;
 class PepperPluginInstanceImpl;
@@ -92,6 +94,7 @@ class CONTENT_EXPORT RenderWidget
   // Creates a new RenderWidget.  The opener_id is the routing ID of the
   // RenderView that this widget lives inside.
   static RenderWidget* Create(int32 opener_id,
+                              CompositorDependencies* compositor_deps,
                               blink::WebPopupType popup_type,
                               const blink::WebScreenInfo& screen_info);
 
@@ -100,6 +103,7 @@ class CONTENT_EXPORT RenderWidget
 
   int32 routing_id() const { return routing_id_; }
   int32 surface_id() const { return surface_id_; }
+  CompositorDependencies* compositor_deps() const { return compositor_deps_; }
   blink::WebWidget* webwidget() const { return webwidget_; }
   gfx::Size size() const { return size_; }
   bool has_focus() const { return has_focus_; }
@@ -326,10 +330,11 @@ class CONTENT_EXPORT RenderWidget
 
   // Initializes this view with the given opener.  CompleteInit must be called
   // later.
-  bool Init(int32 opener_id);
+  bool Init(int32 opener_id, CompositorDependencies* compositor_deps);
 
   // Called by Init and subclasses to perform initialization.
   bool DoInit(int32 opener_id,
+              CompositorDependencies* compositor_deps,
               blink::WebWidget* web_widget,
               IPC::SyncMessage* create_widget_message);
 
@@ -532,6 +537,11 @@ class CONTENT_EXPORT RenderWidget
   // just handled.
   virtual void DidHandleTouchEvent(const blink::WebTouchEvent& event) {}
 
+  // Called by OnHandleInputEvent() to forward a mouse wheel event to the
+  // compositor thread, to effect the elastic overscroll effect.
+  void ObserveWheelEventAndResult(const blink::WebMouseWheelEvent& wheel_event,
+                                  bool event_processed);
+
   // Check whether the WebWidget has any touch event handlers registered
   // at the given point.
   virtual bool HasTouchEventHandlersAt(const gfx::Point& point) const;
@@ -554,6 +564,10 @@ class CONTENT_EXPORT RenderWidget
   int32 routing_id_;
 
   int32 surface_id_;
+
+  // Dependencies for initializing a compositor, including flags for optional
+  // features.
+  CompositorDependencies* compositor_deps_;
 
   // We are responsible for destroying this object via its Close method.
   // May be NULL when the window is closing.

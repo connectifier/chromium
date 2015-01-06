@@ -67,11 +67,7 @@ class AutofillAgent : public content::RenderFrameObserver,
     // content::RenderViewObserver:
     void OnDestruct() override;
     void FrameDetached(blink::WebFrame* frame) override;
-    void WillSubmitForm(blink::WebLocalFrame* frame,
-                        const blink::WebFormElement& form) override;
-    void DidChangeScrollOffset(blink::WebLocalFrame* frame) override;
     void FocusedNodeChanged(const blink::WebNode& node) override;
-    void OrientationChangeEvent() override;
     void Resized() override;
     void FrameWillClose(blink::WebFrame* frame) override;
 
@@ -118,15 +114,13 @@ class AutofillAgent : public content::RenderFrameObserver,
   bool OnMessageReceived(const IPC::Message& message) override;
   void DidCommitProvisionalLoad(bool is_new_navigation) override;
   void DidFinishDocumentLoad() override;
+  void WillSubmitForm(const blink::WebFormElement& form) override;
+  void DidChangeScrollOffset() override;
 
   // Pass-throughs from LegacyAutofillAgent. These correlate with
   // RenderViewObserver methods.
   void FrameDetached(blink::WebFrame* frame);
-  void WillSubmitForm(blink::WebLocalFrame* frame,
-                      const blink::WebFormElement& form);
-  void DidChangeScrollOffset(blink::WebLocalFrame* frame);
   void FocusedNodeChanged(const blink::WebNode& node);
-  void OrientationChangeEvent();
   void Resized();
   void LegacyFrameWillClose(blink::WebFrame* frame);
 

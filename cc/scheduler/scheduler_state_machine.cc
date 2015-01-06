@@ -342,6 +342,10 @@ bool SchedulerStateMachine::ShouldDraw() const {
   if (PendingDrawsShouldBeAborted())
     return active_tree_needs_first_draw_;
 
+  // Don't draw if we are waiting on the first commit after a surface.
+  if (output_surface_state_ != OUTPUT_SURFACE_ACTIVE)
+    return false;
+
   // If a commit has occurred after the animate call, we need to call animate
   // again before we should draw.
   if (did_commit_after_animating_)
@@ -387,6 +391,10 @@ bool SchedulerStateMachine::ShouldActivatePendingTree() const {
 }
 
 bool SchedulerStateMachine::ShouldAnimate() const {
+  // Don't animate if we are waiting on the first commit after a surface.
+  if (output_surface_state_ != OUTPUT_SURFACE_ACTIVE)
+    return false;
+
   // If a commit occurred after our last call, we need to do animation again.
   if (HasAnimatedThisFrame() && !did_commit_after_animating_)
     return false;
@@ -423,10 +431,6 @@ bool SchedulerStateMachine::ShouldSendBeginMainFrame() const {
       (has_pending_tree_ || active_tree_needs_first_draw_)) {
     return false;
   }
-
-  // We want to start the first commit after we get a new output surface ASAP.
-  if (output_surface_state_ == OUTPUT_SURFACE_WAITING_FOR_FIRST_COMMIT)
-    return true;
 
   // We should not send BeginMainFrame while we are in
   // BEGIN_IMPL_FRAME_STATE_IDLE since we might have new
@@ -550,8 +554,8 @@ void SchedulerStateMachine::UpdateState(Action action) {
       return;
 
     case ACTION_COMMIT: {
-      bool commit_was_aborted = false;
-      UpdateStateOnCommit(commit_was_aborted);
+      bool commit_has_no_updates = false;
+      UpdateStateOnCommit(commit_has_no_updates);
       return;
     }
 
@@ -586,13 +590,13 @@ void SchedulerStateMachine::UpdateState(Action action) {
   }
 }
 
-void SchedulerStateMachine::UpdateStateOnCommit(bool commit_was_aborted) {
+void SchedulerStateMachine::UpdateStateOnCommit(bool commit_has_no_updates) {
   commit_count_++;
 
-  if (!commit_was_aborted && HasAnimatedThisFrame())
+  if (!commit_has_no_updates && HasAnimatedThisFrame())
     did_commit_after_animating_ = true;
 
-  if (commit_was_aborted || settings_.main_frame_before_activation_enabled) {
+  if (commit_has_no_updates || settings_.main_frame_before_activation_enabled) {
     commit_state_ = COMMIT_STATE_IDLE;
   } else if (settings_.impl_side_painting) {
     commit_state_ = COMMIT_STATE_WAITING_FOR_ACTIVATION;
@@ -604,7 +608,7 @@ void SchedulerStateMachine::UpdateStateOnCommit(bool commit_was_aborted) {
 
   // If we are impl-side-painting but the commit was aborted, then we behave
   // mostly as if we are not impl-side-painting since there is no pending tree.
-  has_pending_tree_ = settings_.impl_side_painting && !commit_was_aborted;
+  has_pending_tree_ = settings_.impl_side_painting && !commit_has_no_updates;
 
   // Update state related to forced draws.
   if (forced_redraw_state_ == FORCED_REDRAW_STATE_WAITING_FOR_COMMIT) {
@@ -627,7 +631,7 @@ void SchedulerStateMachine::UpdateStateOnCommit(bool commit_was_aborted) {
   // Update state if we have a new active tree to draw, or if the active tree
   // was unchanged but we need to do a forced draw.
   if (!has_pending_tree_ &&
-      (!commit_was_aborted ||
+      (!commit_has_no_updates ||
        forced_redraw_state_ == FORCED_REDRAW_STATE_WAITING_FOR_DRAW)) {
     needs_redraw_ = true;
     active_tree_needs_first_draw_ = true;
@@ -692,6 +696,11 @@ bool SchedulerStateMachine::BeginFrameNeededForChildren() const {
 }
 
 bool SchedulerStateMachine::BeginFrameNeeded() const {
+  // We can't handle BeginFrames when output surface isn't initialized.
+  // TODO(brianderson): Support output surface creation inside a BeginFrame.
+  if (!HasInitializedOutputSurface())
+    return false;
+
   if (SupportsProactiveBeginFrame()) {
     return (BeginFrameNeededToAnimateOrDraw() ||
             BeginFrameNeededForChildren() ||
@@ -706,6 +715,29 @@ bool SchedulerStateMachine::BeginFrameNeeded() const {
   // Synchronous compositor doesn't have a browser.
   DCHECK(!children_need_begin_frames_);
   return BeginFrameNeededToAnimateOrDraw();
+}
+
+bool SchedulerStateMachine::ShouldSetNeedsBeginFrames(
+    bool frame_source_needs_begin_frames) const {
+  bool needs_begin_frame = BeginFrameNeeded();
+
+  // Never call SetNeedsBeginFrames if the frame source has the right value.
+  if (needs_begin_frame == frame_source_needs_begin_frames)
+    return false;
+
+  // Always request the BeginFrame immediately if it's needed.
+  if (needs_begin_frame)
+    return true;
+
+  // Stop requesting BeginFrames after a deadline.
+  if (begin_impl_frame_state_ == BEGIN_IMPL_FRAME_STATE_INSIDE_DEADLINE)
+    return true;
+
+  // Stop requesting BeginFrames immediately when output surface is lost.
+  if (!HasInitializedOutputSurface())
+    return true;
+
+  return false;
 }
 
 bool SchedulerStateMachine::ShouldPollForAnticipatedDrawTriggers() const {
@@ -740,11 +772,6 @@ void SchedulerStateMachine::SetChildrenNeedBeginFrames(
 // These are the cases where we definitely (or almost definitely) have a
 // new frame to animate and/or draw and can draw.
 bool SchedulerStateMachine::BeginFrameNeededToAnimateOrDraw() const {
-  // The output surface is the provider of BeginImplFrames, so we are not going
-  // to get them even if we ask for them.
-  if (!HasInitializedOutputSurface())
-    return false;
-
   // The forced draw respects our normal draw scheduling, so we need to
   // request a BeginImplFrame for it.
   if (forced_redraw_state_ == FORCED_REDRAW_STATE_WAITING_FOR_DRAW)
@@ -758,11 +785,6 @@ bool SchedulerStateMachine::BeginFrameNeededToAnimateOrDraw() const {
 // Proactively requesting the BeginImplFrame helps hide the round trip latency
 // of the SetNeedsBeginFrame request that has to go to the Browser.
 bool SchedulerStateMachine::ProactiveBeginFrameWanted() const {
-  // The output surface is the provider of BeginImplFrames,
-  // so we are not going to get them even if we ask for them.
-  if (!HasInitializedOutputSurface())
-    return false;
-
   // Do not be proactive when invisible.
   if (!visible_)
     return false;
@@ -1025,14 +1047,18 @@ void SchedulerStateMachine::NotifyReadyToCommit() {
     DCHECK(ShouldCommit());
 }
 
-void SchedulerStateMachine::BeginMainFrameAborted(bool did_handle) {
+void SchedulerStateMachine::BeginMainFrameAborted(CommitEarlyOutReason reason) {
   DCHECK_EQ(commit_state_, COMMIT_STATE_BEGIN_MAIN_FRAME_SENT);
-  if (did_handle) {
-    bool commit_was_aborted = true;
-    UpdateStateOnCommit(commit_was_aborted);
-  } else {
-    commit_state_ = COMMIT_STATE_IDLE;
-    SetNeedsCommit();
+  switch (reason) {
+    case CommitEarlyOutReason::ABORTED_OUTPUT_SURFACE_LOST:
+    case CommitEarlyOutReason::ABORTED_NOT_VISIBLE:
+      commit_state_ = COMMIT_STATE_IDLE;
+      SetNeedsCommit();
+      return;
+    case CommitEarlyOutReason::FINISHED_NO_UPDATES:
+      bool commit_has_no_updates = true;
+      UpdateStateOnCommit(commit_has_no_updates);
+      return;
   }
 }
 

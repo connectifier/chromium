@@ -11,7 +11,6 @@
 #include "ash/accelerators/accelerator_delegate.h"
 #include "ash/accelerators/focus_manager_factory.h"
 #include "ash/accelerators/nested_accelerator_delegate.h"
-#include "ash/accelerometer/accelerometer_controller.h"
 #include "ash/ash_switches.h"
 #include "ash/autoclick/autoclick_controller.h"
 #include "ash/desktop_background/desktop_background_controller.h"
@@ -91,9 +90,9 @@
 #include "ui/compositor/layer_animator.h"
 #include "ui/events/event_target_iterator.h"
 #include "ui/gfx/display.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/screen.h"
-#include "ui/gfx/size.h"
 #include "ui/keyboard/keyboard.h"
 #include "ui/keyboard/keyboard_controller.h"
 #include "ui/keyboard/keyboard_switches.h"
@@ -139,6 +138,7 @@
 #include "ash/virtual_keyboard_controller.h"
 #include "base/bind_helpers.h"
 #include "base/sys_info.h"
+#include "chromeos/accelerometer/accelerometer_reader.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "ui/chromeos/user_activity_power_manager_notifier.h"
 #include "ui/display/chromeos/display_configurator.h"
@@ -638,13 +638,13 @@ Shell::Shell(ShellDelegate* delegate)
       delegate_(delegate),
       window_positioner_(new WindowPositioner),
       activation_client_(NULL),
-      accelerometer_controller_(new AccelerometerController()),
 #if defined(OS_CHROMEOS)
+      accelerometer_reader_(new chromeos::AccelerometerReader()),
       display_configurator_(new ui::DisplayConfigurator()),
 #endif  // defined(OS_CHROMEOS)
       native_cursor_manager_(new AshNativeCursorManager),
       cursor_manager_(
-          scoped_ptr< ::wm::NativeCursorManager>(native_cursor_manager_)),
+          scoped_ptr<::wm::NativeCursorManager>(native_cursor_manager_)),
       simulate_modal_window_open_for_testing_(false),
       is_touch_hud_projection_enabled_(false) {
   DCHECK(delegate_.get());
@@ -857,7 +857,7 @@ void Shell::Init(const ShellInitParams& init_params) {
   if (!display_initialized)
     display_manager_->InitDefaultDisplay();
 
-  display_manager_->InitFontParams();
+  display_manager_->RefreshFontParams();
 
   // Install the custom factory first so that views::FocusManagers for Tray,
   // Shelf, and WallPaper could be created by the factory.

@@ -33,7 +33,7 @@ class ThreadTimesKeyHitTestCases(_ThreadTimes):
 class LegacySilkBenchmark(ThreadTimesKeySilkCases):
   """Same as thread_times.key_silk_cases but with the old name."""
   @classmethod
-  def GetName(cls):
+  def Name(cls):
     return "silk.key_silk_cases"
 
 
@@ -42,7 +42,7 @@ class ThreadTimesFastPathMobileSites(_ThreadTimes):
   """Measures timeline metrics while performing smoothness action on
   key mobile sites labeled with fast-path tag.
   http://www.chromium.org/developers/design-documents/rendering-benchmarks"""
-  page_set = page_sets.KeyMobileSitesPageSet
+  page_set = page_sets.KeyMobileSitesSmoothPageSet
   options = {'page_label_filter' : 'fastpath'}
 
 
@@ -53,6 +53,7 @@ class ThreadTimesSimpleMobileSites(_ThreadTimes):
   page_set = page_sets.SimpleMobileSitesPageSet
 
 
+@benchmark.Disabled('win') # crbug.com/443781
 class ThreadTimesCompositorCases(_ThreadTimes):
   """Measures timeline metrics while performing smoothness action on
   tough compositor cases, using software rasterization.

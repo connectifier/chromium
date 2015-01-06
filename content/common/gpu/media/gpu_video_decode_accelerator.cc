@@ -31,9 +31,8 @@
 #elif defined(OS_CHROMEOS) && defined(ARCH_CPU_ARMEL) && defined(USE_X11)
 #include "content/common/gpu/media/v4l2_video_decode_accelerator.h"
 #include "content/common/gpu/media/v4l2_video_device.h"
-#elif defined(OS_CHROMEOS) && defined(ARCH_CPU_X86_FAMILY) && defined(USE_X11)
+#elif defined(OS_CHROMEOS) && defined(ARCH_CPU_X86_FAMILY)
 #include "content/common/gpu/media/vaapi_video_decode_accelerator.h"
-#include "ui/gl/gl_context_glx.h"
 #include "ui/gl/gl_implementation.h"
 #elif defined(USE_OZONE)
 #include "media/ozone/media_ozone_platform.h"
@@ -41,7 +40,7 @@
 #include "content/common/gpu/media/android_video_decode_accelerator.h"
 #endif
 
-#include "ui/gfx/size.h"
+#include "ui/gfx/geometry/size.h"
 
 namespace content {
 
@@ -272,17 +271,9 @@ void GpuVideoDecodeAccelerator::Initialize(
       make_context_current_,
       device.Pass(),
       io_message_loop_));
-#elif defined(OS_CHROMEOS) && defined(ARCH_CPU_X86_FAMILY) && defined(USE_X11)
-  if (gfx::GetGLImplementation() != gfx::kGLImplementationDesktopGL) {
-    VLOG(1) << "HW video decode acceleration not available without "
-               "DesktopGL (GLX).";
-    SendCreateDecoderReply(init_done_msg, false);
-    return;
-  }
-  gfx::GLContextGLX* glx_context =
-      static_cast<gfx::GLContextGLX*>(stub_->decoder()->GetGLContext());
-  video_decode_accelerator_.reset(new VaapiVideoDecodeAccelerator(
-      glx_context->display(), make_context_current_));
+#elif defined(OS_CHROMEOS) && defined(ARCH_CPU_X86_FAMILY)
+  video_decode_accelerator_.reset(
+      new VaapiVideoDecodeAccelerator(make_context_current_));
 #elif defined(USE_OZONE)
   media::MediaOzonePlatform* platform =
       media::MediaOzonePlatform::GetInstance();
@@ -371,7 +362,7 @@ void GpuVideoDecodeAccelerator::OnAssignPictureBuffers(
       return;
     }
     if (texture_target_ == GL_TEXTURE_EXTERNAL_OES ||
-        texture_target_ == GL_TEXTURE_RECTANGLE) {
+        texture_target_ == GL_TEXTURE_RECTANGLE_ARB) {
       // These textures have their dimensions defined by the underlying storage.
       // Use |texture_dimensions_| for this size.
       texture_manager->SetLevelInfo(texture_ref,

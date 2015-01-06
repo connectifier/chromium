@@ -16,9 +16,10 @@
 #include "cc/trees/layer_tree_host_single_thread_client.h"
 #include "cc/trees/layer_tree_settings.h"
 #include "content/common/content_export.h"
+#include "content/renderer/gpu/compositor_dependencies.h"
 #include "third_party/WebKit/public/platform/WebLayerTreeView.h"
 #include "third_party/skia/include/core/SkBitmap.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/rect.h"
 
 namespace ui {
 struct LatencyInfo;
@@ -41,8 +42,9 @@ class CONTENT_EXPORT RenderWidgetCompositor
  public:
   // Attempt to construct and initialize a compositor instance for the widget
   // with the given settings. Returns NULL if initialization fails.
-  static scoped_ptr<RenderWidgetCompositor> Create(RenderWidget* widget,
-                                                   bool threaded);
+  static scoped_ptr<RenderWidgetCompositor> Create(
+      RenderWidget* widget,
+      CompositorDependencies* compositor_deps);
 
   virtual ~RenderWidgetCompositor();
 
@@ -79,9 +81,9 @@ class CONTENT_EXPORT RenderWidgetCompositor
       scoped_ptr<base::Value> value,
       const base::Callback<void(scoped_ptr<base::Value>)>& callback);
   bool SendMessageToMicroBenchmark(int id, scoped_ptr<base::Value> value);
+  void StartCompositor();
 
   // WebLayerTreeView implementation.
-  virtual void setSurfaceReady();
   virtual void setRootLayer(const blink::WebLayer& layer);
   virtual void clearRootLayer();
   virtual void setViewportSize(
@@ -163,16 +165,17 @@ class CONTENT_EXPORT RenderWidgetCompositor
   };
 
  protected:
-  RenderWidgetCompositor(RenderWidget* widget, bool threaded);
+  RenderWidgetCompositor(RenderWidget* widget,
+                         CompositorDependencies* compositor_deps);
 
-  void Initialize(const cc::LayerTreeSettings& settings);
+  void Initialize();
 
   cc::LayerTreeHost* layer_tree_host() { return layer_tree_host_.get(); }
 
  private:
   int num_failed_recreate_attempts_;
-  bool threaded_;
   RenderWidget* widget_;
+  CompositorDependencies* compositor_deps_;
   scoped_ptr<cc::LayerTreeHost> layer_tree_host_;
 
   scoped_ptr<cc::CopyOutputRequest> temporary_copy_output_request_;

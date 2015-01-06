@@ -85,8 +85,9 @@ class _ServiceWorkerTimelineMetric(object):
 class _ServiceWorkerMeasurement(page_test.PageTest):
   """Measure Speed Index and TRACE_EVENTs"""
 
-  def __init__(self, *args, **kwargs):
-    super(_ServiceWorkerMeasurement, self).__init__(*args, **kwargs)
+  def __init__(self):
+    super(_ServiceWorkerMeasurement, self).__init__(
+        action_name_to_run='RunPageInteractions')
     self._timeline_controller = timeline_controller.TimelineController()
     self._speed_index = speedindex.SpeedIndexMetric()
     self._page_open_times = collections.defaultdict(int)
@@ -137,9 +138,9 @@ class _ServiceWorkerMeasurement(page_test.PageTest):
 class _ServiceWorkerMicroBenchmarkMeasurement(page_test.PageTest):
   """Measure JS land values and TRACE_EVENTs"""
 
-  def __init__(self, *args, **kwargs):
-    super(_ServiceWorkerMicroBenchmarkMeasurement, self).__init__(*args,
-                                                                  **kwargs)
+  def __init__(self):
+    super(_ServiceWorkerMicroBenchmarkMeasurement, self).__init__(
+        action_name_to_run='RunPageInteractions')
     self._timeline_controller = timeline_controller.TimelineController()
 
   def CustomizeBrowserOptions(self, options):
@@ -179,7 +180,16 @@ class ServiceWorkerPerfTest(benchmark.Benchmark):
   page_set = page_sets.ServiceWorkerPageSet
 
 
+# Disabled due to redness on the tree. crbug.com/442752
+@benchmark.Disabled
 class ServiceWorkerMicroBenchmarkPerfTest(benchmark.Benchmark):
-  """Service Worker performance test using a micro benchmark page set"""
+  """This test measures the performance of pages using ServiceWorker.
+
+  As a page set, two benchamrk pages (many registration, many concurrent
+  fetching) and one application (Trained-to-thrill:
+  https://jakearchibald.github.io/trained-to-thrill/) are included. Execution
+  time of these pages will be shown as Speed Index, and TRACE_EVENTs are
+  subsidiary information to know more detail performance regression.
+  """
   test = _ServiceWorkerMicroBenchmarkMeasurement
   page_set = page_sets.ServiceWorkerMicroBenchmarkPageSet

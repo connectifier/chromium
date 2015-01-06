@@ -133,6 +133,7 @@ AutofillAgent::AutofillAgent(content::RenderFrame* render_frame,
                              PasswordAutofillAgent* password_autofill_agent,
                              PasswordGenerationAgent* password_generation_agent)
     : content::RenderFrameObserver(render_frame),
+      form_cache_(*render_frame->GetWebFrame()),
       password_autofill_agent_(password_autofill_agent),
       password_generation_agent_(password_generation_agent),
       legacy_(render_frame->GetRenderView(), this),
@@ -179,8 +180,7 @@ bool AutofillAgent::OnMessageReceived(const IPC::Message& message) {
 }
 
 void AutofillAgent::DidCommitProvisionalLoad(bool is_new_navigation) {
-  // TODO(estade): |form_cache_| shouldn't track multiple frames.
-  form_cache_.ResetFrame(*render_frame()->GetWebFrame());
+  form_cache_.Reset();
 }
 
 void AutofillAgent::DidFinishDocumentLoad() {
@@ -191,14 +191,10 @@ void AutofillAgent::FrameDetached(WebFrame* frame) {
   if (frame != render_frame()->GetWebFrame())
     return;
 
-  form_cache_.ResetFrame(*frame);
+  form_cache_.Reset();
 }
 
-void AutofillAgent::WillSubmitForm(WebLocalFrame* frame,
-                                   const WebFormElement& form) {
-  if (frame != render_frame()->GetWebFrame())
-    return;
-
+void AutofillAgent::WillSubmitForm(const WebFormElement& form) {
   FormData form_data;
   if (WebFormElementToFormData(form,
                                WebFormControlElement(),
@@ -212,10 +208,7 @@ void AutofillAgent::WillSubmitForm(WebLocalFrame* frame,
   }
 }
 
-void AutofillAgent::DidChangeScrollOffset(WebLocalFrame* frame) {
-  if (frame != render_frame()->GetWebFrame())
-    return;
-
+void AutofillAgent::DidChangeScrollOffset() {
   HidePopup();
 }
 
@@ -246,10 +239,6 @@ void AutofillAgent::FocusedNodeChanged(const WebNode& node) {
     return;
 
   element_ = *element;
-}
-
-void AutofillAgent::OrientationChangeEvent() {
-  HidePopup();
 }
 
 void AutofillAgent::Resized() {
@@ -760,7 +749,7 @@ void AutofillAgent::ProcessForms() {
   base::TimeTicks forms_seen_timestamp = base::TimeTicks::Now();
 
   WebLocalFrame* frame = render_frame()->GetWebFrame();
-  std::vector<FormData> forms = form_cache_.ExtractNewForms(*frame);
+  std::vector<FormData> forms = form_cache_.ExtractNewForms();
 
   // Always communicate to browser process for topmost frame.
   if (!forms.empty() || !frame->parent()) {
@@ -816,24 +805,9 @@ void AutofillAgent::LegacyAutofillAgent::FrameDetached(WebFrame* frame) {
   agent_->FrameDetached(frame);
 }
 
-void AutofillAgent::LegacyAutofillAgent::WillSubmitForm(
-    WebLocalFrame* frame,
-    const WebFormElement& form) {
-  agent_->WillSubmitForm(frame, form);
-}
-
-void AutofillAgent::LegacyAutofillAgent::DidChangeScrollOffset(
-    WebLocalFrame* frame) {
-  agent_->DidChangeScrollOffset(frame);
-}
-
 void AutofillAgent::LegacyAutofillAgent::FocusedNodeChanged(
     const WebNode& node) {
   agent_->FocusedNodeChanged(node);
-}
-
-void AutofillAgent::LegacyAutofillAgent::OrientationChangeEvent() {
-  agent_->OrientationChangeEvent();
 }
 
 void AutofillAgent::LegacyAutofillAgent::Resized() {

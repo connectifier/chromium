@@ -13,7 +13,7 @@
 #include "components/password_manager/core/browser/password_manager_client.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/browser/web_contents_user_data.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/rect.h"
 
 class Profile;
 
@@ -53,7 +53,8 @@ class ChromePasswordManagerClient
   bool PromptUserToSavePassword(
       scoped_ptr<password_manager::PasswordFormManager> form_to_save) override;
   bool PromptUserToChooseCredentials(
-      const std::vector<autofill::PasswordForm*>& forms,
+      const std::vector<autofill::PasswordForm*>& local_forms,
+      const std::vector<autofill::PasswordForm*>& federated_forms,
       base::Callback<void(const password_manager::CredentialInfo&)>
           callback) override;
   void AutomaticPasswordSave(scoped_ptr<password_manager::PasswordFormManager>
@@ -76,6 +77,7 @@ class ChromePasswordManagerClient
   bool IsOffTheRecord() override;
   password_manager::PasswordManager* GetPasswordManager() override;
   autofill::AutofillManager* GetAutofillManagerForMainFrame() override;
+  const GURL& GetMainFrameURL() override;
 
   // Hides any visible generation UI.
   void HidePasswordGenerationPopup();

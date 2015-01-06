@@ -43,7 +43,7 @@ class InfoBarResponder : public infobars::InfoBarManager::Observer {
     infobar_service_->AddObserver(this);
   }
 
-  virtual ~InfoBarResponder() { infobar_service_->RemoveObserver(this); }
+  ~InfoBarResponder() override { infobar_service_->RemoveObserver(this); }
 
   // infobars::InfoBarManager::Observer
   void OnInfoBarAdded(infobars::InfoBar* infobar) override {
@@ -273,6 +273,8 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, RegisterFailureNoManifest) {
             script_result);
 }
 
+// TODO(johnme): Test registering from a worker - see https://crbug.com/437298.
+
 IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, RegisterPersisted) {
   std::string script_result;
 
@@ -480,6 +482,43 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, HasPermissionSaysDenied) {
 
   ASSERT_TRUE(RunScript("hasPermission()", &script_result));
   EXPECT_EQ("permission status - denied", script_result);
+}
+
+IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, UnregisterSuccess) {
+  std::string script_result;
+
+  TryToRegisterSuccessfully("1-0" /* expected_push_registration_id */);
+
+  gcm_service()->AddExpectedUnregisterResponse(GCMClient::SUCCESS);
+
+  ASSERT_TRUE(RunScript("unregister()", &script_result));
+  EXPECT_EQ("unregister result: true", script_result);
+}
+
+IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, UnregisterNetworkError) {
+  std::string script_result;
+
+  TryToRegisterSuccessfully("1-0" /* expected_push_registration_id */);
+
+  gcm_service()->AddExpectedUnregisterResponse(GCMClient::NETWORK_ERROR);
+
+  ASSERT_TRUE(RunScript("unregister()", &script_result));
+  EXPECT_EQ("unregister error: "
+            "NetworkError: Failed to connect to the push server.",
+            script_result);
+}
+
+IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, UnregisterUnknownError) {
+  std::string script_result;
+
+  TryToRegisterSuccessfully("1-0" /* expected_push_registration_id */);
+
+  gcm_service()->AddExpectedUnregisterResponse(GCMClient::UNKNOWN_ERROR);
+
+  ASSERT_TRUE(RunScript("unregister()", &script_result));
+  EXPECT_EQ("unregister error: "
+            "UnknownError: Unexpected error while trying to unregister from the"
+            " push server.", script_result);
 }
 
 }  // namespace gcm

@@ -31,11 +31,12 @@ namespace content {
 
 namespace {
 
-const char kShutdownErrorMessage[] =
-    "The Service Worker system has shutdown.";
-const char kDisabledErrorMessage[] = "The browser has disabled Service Worker.";
 const char kNoDocumentURLErrorMessage[] =
     "No URL is associated with the caller's document.";
+const char kShutdownErrorMessage[] =
+    "The Service Worker system has shutdown.";
+const char kUserDeniedPermissionMessage[] =
+    "The user denied permission to use Service Worker.";
 
 const uint32 kFilteredMessageClasses[] = {
   ServiceWorkerMsgStart,
@@ -54,15 +55,6 @@ bool OriginCanAccessServiceWorkers(const GURL& url) {
   return url.SchemeIsSecure() || net::IsLocalhost(url.host());
 }
 
-bool CheckPatternIsUnderTheScriptDirectory(const GURL& pattern,
-                                           const GURL& script_url) {
-  size_t slash_pos = script_url.spec().rfind('/');
-  if (slash_pos == std::string::npos)
-    return false;
-  return pattern.spec().compare(
-             0, slash_pos + 1, script_url.spec(), 0, slash_pos + 1) == 0;
-}
-
 bool CanRegisterServiceWorker(const GURL& document_url,
                               const GURL& pattern,
                               const GURL& script_url) {
@@ -70,8 +62,7 @@ bool CanRegisterServiceWorker(const GURL& document_url,
   DCHECK(pattern.is_valid());
   DCHECK(script_url.is_valid());
   return AllOriginsMatch(document_url, pattern, script_url) &&
-         OriginCanAccessServiceWorkers(document_url) &&
-         CheckPatternIsUnderTheScriptDirectory(pattern, script_url);
+         OriginCanAccessServiceWorkers(document_url);
 }
 
 bool CanUnregisterServiceWorker(const GURL& document_url,
@@ -308,13 +299,24 @@ void ServiceWorkerDispatcherHost::OnRegisterServiceWorker(
     return;
   }
 
+  std::string error_message;
+  if (!ServiceWorkerUtils::IsPathRestrictionSatisfied(
+          pattern, script_url, &error_message)) {
+    Send(new ServiceWorkerMsg_ServiceWorkerRegistrationError(
+        thread_id,
+        request_id,
+        WebServiceWorkerError::ErrorTypeSecurity,
+        base::UTF8ToUTF16(error_message)));
+    return;
+  }
+
   if (!GetContentClient()->browser()->AllowServiceWorker(
           pattern, provider_host->topmost_frame_url(), resource_context_)) {
     Send(new ServiceWorkerMsg_ServiceWorkerRegistrationError(
         thread_id,
         request_id,
-        WebServiceWorkerError::ErrorTypeDisabled,
-        base::ASCIIToUTF16(kDisabledErrorMessage)));
+        WebServiceWorkerError::ErrorTypeUnknown,
+        base::ASCIIToUTF16(kUserDeniedPermissionMessage)));
     return;
   }
 
@@ -389,8 +391,8 @@ void ServiceWorkerDispatcherHost::OnUnregisterServiceWorker(
     Send(new ServiceWorkerMsg_ServiceWorkerUnregistrationError(
         thread_id,
         request_id,
-        WebServiceWorkerError::ErrorTypeDisabled,
-        base::ASCIIToUTF16(kDisabledErrorMessage)));
+        WebServiceWorkerError::ErrorTypeUnknown,
+        base::ASCIIToUTF16(kUserDeniedPermissionMessage)));
     return;
   }
 
@@ -464,8 +466,8 @@ void ServiceWorkerDispatcherHost::OnGetRegistration(
     Send(new ServiceWorkerMsg_ServiceWorkerGetRegistrationError(
         thread_id,
         request_id,
-        WebServiceWorkerError::ErrorTypeDisabled,
-        base::ASCIIToUTF16(kDisabledErrorMessage)));
+        WebServiceWorkerError::ErrorTypeUnknown,
+        base::ASCIIToUTF16(kUserDeniedPermissionMessage)));
     return;
   }
 

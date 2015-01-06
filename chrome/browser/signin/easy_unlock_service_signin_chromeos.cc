@@ -138,10 +138,6 @@ void EasyUnlockServiceSignin::SetRemoteDevices(
   NOTREACHED();
 }
 
-void EasyUnlockServiceSignin::ClearRemoteDevices() {
-  NOTREACHED();
-}
-
 void EasyUnlockServiceSignin::RunTurnOffFlow() {
   NOTREACHED();
 }
@@ -216,7 +212,7 @@ void EasyUnlockServiceSignin::RecordPasswordLoginEvent(
         break;
     }
   } else if (!screenlock_state_handler()) {
-    event = chromeos::PASSWORD_SIGN_IN_SERVICE_NOT_ACTIVE;
+    event = chromeos::PASSWORD_SIGN_IN_NO_SCREENLOCK_STATE_HANDLER;
   } else {
     switch (screenlock_state_handler()->state()) {
       case EasyUnlockScreenlockStateHandler::STATE_INACTIVE:

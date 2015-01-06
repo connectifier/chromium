@@ -25,7 +25,6 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/chromeos/boot_times_loader.h"
 #include "chrome/browser/chromeos/customization/customization_document.h"
-#include "chrome/browser/chromeos/kiosk_mode/kiosk_mode_settings.h"
 #include "chrome/browser/chromeos/login/auth/chrome_login_performer.h"
 #include "chrome/browser/chromeos/login/helper.h"
 #include "chrome/browser/chromeos/login/login_utils.h"
@@ -133,9 +132,9 @@ void RecordPasswordLoginEvent(const UserContext& user_context) {
 
 bool CanShowDebuggingFeatures() {
   // We need to be on the login screen and in dev mode to show this menu item.
-  return CommandLine::ForCurrentProcess()->HasSwitch(
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
              chromeos::switches::kSystemDevMode) &&
-         CommandLine::ForCurrentProcess()->HasSwitch(
+         base::CommandLine::ForCurrentProcess()->HasSwitch(
              chromeos::switches::kLoginManager) &&
          !user_manager::UserManager::Get()->IsSessionStarted();
 }
@@ -433,11 +432,6 @@ void ExistingUserController::Login(const UserContext& user_context,
 
   if (user_context.GetUserType() == user_manager::USER_TYPE_PUBLIC_ACCOUNT) {
     LoginAsPublicSession(user_context);
-    return;
-  }
-
-  if (user_context.GetUserType() == user_manager::USER_TYPE_RETAIL_MODE) {
-    LoginAsRetailModeUser();
     return;
   }
 
@@ -831,21 +825,6 @@ bool ExistingUserController::password_changed() const {
     return login_performer_->password_changed();
 
   return password_changed_;
-}
-
-void ExistingUserController::LoginAsRetailModeUser() {
-  PerformPreLoginActions(UserContext(user_manager::USER_TYPE_RETAIL_MODE,
-                                     chromeos::login::kRetailModeUserName));
-
-  // TODO(rkc): Add a CHECK to make sure retail mode logins are allowed once
-  // the enterprise policy wiring is done for retail mode.
-
-  // Only one instance of LoginPerformer should exist at a time.
-  login_performer_.reset(NULL);
-  login_performer_.reset(new ChromeLoginPerformer(this));
-  login_performer_->LoginRetailMode();
-  SendAccessibilityAlert(
-      l10n_util::GetStringUTF8(IDS_CHROMEOS_ACC_LOGIN_SIGNIN_DEMOUSER));
 }
 
 void ExistingUserController::LoginAsGuest() {

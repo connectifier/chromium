@@ -17,6 +17,7 @@
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/toolbar/browser_actions_container_observer.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "chrome/browser/ui/views/toolbar/wrench_toolbar_button.h"
 #include "chrome/common/extensions/command.h"
 #include "chrome/grit/generated_resources.h"
 #include "extensions/common/feature_switch.h"
@@ -66,9 +67,11 @@ BrowserActionsContainer::DropPosition::DropPosition(
 BrowserActionsContainer::BrowserActionsContainer(
     Browser* browser,
     BrowserActionsContainer* main_container)
-    : toolbar_actions_bar_(new ToolbarActionsBar(this,
-                                                 browser,
-                                                 main_container != nullptr)),
+    : toolbar_actions_bar_(new ToolbarActionsBar(
+          this,
+          browser,
+          main_container ?
+              main_container->toolbar_actions_bar_.get() : nullptr)),
       browser_(browser),
       main_container_(main_container),
       popup_owner_(NULL),
@@ -181,8 +184,9 @@ views::MenuButton* BrowserActionsContainer::GetOverflowReferenceView() {
   // With traditional overflow, the reference is the chevron. With the
   // redesign, we use the wrench menu instead.
   return chevron_ ?
-      chevron_ :
-      BrowserView::GetBrowserViewForBrowser(browser_)->toolbar()->app_menu();
+      static_cast<views::MenuButton*>(chevron_) :
+      static_cast<views::MenuButton*>(BrowserView::GetBrowserViewForBrowser(
+          browser_)->toolbar()->app_menu());
 }
 
 void BrowserActionsContainer::SetPopupOwner(ToolbarActionView* popup_owner) {
@@ -323,6 +327,14 @@ int BrowserActionsContainer::GetChevronWidth() const {
 
 bool BrowserActionsContainer::IsPopupRunning() const {
   return popup_owner_ != nullptr;
+}
+
+void BrowserActionsContainer::OnOverflowedActionWantsToRunChanged(
+    bool overflowed_action_wants_to_run) {
+  DCHECK(!in_overflow_mode());
+  BrowserView::GetBrowserViewForBrowser(browser_)->toolbar()->
+      app_menu()->SetOverflowedToolbarActionWantsToRun(
+          overflowed_action_wants_to_run);
 }
 
 void BrowserActionsContainer::AddObserver(
@@ -559,10 +571,7 @@ int BrowserActionsContainer::OnPerformDrop(
     drag_type = in_overflow_mode() ? ToolbarActionsBar::DRAG_TO_OVERFLOW :
         ToolbarActionsBar::DRAG_TO_MAIN;
 
-  // Let the main container handle the drag/drop.
-  ToolbarActionsBar* toolbar_actions_bar = in_overflow_mode() ?
-      main_container_->toolbar_actions_bar_.get() : toolbar_actions_bar_.get();
-  toolbar_actions_bar->OnDragDrop(data.index(), i, drag_type);
+  toolbar_actions_bar_->OnDragDrop(data.index(), i, drag_type);
 
   OnDragExited();  // Perform clean up after dragging.
   return ui::DragDropTypes::DRAG_MOVE;

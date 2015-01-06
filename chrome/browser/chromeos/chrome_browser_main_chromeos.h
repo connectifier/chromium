@@ -11,14 +11,6 @@
 #include "chrome/browser/chromeos/external_metrics.h"
 #include "chromeos/system/version_loader.h"
 
-namespace base {
-class MemoryPressureObserverChromeOS;
-}
-
-namespace content {
-class PowerSaveBlocker;
-}
-
 namespace session_manager {
 class SessionManager;
 }
@@ -28,7 +20,6 @@ namespace chromeos {
 class DataPromoNotification;
 class EventRewriter;
 class EventRewriterController;
-class ExtensionSystemEventObserver;
 class IdleActionWarningObserver;
 class LightBar;
 class MagnificationManager;
@@ -71,11 +62,9 @@ class ChromeBrowserMainPartsChromeos : public ChromeBrowserMainPartsLinux {
 
  private:
   scoped_ptr<default_app_order::ExternalLoader> app_order_loader_;
-  scoped_ptr<ExtensionSystemEventObserver> extension_system_event_observer_;
   scoped_ptr<PeripheralBatteryObserver> peripheral_battery_observer_;
   scoped_ptr<PowerPrefs> power_prefs_;
   scoped_ptr<PowerButtonObserver> power_button_observer_;
-  scoped_ptr<content::PowerSaveBlocker> retail_mode_power_save_blocker_;
   scoped_ptr<IdleActionWarningObserver> idle_action_warning_observer_;
   scoped_ptr<DataPromoNotification> data_promo_notification_;
   scoped_ptr<RendererFreezer> renderer_freezer_;
@@ -89,8 +78,6 @@ class ChromeBrowserMainPartsChromeos : public ChromeBrowserMainPartsLinux {
   scoped_ptr<EventRewriterController> keyboard_event_rewriters_;
 
   scoped_refptr<chromeos::ExternalMetrics> external_metrics_;
-
-  scoped_ptr<base::MemoryPressureObserverChromeOS> memory_pressure_observer_;
 
   bool use_new_network_change_notifier_;
 

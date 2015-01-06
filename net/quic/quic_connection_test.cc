@@ -14,6 +14,7 @@
 #include "net/quic/crypto/null_encrypter.h"
 #include "net/quic/crypto/quic_decrypter.h"
 #include "net/quic/crypto/quic_encrypter.h"
+#include "net/quic/quic_ack_notifier.h"
 #include "net/quic/quic_flags.h"
 #include "net/quic/quic_protocol.h"
 #include "net/quic/quic_utils.h"
@@ -26,6 +27,7 @@
 #include "net/quic/test_tools/quic_sent_packet_manager_peer.h"
 #include "net/quic/test_tools/quic_test_utils.h"
 #include "net/quic/test_tools/simple_quic_framer.h"
+#include "net/test/gtest_util.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -612,7 +614,7 @@ class FecQuicConnectionDebugVisitor
 
 class MockPacketWriterFactory : public QuicConnection::PacketWriterFactory {
  public:
-  MockPacketWriterFactory(QuicPacketWriter* writer) {
+  explicit MockPacketWriterFactory(QuicPacketWriter* writer) {
     ON_CALL(*this, Create(_)).WillByDefault(Return(writer));
   }
   ~MockPacketWriterFactory() override {}
@@ -1346,11 +1348,8 @@ TEST_P(QuicConnectionTest, TooManySentPackets) {
 
   // Ack packet 1, which leaves more than the limit outstanding.
   EXPECT_CALL(*send_algorithm_, OnCongestionEvent(true, _, _, _));
-  if (FLAGS_quic_too_many_outstanding_packets) {
-    EXPECT_CALL(visitor_,
-                OnConnectionClosed(QUIC_TOO_MANY_OUTSTANDING_SENT_PACKETS,
-                                   false));
-  }
+  EXPECT_CALL(visitor_, OnConnectionClosed(
+                            QUIC_TOO_MANY_OUTSTANDING_SENT_PACKETS, false));
   // We're receive buffer limited, so the connection won't try to write more.
   EXPECT_CALL(visitor_, OnCanWrite()).Times(0);
 
@@ -1364,12 +1363,8 @@ TEST_P(QuicConnectionTest, TooManySentPackets) {
 
 TEST_P(QuicConnectionTest, TooManyReceivedPackets) {
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
-
-  if (FLAGS_quic_too_many_outstanding_packets) {
-    EXPECT_CALL(visitor_,
-                OnConnectionClosed(QUIC_TOO_MANY_OUTSTANDING_RECEIVED_PACKETS,
-                                   false));
-  }
+  EXPECT_CALL(visitor_, OnConnectionClosed(
+                            QUIC_TOO_MANY_OUTSTANDING_RECEIVED_PACKETS, false));
 
   // Miss every other packet for 1000 packets.
   for (QuicPacketSequenceNumber i = 1; i < 1000; ++i) {
@@ -2543,8 +2538,6 @@ TEST_P(QuicConnectionTest, RetransmitPacketsWithInitialEncryption) {
 }
 
 TEST_P(QuicConnectionTest, DelayForwardSecureEncryptionUntilClientIsReady) {
-  ValueRestore<bool> old_flag(&FLAGS_enable_quic_delay_forward_security, true);
-
   // A TaggingEncrypter puts kTagSize copies of the given byte (0x02 here) at
   // the end of the packet. We can test this to check which encrypter was used.
   use_tagging_decrypter();
@@ -2568,8 +2561,6 @@ TEST_P(QuicConnectionTest, DelayForwardSecureEncryptionUntilClientIsReady) {
 }
 
 TEST_P(QuicConnectionTest, DelayForwardSecureEncryptionUntilManyPacketSent) {
-  ValueRestore<bool> old_flag(&FLAGS_enable_quic_delay_forward_security, true);
-
   // Set a congestion window of 10 packets.
   QuicPacketCount congestion_window = 10;
   EXPECT_CALL(*send_algorithm_, GetCongestionWindow()).WillRepeatedly(
@@ -4147,7 +4138,7 @@ TEST_P(QuicConnectionTest, AckNotifierCallbackAfterFECRecovery) {
   ProcessFecPacket(2, 1, true, !kEntropyFlag, packet);
 }
 
-TEST_P(QuicConnectionTest, NetworkChangeVisitorCallbacksChangeFecState) {
+TEST_P(QuicConnectionTest, NetworkChangeVisitorCwndCallbackChangesFecState) {
   QuicPacketCreator* creator =
       QuicConnectionPeer::GetPacketCreator(&connection_);
   size_t max_packets_per_fec_group = creator->max_packets_per_fec_group();
@@ -4162,6 +4153,47 @@ TEST_P(QuicConnectionTest, NetworkChangeVisitorCallbacksChangeFecState) {
       Return(1000 * kDefaultTCPMSS));
   visitor->OnCongestionWindowChange();
   EXPECT_LT(max_packets_per_fec_group, creator->max_packets_per_fec_group());
+}
+
+TEST_P(QuicConnectionTest, NetworkChangeVisitorConfigCallbackChangesFecState) {
+  QuicSentPacketManager* sent_packet_manager =
+      QuicConnectionPeer::GetSentPacketManager(&connection_);
+  QuicSentPacketManager::NetworkChangeVisitor* visitor =
+      QuicSentPacketManagerPeer::GetNetworkChangeVisitor(sent_packet_manager);
+  EXPECT_TRUE(visitor);
+
+  QuicPacketGenerator* generator =
+      QuicConnectionPeer::GetPacketGenerator(&connection_);
+  EXPECT_EQ(QuicTime::Delta::Zero(), generator->fec_timeout());
+
+  // Verify that sending a config with a new initial rtt changes fec timeout.
+  // Create and process a config with a non-zero initial RTT.
+  EXPECT_CALL(*send_algorithm_, SetFromConfig(_, _, _));
+  QuicConfig config;
+  config.SetInitialRoundTripTimeUsToSend(300000);
+  connection_.SetFromConfig(config);
+  EXPECT_LT(QuicTime::Delta::Zero(), generator->fec_timeout());
+}
+
+TEST_P(QuicConnectionTest, NetworkChangeVisitorRttCallbackChangesFecState) {
+  // Verify that sending a config with a new initial rtt changes fec timeout.
+  QuicSentPacketManager* sent_packet_manager =
+      QuicConnectionPeer::GetSentPacketManager(&connection_);
+  QuicSentPacketManager::NetworkChangeVisitor* visitor =
+      QuicSentPacketManagerPeer::GetNetworkChangeVisitor(sent_packet_manager);
+  EXPECT_TRUE(visitor);
+
+  QuicPacketGenerator* generator =
+      QuicConnectionPeer::GetPacketGenerator(&connection_);
+  EXPECT_EQ(QuicTime::Delta::Zero(), generator->fec_timeout());
+
+  // Increase FEC timeout by increasing RTT.
+  RttStats* rtt_stats =
+      QuicSentPacketManagerPeer::GetRttStats(sent_packet_manager);
+  rtt_stats->UpdateRtt(QuicTime::Delta::FromMilliseconds(300),
+                       QuicTime::Delta::Zero(), QuicTime::Zero());
+  visitor->OnRttChange();
+  EXPECT_LT(QuicTime::Delta::Zero(), generator->fec_timeout());
 }
 
 class MockQuicConnectionDebugVisitor
@@ -4257,6 +4289,17 @@ TEST_P(QuicConnectionTest, ControlFramesInstigateAcks) {
   EXPECT_CALL(visitor_, OnBlockedFrames(_));
   ProcessFramePacket(QuicFrame(&blocked));
   EXPECT_TRUE(ack_alarm->IsSet());
+}
+
+TEST_P(QuicConnectionTest, NoDataNoFin) {
+  ValueRestore<bool> old_flag(&FLAGS_quic_empty_data_no_fin_early_return, true);
+  // Make sure that a call to SendStreamWithData, with no data and no FIN, does
+  // not result in a QuicAckNotifier being used-after-free (fail under ASAN).
+  // Regression test for b/18594622
+  scoped_refptr<MockAckNotifierDelegate> delegate(new MockAckNotifierDelegate);
+  EXPECT_DFATAL(
+      connection_.SendStreamDataWithString(3, "", 0, !kFin, delegate.get()),
+      "Attempt to send empty stream frame");
 }
 
 }  // namespace

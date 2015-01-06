@@ -23,6 +23,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/threading/thread_restrictions.h"
 #include "build/build_config.h"
+#include "chrome/browser/bookmarks/enhanced_bookmarks_features.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browsing_data/browsing_data_helper.h"
 #include "chrome/browser/chrome_notification_types.h"
@@ -216,7 +217,8 @@ ProfileSyncService::ProfileSyncService(
       factory_(factory.Pass()),
       profile_(profile),
       sync_prefs_(profile_->GetPrefs()),
-      sync_service_url_(GetSyncServiceURL(*CommandLine::ForCurrentProcess())),
+      sync_service_url_(
+          GetSyncServiceURL(*base::CommandLine::ForCurrentProcess())),
       is_first_time_sync_configure_(false),
       backend_initialized_(false),
       sync_disabled_by_admin_(false),
@@ -1154,6 +1156,19 @@ void ProfileSyncService::OnExperimentsChanged(
   profile()->GetPrefs()->SetBoolean(prefs::kInvalidationServiceUseGCMChannel,
                                     experiments.gcm_invalidations_enabled);
 
+  if (experiments.enhanced_bookmarks_enabled) {
+    profile_->GetPrefs()->SetString(
+        sync_driver::prefs::kEnhancedBookmarksExtensionId,
+        experiments.enhanced_bookmarks_ext_id);
+  } else {
+    profile_->GetPrefs()->ClearPref(
+        sync_driver::prefs::kEnhancedBookmarksExtensionId);
+  }
+  UpdateBookmarksExperimentState(
+      profile_->GetPrefs(), g_browser_process->local_state(), true,
+      experiments.enhanced_bookmarks_enabled ? BOOKMARKS_EXPERIMENT_ENABLED :
+                                               BOOKMARKS_EXPERIMENT_NONE);
+
   // If this is a first time sync for a client, this will be called before
   // OnBackendInitialized() to ensure the new datatypes are available at sync
   // setup. As a result, the migrator won't exist yet. This is fine because for
@@ -1740,7 +1755,8 @@ void ProfileSyncService::UpdateSelectedTypesHistogram(
     sync_driver::user_selectable_type::PROXY_TABS,
   };
 
-  COMPILE_ASSERT(33 == syncer::MODEL_TYPE_COUNT, UpdateCustomConfigHistogram);
+  static_assert(34 == syncer::MODEL_TYPE_COUNT,
+                "custom config histogram must be updated");
 
   if (!sync_everything) {
     const syncer::ModelTypeSet current_types = GetPreferredDataTypes();
@@ -2453,7 +2469,8 @@ void ProfileSyncService::SyncEvent(SyncEventCodes code) {
 bool ProfileSyncService::IsSyncEnabled() {
   // We have switches::kEnableSync just in case we need to change back to
   // sync-disabled-by-default on a platform.
-  return !CommandLine::ForCurrentProcess()->HasSwitch(switches::kDisableSync);
+  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
+      switches::kDisableSync);
 }
 
 bool ProfileSyncService::IsManaged() const {

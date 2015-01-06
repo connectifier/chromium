@@ -261,8 +261,9 @@ remoting.OAuth2.prototype.getAuthorizationCode = function(onDone) {
    *
    * @param {Object.<string, string>} message Dictionary containing the parsed
    *   OAuth redirect URL parameters.
+   * @param {function(*)} sendResponse Function to send response.
    */
-  function oauth2MessageListener(message) {
+  function oauth2MessageListener(message, sender, sendResponse) {
     if ('code' in message && 'state' in message) {
       if (message['state'] == xsrf_token) {
         onDone(message['code']);
@@ -282,6 +283,7 @@ remoting.OAuth2.prototype.getAuthorizationCode = function(onDone) {
       onDone(null);
     }
     chrome.extension.onMessage.removeListener(oauth2MessageListener);
+    sendResponse(null);
   }
   chrome.extension.onMessage.addListener(oauth2MessageListener);
   window.open(GET_CODE_URL, '_blank', 'location=yes,toolbar=no,menubar=no');
@@ -320,7 +322,7 @@ remoting.OAuth2.prototype.exchangeCodeForToken = function(code, onDone) {
     console.error('Unable to exchange code for token: ', error);
   };
 
-  remoting.OAuth2Api.exchangeCodeForTokens(
+  remoting.oauth2Api.exchangeCodeForTokens(
       this.onTokens_.bind(this, onDone), onError,
       this.getClientId_(), this.getClientSecret_(), code,
       this.getRedirectUri_());
@@ -360,7 +362,7 @@ remoting.OAuth2.prototype.callWithToken = function(onOk, onError) {
   var refreshToken = this.getRefreshToken();
   if (refreshToken) {
     if (this.needsNewAccessToken_()) {
-      remoting.OAuth2Api.refreshAccessToken(
+      remoting.oauth2Api.refreshAccessToken(
           this.onAccessToken_.bind(this, onOk), onError,
           this.getClientId_(), this.getClientSecret_(),
           refreshToken);
@@ -397,7 +399,8 @@ remoting.OAuth2.prototype.getEmail = function(onOk, onError) {
   };
 
   this.callWithToken(
-      remoting.OAuth2Api.getEmail.bind(null, onResponse, onError), onError);
+      remoting.oauth2Api.getEmail.bind(remoting.oauth2Api, onResponse, onError),
+      onError);
 };
 
 /**
@@ -429,7 +432,9 @@ remoting.OAuth2.prototype.getUserInfo = function(onOk, onError) {
   };
 
   this.callWithToken(
-      remoting.OAuth2Api.getUserInfo.bind(null, onResponse, onError), onError);
+      remoting.oauth2Api.getUserInfo.bind(
+          remoting.oauth2Api, onResponse, onError),
+      onError);
 };
 
 /**

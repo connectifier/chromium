@@ -12,8 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "base/memory/scoped_ptr.h"
 #include "base/callback_forward.h"
+#include "base/memory/scoped_ptr.h"
 #include "base/process/kill.h"
 #include "base/timer/timer.h"
 #include "cc/output/compositor_frame.h"
@@ -29,9 +29,9 @@
 #include "ui/base/ime/text_input_mode.h"
 #include "ui/base/ime/text_input_type.h"
 #include "ui/gfx/display.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/native_widget_types.h"
 #include "ui/gfx/range/range.h"
-#include "ui/gfx/rect.h"
 #include "ui/surface/transport_dib.h"
 
 class SkBitmap;
@@ -256,10 +256,12 @@ class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
   // Copies the contents of the compositing surface, providing a new SkBitmap
   // result via an asynchronously-run |callback|. |src_subrect| is specified in
   // layer space coordinates for the current platform (e.g., DIP for Aura/Mac,
-  // physical for Android), and is the region to be copied from this view. The
-  // copy is then scaled to a SkBitmap of size |dst_size|. |callback| is run
-  // with true on success, false otherwise. A smaller region than |src_subrect|
-  // may be copied if the underlying surface is smaller than |src_subrect|.
+  // physical for Android), and is the region to be copied from this view. When
+  // |src_subrect| is empty then the whole surface will be copied. The copy is
+  // then scaled to a SkBitmap of size |dst_size|. If |dst_size| is empty then
+  // output will be unscaled. |callback| is run with true on success,
+  // false otherwise. A smaller region than |src_subrect| may be copied
+  // if the underlying surface is smaller than |src_subrect|.
   virtual void CopyFromCompositingSurface(const gfx::Rect& src_subrect,
                                           const gfx::Size& dst_size,
                                           ReadbackRequestCallback& callback,

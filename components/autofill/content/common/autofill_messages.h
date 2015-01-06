@@ -22,8 +22,8 @@
 #include "ipc/ipc_message_macros.h"
 #include "ipc/ipc_message_utils.h"
 #include "third_party/WebKit/public/web/WebFormElement.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/ipc/gfx_param_traits.h"
-#include "ui/gfx/rect.h"
 #include "url/gurl.h"
 
 #define IPC_MESSAGE_START AutofillMsgStart
@@ -228,6 +228,11 @@ IPC_MESSAGE_ROUTED0(AutofillHostMsg_PasswordAutofillAgentConstructed)
 
 // Notification that this password form was submitted by the user.
 IPC_MESSAGE_ROUTED1(AutofillHostMsg_PasswordFormSubmitted,
+                    autofill::PasswordForm /* form */)
+
+// Notification that in-page navigation happened and at this moment we have
+// filled password form. We use this as a signal for successful login.
+IPC_MESSAGE_ROUTED1(AutofillHostMsg_InPageNavigation,
                     autofill::PasswordForm /* form */)
 
 // Sends |log| to browser for displaying to the user. Only strings passed as an

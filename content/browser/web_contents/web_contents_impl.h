@@ -38,8 +38,8 @@
 #include "net/http/http_response_headers.h"
 #include "third_party/WebKit/public/web/WebDragOperation.h"
 #include "ui/base/page_transition_types.h"
-#include "ui/gfx/rect_f.h"
-#include "ui/gfx/size.h"
+#include "ui/gfx/geometry/rect_f.h"
+#include "ui/gfx/geometry/size.h"
 
 struct BrowserPluginHostMsg_ResizeGuest_Params;
 struct ViewHostMsg_DateTimeDialogValue_Params;
@@ -99,6 +99,8 @@ class CONTENT_EXPORT WebContentsImpl
       public NON_EXPORTED_BASE(NavigationControllerDelegate),
       public NON_EXPORTED_BASE(NavigatorDelegate) {
  public:
+  class FriendZone;
+
   ~WebContentsImpl() override;
 
   static WebContentsImpl* CreateWithOpener(
@@ -315,6 +317,7 @@ class CONTENT_EXPORT WebContentsImpl
   gfx::Size GetPreferredSize() const override;
   bool GotResponseToLockMouseRequest(bool allowed) override;
   bool HasOpener() const override;
+  WebContents* GetOpener() const override;
   void DidChooseColorInColorChooser(SkColor color) override;
   void DidEndColorChooser() override;
   int DownloadImage(const GURL& url,
@@ -664,8 +667,6 @@ class CONTENT_EXPORT WebContentsImpl
   }
 
  private:
-  friend class TestNavigationObserver;
-  friend class WebContentsAddedObserver;
   friend class WebContentsObserver;
   friend class WebContents;  // To implement factory methods.
 
@@ -942,11 +943,6 @@ class CONTENT_EXPORT WebContentsImpl
   // Removes all entries from |player_map| for |render_frame_host|.
   void RemoveAllMediaPlayerEntries(RenderFrameHost* render_frame_host,
                                    ActiveMediaPlayerMap* player_map);
-
-  // Adds/removes a callback called on creation of each new WebContents.
-  // Deprecated, about to remove.
-  static void AddCreatedCallback(const CreatedCallback& callback);
-  static void RemoveCreatedCallback(const CreatedCallback& callback);
 
   // Data for core operation ---------------------------------------------------
 
@@ -1233,6 +1229,23 @@ class CONTENT_EXPORT WebContentsImpl
   base::WeakPtrFactory<WebContentsImpl> loading_weak_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(WebContentsImpl);
+};
+
+// Dangerous methods which should never be made part of the public API, so we
+// grant their use only to an explicit friend list (c++ attorney/client idiom).
+class CONTENT_EXPORT WebContentsImpl::FriendZone {
+ private:
+  friend class TestNavigationObserver;
+  friend class WebContentsAddedObserver;
+  friend class ContentBrowserSanityChecker;
+
+  FriendZone();  // Not instantiable.
+
+  // Adds/removes a callback called on creation of each new WebContents.
+  static void AddCreatedCallbackForTesting(const CreatedCallback& callback);
+  static void RemoveCreatedCallbackForTesting(const CreatedCallback& callback);
+
+  DISALLOW_COPY_AND_ASSIGN(FriendZone);
 };
 
 }  // namespace content

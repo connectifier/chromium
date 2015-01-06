@@ -146,7 +146,13 @@
             'google/core/browser/google_util_unittest.cc',
             'history/core/android/android_history_types_unittest.cc',
             'history/core/browser/history_types_unittest.cc',
+            'history/core/browser/in_memory_url_index_types_unittest.cc',
+            'history/core/browser/top_sites_cache_unittest.cc',
             'history/core/browser/url_database_unittest.cc',
+            'history/core/browser/url_utils_unittest.cc',
+            'history/core/browser/visit_database_unittest.cc',
+            'history/core/browser/visit_filter_unittest.cc',
+            'history/core/browser/visit_tracker_unittest.cc',
             'history/core/common/thumbnail_score_unittest.cc',
             'invalidation/invalidation_logger_unittest.cc',
             'json_schema/json_schema_validator_unittest.cc',
@@ -159,6 +165,8 @@
             'login/screens/screen_context_unittest.cc',
             'metrics/compression_utils_unittest.cc',
             'metrics/daily_event_unittest.cc',
+            'metrics/histogram_encoder_unittest.cc',
+            'metrics/histogram_manager_unittest.cc',
             'metrics/machine_id_provider_win_unittest.cc',
             'metrics/metrics_hashes_unittest.cc',
             'metrics/metrics_log_manager_unittest.cc',
@@ -170,7 +178,6 @@
             'metrics/profiler/profiler_metrics_provider_unittest.cc',
             'navigation_interception/intercept_navigation_resource_throttle_unittest.cc',
             'network_time/network_time_tracker_unittest.cc',
-            'omaha_client/omaha_query_params_unittest.cc',
             'omnibox/answers_cache_unittest.cc',
             'omnibox/base_search_provider_unittest.cc',
             'omnibox/autocomplete_input_unittest.cc',
@@ -263,6 +270,10 @@
             'translate/core/common/translate_metrics_unittest.cc',
             'translate/core/common/translate_util_unittest.cc',
             'translate/core/language_detection/language_detection_util_unittest.cc',
+            'translate/ios/browser/js_translate_manager_unittest.mm',
+            'translate/ios/browser/language_detection_controller_unittest.mm',
+            'translate/ios/browser/translate_controller_unittest.mm',
+            'update_client/update_query_params_unittest.cc',
             'url_matcher/regex_set_matcher_unittest.cc',
             'url_matcher/string_pattern_unittest.cc',
             'url_matcher/substring_set_matcher_unittest.cc',
@@ -378,9 +389,6 @@
             'components.gyp:history_core_browser',
             'components.gyp:history_core_common',
 
-            # Dependencies of infobar
-            'components.gyp:infobars_test_support',
-
             # Dependencies of invalidation
             'components.gyp:invalidation',
             'components.gyp:invalidation_test_support',
@@ -413,9 +421,6 @@
 
             # Dependencies of network_time
             'components.gyp:network_time',
-
-            # Dependencies of omaha_client
-            'components.gyp:omaha_client',
 
             # Dependencies of omnibox
             'components.gyp:omnibox',
@@ -476,6 +481,9 @@
 
             # Dependencies of wallpaper
             'components.gyp:wallpaper',
+
+            # Dependencies of update_client
+            'components.gyp:update_client',
 
             # Dependencies of url_fixer
             'components.gyp:url_fixer',
@@ -593,6 +601,9 @@
               ],
             }, { # 'OS == "ios"'
               'includes': ['../chrome/chrome_ios_bundle_resources.gypi'],
+              'sources': [
+                'webp_transcode/webp_decoder_unittest.mm',
+              ],
               'sources/': [
                 ['exclude', '\\.cc$'],
                 ['exclude', '\\.mm$'],
@@ -630,6 +641,7 @@
                 ['include', '^translate/'],
                 ['include', '^url_fixer/'],
                 ['include', '^variations/'],
+                ['include', '^webp_transcode/'],
               ],
               'dependencies': [
                 # Dependencies of sessions
@@ -637,7 +649,16 @@
 
                 # Dependencies of signin
                 'components.gyp:signin_ios_browser',
+
+                # Dependencies of translate
+                'components.gyp:translate_ios_browser',
+
+                # Dependencies of webp_transcode
+                'components.gyp:webp_transcode',
+
                 '../ios/ios_tests.gyp:test_support_ios',
+                '../ios/web/ios_web.gyp:test_support_ios_web',
+                '../third_party/ocmock/ocmock.gyp:ocmock',
               ],
               'actions': [
                 {
@@ -744,6 +765,7 @@
             }],
             ['OS != "ios" and OS != "android"', {
               'sources': [
+                'copresence/copresence_state_unittest.cc',
                 'copresence/handlers/audio/audio_directive_handler_unittest.cc',
                 'copresence/handlers/audio/audio_directive_list_unittest.cc',
                 'copresence/handlers/directive_handler_unittest.cc',
@@ -783,11 +805,15 @@
               'sources': [
                 'pairing/message_buffer_unittest.cc',
                 'timers/alarm_timer_unittest.cc',
+                'wifi_sync/wifi_security_class_chromeos_unittest.cc',
               ],
               'sources!': [
                 'storage_monitor/storage_monitor_linux_unittest.cc',
               ],
               'dependencies': [
+	        # Dependencies of wifi_sync
+                'components.gyp:wifi_sync',
+
                 'components.gyp:pairing',
                 '../chromeos/chromeos.gyp:chromeos_test_support',
               ],
@@ -979,6 +1005,7 @@
           'defines!': ['CONTENT_IMPLEMENTATION'],
           'dependencies': [
             'components.gyp:autofill_content_browser',
+            'components.gyp:autofill_content_renderer',
             'components.gyp:password_manager_content_renderer',
             'components.gyp:pref_registry_test_support',
             'components_resources.gyp:components_resources',
@@ -1007,6 +1034,7 @@
           ],
           'sources': [
             'autofill/content/browser/risk/fingerprint_browsertest.cc',
+            'autofill/content/renderer/password_form_conversion_utils_browsertest.cc',
             'dom_distiller/content/distiller_page_web_contents_browsertest.cc',
             'password_manager/content/renderer/credential_manager_client_browsertest.cc',
           ],
@@ -1039,7 +1067,6 @@
             ['OS=="win"', {
               'resource_include_dirs': [
                 '<(SHARED_INTERMEDIATE_DIR)/content/app/resources',
-                '<(SHARED_INTERMEDIATE_DIR)/webkit',
               ],
               'sources': [
                 '../content/shell/app/resource.h',

@@ -13,10 +13,14 @@
 #include "components/keyed_service/core/keyed_service.h"
 
 namespace content {
+
 class BrowserContext;
-}
+
+}  // content
 
 namespace extensions {
+
+class NetworkingPrivateDelegateObserver;
 
 namespace api {
 namespace networking_private {
@@ -78,7 +82,7 @@ class NetworkingPrivateDelegate : public KeyedService {
   // to the delegate. Otherwise they will fail with a NotSupported error.
   explicit NetworkingPrivateDelegate(
       scoped_ptr<VerifyDelegate> verify_delegate);
-  virtual ~NetworkingPrivateDelegate();
+  ~NetworkingPrivateDelegate() override;
 
   // Asynchronous methods
   virtual void GetProperties(const std::string& guid,
@@ -138,6 +142,11 @@ class NetworkingPrivateDelegate : public KeyedService {
   // Returns true if a scan was requested. It may take many seconds for a scan
   // to complete. The scan may or may not trigger API events when complete.
   virtual bool RequestScan() = 0;
+
+  // Optional methods for adding a NetworkingPrivateDelegateObserver for
+  // implementations that require it (non-chromeos).
+  virtual void AddObserver(NetworkingPrivateDelegateObserver* observer);
+  virtual void RemoveObserver(NetworkingPrivateDelegateObserver* observer);
 
   // Verify* methods are forwarded to |verify_delegate_| if not NULL.
   void VerifyDestination(const VerificationProperties& verification_properties,

@@ -124,7 +124,9 @@ class MockHotwordClient : public HotwordClient {
     state_changed_count_++;
   }
 
-  void OnHotwordRecognized() override { recognized_count_++; }
+  void OnHotwordRecognized(
+      const scoped_refptr<content::SpeechRecognitionSessionPreamble>& preamble)
+      override { recognized_count_++; }
 
   bool last_enabled() const { return last_enabled_; }
   int state_changed_count() const { return state_changed_count_; }
@@ -190,7 +192,7 @@ IN_PROC_BROWSER_TEST_F(HotwordPrivateApiTest, SetEnabled) {
 
 IN_PROC_BROWSER_TEST_F(HotwordPrivateApiTest, SetAudioLoggingEnabled) {
   EXPECT_FALSE(service()->IsOptedIntoAudioLogging());
-  EXPECT_TRUE(profile()->GetPrefs()->GetBoolean(
+  EXPECT_FALSE(profile()->GetPrefs()->GetBoolean(
       prefs::kHotwordAudioLoggingEnabled));
 
   ExtensionTestMessageListener listenerTrue("ready", false);

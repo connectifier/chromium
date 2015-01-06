@@ -23,6 +23,10 @@ class MessageLoop;
 class WaitableEvent;
 }
 
+namespace ui {
+class DisplayConfigurator;
+}
+
 namespace content {
 
 class VideoFrameTexture : public base::RefCounted<VideoFrameTexture> {
@@ -114,8 +118,11 @@ class RenderingHelper {
   // Get the platform specific handle to the OpenGL display.
   void* GetGLDisplay();
 
+  // Get the GL context.
+  scoped_refptr<gfx::GLContext> GetGLContext();
+
   // Get the platform specific handle to the OpenGL context.
-  void* GetGLContext();
+  void* GetGLContextHandle();
 
   // Get rendered thumbnails as RGB.
   // Sets alpha_solid to true if the alpha channel is entirely 0xff.
@@ -168,6 +175,15 @@ class RenderingHelper {
 
   scoped_refptr<gfx::GLContext> gl_context_;
   scoped_refptr<gfx::GLSurface> gl_surface_;
+
+#if defined(USE_OZONE)
+  class StubOzoneDelegate;
+  scoped_ptr<StubOzoneDelegate> platform_window_delegate_;
+
+#if defined(OS_CHROMEOS)
+  scoped_ptr<ui::DisplayConfigurator> display_configurator_;
+#endif
+#endif
 
   gfx::AcceleratedWidget window_;
 

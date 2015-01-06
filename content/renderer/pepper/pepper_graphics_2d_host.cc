@@ -31,15 +31,14 @@
 #include "skia/ext/platform_canvas.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/gfx/blit.h"
-#include "ui/gfx/point_conversions.h"
-#include "ui/gfx/rect.h"
-#include "ui/gfx/rect_conversions.h"
+#include "ui/gfx/geometry/point_conversions.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/rect_conversions.h"
+#include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/scoped_ns_graphics_context_save_gstate_mac.h"
-#include "ui/gfx/size_conversions.h"
 #include "ui/gfx/skia_util.h"
 
 #if defined(OS_MACOSX)
-#include "base/mac/mac_util.h"
 #include "base/mac/scoped_cftyperef.h"
 #endif
 

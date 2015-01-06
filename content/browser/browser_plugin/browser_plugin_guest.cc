@@ -395,7 +395,6 @@ void BrowserPluginGuest::SendMessageToEmbedder(IPC::Message* msg) {
     pending_messages_.push_back(linked_ptr<IPC::Message>(msg));
     return;
   }
-  msg->set_routing_id(owner_web_contents_->GetRoutingID());
   owner_web_contents_->Send(msg);
 }
 
@@ -644,7 +643,12 @@ void BrowserPluginGuest::OnDragStatusUpdate(int browser_plugin_instance_id,
 
 void BrowserPluginGuest::OnExecuteEditCommand(int browser_plugin_instance_id,
                                               const std::string& name) {
-  Send(new InputMsg_ExecuteEditCommand(routing_id(), name, std::string()));
+  RenderFrameHost* focused_frame = web_contents()->GetFocusedFrame();
+  if (!focused_frame)
+    return;
+
+  focused_frame->Send(new InputMsg_ExecuteNoValueEditCommand(
+      focused_frame->GetRoutingID(), name));
 }
 
 void BrowserPluginGuest::OnImeSetComposition(

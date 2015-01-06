@@ -26,7 +26,6 @@
 #include "chrome/browser/history/history_service.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/history/in_memory_history_backend.h"
-#include "chrome/browser/history/visit_filter.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/importer/imported_favicon_usage.h"
@@ -34,6 +33,7 @@
 #include "components/history/core/browser/history_constants.h"
 #include "components/history/core/browser/in_memory_database.h"
 #include "components/history/core/browser/keyword_search_term.h"
+#include "components/history/core/browser/visit_filter.h"
 #include "components/history/core/test/history_client_fake_bookmarks.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_source.h"
@@ -309,15 +309,15 @@ class HistoryBackendTest : public HistoryBackendTestBase {
   ~HistoryBackendTest() override {}
 
  protected:
-  void AddRedirectChain(const char* sequence[], int page_id) {
-    AddRedirectChainWithTransitionAndTime(sequence, page_id,
+  void AddRedirectChain(const char* sequence[], int nav_entry_id) {
+    AddRedirectChainWithTransitionAndTime(sequence, nav_entry_id,
                                           ui::PAGE_TRANSITION_LINK,
                                           Time::Now());
   }
 
   void AddRedirectChainWithTransitionAndTime(
       const char* sequence[],
-      int page_id,
+      int nav_entry_id,
       ui::PageTransition transition,
       base::Time time) {
     history::RedirectList redirects;
@@ -326,7 +326,7 @@ class HistoryBackendTest : public HistoryBackendTestBase {
 
     ContextID context_id = reinterpret_cast<ContextID>(1);
     history::HistoryAddPageArgs request(
-        redirects.back(), time, context_id, page_id, GURL(),
+        redirects.back(), time, context_id, nav_entry_id, GURL(),
         redirects, transition, history::SOURCE_BROWSED,
         true);
     backend_->AddPage(request);

@@ -39,6 +39,7 @@
 #include "content/child/child_discardable_shared_memory_manager.h"
 #include "content/child/child_gpu_memory_buffer_manager.h"
 #include "content/child/child_histogram_message_filter.h"
+#include "content/child/child_resource_message_filter.h"
 #include "content/child/child_shared_bitmap_manager.h"
 #include "content/child/content_child_helpers.h"
 #include "content/child/db_message_filter.h"
@@ -47,6 +48,7 @@
 #include "content/child/npapi/npobject_util.h"
 #include "content/child/plugin_messages.h"
 #include "content/child/resource_dispatcher.h"
+#include "content/child/resource_scheduling_filter.h"
 #include "content/child/runtime_features.h"
 #include "content/child/thread_safe_sender.h"
 #include "content/child/web_database_observer_impl.h"
@@ -72,6 +74,7 @@
 #include "content/public/renderer/content_renderer_client.h"
 #include "content/public/renderer/render_process_observer.h"
 #include "content/public/renderer/render_view_visitor.h"
+#include "content/renderer/browser_plugin/browser_plugin_manager.h"
 #include "content/renderer/devtools/devtools_agent_filter.h"
 #include "content/renderer/devtools/v8_sampling_profiler.h"
 #include "content/renderer/dom_storage/dom_storage_dispatcher.h"
@@ -118,6 +121,7 @@
 #include "skia/ext/event_tracer_impl.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebThread.h"
+#include "third_party/WebKit/public/web/WebCache.h"
 #include "third_party/WebKit/public/web/WebColorName.h"
 #include "third_party/WebKit/public/web/WebDatabase.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
@@ -142,6 +146,7 @@
 #endif
 
 #if defined(OS_MACOSX)
+#include "base/mac/mac_util.h"
 #include "content/renderer/webscrollbarbehavior_impl_mac.h"
 #endif
 
@@ -330,7 +335,7 @@ void CreateRenderFrameSetup(mojo::InterfaceRequest<RenderFrameSetup> request) {
 }
 
 bool ShouldUseMojoChannel() {
-  return CommandLine::ForCurrentProcess()->HasSwitch(
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
              switches::kEnableRendererMojoChannel) ||
          IPC::ChannelMojo::ShouldBeUsed();
 }
@@ -373,8 +378,8 @@ RenderThreadImpl::HistogramCustomizer::~HistogramCustomizer() {}
 
 void RenderThreadImpl::HistogramCustomizer::RenderViewNavigatedToHost(
     const std::string& host, size_t view_count) {
-  if (CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kDisableHistogramCustomizer)) {
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kDisableHistogramCustomizer)) {
     return;
   }
   // Check if all RenderViews are displaying a page from the same host. If there
@@ -462,6 +467,7 @@ void RenderThreadImpl::Init() {
   main_thread_indexed_db_dispatcher_.reset(new IndexedDBDispatcher(
       thread_safe_sender()));
   renderer_scheduler_ = RendererScheduler::Create();
+  channel()->SetListenerTaskRunner(renderer_scheduler_->DefaultTaskRunner());
   embedded_worker_dispatcher_.reset(new EmbeddedWorkerDispatcher());
 
   media_stream_center_ = NULL;
@@ -471,6 +477,9 @@ void RenderThreadImpl::Init() {
 
   vc_manager_.reset(new VideoCaptureImplManager());
   AddFilter(vc_manager_->video_capture_message_filter());
+
+  browser_plugin_manager_.reset(new BrowserPluginManager());
+  AddObserver(browser_plugin_manager_.get());
 
 #if defined(ENABLE_WEBRTC)
   peer_connection_tracker_.reset(new PeerConnectionTracker());
@@ -509,7 +518,8 @@ void RenderThreadImpl::Init() {
 
   InitSkiaEventTracer();
 
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
 
   is_impl_side_painting_enabled_ =
       command_line.HasSwitch(switches::kEnableImplSidePainting);
@@ -525,6 +535,15 @@ void RenderThreadImpl::Init() {
   is_one_copy_enabled_ = command_line.HasSwitch(switches::kEnableOneCopy);
 #else
   is_one_copy_enabled_ = !command_line.HasSwitch(switches::kDisableOneCopy);
+#endif
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+  is_elastic_overscroll_enabled_ =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableThreadedEventHandlingMac) &&
+      base::mac::IsOSLionOrLater();
+#else
+  is_elastic_overscroll_enabled_ = false;
 #endif
 
   use_image_texture_target_ = GL_TEXTURE_2D;
@@ -608,6 +627,14 @@ void RenderThreadImpl::Init() {
     DCHECK(parsed_num_raster_threads) << string_value;
     DCHECK_GT(num_raster_threads, 0);
     cc::TileTaskWorkerPool::SetNumWorkerThreads(num_raster_threads);
+
+#if defined(OS_ANDROID) || defined(OS_LINUX)
+    if (!command_line.HasSwitch(
+            switches::kUseNormalPriorityForTileTaskWorkerThreads)) {
+      cc::TileTaskWorkerPool::SetWorkerThreadPriority(
+          base::kThreadPriority_Background);
+    }
+#endif
   }
 
   base::DiscardableMemoryShmemAllocator::SetInstance(
@@ -804,7 +831,8 @@ IPC::SyncChannel* RenderThreadImpl::GetChannel() {
 std::string RenderThreadImpl::GetLocale() {
   // The browser process should have passed the locale to the renderer via the
   // --lang command line flag.
-  const CommandLine& parsed_command_line = *CommandLine::ForCurrentProcess();
+  const base::CommandLine& parsed_command_line =
+      *base::CommandLine::ForCurrentProcess();
   const std::string& lang =
       parsed_command_line.GetSwitchValueASCII(switches::kLang);
   DCHECK(!lang.empty());
@@ -893,11 +921,26 @@ void RenderThreadImpl::SetResourceDispatcherDelegate(
   resource_dispatcher()->set_delegate(delegate);
 }
 
+void RenderThreadImpl::SetResourceDispatchTaskQueue(
+    const scoped_refptr<base::SingleThreadTaskRunner>& resource_task_queue) {
+  // Add a filter that forces resource messages to be dispatched via a
+  // particular task runner.
+  resource_scheduling_filter_ =
+      new ResourceSchedulingFilter(resource_task_queue, resource_dispatcher());
+  channel()->AddFilter(resource_scheduling_filter_.get());
+
+  // The ChildResourceMessageFilter and the ResourceDispatcher need to use the
+  // same queue to ensure tasks are executed in the expected order.
+  child_resource_message_filter()->SetMainThreadTaskRunner(resource_task_queue);
+  resource_dispatcher()->SetMainThreadTaskRunner(resource_task_queue);
+}
+
 void RenderThreadImpl::EnsureWebKitInitialized() {
   if (blink_platform_impl_)
     return;
 
-const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
 
 #ifdef ENABLE_VTUNE_JIT_INTERFACE
   if (command_line.HasSwitch(switches::kEnableVtune))
@@ -915,11 +958,14 @@ const CommandLine& command_line = *CommandLine::ForCurrentProcess();
   isolate->SetAddHistogramSampleFunction(AddHistogramSample);
 
   main_thread_compositor_task_runner_ =
-      renderer_scheduler()->CompositorTaskRunner();
+      renderer_scheduler_->CompositorTaskRunner();
 
   main_input_callback_.Reset(
       base::Bind(base::IgnoreResult(&RenderThreadImpl::OnMessageReceived),
                  base::Unretained(this)));
+
+  // TODO(alexclarke): Add a dedicated loading task queue
+  SetResourceDispatchTaskQueue(renderer_scheduler_->DefaultTaskRunner());
 
   bool enable = !command_line.HasSwitch(switches::kDisableThreadedCompositing);
   if (enable) {
@@ -960,7 +1006,7 @@ const CommandLine& command_line = *CommandLine::ForCurrentProcess();
     }
     input_handler_manager_.reset(new InputHandlerManager(
         compositor_message_loop_proxy_, input_handler_manager_client,
-        renderer_scheduler()));
+        renderer_scheduler_.get()));
   }
 
   if (!input_event_filter_.get()) {
@@ -1154,7 +1200,7 @@ RenderThreadImpl::GetGpuFactories() {
   DCHECK(IsMainThread());
 
   scoped_refptr<GpuChannelHost> gpu_channel_host = GetGpuChannel();
-  const CommandLine* cmd_line = CommandLine::ForCurrentProcess();
+  const base::CommandLine* cmd_line = base::CommandLine::ForCurrentProcess();
   scoped_refptr<media::GpuVideoAcceleratorFactories> gpu_factories;
   scoped_refptr<base::SingleThreadTaskRunner> media_task_runner =
       GetMediaThreadTaskRunner();
@@ -1275,6 +1321,75 @@ ServiceRegistry* RenderThreadImpl::GetServiceRegistry() {
   return service_registry();
 }
 
+bool RenderThreadImpl::IsImplSidePaintingEnabled() {
+  return is_impl_side_painting_enabled_;
+}
+
+bool RenderThreadImpl::IsGpuRasterizationForced() {
+  return is_gpu_rasterization_forced_;
+}
+
+bool RenderThreadImpl::IsGpuRasterizationEnabled() {
+  return is_gpu_rasterization_enabled_;
+}
+
+bool RenderThreadImpl::IsLcdTextEnabled() {
+  return is_lcd_text_enabled_;
+}
+
+bool RenderThreadImpl::IsDistanceFieldTextEnabled() {
+  return is_distance_field_text_enabled_;
+}
+
+bool RenderThreadImpl::IsZeroCopyEnabled() {
+  return is_zero_copy_enabled_;
+}
+
+bool RenderThreadImpl::IsOneCopyEnabled() {
+  return is_one_copy_enabled_;
+}
+
+bool RenderThreadImpl::IsElasticOverscrollEnabled() {
+  return is_elastic_overscroll_enabled_;
+}
+
+uint32 RenderThreadImpl::GetImageTextureTarget() {
+  return use_image_texture_target_;
+}
+scoped_refptr<base::SingleThreadTaskRunner>
+RenderThreadImpl::GetCompositorMainThreadTaskRunner() {
+  return main_thread_compositor_task_runner_;
+}
+
+scoped_refptr<base::SingleThreadTaskRunner>
+RenderThreadImpl::GetCompositorImplThreadTaskRunner() {
+  return compositor_message_loop_proxy_;
+}
+
+gpu::GpuMemoryBufferManager* RenderThreadImpl::GetGpuMemoryBufferManager() {
+  return gpu_memory_buffer_manager();
+}
+
+RendererScheduler* RenderThreadImpl::GetRendererScheduler() {
+  return renderer_scheduler_.get();
+}
+
+cc::ContextProvider* RenderThreadImpl::GetSharedMainThreadContextProvider() {
+  return SharedMainThreadContextProvider().get();
+}
+
+scoped_ptr<cc::BeginFrameSource>
+RenderThreadImpl::CreateExternalBeginFrameSource(int routing_id) {
+#if defined(OS_ANDROID)
+  if (SynchronousCompositorFactory* factory =
+          SynchronousCompositorFactory::GetInstance()) {
+    return factory->CreateExternalBeginFrameSource(routing_id);
+  }
+#endif
+  return make_scoped_ptr(new CompositorExternalBeginFrameSource(
+      compositor_message_filter_.get(), sync_message_filter(), routing_id));
+}
+
 bool RenderThreadImpl::IsMainThread() {
   return !!current();
 }
@@ -1390,8 +1505,9 @@ void RenderThreadImpl::OnSetZoomLevelForCurrentURL(const std::string& scheme,
 
 void RenderThreadImpl::OnCreateNewView(const ViewMsg_New_Params& params) {
   EnsureWebKitInitialized();
+  CompositorDependencies* compositor_deps = this;
   // When bringing in render_view, also bring in webkit's glue and jsbindings.
-  RenderViewImpl::Create(params, false);
+  RenderViewImpl::Create(params, compositor_deps, false);
 }
 
 GpuChannelHost* RenderThreadImpl::EstablishGpuChannelSync(
@@ -1442,8 +1558,8 @@ GpuChannelHost* RenderThreadImpl::EstablishGpuChannelSync(
 blink::WebMediaStreamCenter* RenderThreadImpl::CreateMediaStreamCenter(
     blink::WebMediaStreamCenterClient* client) {
 #if defined(OS_ANDROID)
-  if (CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kDisableWebRTC))
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kDisableWebRTC))
     return NULL;
 #endif
 
@@ -1581,6 +1697,8 @@ void RenderThreadImpl::OnMemoryPressure(
     size_t font_cache_limit = SkGraphics::SetFontCacheLimit(0);
     SkGraphics::SetFontCacheLimit(font_cache_limit);
   }
+
+  blink::WebCache::pruneAll();
 }
 
 scoped_refptr<base::MessageLoopProxy>

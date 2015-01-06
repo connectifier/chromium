@@ -133,6 +133,10 @@ void MimeHandlerViewGuest::DidInitialize() {
     delegate_->AttachHelpers();
 }
 
+bool MimeHandlerViewGuest::ZoomPropagatesFromEmbedderToGuest() const {
+  return false;
+}
+
 bool MimeHandlerViewGuest::Find(int request_id,
                                 const base::string16& search_text,
                                 const blink::WebFindOptions& options) {
@@ -196,6 +200,12 @@ bool MimeHandlerViewGuest::SaveFrame(const GURL& url,
 
   embedder_web_contents()->SaveFrame(content_url_, referrer);
   return true;
+}
+
+void MimeHandlerViewGuest::DocumentOnLoadCompletedInMainFrame() {
+  embedder_web_contents()->Send(
+      new ExtensionMsg_MimeHandlerViewGuestOnLoadCompleted(
+          element_instance_id()));
 }
 
 bool MimeHandlerViewGuest::OnMessageReceived(const IPC::Message& message) {

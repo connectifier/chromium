@@ -2528,7 +2528,7 @@ TEST_F(AutofillDialogControllerTest, NotProdNotification) {
   controller()->OnDidGetWalletItems(
       wallet::GetTestWalletItems(wallet::AMEX_DISALLOWED));
 
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   ASSERT_EQ(
       "",
       command_line->GetSwitchValueASCII(switches::kWalletServiceUseSandbox));
@@ -2543,7 +2543,7 @@ TEST_F(AutofillDialogControllerTest, NoNotProdNotification) {
   controller()->OnDidGetWalletItems(
       wallet::GetTestWalletItems(wallet::AMEX_DISALLOWED));
 
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   ASSERT_EQ(
       "",
       command_line->GetSwitchValueASCII(switches::kWalletServiceUseSandbox));
@@ -3195,10 +3195,8 @@ TEST_F(AutofillDialogControllerTest, IconReservedForCreditCardField) {
   // supported credit card issuers.
   const int kSupportedCardIdrs[] = {
     IDR_AUTOFILL_CC_AMEX,
-    IDR_AUTOFILL_CC_DINERS,
     IDR_AUTOFILL_CC_DISCOVER,
     IDR_AUTOFILL_CC_GENERIC,
-    IDR_AUTOFILL_CC_JCB,
     IDR_AUTOFILL_CC_MASTERCARD,
     IDR_AUTOFILL_CC_VISA,
   };

@@ -16,7 +16,8 @@ from telemetry.value import scalar
 
 class _RobohornetProMeasurement(page_test.PageTest):
   def __init__(self):
-    super(_RobohornetProMeasurement, self).__init__()
+    super(_RobohornetProMeasurement, self).__init__(
+        action_name_to_run='RunPageInteractions')
     self._power_metric = None
 
   def CustomizeBrowserOptions(self, options):
@@ -47,16 +48,20 @@ class _RobohornetProMeasurement(page_test.PageTest):
 # benchmarks.
 @benchmark.Enabled('chromeos')
 class RobohornetPro(benchmark.Benchmark):
+  """Milliseconds to complete the RoboHornetPro demo by Microsoft.
+
+  http://ie.microsoft.com/testdrive/performance/robohornetpro/
+  """
   test = _RobohornetProMeasurement
 
   def CreatePageSet(self, options):
     ps = page_set.PageSet(
-      archive_data_file='../page_sets/data/robohornet_pro.json',
-      # Measurement require use of real Date.now() for measurement.
-      make_javascript_deterministic=False,
-      file_path=os.path.abspath(__file__),
-      bucket=page_set.PARTNER_BUCKET)
+        archive_data_file='../page_sets/data/robohornet_pro.json',
+        file_path=os.path.abspath(__file__),
+        bucket=page_set.PARTNER_BUCKET)
     ps.AddUserStory(page_module.Page(
         'http://ie.microsoft.com/testdrive/performance/robohornetpro/',
-        ps, ps.base_dir))
+        ps, ps.base_dir,
+        # Measurement require use of real Date.now() for measurement.
+        make_javascript_deterministic=False))
     return ps

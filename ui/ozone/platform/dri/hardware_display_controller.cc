@@ -74,11 +74,11 @@ bool HardwareDisplayController::Modeset(const OverlayPlane& primary,
 bool HardwareDisplayController::Enable() {
   TRACE_EVENT0("dri", "HDC::Enable");
   DCHECK(!current_planes_.empty());
-  OverlayPlane primary = OverlayPlane::GetPrimaryPlane(current_planes_);
-  DCHECK(primary.buffer.get());
+  const OverlayPlane* primary = OverlayPlane::GetPrimaryPlane(current_planes_);
+  DCHECK(primary->buffer.get());
   bool status = true;
   for (size_t i = 0; i < crtc_controllers_.size(); ++i)
-    status &= crtc_controllers_[i]->Modeset(primary, mode_);
+    status &= crtc_controllers_[i]->Modeset(*primary, mode_);
 
   return status;
 }
@@ -115,7 +115,6 @@ bool HardwareDisplayController::SchedulePageFlip() {
 
   for (const auto& planes : owned_hardware_planes_) {
     if (!planes.first->plane_manager()->Commit(planes.second)) {
-      LOG(ERROR) << "Failed to commit planes";
       status = false;
     }
   }

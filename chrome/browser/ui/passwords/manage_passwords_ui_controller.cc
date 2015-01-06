@@ -8,12 +8,13 @@
 #include "chrome/browser/browsing_data/browsing_data_helper.h"
 #include "chrome/browser/password_manager/password_store_factory.h"
 #include "chrome/browser/ui/browser_command_controller.h"
-#include "chrome/browser/ui/browser_dialogs.h"
 #include "chrome/browser/ui/browser_finder.h"
+#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/location_bar/location_bar.h"
 #include "chrome/browser/ui/passwords/manage_passwords_icon.h"
 #include "chrome/browser/ui/passwords/password_bubble_experiment.h"
+#include "chrome/browser/ui/tab_dialogs.h"
 #include "chrome/common/url_constants.h"
 #include "components/password_manager/content/common/credential_manager_types.h"
 #include "components/password_manager/core/browser/password_form_manager.h"
@@ -104,16 +105,19 @@ void ManagePasswordsUIController::OnPasswordSubmitted(
   password_form_map_ = ConstifyMap(form_manager_->best_matches());
   origin_ = PendingPassword().origin;
   state_ = password_manager::ui::PENDING_PASSWORD_AND_BUBBLE_STATE;
+  timer_.reset(new base::ElapsedTimer());
   UpdateBubbleAndIconVisibility();
 }
 
 bool ManagePasswordsUIController::OnChooseCredentials(
-    ScopedVector<autofill::PasswordForm> credentials,
+    ScopedVector<autofill::PasswordForm> local_credentials,
+    ScopedVector<autofill::PasswordForm> federated_credentials,
     base::Callback<void(const password_manager::CredentialInfo&)> callback){
-  DCHECK(!credentials.empty());
+  // TODO(vasilii): Do something clever with |federated_credentials|.
+  DCHECK(!local_credentials.empty() || !federated_credentials.empty());
   form_manager_.reset();
-  origin_ = credentials[0]->origin;
-  new_password_forms_.swap(credentials);
+  origin_ = local_credentials[0]->origin;
+  new_password_forms_.swap(local_credentials);
   // The map is useless because usernames may overlap.
   password_form_map_.clear();
   state_ = password_manager::ui::CREDENTIAL_REQUEST_AND_BUBBLE_STATE;
@@ -275,7 +279,7 @@ void ManagePasswordsUIController::DidNavigateMainFrame(
 
 void ManagePasswordsUIController::WasHidden() {
 #if !defined(OS_ANDROID)
-  chrome::CloseManagePasswordsBubble(web_contents());
+  TabDialogs::FromWebContents(web_contents())->HideManagePasswordsBubble();
 #endif
 }
 

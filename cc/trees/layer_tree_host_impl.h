@@ -5,7 +5,6 @@
 #ifndef CC_TREES_LAYER_TREE_HOST_IMPL_H_
 #define CC_TREES_LAYER_TREE_HOST_IMPL_H_
 
-#include <list>
 #include <set>
 #include <string>
 #include <vector>
@@ -30,8 +29,10 @@
 #include "cc/output/output_surface_client.h"
 #include "cc/output/renderer.h"
 #include "cc/quads/render_pass.h"
+#include "cc/resources/rasterizer.h"
 #include "cc/resources/resource_provider.h"
 #include "cc/resources/tile_manager.h"
+#include "cc/scheduler/commit_earlyout_reason.h"
 #include "cc/scheduler/draw_result.h"
 #include "skia/ext/refptr.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -190,7 +191,7 @@ class CC_EXPORT LayerTreeHostImpl
     void AppendRenderPass(scoped_ptr<RenderPass> render_pass) override;
   };
 
-  virtual void BeginMainFrameAborted(bool did_handle);
+  virtual void BeginMainFrameAborted(CommitEarlyOutReason reason);
   virtual void BeginCommit();
   virtual void CommitComplete();
   virtual void Animate(base::TimeTicks monotonic_time);
@@ -499,10 +500,13 @@ class CC_EXPORT LayerTreeHostImpl
   // Only valid for synchronous (non-scheduled) single-threaded case.
   void SynchronouslyInitializeAllTiles();
 
+  virtual scoped_ptr<Rasterizer> CreateRasterizer();
   virtual void CreateResourceAndTileTaskWorkerPool(
       scoped_ptr<TileTaskWorkerPool>* tile_task_worker_pool,
       scoped_ptr<ResourcePool>* resource_pool,
       scoped_ptr<ResourcePool>* staging_resource_pool);
+
+  bool prepare_tiles_needed() const { return tile_priorities_dirty_; }
 
  protected:
   LayerTreeHostImpl(
@@ -522,8 +526,6 @@ class CC_EXPORT LayerTreeHostImpl
       active_animation_controllers() const {
     return animation_registrar_->active_animation_controllers();
   }
-
-  bool prepare_tiles_needed() const { return tile_priorities_dirty_; }
 
   LayerTreeHostImplClient* client_;
   Proxy* proxy_;
@@ -611,6 +613,7 @@ class CC_EXPORT LayerTreeHostImpl
   bool use_gpu_rasterization_;
   GpuRasterizationStatus gpu_rasterization_status_;
   scoped_ptr<TileTaskWorkerPool> tile_task_worker_pool_;
+  scoped_ptr<Rasterizer> rasterizer_;
   scoped_ptr<ResourcePool> resource_pool_;
   scoped_ptr<ResourcePool> staging_resource_pool_;
   scoped_ptr<Renderer> renderer_;

@@ -196,7 +196,8 @@ UMALinuxWindowManager GetLinuxWindowManager() {
 #endif
 
 void RecordTouchEventState() {
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
   const std::string touch_enabled_switch =
       command_line.HasSwitch(switches::kTouchEvents) ?
       command_line.GetSwitchValueASCII(switches::kTouchEvents) :
@@ -266,11 +267,8 @@ void ChromeBrowserMainExtraPartsMetrics::PostBrowserStart() {
   is_screen_observer_ = true;
 
 #if !defined(OS_ANDROID)
-  if (FirstWebContentsProfiler::ShouldCollectMetrics()) {
-    first_web_contents_profiler_ =
-        FirstWebContentsProfiler::CreateProfilerForFirstWebContents(this)
-            .Pass();
-  }
+  first_web_contents_profiler_ =
+      FirstWebContentsProfiler::CreateProfilerForFirstWebContents(this).Pass();
 #endif  // !defined(OS_ANDROID)
 }
 

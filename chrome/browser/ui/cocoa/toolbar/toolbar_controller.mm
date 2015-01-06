@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "base/mac/bundle_locations.h"
+#include "base/mac/foundation_util.h"
 #include "base/mac/mac_util.h"
 #include "base/memory/singleton.h"
 #include "base/prefs/pref_service.h"
@@ -57,8 +58,8 @@
 #import "ui/base/cocoa/menu_controller.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/l10n_util_mac.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/image/image.h"
-#include "ui/gfx/rect.h"
 
 using content::OpenURLParams;
 using content::Referrer;
@@ -459,6 +460,12 @@ class NotificationBridge : public WrenchMenuBadgeController::Delegate {
   locationBarView_->SetTranslateIconLit(on);
 }
 
+- (void)setOverflowedToolbarActionWantsToRun:(BOOL)overflowedActionWantsToRun {
+  WrenchToolbarButtonCell* cell =
+      base::mac::ObjCCastStrict<WrenchToolbarButtonCell>([wrenchButton_ cell]);
+  [cell setOverflowedToolbarActionWantsToRun:overflowedActionWantsToRun];
+}
+
 - (void)zoomChangedForActiveTab:(BOOL)canShowBubble {
   locationBarView_->ZoomChangedForActiveTab(
       canShowBubble && ![wrenchMenuController_ isMenuOpen]);
@@ -590,7 +597,7 @@ class NotificationBridge : public WrenchMenuBadgeController::Delegate {
     browserActionsController_.reset([[BrowserActionsController alloc]
             initWithBrowser:browser_
               containerView:browserActionsContainerView_
-                 isOverflow:NO]);
+             mainController:nil]);
     [[NSNotificationCenter defaultCenter]
         addObserver:self
            selector:@selector(browserActionsContainerWillDrag:)
@@ -690,6 +697,20 @@ class NotificationBridge : public WrenchMenuBadgeController::Delegate {
   // present.
   if (!browserActionsController_.get())
     return;
+
+  if ([browserActionsContainerView_ isAnimating]) {
+    // If the browser actions container is animating, we need to stop it first,
+    // because the frame it's animating for could be incorrect with the new
+    // bounds (if, for instance, the bookmark bar was added).
+    // This will advance to the end of the animation, so we also need to adjust
+    // it afterwards.
+    [browserActionsContainerView_ stopAnimation];
+    NSRect containerFrame = [browserActionsContainerView_ frame];
+    containerFrame.origin.y =
+        NSHeight([[self view] frame]) - NSHeight(containerFrame) - 1;
+    [browserActionsContainerView_ setFrame:containerFrame];
+    [self pinLocationBarToLeftOfBrowserActionsContainerAndAnimate:NO];
+  }
 
   [self maintainMinimumLocationBarWidth];
 

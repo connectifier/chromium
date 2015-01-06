@@ -376,6 +376,18 @@ class RenderWidgetHostViewAuraTest : public testing::Test {
     widget_host_uses_shutdown_to_destroy_ = use;
   }
 
+  void SimulateMemoryPressure(
+      base::MemoryPressureListener::MemoryPressureLevel level) {
+    // Here should be base::MemoryPressureListener::NotifyMemoryPressure, but
+    // since the RendererFrameManager is installing a MemoryPressureListener
+    // which uses ObserverListThreadSafe, which furthermore remembers the
+    // message loop for the thread it was created in. Between tests, the
+    // RendererFrameManager singleton survives and and the MessageLoop gets
+    // destroyed. The correct fix would be to have ObserverListThreadSafe look
+    // up the proper message loop every time (see crbug.com/443824.)
+    RendererFrameManager::GetInstance()->OnMemoryPressure(level);
+  }
+
  protected:
   // If true, then calls RWH::Shutdown() instead of deleting RWH.
   bool widget_host_uses_shutdown_to_destroy_;
@@ -544,8 +556,8 @@ class RenderWidgetHostViewAuraOverscrollTest
   }
 
   void SimulateGestureScrollUpdateEvent(float dX, float dY, int modifiers) {
-    SimulateGestureEventCore(
-        SyntheticWebGestureEventBuilder::BuildScrollUpdate(dX, dY, modifiers));
+    SimulateGestureEventCore(SyntheticWebGestureEventBuilder::BuildScrollUpdate(
+        dX, dY, modifiers, blink::WebGestureDeviceTouchscreen));
   }
 
   void SimulateGesturePinchUpdateEvent(float scale,
@@ -646,10 +658,10 @@ class RenderWidgetHostViewAuraOverscrollTest
       return;
     }
 
-    if (WebInputEventTraits::IgnoresAckDisposition(*params.a))
+    if (WebInputEventTraits::IgnoresAckDisposition(*get<0>(params)))
       return;
 
-    SendInputEventACK(params.a->type, ack_result);
+    SendInputEventACK(get<0>(params)->type, ack_result);
   }
 
   SyntheticWebTouchEvent touch_event_;
@@ -891,19 +903,20 @@ TEST_F(RenderWidgetHostViewAuraTest, SetCompositionText) {
     InputMsg_ImeSetComposition::Param params;
     InputMsg_ImeSetComposition::Read(msg, &params);
     // composition text
-    EXPECT_EQ(composition_text.text, params.a);
+    EXPECT_EQ(composition_text.text, get<0>(params));
     // underlines
-    ASSERT_EQ(underlines.size(), params.b.size());
+    ASSERT_EQ(underlines.size(), get<1>(params).size());
     for (size_t i = 0; i < underlines.size(); ++i) {
-      EXPECT_EQ(underlines[i].start_offset, params.b[i].startOffset);
-      EXPECT_EQ(underlines[i].end_offset, params.b[i].endOffset);
-      EXPECT_EQ(underlines[i].color, params.b[i].color);
-      EXPECT_EQ(underlines[i].thick, params.b[i].thick);
-      EXPECT_EQ(underlines[i].background_color, params.b[i].backgroundColor);
+      EXPECT_EQ(underlines[i].start_offset, get<1>(params)[i].startOffset);
+      EXPECT_EQ(underlines[i].end_offset, get<1>(params)[i].endOffset);
+      EXPECT_EQ(underlines[i].color, get<1>(params)[i].color);
+      EXPECT_EQ(underlines[i].thick, get<1>(params)[i].thick);
+      EXPECT_EQ(underlines[i].background_color,
+                get<1>(params)[i].backgroundColor);
     }
     // highlighted range
-    EXPECT_EQ(4, params.c) << "Should be the same to the caret pos";
-    EXPECT_EQ(4, params.d) << "Should be the same to the caret pos";
+    EXPECT_EQ(4, get<2>(params)) << "Should be the same to the caret pos";
+    EXPECT_EQ(4, get<3>(params)) << "Should be the same to the caret pos";
   }
 
   view_->ImeCancelComposition();
@@ -1127,9 +1140,9 @@ TEST_F(RenderWidgetHostViewAuraTest, PhysicalBackingSizeWithScale) {
     EXPECT_EQ(ViewMsg_Resize::ID, msg->type());
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
-    EXPECT_EQ("100x100", params.a.new_size.ToString());  // dip size
+    EXPECT_EQ("100x100", get<0>(params).new_size.ToString());  // dip size
     EXPECT_EQ("100x100",
-        params.a.physical_backing_size.ToString());  // backing size
+        get<0>(params).physical_backing_size.ToString());  // backing size
   }
 
   widget_host_->ResetSizeAndRepaintPendingFlags();
@@ -1144,10 +1157,10 @@ TEST_F(RenderWidgetHostViewAuraTest, PhysicalBackingSizeWithScale) {
     EXPECT_EQ(ViewMsg_Resize::ID, msg->type());
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
-    EXPECT_EQ(2.0f, params.a.screen_info.deviceScaleFactor);
-    EXPECT_EQ("100x100", params.a.new_size.ToString());  // dip size
+    EXPECT_EQ(2.0f, get<0>(params).screen_info.deviceScaleFactor);
+    EXPECT_EQ("100x100", get<0>(params).new_size.ToString());  // dip size
     EXPECT_EQ("200x200",
-        params.a.physical_backing_size.ToString());  // backing size
+        get<0>(params).physical_backing_size.ToString());  // backing size
   }
 
   widget_host_->ResetSizeAndRepaintPendingFlags();
@@ -1162,10 +1175,10 @@ TEST_F(RenderWidgetHostViewAuraTest, PhysicalBackingSizeWithScale) {
     EXPECT_EQ(ViewMsg_Resize::ID, msg->type());
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
-    EXPECT_EQ(1.0f, params.a.screen_info.deviceScaleFactor);
-    EXPECT_EQ("100x100", params.a.new_size.ToString());  // dip size
+    EXPECT_EQ(1.0f, get<0>(params).screen_info.deviceScaleFactor);
+    EXPECT_EQ("100x100", get<0>(params).new_size.ToString());  // dip size
     EXPECT_EQ("100x100",
-        params.a.physical_backing_size.ToString());  // backing size
+        get<0>(params).physical_backing_size.ToString());  // backing size
   }
 }
 
@@ -1330,14 +1343,14 @@ TEST_F(RenderWidgetHostViewAuraTest, DISABLED_FullscreenResize) {
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
     EXPECT_EQ("0,0 800x600",
-              gfx::Rect(params.a.screen_info.availableRect).ToString());
-    EXPECT_EQ("800x600", params.a.new_size.ToString());
+              gfx::Rect(get<0>(params).screen_info.availableRect).ToString());
+    EXPECT_EQ("800x600", get<0>(params).new_size.ToString());
     // Resizes are blocked until we swapped a frame of the correct size, and
     // we've committed it.
     view_->OnSwapCompositorFrame(
         0,
         MakeDelegatedFrame(
-            1.f, params.a.new_size, gfx::Rect(params.a.new_size)));
+            1.f, get<0>(params).new_size, gfx::Rect(get<0>(params).new_size)));
     ui::DrawWaiterForTest::WaitForCommit(
         root_window->GetHost()->compositor());
   }
@@ -1355,12 +1368,12 @@ TEST_F(RenderWidgetHostViewAuraTest, DISABLED_FullscreenResize) {
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
     EXPECT_EQ("0,0 1600x1200",
-              gfx::Rect(params.a.screen_info.availableRect).ToString());
-    EXPECT_EQ("1600x1200", params.a.new_size.ToString());
+              gfx::Rect(get<0>(params).screen_info.availableRect).ToString());
+    EXPECT_EQ("1600x1200", get<0>(params).new_size.ToString());
     view_->OnSwapCompositorFrame(
         0,
         MakeDelegatedFrame(
-            1.f, params.a.new_size, gfx::Rect(params.a.new_size)));
+            1.f, get<0>(params).new_size, gfx::Rect(get<0>(params).new_size)));
     ui::DrawWaiterForTest::WaitForCommit(
         root_window->GetHost()->compositor());
   }
@@ -1459,7 +1472,7 @@ TEST_F(RenderWidgetHostViewAuraTest, Resize) {
     EXPECT_EQ(ViewMsg_Resize::ID, msg->type());
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
-    EXPECT_EQ(size2.ToString(), params.a.new_size.ToString());
+    EXPECT_EQ(size2.ToString(), get<0>(params).new_size.ToString());
   }
   // Send resize ack to observe new Resize messages.
   update_params.view_size = size2;
@@ -1487,8 +1500,14 @@ TEST_F(RenderWidgetHostViewAuraTest, Resize) {
   // produce a Resize message after the commit.
   view_->OnSwapCompositorFrame(
       0, MakeDelegatedFrame(1.f, size2, gfx::Rect(size2)));
-  // No frame ack yet.
-  EXPECT_EQ(0u, sink_->message_count());
+  cc::SurfaceId surface_id = view_->surface_id();
+  if (surface_id.is_null()) {
+    // No frame ack yet.
+    EXPECT_EQ(0u, sink_->message_count());
+  } else {
+    // Frame isn't desired size, so early ack.
+    EXPECT_EQ(1u, sink_->message_count());
+  }
   EXPECT_EQ(size2.ToString(), view_->GetRequestedRendererSize().ToString());
 
   // Wait for commit, then we should unlock the compositor and send a Resize
@@ -1496,27 +1515,15 @@ TEST_F(RenderWidgetHostViewAuraTest, Resize) {
   ui::DrawWaiterForTest::WaitForCommit(
       root_window->GetHost()->compositor());
   EXPECT_EQ(size3.ToString(), view_->GetRequestedRendererSize().ToString());
-  cc::SurfaceId surface_id = view_->surface_id();
-  int swap_index = 0;
-  int resize_index = 1;
-  if (!surface_id.is_null()) {
-    // Frame ack is sent only due to a draw callback with surfaces.
-    ImageTransportFactory::GetInstance()
-        ->GetSurfaceManager()
-        ->GetSurfaceForId(surface_id)
-        ->RunDrawCallbacks();
-    swap_index = 1;
-    resize_index = 0;
-  }
   EXPECT_EQ(2u, sink_->message_count());
   EXPECT_EQ(ViewMsg_SwapCompositorFrameAck::ID,
-            sink_->GetMessageAt(swap_index)->type());
+            sink_->GetMessageAt(0)->type());
   {
-    const IPC::Message* msg = sink_->GetMessageAt(resize_index);
+    const IPC::Message* msg = sink_->GetMessageAt(1);
     EXPECT_EQ(ViewMsg_Resize::ID, msg->type());
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
-    EXPECT_EQ(size3.ToString(), params.a.new_size.ToString());
+    EXPECT_EQ(size3.ToString(), get<0>(params).new_size.ToString());
   }
   update_params.view_size = size3;
   widget_host_->OnMessageReceived(
@@ -1658,7 +1665,7 @@ TEST_F(RenderWidgetHostViewAuraTest, OutputSurfaceIdChange) {
 
 TEST_F(RenderWidgetHostViewAuraTest, DiscardDelegatedFrames) {
   size_t max_renderer_frames =
-      RendererFrameManager::GetInstance()->max_number_of_saved_frames();
+      RendererFrameManager::GetInstance()->GetMaxNumberOfSavedFrames();
   ASSERT_LE(2u, max_renderer_frames);
   size_t renderer_count = max_renderer_frames + 1;
   gfx::Rect view_rect(100, 100);
@@ -1820,7 +1827,7 @@ TEST_F(RenderWidgetHostViewAuraTest, DiscardDelegatedFrames) {
 
 TEST_F(RenderWidgetHostViewAuraTest, DiscardDelegatedFramesWithLocking) {
   size_t max_renderer_frames =
-      RendererFrameManager::GetInstance()->max_number_of_saved_frames();
+      RendererFrameManager::GetInstance()->GetMaxNumberOfSavedFrames();
   ASSERT_LE(2u, max_renderer_frames);
   size_t renderer_count = max_renderer_frames + 1;
   gfx::Rect view_rect(100, 100);
@@ -1871,6 +1878,70 @@ TEST_F(RenderWidgetHostViewAuraTest, DiscardDelegatedFramesWithLocking) {
   // If we unlock [0] now, then [0] should be evicted.
   views[0]->GetDelegatedFrameHost()->UnlockResources();
   EXPECT_FALSE(views[0]->HasFrameData());
+
+  for (size_t i = 0; i < renderer_count; ++i) {
+    views[i]->Destroy();
+    delete hosts[i];
+  }
+}
+
+// Test that changing the memory pressure should delete saved frames. This test
+// only applies to ChromeOS.
+TEST_F(RenderWidgetHostViewAuraTest, DiscardDelegatedFramesWithMemoryPressure) {
+  size_t max_renderer_frames =
+      RendererFrameManager::GetInstance()->GetMaxNumberOfSavedFrames();
+  ASSERT_LE(2u, max_renderer_frames);
+  size_t renderer_count = max_renderer_frames;
+  gfx::Rect view_rect(100, 100);
+  gfx::Size frame_size = view_rect.size();
+  DCHECK_EQ(0u, HostSharedBitmapManager::current()->AllocatedBitmapCount());
+
+  scoped_ptr<RenderWidgetHostImpl * []> hosts(
+      new RenderWidgetHostImpl* [renderer_count]);
+  scoped_ptr<FakeRenderWidgetHostViewAura * []> views(
+      new FakeRenderWidgetHostViewAura* [renderer_count]);
+
+  // Create a bunch of renderers.
+  for (size_t i = 0; i < renderer_count; ++i) {
+    hosts[i] = new RenderWidgetHostImpl(
+        &delegate_, process_host_, MSG_ROUTING_NONE, false);
+    hosts[i]->Init();
+    views[i] = new FakeRenderWidgetHostViewAura(hosts[i], false);
+    views[i]->InitAsChild(NULL);
+    aura::client::ParentWindowWithContext(
+        views[i]->GetNativeView(),
+        parent_view_->GetNativeView()->GetRootWindow(),
+        gfx::Rect());
+    views[i]->SetSize(view_rect.size());
+  }
+
+  // Make each renderer visible and swap a frame on it. No eviction should
+  // occur because all frames are visible.
+  for (size_t i = 0; i < renderer_count; ++i) {
+    views[i]->WasShown();
+    views[i]->OnSwapCompositorFrame(
+        1, MakeDelegatedFrame(1.f, frame_size, view_rect));
+    EXPECT_TRUE(views[i]->HasFrameData());
+  }
+
+  // If we hide one, it should not get evicted.
+  views[0]->WasHidden();
+  message_loop_.RunUntilIdle();
+  EXPECT_TRUE(views[0]->HasFrameData());
+  // Using a lesser memory pressure event however, should evict.
+  SimulateMemoryPressure(
+      base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_MODERATE);
+  message_loop_.RunUntilIdle();
+  EXPECT_FALSE(views[0]->HasFrameData());
+
+  // Check the same for a higher pressure event.
+  views[1]->WasHidden();
+  message_loop_.RunUntilIdle();
+  EXPECT_TRUE(views[1]->HasFrameData());
+  SimulateMemoryPressure(
+      base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL);
+  message_loop_.RunUntilIdle();
+  EXPECT_FALSE(views[1]->HasFrameData());
 
   for (size_t i = 0; i < renderer_count; ++i) {
     views[i]->Destroy();
@@ -2026,7 +2097,7 @@ TEST_F(RenderWidgetHostViewAuraTest, VisibleViewportTest) {
 
   ViewMsg_Resize::Param params;
   ViewMsg_Resize::Read(message, &params);
-  EXPECT_EQ(60, params.a.visible_viewport_size.height());
+  EXPECT_EQ(60, get<0>(params).visible_viewport_size.height());
 }
 
 // Ensures that touch event positions are never truncated to integers.

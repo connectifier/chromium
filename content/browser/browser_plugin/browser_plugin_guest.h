@@ -36,7 +36,7 @@
 #include "third_party/WebKit/public/web/WebInputEvent.h"
 #include "ui/base/ime/text_input_mode.h"
 #include "ui/base/ime/text_input_type.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/rect.h"
 
 class SkBitmap;
 struct BrowserPluginHostMsg_Attach_Params;
@@ -171,8 +171,8 @@ class CONTENT_EXPORT BrowserPluginGuest : public WebContentsObserver {
 
   gfx::Point GetScreenCoordinates(const gfx::Point& relative_position) const;
 
-  // Helper to send messages to embedder. This methods fills the message with
-  // the correct routing id.
+  // Helper to send messages to embedder. If this guest is not yet attached,
+  // then IPCs will be queued until attachment.
   void SendMessageToEmbedder(IPC::Message* msg);
 
   // Returns whether the guest is attached to an embedder.

@@ -60,7 +60,6 @@
 #include "chrome/browser/first_run/first_run.h"
 #include "chrome/browser/history/top_sites.h"
 #include "chrome/browser/infobars/infobar_service.h"
-#include "chrome/browser/infobars/simple_alert_infobar_delegate.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/notifications/notification_ui_manager.h"
 #include "chrome/browser/pepper_broker_infobar_delegate.h"
@@ -105,11 +104,11 @@
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/chrome_select_file_policy.h"
+#include "chrome/browser/ui/exclusive_access/fullscreen_controller.h"
 #include "chrome/browser/ui/fast_unload_controller.h"
 #include "chrome/browser/ui/find_bar/find_bar.h"
 #include "chrome/browser/ui/find_bar/find_bar_controller.h"
 #include "chrome/browser/ui/find_bar/find_tab_helper.h"
-#include "chrome/browser/ui/fullscreen/fullscreen_controller.h"
 #include "chrome/browser/ui/global_error/global_error.h"
 #include "chrome/browser/ui/global_error/global_error_service.h"
 #include "chrome/browser/ui/global_error/global_error_service_factory.h"
@@ -124,6 +123,7 @@
 #include "chrome/browser/ui/status_bubble.h"
 #include "chrome/browser/ui/sync/browser_synced_window_delegate.h"
 #include "chrome/browser/ui/tab_contents/core_tab_helper.h"
+#include "chrome/browser/ui/tab_dialogs.h"
 #include "chrome/browser/ui/tab_helpers.h"
 #include "chrome/browser/ui/tab_modal_confirm_dialog.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
@@ -153,6 +153,7 @@
 #include "components/bookmarks/browser/bookmark_utils.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/google/core/browser/google_url_tracker.h"
+#include "components/infobars/core/simple_alert_infobar_delegate.h"
 #include "components/search/search.h"
 #include "components/sessions/session_types.h"
 #include "components/startup_metric_utils/startup_metric_utils.h"
@@ -192,7 +193,7 @@
 #include "third_party/WebKit/public/web/WebWindowFeatures.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/window_open_disposition.h"
-#include "ui/gfx/point.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/shell_dialogs/selected_file_info.h"
 
 #if defined(OS_WIN)
@@ -243,8 +244,13 @@ BrowserWindow* CreateBrowserWindow(Browser* browser) {
 
 // Is the fast tab unload experiment enabled?
 bool IsFastTabUnloadEnabled() {
-  return CommandLine::ForCurrentProcess()->HasSwitch(
-        switches::kEnableFastUnload);
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
+      switches::kEnableFastUnload);
+}
+
+bool IsWebAppFrameEnabled() {
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
+      switches::kEnableWebAppFrame);
 }
 
 }  // namespace
@@ -1145,8 +1151,9 @@ bool Browser::CanOverscrollContent() const {
   if (!allow_overscroll)
     return false;
 
-  const std::string value = CommandLine::ForCurrentProcess()->
-      GetSwitchValueASCII(switches::kOverscrollHistoryNavigation);
+  const std::string value =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          switches::kOverscrollHistoryNavigation);
   bool overscroll_enabled = value != "0";
   if (!overscroll_enabled)
     return false;
@@ -1348,8 +1355,9 @@ WebContents* Browser::OpenURLFromTab(WebContents* source,
          params.disposition == NEW_FOREGROUND_TAB ||
          params.disposition == NEW_BACKGROUND_TAB ||
          params.disposition == NEW_WINDOW) &&
-        !params.user_gesture && !CommandLine::ForCurrentProcess()->HasSwitch(
-                                    switches::kDisablePopupBlocking)) {
+        !params.user_gesture &&
+        !base::CommandLine::ForCurrentProcess()->HasSwitch(
+            switches::kDisablePopupBlocking)) {
       if (popup_blocker_helper->MaybeBlockPopup(nav_params,
                                                 WebWindowFeatures())) {
         return NULL;
@@ -1606,11 +1614,11 @@ void Browser::RendererUnresponsive(WebContents* source) {
   if (tab_strip_model_->IsTabBlocked(index))
     return;
 
-  chrome::ShowHungRendererDialog(source);
+  TabDialogs::FromWebContents(source)->ShowHungRendererDialog();
 }
 
 void Browser::RendererResponsive(WebContents* source) {
-  chrome::HideHungRendererDialog(source);
+  TabDialogs::FromWebContents(source)->HideHungRendererDialog();
 }
 
 void Browser::WorkerCrashed(WebContents* source) {
@@ -1966,7 +1974,7 @@ void Browser::Observe(int type,
     case extensions::NOTIFICATION_EXTENSION_PROCESS_TERMINATED: {
       Profile* profile = content::Source<Profile>(source).ptr();
       if (profile_->IsSameProfile(profile) && window()->GetLocationBar())
-        window()->GetLocationBar()->InvalidatePageActions();
+        window()->GetLocationBar()->UpdatePageActions();
       break;
     }
 
@@ -2009,28 +2017,14 @@ void Browser::OnExtensionUninstalled(content::BrowserContext* browser_context,
 
 void Browser::OnExtensionLoaded(content::BrowserContext* browser_context,
                                 const extensions::Extension* extension) {
-  chrome::UpdateCommandEnabled(
-      this,
-      IDC_BOOKMARK_PAGE,
-      !chrome::ShouldRemoveBookmarkThisPageUI(profile_));
-  chrome::UpdateCommandEnabled(
-      this,
-      IDC_BOOKMARK_ALL_TABS,
-      !chrome::ShouldRemoveBookmarkOpenPagesUI(profile_));
+  command_controller_->ExtensionStateChanged();
 }
 
 void Browser::OnExtensionUnloaded(
     content::BrowserContext* browser_context,
     const extensions::Extension* extension,
     extensions::UnloadedExtensionInfo::Reason reason) {
-  chrome::UpdateCommandEnabled(
-      this,
-      IDC_BOOKMARK_PAGE,
-      !chrome::ShouldRemoveBookmarkThisPageUI(profile_));
-  chrome::UpdateCommandEnabled(
-      this,
-      IDC_BOOKMARK_ALL_TABS,
-      !chrome::ShouldRemoveBookmarkOpenPagesUI(profile_));
+  command_controller_->ExtensionStateChanged();
   if (window()->GetLocationBar())
     window()->GetLocationBar()->UpdatePageActions();
 
@@ -2349,7 +2343,7 @@ bool Browser::ShouldUseWebAppFrame() const {
   // Only use the web app frame for apps in ash, and only if streamlined hosted
   // apps are enabled.
   if (!is_app() || host_desktop_type() != chrome::HOST_DESKTOP_TYPE_ASH ||
-      !extensions::util::IsStreamlinedHostedAppsEnabled()) {
+      !IsWebAppFrameEnabled()) {
     return false;
   }
 
@@ -2425,8 +2419,8 @@ void Browser::UpdateBookmarkBarState(BookmarkBarStateChangeReason reason) {
     return;
   }
 
-  bool shouldAnimate = reason == BOOKMARK_BAR_STATE_CHANGE_PREF_CHANGE;
-  window_->BookmarkBarStateChanged(shouldAnimate ?
+  bool should_animate = reason == BOOKMARK_BAR_STATE_CHANGE_PREF_CHANGE;
+  window_->BookmarkBarStateChanged(should_animate ?
       BookmarkBar::ANIMATE_STATE_CHANGE :
       BookmarkBar::DONT_ANIMATE_STATE_CHANGE);
 }

@@ -43,6 +43,7 @@
 #include "content/public/browser/page_navigator.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/render_widget_host_view.h"
+#include "content/public/browser/speech_recognition_session_preamble.h"
 #include "content/public/browser/user_metrics.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/browser/extension_registry.h"
@@ -158,6 +159,7 @@ AppListViewDelegate::AppListViewDelegate(AppListControllerDelegate* controller)
     : controller_(controller),
       profile_(NULL),
       model_(NULL),
+      is_voice_query_(false),
       scoped_observer_(this) {
   // TODO(vadimt): Remove ScopedTracker below once crbug.com/431326 is fixed.
   tracked_objects::ScopedTracker tracking_profile(
@@ -204,10 +206,23 @@ AppListViewDelegate::AppListViewDelegate(AppListControllerDelegate* controller)
           "431326 AppListViewDelegate::AppListViewDelegate3"));
 
 #if defined(GOOGLE_CHROME_BUILD)
-  speech_ui_->set_logo(
+  gfx::ImageSkia image =
       *ui::ResourceBundle::GetSharedInstance().GetImageSkiaNamed(
-          IDR_APP_LIST_GOOGLE_LOGO_VOICE_SEARCH));
+          IDR_APP_LIST_GOOGLE_LOGO_VOICE_SEARCH);
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/431326 is
+  // fixed.
+  tracked_objects::ScopedTracker tracking_profile31(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "431326 AppListViewDelegate::AppListViewDelegate31"));
+
+  speech_ui_->set_logo(image);
 #endif
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/431326 is fixed.
+  tracked_objects::ScopedTracker tracking_profile32(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "431326 AppListViewDelegate::AppListViewDelegate32"));
 
   registrar_.Add(this,
                  chrome::NOTIFICATION_APP_TERMINATING,
@@ -371,10 +386,11 @@ void AppListViewDelegate::OnHotwordStateChanged(bool started) {
   }
 }
 
-void AppListViewDelegate::OnHotwordRecognized() {
+void AppListViewDelegate::OnHotwordRecognized(
+    const scoped_refptr<content::SpeechRecognitionSessionPreamble>& preamble) {
   DCHECK_EQ(app_list::SPEECH_RECOGNITION_HOTWORD_LISTENING,
             speech_ui_->state());
-  ToggleSpeechRecognition();
+  ToggleSpeechRecognitionForHotword(preamble);
 }
 
 void AppListViewDelegate::SigninManagerCreated(SigninManagerBase* manager) {
@@ -465,7 +481,7 @@ void AppListViewDelegate::GetShortcutPathForApp(
 
 void AppListViewDelegate::StartSearch() {
   if (search_controller_) {
-    search_controller_->Start();
+    search_controller_->Start(is_voice_query_);
     controller_->OnSearchStarted();
   }
 }
@@ -498,6 +514,8 @@ base::TimeDelta AppListViewDelegate::GetAutoLaunchTimeout() {
 void AppListViewDelegate::AutoLaunchCanceled() {
   base::RecordAction(base::UserMetricsAction("AppList_AutoLaunchCanceled"));
   auto_launch_timeout_ = base::TimeDelta();
+  // Cancelling the auto launch means we are no longer in a voice query.
+  is_voice_query_ = false;
 }
 
 void AppListViewDelegate::ViewInitialized() {
@@ -588,10 +606,15 @@ void AppListViewDelegate::OpenFeedback() {
 }
 
 void AppListViewDelegate::ToggleSpeechRecognition() {
+  ToggleSpeechRecognitionForHotword(nullptr);
+}
+
+void AppListViewDelegate::ToggleSpeechRecognitionForHotword(
+    const scoped_refptr<content::SpeechRecognitionSessionPreamble>& preamble) {
   app_list::StartPageService* service =
       app_list::StartPageService::Get(profile_);
   if (service)
-    service->ToggleSpeechRecognition();
+    service->ToggleSpeechRecognition(preamble);
 
   // With the new hotword extension, stop the hotword session. With the launcher
   // and NTP, this is unnecessary since the hotwording is implicitly stopped.
@@ -622,6 +645,7 @@ void AppListViewDelegate::OnSpeechResult(const base::string16& result,
   if (is_final) {
     auto_launch_timeout_ = base::TimeDelta::FromMilliseconds(
         kAutoLaunchDefaultTimeoutMilliSec);
+    is_voice_query_ = true;
     model_->search_box()->SetText(result);
   }
 }

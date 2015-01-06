@@ -111,6 +111,7 @@ NSDictionary* attributeToMethodNameMap = nil;
     { @"AXInvalid", @"invalid" },
     { @"AXLoaded", @"loaded" },
     { @"AXLoadingProgress", @"loadingProgress" },
+    { @"AXPlaceholder", @"placeholder" },
     { @"AXRequired", @"required" },
     { @"AXVisited", @"visited" },
   };
@@ -401,6 +402,11 @@ NSDictionary* attributeToMethodNameMap = nil;
   return invalid;
 }
 
+- (NSString*)placeholder {
+  return NSStringForStringAttribute(
+      browserAccessibility_, ui::AX_ATTR_PLACEHOLDER);
+}
+
 - (void)addLinkedUIElementsFromAttribute:(ui::AXIntListAttribute)attribute
                                    addTo:(NSMutableArray*)outArray {
   const std::vector<int32>& attributeValues =
@@ -532,6 +538,13 @@ NSDictionary* attributeToMethodNameMap = nil;
     else
       return NSAccessibilityButtonRole;
   }
+
+  // If this is a web area for a presentational iframe, give it a role of
+  // something other than WebArea so that the fact that it's a separate doc
+  // is not exposed to AT.
+  if (browserAccessibility_->IsWebAreaForPresentationalIframe())
+    return NSAccessibilityGroupRole;
+
   return [AXPlatformNodeCocoa nativeRoleFromAXRole:role];
 }
 
@@ -557,8 +570,9 @@ NSDictionary* attributeToMethodNameMap = nil;
         IDS_AX_ROLE_HEADING));
   }
 
-  if ([role isEqualToString:NSAccessibilityGroupRole] ||
-      [role isEqualToString:NSAccessibilityRadioButtonRole]) {
+  if (([role isEqualToString:NSAccessibilityGroupRole] ||
+       [role isEqualToString:NSAccessibilityRadioButtonRole]) &&
+      !browserAccessibility_->IsWebAreaForPresentationalIframe()) {
     std::string role;
     if (browserAccessibility_->GetHtmlAttribute("role", &role)) {
       ui::AXRole internalRole = [self internalRole];
@@ -1348,6 +1362,11 @@ NSDictionary* attributeToMethodNameMap = nil;
       || GetState(browserAccessibility_, ui::AX_STATE_HORIZONTAL)) {
     [ret addObjectsFromArray:[NSArray arrayWithObjects:
         NSAccessibilityOrientationAttribute, nil]];
+  }
+
+  if (browserAccessibility_->HasStringAttribute(ui::AX_ATTR_PLACEHOLDER)) {
+    [ret addObjectsFromArray:[NSArray arrayWithObjects:
+        @"AXPlaceholder", nil]];
   }
 
   if (GetState(browserAccessibility_, ui::AX_STATE_REQUIRED)) {

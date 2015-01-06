@@ -4,13 +4,13 @@
 
 #include "ui/gfx/geometry/dip_util.h"
 
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/point_conversions.h"
 #include "ui/gfx/geometry/point_f.h"
-#include "ui/gfx/point.h"
-#include "ui/gfx/point_conversions.h"
-#include "ui/gfx/rect.h"
-#include "ui/gfx/rect_conversions.h"
-#include "ui/gfx/size.h"
-#include "ui/gfx/size_conversions.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/rect_conversions.h"
+#include "ui/gfx/geometry/size.h"
+#include "ui/gfx/geometry/size_conversions.h"
 
 namespace gfx {
 

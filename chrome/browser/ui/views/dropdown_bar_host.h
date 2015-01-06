@@ -9,8 +9,8 @@
 #include "base/memory/scoped_ptr.h"
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "ui/gfx/animation/animation_delegate.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/native_widget_types.h"
-#include "ui/gfx/rect.h"
 #include "ui/views/focus/focus_manager.h"
 
 class BrowserView;
@@ -85,8 +85,8 @@ class DropdownBarHost : public ui::AcceleratorTarget,
                         views::View* focused_now) override;
 
   // Overridden from ui::AcceleratorTarget:
-  virtual bool AcceleratorPressed(const ui::Accelerator& accelerator) = 0;
-  virtual bool CanHandleAccelerators() const = 0;
+  bool AcceleratorPressed(const ui::Accelerator& accelerator) override = 0;
+  bool CanHandleAccelerators() const override = 0;
 
   // gfx::AnimationDelegate implementation:
   void AnimationProgressed(const gfx::Animation* animation) override;

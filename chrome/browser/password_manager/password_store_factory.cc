@@ -15,6 +15,7 @@
 #include "chrome/browser/webdata/web_data_service_factory.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_switches.h"
+#include "chrome/common/chrome_version_info.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/os_crypt/os_crypt_switches.h"
 #include "components/password_manager/core/browser/login_database.h"
@@ -51,23 +52,42 @@ const LocalProfileId kInvalidLocalProfileId =
     static_cast<LocalProfileId>(0);
 #endif
 
-void ReportOsPassword() {
-  password_manager_util::OsPasswordStatus status =
-      password_manager_util::GetOsPasswordStatus();
-
+void ReportOsPassword(password_manager_util::OsPasswordStatus status) {
   UMA_HISTOGRAM_ENUMERATION("PasswordManager.OsPasswordStatus",
                             status,
                             password_manager_util::MAX_PASSWORD_STATUS);
 }
 
 void DelayReportOsPassword() {
+  int64 kInitWindowDelay = 40;
+
+  // TODO(vadimt): Remove kInitWindowDelay and the below switch, and delay by 40
+  // sec always before crbug.com/441428 is closed.
+
+  // Profiler UMA data is reported only for first 30 sec after browser startup.
+  // To make pasword reporting visible to the server-side analysis tool,
+  // reducing this period to 10 sec in trunk and Canary builds, making it
+  // possible to see jankiness of password reporting based on the Canary data.
+  switch (chrome::VersionInfo::GetChannel()) {
+    case chrome::VersionInfo::CHANNEL_UNKNOWN:
+    case chrome::VersionInfo::CHANNEL_CANARY:
+      kInitWindowDelay = 10;
+      break;
+
+    case chrome::VersionInfo::CHANNEL_DEV:
+    case chrome::VersionInfo::CHANNEL_BETA:
+    case chrome::VersionInfo::CHANNEL_STABLE:
+      // Profiler instrumentations are not enabled.
+      break;
+  }
+
   // Avoid checking OS password until later on in browser startup
   // since it calls a few Windows APIs.
   content::BrowserThread::PostDelayedTask(
-      content::BrowserThread::FILE,
-      FROM_HERE,
-      base::Bind(&ReportOsPassword),
-      base::TimeDelta::FromSeconds(40));
+      content::BrowserThread::UI, FROM_HERE,
+      base::Bind(&password_manager_util::GetOsPasswordStatus,
+                 base::Bind(&ReportOsPassword)),
+      base::TimeDelta::FromSeconds(kInitWindowDelay));
 }
 
 }  // namespace
@@ -176,9 +196,10 @@ KeyedService* PasswordStoreFactory::BuildServiceInstanceFor(
                                 profile, Profile::EXPLICIT_ACCESS));
 #elif defined(OS_MACOSX)
   crypto::AppleKeychain* keychain =
-      CommandLine::ForCurrentProcess()->HasSwitch(
-          os_crypt::switches::kUseMockKeychain) ?
-          new crypto::MockAppleKeychain() : new crypto::AppleKeychain();
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          os_crypt::switches::kUseMockKeychain)
+          ? new crypto::MockAppleKeychain()
+          : new crypto::AppleKeychain();
   ps = new PasswordStoreMac(
       main_thread_runner, db_thread_runner, keychain, login_db.release());
 #elif defined(OS_CHROMEOS) || defined(OS_ANDROID)
@@ -192,7 +213,7 @@ KeyedService* PasswordStoreFactory::BuildServiceInstanceFor(
   // (In all cases we fall back on the basic store in case of failure.)
   base::nix::DesktopEnvironment desktop_env;
   std::string store_type =
-      CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
           switches::kPasswordStore);
   if (store_type == "kwallet") {
     desktop_env = base::nix::DESKTOP_ENVIRONMENT_KDE4;

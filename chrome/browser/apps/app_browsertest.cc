@@ -183,7 +183,7 @@ bool CopyTestDataAndSetCommandLineArg(
   if (!(base::CopyFile(test_data_file, path)))
     return false;
 
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   command_line->AppendArgPath(path);
   return true;
 }
@@ -361,14 +361,7 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, AppWithContextMenuClicked) {
   ASSERT_TRUE(onclicked_listener.WaitUntilSatisfied());
 }
 
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS) && defined(USE_AURA)
-// TODO(erg): linux_aura bringup: http://crbug.com/163931
-#define MAYBE_DisallowNavigation DISABLED_DisallowNavigation
-#else
-#define MAYBE_DisallowNavigation DisallowNavigation
-#endif
-
-IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, MAYBE_DisallowNavigation) {
+IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, DisallowNavigation) {
   TabsAddedNotificationObserver observer(2);
 
   ASSERT_TRUE(StartEmbeddedTestServer());
@@ -420,9 +413,7 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, Isolation) {
   replace_host.SetHostStr(host_str);
   set_cookie_url = set_cookie_url.ReplaceComponents(replace_host);
 
-  ui_test_utils::NavigateToURLWithDisposition(
-      browser(), set_cookie_url,
-      CURRENT_TAB, ui_test_utils::BROWSER_TEST_WAIT_FOR_NAVIGATION);
+  ui_test_utils::NavigateToURL(browser(), set_cookie_url);
 
   // Make sure the cookie is set.
   int cookie_size;
@@ -498,7 +489,7 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, LaunchWithFile) {
 IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, LaunchWithRelativeFile) {
   // Setup the command line
   ClearCommandLineArgs();
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   base::FilePath relative_test_doc =
       base::FilePath::FromUTF8Unsafe(kTestFilePath);
   relative_test_doc = relative_test_doc.NormalizePathSeparators();
@@ -513,7 +504,7 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, LaunchWithRelativeFile) {
   // Run the test
   AppLaunchParams params(browser()->profile(), extension, LAUNCH_CONTAINER_NONE,
                          NEW_WINDOW, extensions::SOURCE_TEST);
-  params.command_line = *CommandLine::ForCurrentProcess();
+  params.command_line = *base::CommandLine::ForCurrentProcess();
   params.current_directory = test_data_dir_;
   OpenApplication(params);
 
@@ -540,17 +531,10 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest,
           << message_;
 }
 
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS) && defined(USE_AURA)
-// TODO(erg): linux_aura bringup: http://crbug.com/163931
-#define MAYBE_LaunchWithFileExtensionAndMimeType DISABLED_LaunchWithFileExtensionAndMimeType
-#else
-#define MAYBE_LaunchWithFileExtensionAndMimeType LaunchWithFileExtensionAndMimeType
-#endif
-
 // Tests that launch data is sent through if the file extension and MIME type
 // both match.
 IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest,
-                       MAYBE_LaunchWithFileExtensionAndMimeType) {
+                       LaunchWithFileExtensionAndMimeType) {
   SetCommandLineArg(kTestFilePath);
   ASSERT_TRUE(RunPlatformAppTest(
       "platform_apps/launch_file_by_extension_and_type")) << message_;
@@ -697,7 +681,7 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, LaunchNewFile) {
   base::ScopedTempDir temp_dir;
   ASSERT_TRUE(temp_dir.CreateUniqueTempDir());
   ClearCommandLineArgs();
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   command_line->AppendArgPath(temp_dir.path().AppendASCII("new_file.txt"));
   ASSERT_TRUE(RunPlatformAppTest("platform_apps/launch_new_file")) << message_;
 }
@@ -866,7 +850,8 @@ void PlatformAppDevToolsBrowserTest::RunTestWithDevTools(
 IN_PROC_BROWSER_TEST_F(PlatformAppDevToolsBrowserTest, MAYBE_ReOpenedWithID) {
 #if defined(OS_WIN) && defined(USE_ASH)
   // Disable this test in Metro+Ash for now (http://crbug.com/262796).
-  if (CommandLine::ForCurrentProcess()->HasSwitch(switches::kAshBrowserTests))
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kAshBrowserTests))
     return;
 #endif
   RunTestWithDevTools("minimal_id", RELAUNCH | HAS_ID);
@@ -947,7 +932,7 @@ class CheckExtensionInstalledObserver : public content::NotificationObserver {
 
   bool seen() const {
     return seen_;
-  };
+  }
 
   // NotificationObserver:
   void Observe(int type,
@@ -999,7 +984,6 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest,
 // to be run, then perform setup for step 3.
 IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest,
                        PRE_ComponentAppBackgroundPage) {
-
   // Since the component app is now installed, re-adding it in the same profile
   // should not cause it to be re-installed. Instead, we wait for the OnLaunched
   // in a different observer (which would timeout if not the app was not
@@ -1106,15 +1090,9 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, MAYBE_Messaging) {
   EXPECT_TRUE(result_catcher.GetNextResult());
 }
 
-// TODO(linux_aura) http://crbug.com/163931
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS) && defined(USE_AURA)
-#define MAYBE_WebContentsHasFocus DISABLED_WebContentsHasFocus
-#else
 // This test depends on focus and so needs to be in interactive_ui_tests.
 // http://crbug.com/227041
-#define MAYBE_WebContentsHasFocus DISABLED_WebContentsHasFocus
-#endif
-IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, MAYBE_WebContentsHasFocus) {
+IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, DISABLED_WebContentsHasFocus) {
   LoadAndLaunchPlatformApp("minimal", "Launched");
 
   EXPECT_EQ(1LU, GetAppWindowCount());
@@ -1182,7 +1160,7 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest,
 class PlatformAppIncognitoBrowserTest : public PlatformAppBrowserTest,
                                         public AppWindowRegistry::Observer {
  public:
-  virtual void SetUpCommandLine(CommandLine* command_line) override {
+  virtual void SetUpCommandLine(base::CommandLine* command_line) override {
     // Tell chromeos to launch in Guest mode, aka incognito.
     command_line->AppendSwitch(switches::kIncognito);
     PlatformAppBrowserTest::SetUpCommandLine(command_line);

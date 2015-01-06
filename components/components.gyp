@@ -40,7 +40,6 @@
     'metrics.gypi',
     'navigation_metrics.gypi',
     'network_time.gypi',
-    'omaha_client.gypi',
     'onc.gypi',
     'os_crypt.gypi',
     'ownership.gypi',
@@ -58,6 +57,7 @@
     'suggestions.gypi',
     'translate.gypi',
     'ui_zoom.gypi',
+    'update_client.gypi',
     'url_fixer.gypi',
     'url_matcher.gypi',
     'user_prefs.gypi',
@@ -81,6 +81,11 @@
         'web_modal.gypi',
       ],
     }],
+    ['OS == "ios"', {
+      'includes': [
+        'webp_transcode.gypi',
+      ],
+    }],
     ['OS != "android"', {
       'includes': [
         'feedback.gypi',
@@ -97,6 +102,7 @@
       'includes': [
         'pairing.gypi',
         'timers.gypi',
+        'wifi_sync.gypi',
       ],
     }],
     ['OS == "win" or OS == "mac"', {
@@ -130,6 +136,7 @@
         'search_engines.gypi',
         'sync_driver.gypi',
         'invalidation.gypi',
+        'webdata_services.gypi',
       ],
     }],
     ['enable_plugins==1', {

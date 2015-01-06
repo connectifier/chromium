@@ -11,12 +11,12 @@ var LaunchType = {
   FOCUS_ANY_OR_CREATE: 1,
   FOCUS_SAME_OR_CREATE: 2
 };
-Object.freeze(LaunchType);
 
 /**
  * Root class of the background page.
  * @constructor
  * @extends {BackgroundBase}
+ * @struct
  */
 function FileBrowserBackground() {
   BackgroundBase.call(this);
@@ -50,9 +50,9 @@ function FileBrowserBackground() {
    * necessary for decorating files in some views and integral to
    * local dedupling files during the cloud import process.
    *
-   * @type {!Promise.<!importer.HistoryLoader>}
+   * @type {!importer.HistoryLoader}
    */
-  this.historyLoaderPromise = FileBrowserBackground.initHistoryLoader_();
+  this.historyLoader = new FileBrowserBackground.HistoryLoader();
 
   /**
    * Event handler for progress center.
@@ -81,6 +81,12 @@ function FileBrowserBackground() {
       function() { this.tryClose(); }.bind(this));
 
   /**
+   * Provides support for scaning media devices as part of Cloud Import.
+   * @type {!importer.MediaScanner}
+   */
+  this.mediaScanner = new importer.DefaultMediaScanner(this.historyLoader);
+
+  /**
    * Handles importing of user media (e.g. photos, videos) from removable
    * devices.
    * @type {!importer.MediaImportHandler}
@@ -88,7 +94,7 @@ function FileBrowserBackground() {
   this.mediaImportHandler =
       new importer.MediaImportHandler(
           this.fileOperationManager,
-          new importer.DefaultMediaScanner());
+          this.historyLoader);
 
   /**
    * Promise of string data.
@@ -118,9 +124,6 @@ function FileBrowserBackground() {
    * @private {?number}
    */
   this.lastTimeCanClose_ = null;
-
-  // Seal self.
-  Object.seal(this);
 
   // Initialize handlers.
   chrome.fileBrowserHandler.onExecute.addListener(this.onExecute_.bind(this));
@@ -154,29 +157,7 @@ function FileBrowserBackground() {
  */
 FileBrowserBackground.CLOSE_DELAY_MS_ = 5000;
 
-FileBrowserBackground.prototype = {
-  __proto__: BackgroundBase.prototype
-};
-
-/**
- * Prepares the Cloud Import {@code HistoryLoader} to be used at runtime.
- *
- * @return {!Promise.<!importer.HistoryLoader>}
- */
-FileBrowserBackground.initHistoryLoader_ = function() {
-  return importer.importEnabled()
-      .then(
-          /**
-           * @param {boolean} enabled
-           * @this {!FileBrowserBackground}
-           */
-          function(enabled) {
-            return enabled ?
-                new importer.SynchronizedHistoryLoader(
-                    new importer.ChromeSyncFileEntryProvider()) :
-                new importer.DummyImportHistory(false);
-          });
-};
+FileBrowserBackground.prototype.__proto__ = BackgroundBase.prototype;
 
 /**
  * Register callback to be invoked after initialization.
@@ -596,6 +577,42 @@ FileBrowserBackground.prototype.initContextMenu_ = function() {
     contexts: ['launcher'],
     title: str('NEW_WINDOW_BUTTON_LABEL')
   });
+};
+
+/**
+ * History loader that provides an ImportHistorty appropriate
+ * to user settings (if import history is enabled/disabled).
+ *
+ * TODO(smckay): Use SynchronizedHistoryLoader directly
+ *     once cloud-import feature is enabled by default.
+ *
+ * @constructor
+ * @implements {importer.HistoryLoader}
+ */
+FileBrowserBackground.HistoryLoader = function() {
+  /** @private {Promise.<!importer.ImportHistory>} */
+  this.historyPromise_ = null;
+};
+
+/** @override */
+FileBrowserBackground.HistoryLoader.prototype.getHistory = function() {
+  return this.historyPromise_ ?
+      this.historyPromise_ :
+      importer.importEnabled()
+          .then(this.initHistoryPromise_.bind(this))
+          .then(
+              function() {
+                return this.historyPromise_;
+              }.bind(this));
+};
+
+/** @param {boolean} featureEnabled */
+FileBrowserBackground.HistoryLoader.prototype.initHistoryPromise_ =
+    function(featureEnabled) {
+  this.historyPromise_ = featureEnabled ?
+      new importer.SynchronizedHistoryLoader(
+          new importer.ChromeSyncFileEntryProvider()).getHistory() :
+      new importer.DummyImportHistory(false).getHistory();
 };
 
 /**

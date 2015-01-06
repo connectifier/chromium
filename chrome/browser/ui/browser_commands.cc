@@ -40,15 +40,17 @@
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/chrome_pages.h"
+#include "chrome/browser/ui/exclusive_access/fullscreen_controller.h"
 #include "chrome/browser/ui/find_bar/find_bar.h"
 #include "chrome/browser/ui/find_bar/find_bar_controller.h"
 #include "chrome/browser/ui/find_bar/find_tab_helper.h"
-#include "chrome/browser/ui/fullscreen/fullscreen_controller.h"
 #include "chrome/browser/ui/location_bar/location_bar.h"
+#include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
 #include "chrome/browser/ui/scoped_tabbed_browser_displayer.h"
 #include "chrome/browser/ui/search/search_tab_helper.h"
 #include "chrome/browser/ui/status_bubble.h"
 #include "chrome/browser/ui/tab_contents/core_tab_helper.h"
+#include "chrome/browser/ui/tab_dialogs.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/upgrade_detector.h"
 #include "chrome/common/chrome_switches.h"
@@ -319,9 +321,9 @@ void NewEmptyWindow(Profile* profile, HostDesktopType desktop_type) {
       incognito = false;
     }
   } else if (profile->IsGuestSession() ||
-      (browser_defaults::kAlwaysOpenIncognitoWindow &&
-      IncognitoModePrefs::ShouldLaunchIncognito(
-          *CommandLine::ForCurrentProcess(), prefs))) {
+             (browser_defaults::kAlwaysOpenIncognitoWindow &&
+              IncognitoModePrefs::ShouldLaunchIncognito(
+                  *base::CommandLine::ForCurrentProcess(), prefs))) {
     incognito = true;
   }
 
@@ -814,7 +816,11 @@ void ManagePasswordsForPage(Browser* browser) {
 
   WebContents* web_contents =
       browser->tab_strip_model()->GetActiveWebContents();
-  chrome::ShowManagePasswordsBubble(web_contents);
+  ManagePasswordsUIController* controller =
+      ManagePasswordsUIController::FromWebContents(web_contents);
+  TabDialogs::FromWebContents(web_contents)
+      ->ShowManagePasswordsBubble(
+          !password_manager::ui::IsAutomaticDisplayState(controller->state()));
 }
 
 #if defined(OS_WIN)

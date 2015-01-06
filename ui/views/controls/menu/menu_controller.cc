@@ -13,10 +13,10 @@
 #include "ui/events/event.h"
 #include "ui/events/event_utils.h"
 #include "ui/gfx/canvas.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/native_widget_types.h"
-#include "ui/gfx/point.h"
 #include "ui/gfx/screen.h"
-#include "ui/gfx/vector2d.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/controls/button/menu_button.h"
 #include "ui/views/controls/menu/menu_config.h"
@@ -2261,8 +2261,7 @@ void MenuController::SetExitType(ExitType type) {
   //
   // It's safe to invoke QuitNestedMessageLoop() multiple times, it only effects
   // the current loop.
-  bool quit_now = message_loop_->ShouldQuitNow() && exit_type_ != EXIT_NONE &&
-      message_loop_depth_;
+  bool quit_now = exit_type_ != EXIT_NONE && message_loop_depth_;
   if (quit_now)
     TerminateNestedMessageLoop();
 }

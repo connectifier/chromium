@@ -346,11 +346,13 @@ void ToolbarView::ShowAppMenu(bool for_drop) {
   if (wrench_menu_.get() && wrench_menu_->IsShowing())
     return;
 
+#if defined(USE_AURA)
   if (keyboard::KeyboardController::GetInstance() &&
       keyboard::KeyboardController::GetInstance()->keyboard_visible()) {
     keyboard::KeyboardController::GetInstance()->HideKeyboard(
         keyboard::KeyboardController::HIDE_REASON_AUTOMATIC);
   }
+#endif
 
   wrench_menu_.reset(
       new WrenchMenu(browser_, for_drop ? WrenchMenu::FOR_DROP : 0));
@@ -360,10 +362,6 @@ void ToolbarView::ShowAppMenu(bool for_drop) {
   FOR_EACH_OBSERVER(views::MenuListener, menu_listeners_, OnMenuOpened());
 
   wrench_menu_->RunMenu(app_menu_);
-}
-
-views::MenuButton* ToolbarView::app_menu() const {
-  return app_menu_;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

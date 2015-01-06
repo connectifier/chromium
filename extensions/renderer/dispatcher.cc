@@ -189,7 +189,8 @@ Dispatcher::Dispatcher(DispatcherDelegate* delegate)
       is_webkit_initialized_(false),
       user_script_set_manager_observer_(this),
       webrequest_used_(false) {
-  const CommandLine& command_line = *(CommandLine::ForCurrentProcess());
+  const base::CommandLine& command_line =
+      *(base::CommandLine::ForCurrentProcess());
   is_extension_process_ =
       command_line.HasSwitch(switches::kExtensionProcess) ||
       command_line.HasSwitch(::switches::kSingleProcess);
@@ -328,9 +329,9 @@ void Dispatcher::DidCreateScriptContext(
     module_system->Require("denyAppView");
   }
 
-  if (extensions::FeatureSwitch::worker_frame()->IsEnabled() &&
-      context->GetAvailability("workerFrameInternal").is_available()) {
-    module_system->Require("workerframe");
+  if (extensions::FeatureSwitch::surface_worker()->IsEnabled() &&
+      context->GetAvailability("surfaceWorkerInternal").is_available()) {
+    module_system->Require("surfaceWorker");
   }
 
   // Note: setting up the WebView class here, not the chrome.webview API.
@@ -551,7 +552,9 @@ std::vector<std::pair<std::string, int> > Dispatcher::GetJsResources() {
   resources.push_back(std::make_pair("guestViewContainer",
                                      IDR_GUEST_VIEW_CONTAINER_JS));
   resources.push_back(std::make_pair("webView", IDR_WEB_VIEW_JS));
-  resources.push_back(std::make_pair("workerframe", IDR_WORKER_FRAME_JS));
+  resources.push_back(std::make_pair("surfaceWorker", IDR_SURFACE_VIEW_JS));
+  resources.push_back(std::make_pair("webViewActionRequests",
+                                     IDR_WEB_VIEW_ACTION_REQUESTS_JS));
   resources.push_back(std::make_pair("webViewApiMethods",
                                      IDR_WEB_VIEW_API_METHODS_JS));
   resources.push_back(std::make_pair("webViewAttributes",
@@ -564,6 +567,8 @@ std::vector<std::pair<std::string, int> > Dispatcher::GetJsResources() {
   resources.push_back(std::make_pair("webViewInternal",
                                      IDR_WEB_VIEW_INTERNAL_CUSTOM_BINDINGS_JS));
   resources.push_back(std::make_pair("denyWebView", IDR_WEB_VIEW_DENY_JS));
+  resources.push_back(
+      std::make_pair(mojo::kBindingsModuleName, IDR_MOJO_BINDINGS_JS));
   resources.push_back(
       std::make_pair(mojo::kBufferModuleName, IDR_MOJO_BUFFER_JS));
   resources.push_back(
@@ -1085,9 +1090,9 @@ void Dispatcher::EnableCustomElementWhiteList() {
       "extensionoptionsbrowserplugin");
   blink::WebCustomElement::addEmbedderCustomElementName("webview");
   blink::WebCustomElement::addEmbedderCustomElementName("webviewbrowserplugin");
-  blink::WebCustomElement::addEmbedderCustomElementName("workerframe");
+  blink::WebCustomElement::addEmbedderCustomElementName("surfaceview");
   blink::WebCustomElement::addEmbedderCustomElementName(
-      "workerframebrowserplugin");
+      "surfaceviewbrowserplugin");
 }
 
 void Dispatcher::UpdateBindings(const std::string& extension_id) {
@@ -1146,7 +1151,7 @@ void Dispatcher::UpdateBindingsForContext(ScriptContext* context) {
 
         // Skip chrome.test if this isn't a test.
         if (api_name == "test" &&
-            !CommandLine::ForCurrentProcess()->HasSwitch(
+            !base::CommandLine::ForCurrentProcess()->HasSwitch(
                 ::switches::kTestType)) {
           continue;
         }
@@ -1228,8 +1233,8 @@ void Dispatcher::RegisterNativeHandlers(ModuleSystem* module_system,
 }
 
 bool Dispatcher::IsRuntimeAvailableToContext(ScriptContext* context) {
-  if (extensions::FeatureSwitch::worker_frame()->IsEnabled() &&
-      context->GetAvailability("workerFrameInternal").is_available()) {
+  if (extensions::FeatureSwitch::surface_worker()->IsEnabled() &&
+      context->GetAvailability("surfaceWorkerInternal").is_available()) {
     return true;
   }
   for (const auto& extension : extensions_) {

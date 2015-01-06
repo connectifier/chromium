@@ -19,9 +19,10 @@ namespace content {
 // push messaging services like GCM. Must only be used on the UI thread.
 class CONTENT_EXPORT PushMessagingService {
  public:
-  typedef base::Callback<void(const std::string& /* registration_id */,
-                              PushRegistrationStatus /* status */)>
-      RegisterCallback;
+  using RegisterCallback =
+      base::Callback<void(const std::string& /* registration_id */,
+                          PushRegistrationStatus /* status */)>;
+  using UnregisterCallback = base::Callback<void(PushUnregistrationStatus)>;
 
   virtual ~PushMessagingService() {}
 
@@ -49,14 +50,11 @@ class CONTENT_EXPORT PushMessagingService {
                                   const std::string& sender_id,
                                   const RegisterCallback& callback) = 0;
 
-  // Check whether the requester has permission to register for Push
-  // Messages
-  // TODO(mvanouwerkerk): Delete once the Push API flows through platform.
-  // https://crbug.com/389194
-  virtual blink::WebPushPermissionStatus GetPermissionStatus(
-      const GURL& requesting_origin,
-      int renderer_id,
-      int render_frame_id) = 0;
+  // Unregister an origin and its associated service worker registration id from
+  // the push service.
+  virtual void Unregister(const GURL& requesting_origin,
+                          int64 service_worker_registration_id,
+                          const UnregisterCallback& callback) = 0;
 
   // Checks the permission status for the requesting origin. Permission is only
   // ever granted when the requesting origin matches the top level embedding

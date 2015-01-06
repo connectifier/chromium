@@ -25,15 +25,12 @@
 #include "base/time/time.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/history/download_row.h"
-#include "chrome/browser/history/history_db_task.h"
-#include "chrome/browser/history/history_db_task.h"
 #include "chrome/browser/history/history_notifications.h"
 #include "chrome/browser/history/in_memory_history_backend.h"
 #include "chrome/browser/history/in_memory_history_backend.h"
 #include "chrome/browser/history/top_sites.h"
 #include "chrome/browser/history/typed_url_syncable_service.h"
 #include "chrome/browser/history/typed_url_syncable_service.h"
-#include "chrome/browser/history/visit_filter.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/importer/imported_favicon_usage.h"
 #include "chrome/common/url_constants.h"
@@ -41,8 +38,10 @@
 #include "components/history/core/browser/history_backend_observer.h"
 #include "components/history/core/browser/history_client.h"
 #include "components/history/core/browser/history_constants.h"
+#include "components/history/core/browser/history_db_task.h"
 #include "components/history/core/browser/keyword_search_term.h"
 #include "components/history/core/browser/page_usage_data.h"
+#include "components/history/core/browser/visit_filter.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "sql/error_delegate_util.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -381,11 +380,11 @@ SegmentID HistoryBackend::UpdateSegments(
 }
 
 void HistoryBackend::UpdateWithPageEndTime(ContextID context_id,
-                                           int32 page_id,
+                                           int nav_entry_id,
                                            const GURL& url,
                                            Time end_ts) {
   // Will be filled with the URL ID and the visit ID of the last addition.
-  VisitID visit_id = tracker_.GetLastVisit(context_id, page_id, url);
+  VisitID visit_id = tracker_.GetLastVisit(context_id, nav_entry_id, url);
   UpdateVisitDuration(visit_id, end_ts);
 }
 
@@ -409,7 +408,7 @@ void HistoryBackend::AddPage(const HistoryAddPageArgs& request) {
 
   // Will be filled with the URL ID and the visit ID of the last addition.
   std::pair<URLID, VisitID> last_ids(0, tracker_.GetLastVisit(
-      request.context_id, request.page_id, request.referrer));
+      request.context_id, request.nav_entry_id, request.referrer));
 
   VisitID from_visit_id = last_ids.second;
 
@@ -572,7 +571,7 @@ void HistoryBackend::AddPage(const HistoryAddPageArgs& request) {
   if (stripped_transition != ui::PAGE_TRANSITION_AUTO_SUBFRAME &&
       stripped_transition != ui::PAGE_TRANSITION_MANUAL_SUBFRAME &&
       !is_keyword_generated) {
-    tracker_.AddVisit(request.context_id, request.page_id, request.url,
+    tracker_.AddVisit(request.context_id, request.nav_entry_id, request.url,
                       last_ids.second);
   }
 
@@ -2637,7 +2636,7 @@ bool HistoryBackend::ClearAllThumbnailHistory(const URLRows& kept_urls) {
 
 #if defined(OS_ANDROID)
   // TODO (michaelbai): Add the unit test once AndroidProviderBackend is
-  // avaliable in HistoryBackend.
+  // available in HistoryBackend.
   db_->ClearAndroidURLRows();
 #endif
 

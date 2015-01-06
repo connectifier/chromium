@@ -141,6 +141,7 @@ component("events") {
 
   if (use_ozone) {
     sources += [ "ozone/events_ozone.cc" ]
+    deps += [ "//ui/events/ozone:events_ozone_layout" ]
   }
 
   if (use_aura) {
@@ -282,6 +283,7 @@ test("events_unittests") {
     "event_rewriter_unittest.cc",
     "event_unittest.cc",
     "gesture_detection/bitset_32_unittest.cc",
+    "gesture_detection/filtered_gesture_provider_unittest.cc",
     "gesture_detection/gesture_event_data_packet_unittest.cc",
     "gesture_detection/gesture_provider_unittest.cc",
     "gesture_detection/motion_event_buffer_unittest.cc",
@@ -330,10 +332,12 @@ test("events_unittests") {
       "ozone/evdev/input_injector_evdev_unittest.cc",
       "ozone/evdev/tablet_event_converter_evdev_unittest.cc",
       "ozone/evdev/touch_event_converter_evdev_unittest.cc",
+      "ozone/layout/xkb/xkb_keyboard_layout_engine_unittest.cc",
     ]
     deps += [
       "//ui/events/ozone:events_ozone",
       "//ui/events/ozone:events_ozone_evdev",
+      "//ui/events/ozone:events_ozone_layout",
     ]
   }
 

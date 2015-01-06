@@ -74,9 +74,9 @@ void GetAllCallback(
   *all_out = all;
 }
 
-ServiceWorkerStorage::GetAllRegistrationInfosCallback MakeGetAllCallback(
-    bool* was_called,
-    std::vector<ServiceWorkerRegistrationInfo>* all) {
+ServiceWorkerStorage::GetRegistrationsInfosCallback
+MakeGetRegistrationsCallback(bool* was_called,
+                             std::vector<ServiceWorkerRegistrationInfo>* all) {
   return base::Bind(&GetAllCallback, was_called, all);
 }
 
@@ -85,6 +85,17 @@ void GetUserDataCallback(
     std::string* data_out,
     ServiceWorkerStatusCode* status_out,
     const std::string& data,
+    ServiceWorkerStatusCode status) {
+  *was_called = true;
+  *data_out = data;
+  *status_out = status;
+}
+
+void GetUserDataForAllRegistrationsCallback(
+    bool* was_called,
+    std::vector<std::pair<int64, std::string>>* data_out,
+    ServiceWorkerStatusCode* status_out,
+    const std::vector<std::pair<int64, std::string>>& data,
     ServiceWorkerStatusCode status) {
   *was_called = true;
   *data_out = data;
@@ -273,7 +284,19 @@ class ServiceWorkerStorageTest : public testing::Test {
       std::vector<ServiceWorkerRegistrationInfo>* registrations) {
     bool was_called = false;
     storage()->GetAllRegistrations(
-        MakeGetAllCallback(&was_called, registrations));
+        MakeGetRegistrationsCallback(&was_called, registrations));
+    EXPECT_FALSE(was_called);  // always async
+    base::RunLoop().RunUntilIdle();
+    EXPECT_TRUE(was_called);
+  }
+
+  void GetRegistrationsForOrigin(
+      const GURL& origin,
+      std::vector<ServiceWorkerRegistrationInfo>* registrations) {
+    bool was_called = false;
+    storage()->GetRegistrationsForOrigin(
+        origin,
+        MakeGetRegistrationsCallback(&was_called, registrations));
     EXPECT_FALSE(was_called);  // always async
     base::RunLoop().RunUntilIdle();
     EXPECT_TRUE(was_called);
@@ -317,6 +340,20 @@ class ServiceWorkerStorageTest : public testing::Test {
     ServiceWorkerStatusCode result = SERVICE_WORKER_ERROR_FAILED;
     storage()->ClearUserData(
         registration_id, key, MakeStatusCallback(&was_called, &result));
+    EXPECT_FALSE(was_called);  // always async
+    base::RunLoop().RunUntilIdle();
+    EXPECT_TRUE(was_called);
+    return result;
+  }
+
+  ServiceWorkerStatusCode GetUserDataForAllRegistrations(
+      const std::string& key,
+      std::vector<std::pair<int64, std::string>>* data) {
+    bool was_called = false;
+    ServiceWorkerStatusCode result = SERVICE_WORKER_ERROR_FAILED;
+    storage()->GetUserDataForAllRegistrations(
+        key, base::Bind(&GetUserDataForAllRegistrationsCallback, &was_called,
+                        data, &result));
     EXPECT_FALSE(was_called);  // always async
     base::RunLoop().RunUntilIdle();
     EXPECT_TRUE(was_called);
@@ -479,6 +516,17 @@ TEST_F(ServiceWorkerStorageTest, StoreFindUpdateDeleteRegistration) {
   EXPECT_EQ(kResource1Size + kResource2Size, info.stored_version_size_bytes);
   all_registrations.clear();
 
+  // Finding by origin should provide the same result iif origin is kScope.
+  std::vector<ServiceWorkerRegistrationInfo> registrations_origin;
+  GetRegistrationsForOrigin(kScope.GetOrigin(), &registrations_origin);
+  EXPECT_EQ(1u, registrations_origin.size());
+  registrations_origin.clear();
+
+  GetRegistrationsForOrigin(
+      GURL("http://example.com/").GetOrigin(),
+      &registrations_origin);
+  EXPECT_TRUE(registrations_origin.empty());
+
   found_registration = NULL;
 
   // Drop the live version too.
@@ -583,6 +631,15 @@ TEST_F(ServiceWorkerStorageTest, InstallingRegistrationsAreFindable) {
   GetAllRegistrations(&all_registrations);
   EXPECT_TRUE(all_registrations.empty());
 
+  std::vector<ServiceWorkerRegistrationInfo> registrations_origin;
+  GetRegistrationsForOrigin(kScope.GetOrigin(), &registrations_origin);
+  EXPECT_TRUE(registrations_origin.empty());
+
+  GetRegistrationsForOrigin(
+      GURL("http://example.com/").GetOrigin(),
+      &registrations_origin);
+  EXPECT_TRUE(registrations_origin.empty());
+
   // Notify storage of it being installed.
   storage()->NotifyInstallingRegistration(live_registration.get());
 
@@ -607,6 +664,16 @@ TEST_F(ServiceWorkerStorageTest, InstallingRegistrationsAreFindable) {
   EXPECT_EQ(1u, all_registrations.size());
   all_registrations.clear();
 
+  // Finding by origin should provide the same result iif origin is kScope.
+  GetRegistrationsForOrigin(kScope.GetOrigin(), &registrations_origin);
+  EXPECT_EQ(1u, registrations_origin.size());
+  registrations_origin.clear();
+
+  GetRegistrationsForOrigin(
+      GURL("http://example.com/").GetOrigin(),
+      &registrations_origin);
+  EXPECT_TRUE(registrations_origin.empty());
+
   // Notify storage of installation no longer happening.
   storage()->NotifyDoneInstallingRegistration(
       live_registration.get(), NULL, SERVICE_WORKER_OK);
@@ -627,6 +694,14 @@ TEST_F(ServiceWorkerStorageTest, InstallingRegistrationsAreFindable) {
 
   GetAllRegistrations(&all_registrations);
   EXPECT_TRUE(all_registrations.empty());
+
+  GetRegistrationsForOrigin(kScope.GetOrigin(), &registrations_origin);
+  EXPECT_TRUE(registrations_origin.empty());
+
+  GetRegistrationsForOrigin(
+      GURL("http://example.com/").GetOrigin(),
+      &registrations_origin);
+  EXPECT_TRUE(registrations_origin.empty());
 }
 
 TEST_F(ServiceWorkerStorageTest, StoreUserData) {
@@ -657,6 +732,16 @@ TEST_F(ServiceWorkerStorageTest, StoreUserData) {
   EXPECT_EQ("data", data_out);
   EXPECT_EQ(SERVICE_WORKER_ERROR_NOT_FOUND,
             GetUserData(kRegistrationId, "unknown_key", &data_out));
+  std::vector<std::pair<int64, std::string>> data_list_out;
+  EXPECT_EQ(SERVICE_WORKER_OK,
+            GetUserDataForAllRegistrations("key", &data_list_out));
+  ASSERT_EQ(1u, data_list_out.size());
+  EXPECT_EQ(kRegistrationId, data_list_out[0].first);
+  EXPECT_EQ("data", data_list_out[0].second);
+  data_list_out.clear();
+  EXPECT_EQ(SERVICE_WORKER_OK,
+            GetUserDataForAllRegistrations("unknown_key", &data_list_out));
+  EXPECT_EQ(0u, data_list_out.size());
   EXPECT_EQ(SERVICE_WORKER_OK, ClearUserData(kRegistrationId, "key"));
   EXPECT_EQ(SERVICE_WORKER_ERROR_NOT_FOUND,
             GetUserData(kRegistrationId, "key", &data_out));
@@ -672,6 +757,10 @@ TEST_F(ServiceWorkerStorageTest, StoreUserData) {
             DeleteRegistration(kRegistrationId, kScope.GetOrigin()));
   EXPECT_EQ(SERVICE_WORKER_ERROR_NOT_FOUND,
             GetUserData(kRegistrationId, "key", &data_out));
+  data_list_out.clear();
+  EXPECT_EQ(SERVICE_WORKER_OK,
+            GetUserDataForAllRegistrations("key", &data_list_out));
+  EXPECT_EQ(0u, data_list_out.size());
 
   // Data access with an invalid registration id should be failed.
   EXPECT_EQ(SERVICE_WORKER_ERROR_FAILED,
@@ -690,6 +779,9 @@ TEST_F(ServiceWorkerStorageTest, StoreUserData) {
             GetUserData(kRegistrationId, std::string(), &data_out));
   EXPECT_EQ(SERVICE_WORKER_ERROR_FAILED,
             ClearUserData(kRegistrationId, std::string()));
+  data_list_out.clear();
+  EXPECT_EQ(SERVICE_WORKER_ERROR_FAILED,
+            GetUserDataForAllRegistrations(std::string(), &data_list_out));
 }
 
 class ServiceWorkerResourceStorageTest : public ServiceWorkerStorageTest {

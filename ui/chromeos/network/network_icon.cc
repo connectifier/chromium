@@ -19,10 +19,10 @@
 #include "ui/chromeos/network/network_icon_animation.h"
 #include "ui/chromeos/network/network_icon_animation_observer.h"
 #include "ui/gfx/canvas.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/image/image_skia_operations.h"
 #include "ui/gfx/image/image_skia_source.h"
-#include "ui/gfx/rect.h"
-#include "ui/gfx/size_conversions.h"
 
 using chromeos::DeviceState;
 using chromeos::NetworkConnectionHandler;

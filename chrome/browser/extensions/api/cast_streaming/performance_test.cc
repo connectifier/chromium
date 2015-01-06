@@ -7,9 +7,6 @@
 
 #include "base/basictypes.h"
 #include "base/command_line.h"
-#if defined(OS_MACOSX)
-#include "base/mac/mac_util.h"
-#endif
 #include "base/strings/stringprintf.h"
 #include "base/test/trace_event_analyzer.h"
 #include "base/time/default_tick_clock.h"
@@ -18,7 +15,7 @@
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/tab_helper.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/fullscreen/fullscreen_controller.h"
+#include "chrome/browser/ui/exclusive_access/fullscreen_controller.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/chrome_version_info.h"
 #include "chrome/test/base/test_launcher_utils.h"
@@ -295,7 +292,7 @@ class CastV2PerformanceTest
   }
 
   bool IsGpuAvailable() const {
-    return CommandLine::ForCurrentProcess()->HasSwitch("enable-gpu");
+    return base::CommandLine::ForCurrentProcess()->HasSwitch("enable-gpu");
   }
 
   std::string GetSuffixForTestFlags() {
@@ -357,7 +354,7 @@ class CastV2PerformanceTest
     ExtensionApiTest::SetUp();
   }
 
-  void SetUpCommandLine(CommandLine* command_line) override {
+  void SetUpCommandLine(base::CommandLine* command_line) override {
     // Some of the tests may launch http requests through JSON or AJAX
     // which causes a security error (cross domain request) when the page
     // is loaded from the local file system ( file:// ). The following switch

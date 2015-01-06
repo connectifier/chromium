@@ -56,6 +56,7 @@
 #include "chrome/browser/safe_browsing/incident_reporting/blacklist_load_analyzer.h"
 #include "chrome/browser/safe_browsing/incident_reporting/incident_reporting_service.h"
 #include "chrome/browser/safe_browsing/incident_reporting/off_domain_inclusion_detector.h"
+#include "chrome/browser/safe_browsing/incident_reporting/variations_seed_signature_analyzer.h"
 #endif
 
 using content::BrowserThread;
@@ -218,7 +219,7 @@ void SafeBrowsingService::Initialize() {
 
 #if defined(FULL_SAFE_BROWSING)
 #if !defined(OS_ANDROID)
-  if (!CommandLine::ForCurrentProcess()->HasSwitch(
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kDisableClientSidePhishingDetection)) {
     csd_service_.reset(safe_browsing::ClientSideDetectionService::Create(
         url_request_context_getter_.get()));
@@ -377,6 +378,7 @@ void SafeBrowsingService::RegisterAllDelayedAnalysis() {
 #if defined(FULL_SAFE_BROWSING)
   safe_browsing::RegisterBinaryIntegrityAnalysis();
   safe_browsing::RegisterBlacklistLoadAnalysis();
+  safe_browsing::RegisterVariationsSeedSignatureAnalysis();
 #else
   NOTREACHED();
 #endif
@@ -441,7 +443,7 @@ SafeBrowsingProtocolConfig SafeBrowsingService::GetProtocolConfig() const {
 #endif
 
 #endif  // defined(OS_WIN)
-  CommandLine* cmdline = CommandLine::ForCurrentProcess();
+  base::CommandLine* cmdline = base::CommandLine::ForCurrentProcess();
   config.disable_auto_update =
       cmdline->HasSwitch(switches::kSbDisableAutoUpdate) ||
       cmdline->HasSwitch(switches::kDisableBackgroundNetworking);

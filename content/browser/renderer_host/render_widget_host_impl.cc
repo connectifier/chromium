@@ -67,8 +67,8 @@
 #include "third_party/WebKit/public/web/WebCompositionUnderline.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/geometry/vector2d_conversions.h"
-#include "ui/gfx/size_conversions.h"
 #include "ui/gfx/skbitmap_operations.h"
 #include "ui/snapshot/snapshot.h"
 
@@ -183,7 +183,6 @@ RenderWidgetHostImpl::RenderWidgetHostImpl(RenderWidgetHostDelegate* delegate,
       pending_mouse_lock_request_(false),
       allow_privileged_mouse_lock_(false),
       has_touch_handler_(false),
-      subscribe_uniform_enabled_(false),
       next_browser_snapshot_id_(1),
       weak_factory_(this) {
   CHECK(delegate_);
@@ -233,10 +232,6 @@ RenderWidgetHostImpl::RenderWidgetHostImpl(RenderWidgetHostDelegate* delegate,
         base::Bind(&RenderWidgetHostImpl::RendererIsUnresponsive,
                    weak_factory_.GetWeakPtr())));
   }
-
-  subscribe_uniform_enabled_ =
-      base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableSubscribeUniformExtension);
 }
 
 RenderWidgetHostImpl::~RenderWidgetHostImpl() {
@@ -902,17 +897,13 @@ void RenderWidgetHostImpl::ForwardMouseEventWithLatencyInfo(
 
   // Pass mouse state to gpu service if the subscribe uniform
   // extension is enabled.
-  // TODO(orglofch): Only pass mouse information if one of the GL Contexts
-  // is subscribed to GL_MOUSE_POSITION_CHROMIUM
-  if (subscribe_uniform_enabled_) {
+  if (process_->SubscribeUniformEnabled()) {
     gpu::ValueState state;
     state.int_value[0] = mouse_event.x;
     state.int_value[1] = mouse_event.y;
-    GpuProcessHost::SendOnIO(
-        GpuProcessHost::GPU_PROCESS_KIND_SANDBOXED,
-        CAUSE_FOR_GPU_LAUNCH_NO_LAUNCH,
-        new GpuMsg_UpdateValueState(
-            process_->GetID(), GL_MOUSE_POSITION_CHROMIUM, state));
+    // TODO(orglofch) Separate the mapping of pending value states to the
+    // Gpu Service to be per RWH not per process
+    process_->SendUpdateValueState(GL_MOUSE_POSITION_CHROMIUM, state);
   }
 }
 
@@ -1437,10 +1428,10 @@ bool RenderWidgetHostImpl::OnSwapCompositorFrame(
   if (!ViewHostMsg_SwapCompositorFrame::Read(&message, &param))
     return false;
   scoped_ptr<cc::CompositorFrame> frame(new cc::CompositorFrame);
-  uint32 output_surface_id = param.a;
-  param.b.AssignTo(frame.get());
+  uint32 output_surface_id = get<0>(param);
+  get<1>(param).AssignTo(frame.get());
   std::vector<IPC::Message> messages_to_deliver_with_frame;
-  messages_to_deliver_with_frame.swap(param.c);
+  messages_to_deliver_with_frame.swap(get<2>(param));
 
   latency_tracker_.OnSwapCompositorFrame(&frame->metadata.latency_info);
 

@@ -12,8 +12,8 @@
 #include "ui/base/ui_base_switches.h"
 #include "ui/events/test/event_generator.h"
 #include "ui/gfx/canvas.h"
-#include "ui/gfx/point.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/render_text.h"
 #include "ui/resources/grit/ui_resources.h"
 #include "ui/views/controls/textfield/textfield.h"
@@ -66,7 +66,7 @@ class TouchSelectionControllerImplTest : public ViewsTestBase {
         widget_(nullptr),
         textfield_(nullptr),
         views_tsc_factory_(new ViewsTouchEditingControllerFactory) {
-    CommandLine::ForCurrentProcess()->AppendSwitch(
+    base::CommandLine::ForCurrentProcess()->AppendSwitch(
         switches::kEnableTouchEditing);
     ui::TouchEditingControllerFactory::SetInstance(views_tsc_factory_.get());
   }

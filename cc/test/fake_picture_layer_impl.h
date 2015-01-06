@@ -76,7 +76,6 @@ class FakePictureLayerImpl : public PictureLayerImpl {
   using PictureLayerImpl::AddTiling;
   using PictureLayerImpl::CleanUpTilingsOnActiveLayer;
   using PictureLayerImpl::CanHaveTilings;
-  using PictureLayerImpl::DoPostCommitInitializationIfNeeded;
   using PictureLayerImpl::MinimumContentsScale;
   using PictureLayerImpl::GetViewportForTilePriorityInContentSpace;
   using PictureLayerImpl::SanityCheckTilingState;
@@ -85,14 +84,6 @@ class FakePictureLayerImpl : public PictureLayerImpl {
 
   using PictureLayerImpl::UpdateIdealScales;
   using PictureLayerImpl::MaximumTilingContentsScale;
-
-  void SetNeedsPostCommitInitialization() {
-    needs_post_commit_initialization_ = true;
-  }
-
-  bool needs_post_commit_initialization() const {
-    return needs_post_commit_initialization_;
-  }
 
   float raster_page_scale() const { return raster_page_scale_; }
   void set_raster_page_scale(float scale) { raster_page_scale_ = scale; }
@@ -119,9 +110,7 @@ class FakePictureLayerImpl : public PictureLayerImpl {
 
   void set_fixed_tile_size(const gfx::Size& size) { fixed_tile_size_ = size; }
 
-  // TODO(danakj): Remove this darn thing.
-  void CreateDefaultTilingsAndTiles();
-
+  void CreateAllTiles();
   void SetAllTilesVisible();
   void SetAllTilesReady();
   void SetAllTilesReadyInTiling(PictureLayerTiling* tiling);

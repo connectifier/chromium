@@ -219,7 +219,10 @@ class HotwordNotificationDelegate : public NotificationDelegate {
   // Overridden from NotificationDelegate:
   void ButtonClick(int button_index) override {
     DCHECK_EQ(0, button_index);
+    Click();
+  }
 
+  void Click() override {
     // Launch the hotword audio verification app in the right mode.
     HotwordService::LaunchMode launch_mode =
         HotwordService::HOTWORD_AND_AUDIO_HISTORY;
@@ -277,7 +280,7 @@ bool HotwordService::IsExperimentalHotwordingEnabled() {
     return true;
   }
 
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   return !command_line->HasSwitch(switches::kDisableExperimentalHotwording);
 }
 
@@ -331,7 +334,11 @@ HotwordService::HotwordService(Profile* profile)
   pref_registrar_.Add(
       prefs::kHotwordSearchEnabled,
       base::Bind(&HotwordService::OnHotwordSearchEnabledChanged,
-                 base::Unretained(this)));
+      base::Unretained(this)));
+  pref_registrar_.Add(
+      prefs::kHotwordAlwaysOnSearchEnabled,
+      base::Bind(&HotwordService::OnHotwordAlwaysOnSearchEnabledChanged,
+      base::Unretained(this)));
 
   extensions::ExtensionSystem::Get(profile_)->ready().Post(
       FROM_HERE,
@@ -355,7 +362,7 @@ HotwordService::HotwordService(Profile* profile)
     // Show the hotword notification in 5 seconds if the experimental flag is
     // on, or in 30 minutes if not. We need to wait at least a few seconds
     // for the hotword extension to be installed.
-    CommandLine* command_line = CommandLine::ForCurrentProcess();
+    base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
     if (command_line->HasSwitch(switches::kEnableExperimentalHotwordHardware)) {
       base::MessageLoop::current()->PostDelayedTask(
           FROM_HERE,
@@ -772,6 +779,16 @@ void HotwordService::OnHotwordSearchEnabledChanged(
     DisableHotwordExtension(extension_service);
 }
 
+void HotwordService::OnHotwordAlwaysOnSearchEnabledChanged(
+    const std::string& pref_name) {
+  // If the pref for always on has been changed in some way, that means that
+  // the user is aware of always on (either from settings or another source)
+  // so they don't need to be shown the notification.
+  profile_->GetPrefs()->SetBoolean(prefs::kHotwordAlwaysOnNotificationSeen,
+                                   true);
+  pref_registrar_.Remove(prefs::kHotwordAlwaysOnSearchEnabled);
+}
+
 void HotwordService::RequestHotwordSession(HotwordClient* client) {
   if (!IsServiceAvailable() || (client_ && client_ != client))
     return;
@@ -826,7 +843,7 @@ void HotwordService::ActiveUserChanged() {
     return;
 
   // Don't bother notifying the extension if hotwording is completely off.
-  if (!IsSometimesOnEnabled() && !IsAlwaysOnEnabled())
+  if (!IsSometimesOnEnabled() && !IsAlwaysOnEnabled() && !IsTraining())
     return;
 
   HotwordPrivateEventService* event_service =

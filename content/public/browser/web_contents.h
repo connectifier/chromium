@@ -23,8 +23,8 @@
 #include "ipc/ipc_sender.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/native_widget_types.h"
-#include "ui/gfx/rect.h"
 
 #if defined(OS_ANDROID)
 #include "base/android/scoped_java_ref.h"
@@ -541,6 +541,9 @@ class WebContents : public PageNavigator,
 
   // Does this have an opener associated with it?
   virtual bool HasOpener() const = 0;
+
+  // Returns the opener if HasOpener() is true, or NULL otherwise.
+  virtual WebContents* GetOpener() const = 0;
 
   typedef base::Callback<void(
       int, /* id */

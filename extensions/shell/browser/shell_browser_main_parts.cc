@@ -10,8 +10,8 @@
 #include "base/prefs/pref_service.h"
 #include "base/run_loop.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
-#include "components/omaha_client/omaha_query_params.h"
 #include "components/storage_monitor/storage_monitor.h"
+#include "components/update_client/update_query_params.h"
 #include "content/public/browser/child_process_security_policy.h"
 #include "content/public/browser/context_factory.h"
 #include "content/public/browser/devtools_http_handler.h"
@@ -32,8 +32,8 @@
 #include "extensions/shell/browser/shell_extension_system_factory.h"
 #include "extensions/shell/browser/shell_extensions_browser_client.h"
 #include "extensions/shell/browser/shell_oauth2_token_service.h"
-#include "extensions/shell/browser/shell_omaha_query_params_delegate.h"
 #include "extensions/shell/browser/shell_prefs.h"
+#include "extensions/shell/browser/shell_update_query_params_delegate.h"
 #include "extensions/shell/common/shell_extensions_client.h"
 #include "extensions/shell/common/switches.h"
 #include "ui/base/ime/input_method_initializer.h"
@@ -44,11 +44,16 @@
 #endif
 
 #if defined(OS_CHROMEOS)
+#include "chromeos/audio/audio_devices_pref_handler_impl.h"
 #include "chromeos/audio/cras_audio_handler.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/network/network_handler.h"
 #include "extensions/shell/browser/shell_audio_controller_chromeos.h"
 #include "extensions/shell/browser/shell_network_controller_chromeos.h"
+#endif
+
+#if defined(OS_MACOSX)
+#include "extensions/shell/browser/shell_browser_main_parts_mac.h"
 #endif
 
 #if !defined(DISABLE_NACL)
@@ -90,6 +95,9 @@ ShellBrowserMainParts::~ShellBrowserMainParts() {
 
 void ShellBrowserMainParts::PreMainMessageLoopStart() {
   // TODO(jamescook): Initialize touch here?
+#if defined(OS_MACOSX)
+  MainPartsPreMainMessageLoopStartMac();
+#endif
 }
 
 void ShellBrowserMainParts::PostMainMessageLoopStart() {
@@ -101,12 +109,8 @@ void ShellBrowserMainParts::PostMainMessageLoopStart() {
 
   chromeos::NetworkHandler::Initialize();
   network_controller_.reset(new ShellNetworkController(
-      CommandLine::ForCurrentProcess()->GetSwitchValueNative(
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueNative(
           switches::kAppShellPreferredNetwork)));
-
-  chromeos::CrasAudioHandler::Initialize(
-      new ShellAudioController::PrefHandler());
-  audio_controller_.reset(new ShellAudioController());
 #else
   // Non-Chrome OS platforms are for developer convenience, so use a test IME.
   ui::InitializeInputMethodForTesting();
@@ -131,7 +135,18 @@ int ShellBrowserMainParts::PreCreateThreads() {
 void ShellBrowserMainParts::PreMainMessageLoopRun() {
   // Initialize our "profile" equivalent.
   browser_context_.reset(new ShellBrowserContext);
-  pref_service_ = ShellPrefs::CreatePrefService(browser_context_.get());
+
+  // app_shell only supports a single user, so all preferences live in the user
+  // data directory, including the device-wide local state.
+  local_state_ = shell_prefs::CreateLocalState(browser_context_->GetPath());
+  user_pref_service_ =
+      shell_prefs::CreateUserPrefService(browser_context_.get());
+
+#if defined(OS_CHROMEOS)
+  chromeos::CrasAudioHandler::Initialize(
+      new chromeos::AudioDevicesPrefHandlerImpl(local_state_.get(), ""));
+  audio_controller_.reset(new ShellAudioController());
+#endif
 
 #if defined(USE_AURA)
   aura::Env::GetInstance()->set_context_factory(content::GetContextFactory());
@@ -149,12 +164,12 @@ void ShellBrowserMainParts::PreMainMessageLoopRun() {
   ExtensionsClient::Set(extensions_client_.get());
 
   extensions_browser_client_.reset(CreateExtensionsBrowserClient(
-      browser_context_.get(), pref_service_.get()));
+      browser_context_.get(), user_pref_service_.get()));
   ExtensionsBrowserClient::Set(extensions_browser_client_.get());
 
-  omaha_query_params_delegate_.reset(new ShellOmahaQueryParamsDelegate);
-  omaha_client::OmahaQueryParams::SetDelegate(
-      omaha_query_params_delegate_.get());
+  update_query_params_delegate_.reset(new ShellUpdateQueryParamsDelegate);
+  update_client::UpdateQueryParams::SetDelegate(
+      update_query_params_delegate_.get());
 
   // Create our custom ExtensionSystem first because other
   // KeyedServices depend on it.
@@ -170,7 +185,7 @@ void ShellBrowserMainParts::PreMainMessageLoopRun() {
       browser_context_.get());
 
   // Initialize OAuth2 support from command line.
-  CommandLine* cmd = CommandLine::ForCurrentProcess();
+  base::CommandLine* cmd = base::CommandLine::ForCurrentProcess();
   oauth2_token_service_.reset(new ShellOAuth2TokenService(
       browser_context_.get(),
       cmd->GetSwitchValueASCII(switches::kAppShellUser),
@@ -243,15 +258,21 @@ void ShellBrowserMainParts::PostMainMessageLoopRun() {
 
   storage_monitor::StorageMonitor::Destroy();
 
-  pref_service_->CommitPendingWrite();
-  pref_service_.reset();
+#if defined(OS_CHROMEOS)
+  audio_controller_.reset();
+  chromeos::CrasAudioHandler::Shutdown();
+#endif
+
+  user_pref_service_->CommitPendingWrite();
+  user_pref_service_.reset();
+  local_state_->CommitPendingWrite();
+  local_state_.reset();
+
   browser_context_.reset();
 }
 
 void ShellBrowserMainParts::PostDestroyThreads() {
 #if defined(OS_CHROMEOS)
-  audio_controller_.reset();
-  chromeos::CrasAudioHandler::Shutdown();
   network_controller_.reset();
   chromeos::NetworkHandler::Shutdown();
   chromeos::DBusThreadManager::Shutdown();

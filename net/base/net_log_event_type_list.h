@@ -584,6 +584,20 @@ EVENT_TYPE(SIGNED_CERTIFICATE_TIMESTAMPS_RECEIVED)
 // }
 EVENT_TYPE(SIGNED_CERTIFICATE_TIMESTAMPS_CHECKED)
 
+// The EV certificate was checked for compliance with Certificate Transparency
+// requirements.
+//
+// The following parameters are attached to the event:
+// {
+//    "certificate": <An X.509 certificate, same format as in
+//                   CERT_VERIFIER_JOB.>
+//    "policy_enforcement_required": <boolean>
+//    "build_timely": <boolean>
+//    "ct_compliance_status": <string describing compliance status>
+//    "ev_whitelist_version": <optional; string representing whitelist version>
+// }
+EVENT_TYPE(EV_CERT_CT_COMPLIANCE_CHECKED)
+
 // ------------------------------------------------------------------------
 // DatagramSocket
 // ------------------------------------------------------------------------
@@ -832,6 +846,20 @@ EVENT_TYPE(HTTP_CACHE_WRITE_INFO)
 // Measures the time while reading/writing a disk cache entry's body.
 EVENT_TYPE(HTTP_CACHE_READ_DATA)
 EVENT_TYPE(HTTP_CACHE_WRITE_DATA)
+
+// The request headers received by the HTTP cache.
+// The following parameters are attached:
+//   {
+//     "line": <empty>,
+//     "headers": <The list of header:value pairs>,
+//   }
+EVENT_TYPE(HTTP_CACHE_CALLER_REQUEST_HEADERS)
+
+// Signal a significant change on the flow of the satate machine: start again
+// from scratch or create a new network request for byte-range operations.
+// There are no parameters.
+EVENT_TYPE(HTTP_CACHE_RESTART_PARTIAL_REQUEST)
+EVENT_TYPE(HTTP_CACHE_RE_SEND_PARTIAL_REQUEST)
 
 // Identifies the NetLog::Source() for the asynchronous HttpCache::Transaction
 // that will revalidate this entry.

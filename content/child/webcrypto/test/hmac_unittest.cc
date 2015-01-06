@@ -208,6 +208,18 @@ TEST(WebCryptoHmacTest, Generate1BitKey) {
   EXPECT_FALSE(raw_key[0] & 0x7F);
 }
 
+TEST(WebCryptoHmacTest, ImportKeyEmptyUsage) {
+  blink::WebCryptoKey key;
+  std::string key_raw_hex_in = "025a8cf3f08b4f6c5f33bbc76a471939";
+  EXPECT_EQ(
+      Status::ErrorCreateKeyEmptyUsages(),
+      ImportKey(blink::WebCryptoKeyFormatRaw,
+                CryptoData(HexStringToBytes(key_raw_hex_in)),
+                CreateHmacImportAlgorithmNoLength(
+                    blink::WebCryptoAlgorithmIdSha1),
+                true, 0, &key));
+}
+
 TEST(WebCryptoHmacTest, ImportKeyJwkKeyOpsSignVerify) {
   blink::WebCryptoKey key;
   base::DictionaryValue dict;
@@ -457,46 +469,59 @@ TEST(WebCryptoHmacTest, ImportExportJwk) {
   ImportExportJwkSymmetricKey(
       512, CreateHmacImportAlgorithmNoLength(blink::WebCryptoAlgorithmIdSha512),
       blink::WebCryptoKeyUsageVerify, "HS512");
-
-  // Zero usage value
-  ImportExportJwkSymmetricKey(
-      512, CreateHmacImportAlgorithmNoLength(blink::WebCryptoAlgorithmIdSha512),
-      0, "HS512");
 }
 
 TEST(WebCryptoHmacTest, ExportJwkEmptyKey) {
+  blink::WebCryptoKeyUsageMask usages = blink::WebCryptoKeyUsageSign;
+
+  // Importing empty HMAC key is no longer allowed. However such a key can be
+  // created via de-serialization.
+  blink::WebCryptoKey key;
+  ASSERT_TRUE(DeserializeKeyForClone(blink::WebCryptoKeyAlgorithm::createHmac(
+                                         blink::WebCryptoAlgorithmIdSha1, 0),
+                                     blink::WebCryptoKeyTypeSecret, true,
+                                     usages, CryptoData(), &key));
+
+  // Export the key in JWK format and validate.
+  std::vector<uint8_t> json;
+  ASSERT_EQ(Status::Success(),
+            ExportKey(blink::WebCryptoKeyFormatJwk, key, &json));
+  EXPECT_TRUE(VerifySecretJwk(json, "HS1", "", usages));
+
+  // Now try re-importing the JWK key.
+  key = blink::WebCryptoKey::createNull();
+  EXPECT_EQ(Status::ErrorHmacImportEmptyKey(),
+            ImportKey(blink::WebCryptoKeyFormatJwk, CryptoData(json),
+                      CreateHmacImportAlgorithmNoLength(
+                          blink::WebCryptoAlgorithmIdSha1),
+                      true, usages, &key));
+}
+
+// Imports an HMAC key contaning no byte data.
+TEST(WebCryptoHmacTest, ImportRawEmptyKey) {
   const blink::WebCryptoAlgorithm import_algorithm =
       CreateHmacImportAlgorithmNoLength(blink::WebCryptoAlgorithmIdSha1);
 
   blink::WebCryptoKeyUsageMask usages = blink::WebCryptoKeyUsageSign;
   blink::WebCryptoKey key;
 
-  // Import a zero-byte HMAC key.
-  const char key_data_hex[] = "";
-  key = ImportSecretKeyFromRaw(HexStringToBytes(key_data_hex), import_algorithm,
-                               usages);
-  EXPECT_EQ(0u, key.algorithm().hmacParams()->lengthBits());
-
-  // Export the key in JWK format and validate.
-  std::vector<uint8_t> json;
-  ASSERT_EQ(Status::Success(),
-            ExportKey(blink::WebCryptoKeyFormatJwk, key, &json));
-  EXPECT_TRUE(VerifySecretJwk(json, "HS1", key_data_hex, usages));
-
-  // Now try re-importing the JWK key.
-  key = blink::WebCryptoKey::createNull();
-  EXPECT_EQ(Status::Success(),
-            ImportKey(blink::WebCryptoKeyFormatJwk, CryptoData(json),
+  ASSERT_EQ(Status::ErrorHmacImportEmptyKey(),
+            ImportKey(blink::WebCryptoKeyFormatRaw, CryptoData(),
                       import_algorithm, true, usages, &key));
+}
 
-  EXPECT_EQ(blink::WebCryptoKeyTypeSecret, key.type());
-  EXPECT_EQ(0u, key.algorithm().hmacParams()->lengthBits());
+// Imports an HMAC key contaning 1 byte data, however the length was set to 0.
+TEST(WebCryptoHmacTest, ImportRawKeyWithZeroLength) {
+  const blink::WebCryptoAlgorithm import_algorithm =
+      CreateHmacImportAlgorithm(blink::WebCryptoAlgorithmIdSha1, 0);
 
-  std::vector<uint8_t> exported_key_data;
-  EXPECT_EQ(Status::Success(),
-            ExportKey(blink::WebCryptoKeyFormatRaw, key, &exported_key_data));
+  blink::WebCryptoKeyUsageMask usages = blink::WebCryptoKeyUsageSign;
+  blink::WebCryptoKey key;
 
-  EXPECT_EQ(0u, exported_key_data.size());
+  std::vector<uint8_t> key_data(1);
+  ASSERT_EQ(Status::ErrorHmacImportBadLength(),
+            ImportKey(blink::WebCryptoKeyFormatRaw, CryptoData(key_data),
+                      import_algorithm, true, usages, &key));
 }
 
 // Import a huge hmac key (UINT_MAX bytes). This will fail before actually

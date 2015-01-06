@@ -19,7 +19,6 @@ import android.support.v4.view.ViewCompat;
 import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.MenuItem;
-import android.view.View;
 
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.VisibleForTesting;
@@ -101,12 +100,15 @@ public abstract class Preferences extends ActionBarActivity implements
         // This must be called before the fragment transaction below.
         workAroundPlatformBugs();
 
-        // Display the fragment as the main content.
-        if (initialFragment == null) initialFragment = getTopLevelFragmentName();
-        Fragment fragment = Fragment.instantiate(this, initialFragment, initialArguments);
-        getFragmentManager().beginTransaction()
-                .replace(android.R.id.content, fragment)
-                .commit();
+        // If savedInstanceState is non-null, then the activity is being
+        // recreated and super.onCreate() has already recreated the fragment.
+        if (savedInstanceState == null) {
+            if (initialFragment == null) initialFragment = getTopLevelFragmentName();
+            Fragment fragment = Fragment.instantiate(this, initialFragment, initialArguments);
+            getFragmentManager().beginTransaction()
+                    .replace(android.R.id.content, fragment)
+                    .commit();
+        }
 
         // Disable Android Beam on JB and later devices.
         // In ICS it does nothing - i.e. we will send a Play Store link if NFC is used.
@@ -203,7 +205,7 @@ public abstract class Preferences extends ActionBarActivity implements
     private void workAroundPlatformBugs() {
         // Workaround for an Android bug where the fragment's view may not be attached to the view
         // hierarchy. http://b/18525402
-        setContentView(new View(this));
+        getSupportActionBar();
 
         // Workaround for HTC One S bug which causes all the text in settings to turn white.
         // This must be called after setContentView().

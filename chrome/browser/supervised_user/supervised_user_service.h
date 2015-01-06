@@ -25,7 +25,6 @@
 #include "components/keyed_service/core/keyed_service.h"
 
 #if defined(ENABLE_EXTENSIONS)
-#include "extensions/browser/extension_registry_observer.h"
 #include "extensions/browser/management_policy.h"
 #endif
 
@@ -39,6 +38,7 @@ class SupervisedUserServiceObserver;
 class SupervisedUserSettingsService;
 class SupervisedUserSiteList;
 class SupervisedUserURLFilter;
+class SupervisedUserWhitelistService;
 
 namespace base {
 class FilePath;
@@ -66,11 +66,11 @@ class PrefRegistrySyncable;
 class SupervisedUserService : public KeyedService,
 #if defined(ENABLE_EXTENSIONS)
                               public extensions::ManagementPolicy::Provider,
-                              public extensions::ExtensionRegistryObserver,
 #endif
                               public SyncTypePreferenceProvider,
                               public ProfileSyncServiceObserver,
-                              public chrome::BrowserListObserver {
+                              public chrome::BrowserListObserver,
+                              public SupervisedUserURLFilter::Observer {
  public:
   typedef std::vector<base::string16> CategoryList;
   typedef base::Callback<void(content::WebContents*)> NavigationBlockedCallback;
@@ -83,8 +83,6 @@ class SupervisedUserService : public KeyedService,
     // Returns true to indicate that the delegate handled the (de)activation, or
     // false to indicate that the SupervisedUserService itself should handle it.
     virtual bool SetActive(bool active) = 0;
-    // TODO(treib): Unused, remove.
-    virtual bool IsChildAccount() const;
     // Returns the path to a blacklist file to load, or an empty path to
     // indicate "none".
     virtual base::FilePath GetBlacklistPath() const;
@@ -113,6 +111,9 @@ class SupervisedUserService : public KeyedService,
   // Returns the URL filter for the UI thread, for filtering navigations and
   // classifying sites in the history view.
   SupervisedUserURLFilter* GetURLFilterForUIThread();
+
+  // Returns the whitelist service.
+  SupervisedUserWhitelistService* GetWhitelistService();
 
   // Returns the URL's category, obtained from the installed content packs.
   int GetCategory(const GURL& url);
@@ -164,10 +165,6 @@ class SupervisedUserService : public KeyedService,
       const std::string& supervised_user_id,
       const AuthErrorCallback& callback);
 
-  void set_elevated_for_testing(bool skip) {
-    elevated_for_testing_ = skip;
-  }
-
   void AddNavigationBlockedCallback(const NavigationBlockedCallback& callback);
   void DidBlockNavigation(content::WebContents* web_contents);
 
@@ -184,14 +181,6 @@ class SupervisedUserService : public KeyedService,
                    base::string16* error) const override;
   bool UserMayModifySettings(const extensions::Extension* extension,
                              base::string16* error) const override;
-
-  // extensions::ExtensionRegistryObserver implementation.
-  void OnExtensionLoaded(content::BrowserContext* browser_context,
-                         const extensions::Extension* extension) override;
-  void OnExtensionUnloaded(
-      content::BrowserContext* browser_context,
-      const extensions::Extension* extension,
-      extensions::UnloadedExtensionInfo::Reason reason) override;
 #endif
 
   // SyncTypePreferenceProvider implementation:
@@ -202,6 +191,9 @@ class SupervisedUserService : public KeyedService,
 
   // chrome::BrowserListObserver implementation:
   void OnBrowserSetLastActive(Browser* browser) override;
+
+  // SupervisedUserURLFilter::Observer implementation:
+  void OnSiteListUpdated() override;
 
  private:
   friend class SupervisedUserServiceExtensionTestBase;
@@ -226,7 +218,8 @@ class SupervisedUserService : public KeyedService,
     void SetDefaultFilteringBehavior(
         SupervisedUserURLFilter::FilteringBehavior behavior);
     void LoadWhitelists(ScopedVector<SupervisedUserSiteList> site_lists);
-    void LoadBlacklist(const base::FilePath& path);
+    void LoadBlacklist(const base::FilePath& path,
+                       const base::Closure& callback);
     void SetManualHosts(scoped_ptr<std::map<std::string, bool> > host_map);
     void SetManualURLs(scoped_ptr<std::map<GURL, bool> > url_map);
 
@@ -234,7 +227,7 @@ class SupervisedUserService : public KeyedService,
                              const std::string& cx);
 
    private:
-    void OnBlacklistLoaded();
+    void OnBlacklistLoaded(const base::Closure& callback);
 
     // SupervisedUserURLFilter is refcounted because the IO thread filter is
     // used both by ProfileImplIOData and OffTheRecordProfileIOData (to filter
@@ -279,10 +272,6 @@ class SupervisedUserService : public KeyedService,
   bool ExtensionManagementPolicyImpl(const extensions::Extension* extension,
                                      base::string16* error) const;
 
-  // Returns a list of all installed and enabled site lists in the current
-  // supervised profile.
-  ScopedVector<SupervisedUserSiteList> GetActiveSiteLists();
-
   // Extensions helper to SetActive().
   void SetExtensionsActive();
 #endif
@@ -302,7 +291,7 @@ class SupervisedUserService : public KeyedService,
 
   void OnDefaultFilteringBehaviorChanged();
 
-  void UpdateSiteLists();
+  void OnSiteListsChanged(ScopedVector<SupervisedUserSiteList> site_lists);
 
   // Asynchronously downloads a static blacklist file from |url|, stores it at
   // |path|, loads it, and applies it to the URL filters. If |url| is not valid
@@ -314,6 +303,8 @@ class SupervisedUserService : public KeyedService,
   void LoadBlacklistFromFile(const base::FilePath& path);
 
   void OnBlacklistDownloadDone(const base::FilePath& path, bool success);
+
+  void OnBlacklistLoaded();
 
   // Updates the manual overrides for hosts in the URL filters when the
   // corresponding preference is changed.
@@ -346,12 +337,6 @@ class SupervisedUserService : public KeyedService,
 
   Delegate* delegate_;
 
-#if defined(ENABLE_EXTENSIONS)
-  ScopedObserver<extensions::ExtensionRegistry,
-                 extensions::ExtensionRegistryObserver>
-      extension_registry_observer_;
-#endif
-
   PrefChangeRegistrar pref_change_registrar_;
 
   // True iff we're waiting for the Sync service to be initialized.
@@ -359,9 +344,6 @@ class SupervisedUserService : public KeyedService,
   bool is_profile_active_;
 
   std::vector<NavigationBlockedCallback> navigation_blocked_callbacks_;
-
-  // Sets a profile in elevated state for testing if set to true.
-  bool elevated_for_testing_;
 
   // True only when |Init()| method has been called.
   bool did_init_;
@@ -371,6 +353,8 @@ class SupervisedUserService : public KeyedService,
 
   URLFilterContext url_filter_context_;
   scoped_ptr<SupervisedUserBlacklistDownloader> blacklist_downloader_;
+
+  scoped_ptr<SupervisedUserWhitelistService> whitelist_service_;
 
   // Used to create permission requests.
   ScopedVector<PermissionRequestCreator> permissions_creators_;

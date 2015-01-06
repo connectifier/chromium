@@ -8,6 +8,7 @@
 
 #include "base/command_line.h"
 #include "base/mac/bind_objc_block.h"
+#include "base/mac/foundation_util.h"
 #include "base/mac/mac_util.h"
 #import "base/mac/scoped_nsobject.h"
 #import "base/mac/sdk_forward_declarations.h"
@@ -38,7 +39,7 @@
 #import "chrome/browser/ui/cocoa/tabs/tab_strip_view.h"
 #import "chrome/browser/ui/cocoa/toolbar/toolbar_controller.h"
 #import "chrome/browser/ui/cocoa/website_settings/permission_bubble_cocoa.h"
-#include "chrome/browser/ui/fullscreen/fullscreen_controller.h"
+#include "chrome/browser/ui/exclusive_access/fullscreen_controller.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/chrome_switches.h"
 #include "content/public/browser/render_widget_host_view.h"
@@ -436,7 +437,7 @@ willPositionSheet:(NSWindow*)sheet
   BOOL fullscreen_for_tab =
       browser_->fullscreen_controller()->IsWindowFullscreenForTabOrPending();
   BOOL kiosk_mode =
-      CommandLine::ForCurrentProcess()->HasSwitch(switches::kKioskMode);
+      base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kKioskMode);
   BOOL showDropdown =
       !fullscreen_for_tab && !kiosk_mode && ([self floatingBarHasFocus]);
   if (permissionBubbleCocoa_ && permissionBubbleCocoa_->IsVisible()) {

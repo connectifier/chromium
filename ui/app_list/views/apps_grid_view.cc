@@ -83,8 +83,9 @@ const int kPageFlipZoneSize = 40;
 // Delay in milliseconds to do the page flip.
 const int kPageFlipDelayInMs = 1000;
 
-// How many pages on either side of the selected one we prerender.
-const int kPrerenderPages = 1;
+// How many pages on either side of the selected one we prerender. Currently 0
+// to test impact of prerendering on UI jank for http://crbug.com/440224. Was 1.
+const int kPrerenderPages = 0;
 
 // The drag and drop proxy should get scaled by this factor.
 const float kDragAndDropProxyScale = 1.5f;
@@ -708,17 +709,19 @@ void AppsGridView::EndDrag(bool cancel) {
     // If we had a drag and drop proxy icon, we delete it and make the real
     // item visible again.
     drag_and_drop_host_->DestroyDragIconProxy();
-    if (landed_in_drag_and_drop_host) {
-      // Move the item directly to the target location, avoiding the "zip back"
-      // animation if the user was pinning it to the shelf.
-      int i = reorder_drop_target_.slot;
-      gfx::Rect bounds = view_model_.ideal_bounds(i);
-      drag_view_->SetBoundsRect(bounds);
+    // Issue 439055: MoveItemToFolder() can sometimes delete |drag_view_|
+    if (drag_view_) {
+      if (landed_in_drag_and_drop_host) {
+        // Move the item directly to the target location, avoiding the
+        // "zip back" animation if the user was pinning it to the shelf.
+        int i = reorder_drop_target_.slot;
+        gfx::Rect bounds = view_model_.ideal_bounds(i);
+        drag_view_->SetBoundsRect(bounds);
+      }
+      // Fade in slowly if it landed in the shelf.
+      SetViewHidden(drag_view_, false /* show */,
+                    !landed_in_drag_and_drop_host /* animate */);
     }
-    // Fade in slowly if it landed in the shelf.
-    SetViewHidden(drag_view_,
-                  false /* show */,
-                  !landed_in_drag_and_drop_host /* animate */);
   }
 
   // The drag can be ended after the synchronous drag is created but before it

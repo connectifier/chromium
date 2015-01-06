@@ -5,6 +5,8 @@
 #ifndef CHROMECAST_RENDERER_CAST_CONTENT_RENDERER_CLIENT_H_
 #define CHROMECAST_RENDERER_CAST_CONTENT_RENDERER_CLIENT_H_
 
+#include <vector>
+
 #include "base/macros.h"
 #include "content/public/renderer/content_renderer_client.h"
 
@@ -14,6 +16,7 @@ class PrescientNetworkingDispatcher;
 
 namespace chromecast {
 namespace shell {
+class CastRenderProcessObserver;
 
 class CastContentRendererClient : public content::ContentRendererClient {
  public:
@@ -25,11 +28,18 @@ class CastContentRendererClient : public content::ContentRendererClient {
   void RenderViewCreated(content::RenderView* render_view) override;
   void AddKeySystems(
       std::vector< ::media::KeySystemInfo>* key_systems) override;
+#if !defined(OS_ANDROID)
+  scoped_ptr<media::RendererFactory> CreateMediaRendererFactory(
+      content::RenderFrame* render_frame) override;
+#endif
   blink::WebPrescientNetworking* GetPrescientNetworking() override;
+  void DeferMediaLoad(content::RenderFrame* render_frame,
+                      const base::Closure& closure) override;
 
  private:
   scoped_ptr<dns_prefetch::PrescientNetworkingDispatcher>
       prescient_networking_dispatcher_;
+  scoped_ptr<CastRenderProcessObserver> cast_observer_;
 
   DISALLOW_COPY_AND_ASSIGN(CastContentRendererClient);
 };
