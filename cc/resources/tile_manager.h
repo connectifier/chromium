@@ -90,12 +90,16 @@ class CC_EXPORT TileManager : public TileTaskRunnerClient,
                               public RefCountedManager<Tile> {
  public:
   enum NamedTaskSet {
-    ALL,
     REQUIRED_FOR_ACTIVATION,
-    REQUIRED_FOR_DRAW
+    REQUIRED_FOR_DRAW,
+    // PixelBufferTileTaskWorkerPool depends on ALL being last.
+    ALL
     // Adding additional values requires increasing kNumberOfTaskSets in
     // rasterizer.h
   };
+
+  COMPILE_ASSERT(NamedTaskSet::ALL == (kNumberOfTaskSets - 1),
+                 NamedTaskSet_ALL_not_kNumberOfTaskSets_minus_1);
 
   static scoped_ptr<TileManager> Create(TileManagerClient* client,
                                         base::SequencedTaskRunner* task_runner,
@@ -196,7 +200,8 @@ class CC_EXPORT TileManager : public TileTaskRunnerClient,
       const TileVector& tiles_that_need_to_be_rasterized);
 
   void AssignGpuMemoryToTiles(TileVector* tiles_that_need_to_be_rasterized,
-                              size_t scheduled_raser_task_limit);
+                              size_t scheduled_raser_task_limit,
+                              bool required_for_draw_only);
 
   void SynchronouslyRasterizeTiles(
       const GlobalStateThatImpactsTilePriority& state);

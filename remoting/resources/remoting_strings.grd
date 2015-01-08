@@ -298,6 +298,9 @@
         <message desc="Error displayed when an operation is attempted that requires a signed-in user, but no-one is currently signed in." name="IDS_ERROR_NOT_AUTHENTICATED">
           You are not signed in to Chrome Remote Desktop. Please sign in and try again.
         </message>
+        <message desc="Error displayed when a user attempts to connect to an application that they have not been authorized to access." name="IDS_ERROR_NOT_AUTHORIZED">
+          You are not authorized to access this application.
+        </message>
         <message desc="Error displayed if the client plugin fails to load." name="IDS_ERROR_MISSING_PLUGIN">
           Some components required for Chrome Remote Desktop are missing. Please make sure you're running the latest version of Chrome and try again.
         </message>
@@ -940,6 +943,15 @@ For information about privacy, please see the Google Privacy Policy (http://goo.
       </message>
       <message desc="Label for button to decline remote assistance.  This button appears in the Hangouts confirm dialog." name="IDS_HANGOUTS_CONFIRM_DIALOG_DECLINE" >
         Decline
+      </message>
+      <message desc="Message displayed before sharing computer in 'It2Me' mode." name="IDS_SHARE_CONFIRM_DIALOG_MESSAGE" >
+        Would you like to share this computer for another user to see and control?
+      </message>
+      <message desc="Label for the button to accept sharing the computer in 'It2Me' mode." name="IDS_SHARE_CONFIRM_DIALOG_CONFIRM" >
+        Share
+      </message>
+      <message desc="Label for the button to decline sharing the computer in 'It2Me' mode." name="IDS_SHARE_CONFIRM_DIALOG_DECLINE" >
+        Cancel
       </message>
     </messages>
   </release>

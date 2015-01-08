@@ -36,7 +36,7 @@ vars = {
   'libcxx_revision': '48198f9110397fff47fe7c37cbfa296be7d44d3d',
   'libcxxabi_revision': '4ad1009ab3a59fa7a6896d74d5e4de5885697f95',
   'webkit_trunk': 'http://src.chromium.org/blink/trunk',
-  'webkit_revision': '28ef1ef4321b5e41a7e0c092b562a86e2be2130c', # from svn revision 187916
+  'webkit_revision': 'd6533e03d9a0f9b613d9cee2a40d1bd9a1e5c58f', # from svn revision 188054
   'chromium_git': 'https://chromium.googlesource.com',
   'chromiumos_git': 'https://chromium.googlesource.com/chromiumos',
   'pdfium_git': 'https://pdfium.googlesource.com',
@@ -44,12 +44,12 @@ vars = {
   'boringssl_git': 'https://boringssl.googlesource.com',
   'libvpx_revision': 'd3f3dcefb055656807e8a2f65a322bbb13cd05a4',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': '6b0f701687edcdfc4fc996aed085054912866aff',
+  'skia_revision': '266044f6639094cc672297ee5fedac68ae5783d4',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   'v8_branch': 'trunk',
-  'v8_revision': '799ad2fac3f6fc13094d3ea9d729c461bd26b769',
+  'v8_revision': 'cc2b2f487bfa07c4f8f33ac574a4580ad9ec0374',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
@@ -60,7 +60,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
-  'angle_revision': '2609bf4ca44972379ff82bcda370ad6f13b817cc',
+  'angle_revision': 'cd1db9e6c937a69f8efb5f73a3fcad14a737c436',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling build tools
   # and whatever else without interference from each other.
@@ -68,7 +68,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
-  'pdfium_revision': '5a35129bce7ca777e155e5498e8d4792fa6a4819',
+  'pdfium_revision': 'a48ead9b7e3dc01f1bde83f69062eebd960edfdc',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openmax_dl
   # and whatever else without interference from each other.
@@ -76,7 +76,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling BoringSSL
   # and whatever else without interference from each other.
-  'boringssl_revision': '306e520cda7d2f0afee9ba634dae629f994b096c',
+  'boringssl_revision': 'aac2f6a6a00921499ed85787aace287724fbc07e',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling nss
   # and whatever else without interference from each other.
@@ -169,7 +169,7 @@ deps = {
     Var('chromium_git') + '/external/grit-i18n.git' + '@' + 'a5890a8118c0c80cc0560e6d8d5cf65e5d725509', # from svn revision 185
 
   'src/tools/gyp':
-    Var('chromium_git') + '/external/gyp.git' + '@' + 'fe00999dfaee449d3465a9316778434884da4fa7', # from svn revision 2010
+    Var('chromium_git') + '/external/gyp.git' + '@' + '82b08049cc0b1f9e0bdcc0702ac6b523360f635f', # from svn revision 2020
 
   'src/tools/swarming_client':
    Var('chromium_git') + '/external/swarming.client.git' + '@' +  Var('swarming_revision'),
@@ -217,7 +217,7 @@ deps = {
    Var('chromium_git') + '/chromium/deps/libvpx.git' + '@' +  Var('libvpx_revision'),
 
   'src/third_party/ffmpeg':
-   Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + 'b5bc821a0a85808e445cb82156c6714d5288b4e3',
+   Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + 'b9d631d0ad277109678e86d729acc889793b4b94',
 
   'src/third_party/libjingle/source/talk':
     Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '1aaae712f168d0a023c20c936867a766a4f65674', # from svn revision 7972
@@ -262,7 +262,7 @@ deps = {
     Var('chromium_git') + '/external/smhasher.git' + '@' + 'e87738e57558e0ec472b2fc3a643b838e5b6e88f',
 
   'src/third_party/libaddressinput/src':
-    Var('chromium_git') + '/external/libaddressinput.git' + '@' + '678a7f55a2ae7ccf417b4809e602b808b56a8ddb',
+    Var('chromium_git') + '/external/libaddressinput.git' + '@' + '61f63da7ae6fa469138d60dec5d6bbecc6ab43d6',
 
   # These are all at libphonenumber r728.
   'src/third_party/libphonenumber/src/phonenumbers':
@@ -560,9 +560,9 @@ hooks = [
     # need to manually install these packages and accept the ToS.
     'name': 'sdkextras',
     'pattern': '.',
-    # Make sure to add package to .gitignore in third_party/android_tools.
-    'action': ['python', 'src/build/download_sdk_extras.py',
-               'google_google_play_services_21.0.0'],
+    # When adding a new sdk extras package to download, add the package
+    # directory and zip file to .gitignore in third_party/android_tools.
+    'action': ['python', 'src/build/download_sdk_extras.py'],
   },
   {
     # Downloads the Debian Wheezy sysroot to chrome/installer/linux if needed.

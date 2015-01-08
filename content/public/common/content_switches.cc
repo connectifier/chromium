@@ -257,19 +257,14 @@ const char kDisableThreadedCompositing[]     = "disable-threaded-compositing";
 // Disable multithreaded, compositor scrolling of web content.
 const char kDisableThreadedScrolling[]      = "disable-threaded-scrolling";
 
-// Disable V8 idle notification after commit.
-// Overrides kEnableV8IdleNotificationAfterCommit.
-const char kDisableV8IdleNotificationAfterCommit[] =
-    "disable-v8-idle-notification-after-commit";
+// Disable V8 idle tasks.
+const char kDisableV8IdleTasks[]            = "disable-v8-idle-tasks";
 
 // Don't enforce the same-origin policy. (Used by people testing their sites.)
 const char kDisableWebSecurity[]            = "disable-web-security";
 
 // Disables support for XSLT.
 const char kDisableXSLT[]                   = "disable-xslt";
-
-// Disables Blink's XSSAuditor. The XSSAuditor mitigates reflective XSS.
-const char kDisableXSSAuditor[]             = "disable-xss-auditor";
 
 // Specifies if the |DOMAutomationController| needs to be bound in the
 // renderer. This binding happens on per-frame basis and hence can potentially
@@ -434,6 +429,11 @@ const char kEnableStatsTable[]              = "enable-stats-table";
 // cookies on cross-site requests.
 const char kEnableStrictSiteIsolation[]     = "enable-strict-site-isolation";
 
+// Blocks all insecure requests from secure contexts, and prevents the user
+// from overriding that decision.
+const char kEnableStrictMixedContentChecking[] =
+    "enable-strict-mixed-content-checking";
+
 // Enable support for sync events in ServiceWorkers.
 const char kEnableServiceWorkerSync[]       = "enable-service-worker-sync";
 
@@ -456,14 +456,6 @@ const char kEnableUserMediaScreenCapturing[] =
 
 // Enables streaming scripts to V8 while loading.
 const char kEnableV8ScriptStreaming[] = "enable-v8-script-streaming";
-
-// Send a notification from RenderWidgetCompositor to V8 to do idle work
-// (e.g. garbage collection) after the commit until the beginning of the next
-// frame.  This moves the work off the critical path where compositor is waiting
-// for the main thread. The flag is experimental until the implementation of the
-// V8 idle handler is completed.
-const char kEnableV8IdleNotificationAfterCommit[] =
-    "enable-v8-idle-notification-after-commit";
 
 // Enables the use of the @viewport CSS rule, which allows
 // pages to control aspects of their own layout. This also turns on touch-screen
@@ -838,9 +830,6 @@ const char kUseNormalPriorityForTileTaskWorkerThreads[] =
 // Use the new surfaces system to handle compositor delegation.
 const char kUseSurfaces[] = "use-surfaces";
 
-// Disable the use of the new surfaces system to handle compositor delegation.
-const char kDisableSurfaces[] = "disable-surfaces";
-
 // On POSIX only: the contents of this flag are prepended to the utility
 // process command line. Useful values might be "valgrind" or "xterm -e gdb
 // --args".
@@ -908,9 +897,6 @@ const char kDisablePullToRefreshEffect[]   = "disable-pull-to-refresh-effect";
 // WebRTC is enabled by default on Android.
 const char kDisableWebRTC[]                 = "disable-webrtc";
 
-// Enable the recognition part of the Web Speech API.
-const char kEnableSpeechRecognition[]       = "enable-speech-recognition";
-
 // Always use the video overlay for the embedded video.
 // This switch is intended only for tests.
 const char kForceUseOverlayEmbeddedVideo[] = "force-use-overlay-embedded-video";
@@ -951,10 +937,11 @@ const char kEnableSpeechDispatcher[] = "enable-speech-dispatcher";
 const char kDisableCoreAnimationPlugins[] =
     "disable-core-animation-plugins";
 
-// Allows input events to be handed on the compositor thread.
-// This feature is under development, see http://crbug.com/138003.
-extern const char kEnableThreadedEventHandlingMac[] =
-    "enable-threaded-event-handling-mac";
+// Force all input events to be handled by Blink on thread. This will be removed
+// once compositor thread events have stuck.
+// http://crbug.com/138003
+extern const char kDisableThreadedEventHandlingMac[] =
+    "disable-threaded-event-handling-mac";
 #endif
 
 #if defined(OS_WIN)

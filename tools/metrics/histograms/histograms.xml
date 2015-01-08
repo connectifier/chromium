@@ -3336,7 +3336,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Cookie.PriorityBlockingTime" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>erikwright@chromium.org</owner>
   <summary>
     This histogram records the total duration of time during which at least one
     web request was blocked waiting for the cookie store to load. If no requests
@@ -3347,7 +3347,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Cookie.PriorityLoadCount">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>erikwright@chromium.org</owner>
   <summary>
     The number of distinct Effective Top-Level Domains Plus One (ETLD+1, i.e.,
     google.com, bbc.co.uk) for which a priority cookie load occurred.
@@ -3408,7 +3408,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Cookie.TimeBlockedOnLoad" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>erikwright@chromium.org</owner>
   <summary>
     The amount of time (ms) between the cookie store load starting and
     completing.
@@ -3449,7 +3449,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Cookie.TimeKeyLoadDBQueueWait" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>erikwright@chromium.org</owner>
   <summary>
     This histogram records the wall-clock delay between a priority load task
     being posted to the DB-thread and its execution.
@@ -3457,7 +3457,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Cookie.TimeLoad" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>erikwright@chromium.org</owner>
   <summary>
     This histogram records the sum of the durations of all initial tasks loading
     cookies from the database.
@@ -11962,6 +11962,35 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="ManagedUsers.Whitelist.JsonParseDuration" units="milliseconds">
+  <owner>bauerb@chromium.org</owner>
+  <owner>treib@chromium.org</owner>
+  <owner>pam@chromium.org</owner>
+  <summary>
+    The total amount of time taken to parse the JSON contents of a whitelist out
+    of process.
+  </summary>
+</histogram>
+
+<histogram name="ManagedUsers.Whitelist.ReadDuration" units="milliseconds">
+  <owner>bauerb@chromium.org</owner>
+  <owner>treib@chromium.org</owner>
+  <owner>pam@chromium.org</owner>
+  <summary>
+    The amount of time taken to read a whitelist file from disk.
+  </summary>
+</histogram>
+
+<histogram name="ManagedUsers.Whitelist.TotalLoadDuration" units="milliseconds">
+  <owner>bauerb@chromium.org</owner>
+  <owner>treib@chromium.org</owner>
+  <owner>pam@chromium.org</owner>
+  <summary>
+    The total amount of time taken to load a whitelist from disk and parse it,
+    including jumps to the blocking thread.
+  </summary>
+</histogram>
+
 <histogram name="Manifest.FetchResult" enum="ManifestFetchResultType">
   <owner>mlamouri@chromium.org</owner>
   <summary>
@@ -16968,6 +16997,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Net.IPv6ConnectDuration" units="milliseconds">
+  <obsolete>
+    Deprecated 1/2015. No longer tracked.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>Duration of time spent during the UDP-connect IPv6 probe.</summary>
 </histogram>
@@ -22700,6 +22732,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="OSX.RendererHost.SurfaceWaitTime" units="milliseconds">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    This event records the amount of time that the browser process main thread
+    blocks, waiting for a frame with the right dimensions to arrive from the gpu
+    process.
+  </summary>
+</histogram>
+
 <histogram name="OSX.Settings.ScreensHaveSeparateSpaces"
     enum="OSXScreensHaveSeparateSpaces">
   <owner>erikchen@chromium.org</owner>
@@ -22992,6 +23033,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Stats documenting how we handle every form containing a password, bucketed
     by the actions taken.
   </summary>
+</histogram>
+
+<histogram name="PasswordManager.AllowToCollectURLBubble.UIDismissalReason"
+    enum="PasswordManagerAllowToCollectURLBubble.UIDismissalReason">
+  <owner>melandory@chromium.org</owner>
+  <owner>vasilii@chromium.org</owner>
+  <summary>Why was &quot;Allow to collect URL?&quot; bubble closed?</summary>
 </histogram>
 
 <histogram name="PasswordManager.BlacklistedSites">
@@ -29617,7 +29665,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="ResourceScheduler.RequestTimeThrottled_Active">
+<histogram name="ResourceScheduler.RequestTimeThrottled.Active">
   <owner>aiolos@chromium.org</owner>
   <summary>
     The amount of time between when the request was created and when the
@@ -29626,7 +29674,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="ResourceScheduler.RequestTimeThrottled_Background">
+<histogram name="ResourceScheduler.RequestTimeThrottled.Background">
   <owner>aiolos@chromium.org</owner>
   <summary>
     The amount of time between when the request was created and when the
@@ -29635,7 +29683,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="ResourceScheduler.RequestTimeThrottled_Other">
+<histogram name="ResourceScheduler.RequestTimeThrottled.Other">
   <owner>aiolos@chromium.org</owner>
   <summary>
     The amount of time between when the request was created and when the
@@ -29943,8 +29991,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>gab@chromium.org</owner>
   <summary>
     The size of one of the SafeBrowsing database file on disk in kilobytes,
-    after a database update has occurred (once on startup (delayed) and
-    periodically thereafter).
+    after a database update has occurred (once a few minutes after startup, and
+    every thirty minutes or so thereafter).
   </summary>
 </histogram>
 
@@ -30384,6 +30432,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.PrefixSetKilobytes" units="KB">
+  <obsolete>
+    Deprecated 01/2014. Replaced by suffixed SB2.PrefixSetSizeKilobytes.
+  </obsolete>
   <owner>shess@chromium.org</owner>
   <summary>The size of one of the PrefixSet files in kilobytes.</summary>
 </histogram>
@@ -30410,6 +30461,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     For debugging PrefixSet.  How many fewer results GetPrefixes returns.
+  </summary>
+</histogram>
+
+<histogram name="SB2.PrefixSetSizeKilobytes" units="KB">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    The size of one of the PrefixSet files in kilobytes. Logged after a database
+    update has occurred and the PrefixSet has been flushed to disk (once a few
+    minutes after startup, and every thirty minutes or so thereafter).
   </summary>
 </histogram>
 
@@ -30524,7 +30584,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="SB2.SideEffectFreeWhitelistPrefixSetKilobytes" units="KB">
   <obsolete>
-    Deprecated 12/2014. Moved to SB2.PrefixSetKilobytes.SideEffectFreeWhitelist.
+    Deprecated 12/2014. Moved to
+    SB2.PrefixSetSizeKilobytes.SideEffectFreeWhitelist.
   </obsolete>
   <owner>shess@chromium.org</owner>
   <summary>
@@ -36206,6 +36267,39 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Time duration measured from the time the startup timebomb was started and
     when it went off.
+  </summary>
+</histogram>
+
+<histogram name="Storage.Blob.ExceededMemory" enum="Boolean">
+  <owner>dmurph@chromium.org</owner>
+  <summary>
+    True if a created blob exceeded the internal in-memory storage memory limit
+    for blobs.
+  </summary>
+</histogram>
+
+<histogram name="Storage.Blob.StorageSizeAfterAppend" units="KB">
+  <owner>dmurph@chromium.org</owner>
+  <summary>
+    Records the total in-memory storage size of blobs before a blob item is
+    appended.  Can be subtracted by Storage.Blob.StorageSizeBeforeAppend to find
+    the true distribution of blob storage sizes.
+  </summary>
+</histogram>
+
+<histogram name="Storage.Blob.StorageSizeBeforeAppend" units="KB">
+  <owner>dmurph@chromium.org</owner>
+  <summary>
+    Records the total in-memory storage size of blobs before a blob item is
+    appended.  Can be subtracted from Storage.Blob.StorageSizeAfterAppend to
+    find the true distribution of blob storage sizes.
+  </summary>
+</histogram>
+
+<histogram name="Storage.BlobItemSize" units="KB">
+  <owner>dmurph@chromium.org</owner>
+  <summary>
+    The size in KB of items (or parts of items) appended to blobs.
   </summary>
 </histogram>
 
@@ -46219,9 +46313,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
       label="DELETED_FILESYSTEMPROVIDERINTERNAL_CLOSEFILEREQUESTEDSUCCESS"/>
   <int value="766"
       label="DELETED_FILESYSTEMPROVIDERINTERNAL_CLOSEFILEREQUESTEDERROR"/>
-  <int value="767" label="SYNCEDNOTIFICATIONSPRIVATE_GETINITIALDATA"/>
-  <int value="768" label="SYNCEDNOTIFICATIONSPRIVATE_UPDATENOTIFICATION"/>
-  <int value="769" label="SYNCEDNOTIFICATIONSPRIVATE_SETRENDERCONTEXT"/>
+  <int value="767" label="DELETED_SYNCEDNOTIFICATIONSPRIVATE_GETINITIALDATA"/>
+  <int value="768"
+      label="DELETED_SYNCEDNOTIFICATIONSPRIVATE_UPDATENOTIFICATION"/>
+  <int value="769" label="DELETED_SYNCEDNOTIFICATIONSPRIVATE_SETRENDERCONTEXT"/>
   <int value="770" label="IDENTITY_GETACCOUNTS"/>
   <int value="771" label="FILEMANAGERPRIVATE_RESOLVEISOLATEDENTRIES"/>
   <int value="772" label="FILESYSTEMPROVIDERINTERNAL_READFILEREQUESTEDSUCCESS"/>
@@ -46397,7 +46492,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="939" label="COPRESENCEENDPOINTS_SEND"/>
   <int value="940" label="INLINE_INSTALL_PRIVATE_INSTALL"/>
   <int value="941" label="LAUNCHERPAGE_SETENABLED"/>
-  <int value="942" label="CRYPTOTOKEN_REQUESTPERMISSION"/>
+  <int value="942" label="CRYPTOTOKENPRIVATE_REQUESTPERMISSION"/>
+  <int value="943" label="BLUETOOTHPRIVATE_DISCONNECTALL"/>
+  <int value="944" label="FILEMANAGERPRIVATE_GETMIMETYPE"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -48583,6 +48680,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="14" label="OpenAttemptPriorCorruption">
     The corrupted open database was deleted.
   </int>
+  <int value="15" label="OpenCleanupBlobJournalFailed">
+    Open failed because the blob journal could not be cleaned up.
+  </int>
 </enum>
 
 <enum name="IMECommitType" type="int">
@@ -49835,6 +49935,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1392562498" label="disable-origin-chip"/>
   <int value="-1375111024" label="enable-fixed-position-compositing"/>
   <int value="-1358669137" label="enable-supervised-user-blacklist"/>
+  <int value="-1357655121" label="enable-iframe-based-signin"/>
   <int value="-1349872906"
       label="disallow-autofill-sync-credential-for-reauth"/>
   <int value="-1349532167" label="enable-wifi-credential-sync"/>
@@ -53031,6 +53132,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="47"
       label="manager did nothing (autocomplete off) / user typed in something
              / form submit succeeded"/>
+</enum>
+
+<enum name="PasswordManagerAllowToCollectURLBubble.UIDismissalReason"
+    type="int">
+  <int value="0" label="Bubble lost focus / No infobar interaction"/>
+  <int value="1" label="Clicked collect URL"/>
+  <int value="2" label="Clicked do not collect URL"/>
 </enum>
 
 <enum name="PasswordManagerOsPasswordStatus" type="int">
@@ -57833,8 +57941,10 @@ To add a new entry, add it with any value and run test to compute valid value.
 <enum name="VariationsSeedEmpty" type="int">
   <int value="0" label="Seed Not Empty"/>
   <int value="1" label="Seed Empty"/>
-  <int value="2" label="Seed Corrupt"/>
+  <int value="2" label="Seed Corrupt (Obsolete)"/>
   <int value="3" label="Seed Signature Verification Failed"/>
+  <int value="4" label="Seed Corrupt Base64 Data"/>
+  <int value="5" label="Seed Corrupt Protobuf"/>
 </enum>
 
 <enum name="VaryType" type="int">
@@ -58794,7 +58904,10 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="SSL" label="Bypass due to SSL"/>
   <suffix name="LocalBypassRules"
       label="Bypass due to client-side bypass rules"/>
-  <suffix name="ManagedProxyConfig" label="Bypass due to a managed config"/>
+  <suffix name="ManagedProxyConfig"
+      label="Deprecated 1/9/2014 (M-41). Bypass due to a managed config"/>
+  <suffix name="ProxyOverridden"
+      label="Bypass due to another proxy taking precedence"/>
   <suffix name="Current" label="Bypass due to explicit instruction"/>
   <suffix name="ShortAll" label="Short bypass"/>
   <suffix name="ShortTriggeringRequest"
@@ -61879,6 +61992,23 @@ To add a new entry, add it with any value and run test to compute valid value.
       name="ResourcePrefetchPredictor.Url.PredictedPrefetchMisses"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="ResourceSchedulerClientBreakDown">
+  <suffix name="1Client" label="One Client in the ResourceScheduler."/>
+  <suffix name="Max5Clients"
+      label="Two to five Clients in the ResourceScheduler."/>
+  <suffix name="Max15Clients"
+      label="Six to fifteen Clients in the ResourceScheduler."/>
+  <suffix name="Max30Clients"
+      label="Sixteen to thirty Clients in the ResourceScheduler."/>
+  <suffix name="Over30Clients"
+      label="Over thirty Clients in the ResourceScheduler."/>
+  <affected-histogram name="ResourceScheduler.ClientLoadedTime.Active"/>
+  <affected-histogram name="ResourceScheduler.ClientLoadedTime.Background"/>
+  <affected-histogram name="ResourceScheduler.ClientLoadedTime.Other"/>
+  <affected-histogram
+      name="ResourceScheduler.ClientLoadedTime.Other.SwitchedToActive"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="SafeBrowsingLists" separator=".">
   <suffix name="Browse" label="Browse"/>
   <suffix name="Download" label="Download"/>
@@ -61889,7 +62019,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="IPBlacklist" label="IPBlacklist"/>
   <suffix name="UnwantedSoftware" label="UnwantedSoftware"/>
   <affected-histogram name="SB2.DatabaseSizeKilobytes"/>
-  <affected-histogram name="SB2.PrefixSetKilobytes"/>
+  <affected-histogram name="SB2.PrefixSetSizeKilobytes"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="SBInterstitial">
@@ -62151,6 +62281,14 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="TimeDuration" label="Duration is in clock time."/>
   <suffix name="TimeTicksDuration" label="Duration is in TimeTicks time."/>
   <affected-histogram name="StartupTimeBomb.Alarm"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="Storage.BlobAppendableItems" separator=".">
+  <suffix name="Bytes" label="Appending bytes."/>
+  <suffix name="File" label="Appending a file."/>
+  <suffix name="FileSystem" label="Appending a filesystem object."/>
+  <suffix name="Blob" label="Appending a blob."/>
+  <affected-histogram name="Storage.BlobItemSize"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="SyzygyStartupTime">

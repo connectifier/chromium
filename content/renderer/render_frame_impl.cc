@@ -81,7 +81,7 @@
 #include "content/renderer/mojo/service_registry_js_wrapper.h"
 #include "content/renderer/notification_permission_dispatcher.h"
 #include "content/renderer/npapi/plugin_channel_host.h"
-#include "content/renderer/push_messaging_dispatcher.h"
+#include "content/renderer/push_messaging/push_messaging_dispatcher.h"
 #include "content/renderer/render_frame_proxy.h"
 #include "content/renderer/render_process.h"
 #include "content/renderer/render_thread_impl.h"
@@ -1930,9 +1930,10 @@ blink::WebFrame* RenderFrameImpl::createChildFrame(
   // Synchronously notify the browser of a child frame creation to get the
   // routing_id for the RenderFrame.
   int child_routing_id = MSG_ROUTING_NONE;
-  Send(new FrameHostMsg_CreateChildFrame(routing_id_,
-                                         base::UTF16ToUTF8(name),
-                                         &child_routing_id));
+  CHECK(Send(new FrameHostMsg_CreateChildFrame(routing_id_,
+                                               base::UTF16ToUTF8(name),
+                                               &child_routing_id)));
+
   // Allocation of routing id failed, so we can't create a child frame. This can
   // happen if this RenderFrameImpl's IPCs are being filtered when in swapped
   // out state.
@@ -1949,6 +1950,7 @@ blink::WebFrame* RenderFrameImpl::createChildFrame(
     base::debug::Alias(&is_swapped_out_);
     base::debug::DumpWithoutCrashing();
 #endif
+    NOTREACHED() << "Failed to allocate routing id for child frame.";
     return NULL;
   }
 
@@ -1995,6 +1997,7 @@ void RenderFrameImpl::frameDetached(blink::WebFrame* frame) {
   // have IPCs fired off.
   is_detaching_ = true;
 
+  FOR_EACH_OBSERVER(RenderFrameObserver, observers_, FrameDetached());
   FOR_EACH_OBSERVER(RenderViewObserver, render_view_->observers(),
                     FrameDetached(frame));
 

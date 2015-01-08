@@ -90,10 +90,6 @@
 #include "base/win/win_util.h"
 #endif
 
-#if defined(ENABLE_BROWSER_CDMS)
-#include "content/browser/media/media_web_contents_observer.h"
-#endif
-
 using base::TimeDelta;
 using blink::WebConsoleMessage;
 using blink::WebDragOperation;
@@ -217,9 +213,6 @@ RenderViewHostImpl::RenderViewHostImpl(
                    !is_hidden(),
                    has_active_audio));
   }
-#if defined(ENABLE_BROWSER_CDMS)
-  media_web_contents_observer_.reset(new MediaWebContentsObserver(this));
-#endif
 }
 
 RenderViewHostImpl::~RenderViewHostImpl() {
@@ -345,8 +338,6 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs(const GURL& url) {
       !command_line.HasSwitch(switches::kDisableRemoteFonts);
   prefs.xslt_enabled =
       !command_line.HasSwitch(switches::kDisableXSLT);
-  prefs.xss_auditor_enabled =
-      !command_line.HasSwitch(switches::kDisableXSSAuditor);
   prefs.application_cache_enabled =
       !command_line.HasSwitch(switches::kDisableApplicationCache);
 
@@ -403,8 +394,12 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs(const GURL& url) {
     prefs.pinch_overlay_scrollbar_thickness = 10;
   }
 #if defined(OS_MACOSX)
+  // This preference has the effect of disabling Blink's elastic overscroll,
+  // and may be removed when Blink's elastic overscroll implementation is
+  // removed.
+  // http://crbug.com/138003
   prefs.rubber_banding_on_compositor_thread =
-      command_line.HasSwitch(switches::kEnableThreadedEventHandlingMac);
+      !command_line.HasSwitch(switches::kDisableThreadedEventHandlingMac);
 #endif
   prefs.use_solid_color_scrollbars = ui::IsOverlayScrollbarEnabled();
 
@@ -484,6 +479,9 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs(const GURL& url) {
 
   prefs.spatial_navigation_enabled = command_line.HasSwitch(
       switches::kEnableSpatialNavigation);
+
+  prefs.strict_mixed_content_checking =
+      command_line.HasSwitch(switches::kEnableStrictMixedContentChecking);
 
   std::string v8_cache_options =
       command_line.GetSwitchValueASCII(switches::kV8CacheOptions);

@@ -754,6 +754,7 @@
       'browser/browser_process.h',
       'browser/browser_process_platform_part_base.cc',
       'browser/browser_process_platform_part_base.h',
+      'browser/password_manager/password_manager_util_ios.mm',
     ],
     # Desktop Linux and ChromeOS.
     'chrome_browser_linux_sources': [
@@ -1475,8 +1476,6 @@
       'browser/google/google_update_win.h',
       'browser/google/google_url_tracker_factory.cc',
       'browser/google/google_url_tracker_factory.h',
-      'browser/google/google_url_tracker_navigation_helper_impl.cc',
-      'browser/google/google_url_tracker_navigation_helper_impl.h',
     ],
     'chrome_browser_history_sources': [
       'browser/history/android/android_history_provider_service.cc',
@@ -1559,6 +1558,7 @@
       'android/java/src/org/chromium/chrome/browser/banners/AppBannerManager.java',
       'android/java/src/org/chromium/chrome/browser/CertificateViewer.java',
       'android/java/src/org/chromium/chrome/browser/child_accounts/ChildAccountService.java',
+      'android/java/src/org/chromium/chrome/browser/child_accounts/ChildAccountFeedbackReporter.java',
       'android/java/src/org/chromium/chrome/browser/ChromiumApplication.java',
       'android/java/src/org/chromium/chrome/browser/ChromeBrowserProvider.java',
       'android/java/src/org/chromium/chrome/browser/ChromeHttpAuthHandler.java',
@@ -1773,8 +1773,6 @@
       'browser/net/safe_search_util.h',
       'browser/net/service_providers_win.cc',
       'browser/net/service_providers_win.h',
-      'browser/net/spdyproxy/data_reduction_proxy_chrome_configurator.cc',
-      'browser/net/spdyproxy/data_reduction_proxy_chrome_configurator.h',
       'browser/net/spdyproxy/data_reduction_proxy_chrome_settings.cc',
       'browser/net/spdyproxy/data_reduction_proxy_chrome_settings.h',
       'browser/net/spdyproxy/data_reduction_proxy_chrome_settings_factory.cc',
@@ -2567,6 +2565,8 @@
       'browser/ssl/ssl_error_info.h',
     ],
     'chrome_browser_supervised_user_sources': [
+      'browser/supervised_user/child_accounts/child_account_feedback_reporter_android.cc',
+      'browser/supervised_user/child_accounts/child_account_feedback_reporter_android.h',
       'browser/supervised_user/child_accounts/child_account_service.cc',
       'browser/supervised_user/child_accounts/child_account_service.h',
       'browser/supervised_user/child_accounts/child_account_service_android.cc',

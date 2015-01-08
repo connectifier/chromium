@@ -25,21 +25,21 @@ class EVENTS_OZONE_LAYOUT_EXPORT XkbKeyboardLayoutEngine
     : public KeyboardLayoutEngine {
  public:
   XkbKeyboardLayoutEngine(const XkbKeyCodeConverter& converter);
-  virtual ~XkbKeyboardLayoutEngine();
+  ~XkbKeyboardLayoutEngine() override;
 
   // KeyboardLayoutEngine:
-  virtual bool CanSetCurrentLayout() const override;
-  virtual bool SetCurrentLayoutByName(const std::string& layout_name) override;
+  bool CanSetCurrentLayout() const override;
+  bool SetCurrentLayoutByName(const std::string& layout_name) override;
 
-  virtual bool UsesISOLevel5Shift() const override;
-  virtual bool UsesAltGr() const override;
+  bool UsesISOLevel5Shift() const override;
+  bool UsesAltGr() const override;
 
-  virtual bool Lookup(DomCode dom_code,
-                      int flags,
-                      DomKey* dom_key,
-                      base::char16* character,
-                      KeyboardCode* key_code,
-                      uint32* platform_keycode) const override;
+  bool Lookup(DomCode dom_code,
+              int flags,
+              DomKey* dom_key,
+              base::char16* character,
+              KeyboardCode* key_code,
+              uint32* platform_keycode) const override;
 
   // Gets the names of the RMLO rule for libxkbcommon.
   // Makes it protected for testing.
@@ -52,6 +52,9 @@ class EVENTS_OZONE_LAYOUT_EXPORT XkbKeyboardLayoutEngine
     xkb_mod_mask_t xkb_flag;
   };
   std::vector<XkbFlagMapEntry> xkb_flag_map_;
+
+  // Flag mask for num lock, which is always considered enabled.
+  xkb_mod_mask_t num_lock_mod_mask_;
 
   // Determines the Windows-based KeyboardCode (VKEY) for a character key,
   // accounting for non-US layouts. May return VKEY_UNKNOWN, in which case the
@@ -96,8 +99,7 @@ class EVENTS_OZONE_LAYOUT_EXPORT XkbKeyboardLayoutEngine
                                int ui_flags) const;
 
   // Callback when keymap file is loaded complete.
-  void OnKeymapLoaded(const std::string& layout_name,
-                      scoped_ptr<xkb_keymap, XkbKeymapDeleter> keymap);
+  void OnKeymapLoaded(const std::string& layout_name, const char* keymap_str);
 
   // libxkbcommon uses explicit reference counting for its structures,
   // so we need to trigger its cleanup.

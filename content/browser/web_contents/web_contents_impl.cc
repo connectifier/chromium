@@ -103,6 +103,10 @@
 #include "ui/gfx/screen.h"
 #include "ui/gl/gl_switches.h"
 
+#if defined(ENABLE_BROWSER_CDMS)
+#include "content/browser/media/media_web_contents_observer.h"
+#endif
+
 #if defined(OS_ANDROID)
 #include "content/browser/android/date_time_chooser_android.h"
 #include "content/browser/media/android/browser_media_player_manager.h"
@@ -338,6 +342,9 @@ WebContentsImpl::WebContentsImpl(BrowserContext* browser_context,
   frame_tree_.SetFrameRemoveListener(
       base::Bind(&WebContentsImpl::OnFrameRemoved,
                  base::Unretained(this)));
+#if defined(ENABLE_BROWSER_CDMS)
+  media_web_contents_observer_.reset(new MediaWebContentsObserver(this));
+#endif
 }
 
 WebContentsImpl::~WebContentsImpl() {
@@ -997,7 +1004,7 @@ void WebContentsImpl::NotifyNavigationStateChanged(
     InvalidateTypes changed_flags) {
   // Create and release the audio power save blocker depending on whether the
   // tab is actively producing audio or not.
-  if (changed_flags == INVALIDATE_TYPE_TAB &&
+  if ((changed_flags & INVALIDATE_TYPE_TAB) &&
       AudioStreamMonitor::monitoring_available()) {
     if (WasRecentlyAudible()) {
       if (!audio_power_save_blocker_)
@@ -2535,9 +2542,14 @@ void WebContentsImpl::DidStartNavigationToPendingEntry(
 
 void WebContentsImpl::RequestOpenURL(RenderFrameHostImpl* render_frame_host,
                                      const OpenURLParams& params) {
+  // OpenURL can blow away the source RFH. Use the process/frame routing ID as a
+  // weak pointer of sorts.
+  const int32_t process_id = render_frame_host->GetProcess()->GetID();
+  const int32_t frame_id = render_frame_host->GetRoutingID();
+
   WebContents* new_contents = OpenURL(params);
 
-  if (new_contents) {
+  if (new_contents && RenderFrameHost::FromID(process_id, frame_id)) {
     // Notify observers.
     FOR_EACH_OBSERVER(WebContentsObserver, observers_,
                       DidOpenRequestedURL(new_contents,
