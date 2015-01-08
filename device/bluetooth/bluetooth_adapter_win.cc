@@ -284,7 +284,8 @@ void BluetoothAdapterWin::DevicesPolled(
 }
 
 void BluetoothAdapterWin::DeleteOnCorrectThread() const {
-  if (!ui_task_runner_->DeleteSoon(FROM_HERE, this))
+  if (ui_task_runner_->RunsTasksOnCurrentThread() ||
+      !ui_task_runner_->DeleteSoon(FROM_HERE, this))
     delete this;
 }
 
