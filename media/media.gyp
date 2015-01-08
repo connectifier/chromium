@@ -473,6 +473,8 @@
         'filters/video_frame_scheduler_proxy.h',
         'filters/video_renderer_impl.cc',
         'filters/video_renderer_impl.h',
+        'filters/vp8_bool_decoder.cc',
+        'filters/vp8_bool_decoder.h',
         'filters/vpx_video_decoder.cc',
         'filters/vpx_video_decoder.h',
         'filters/webvtt_util.h',
@@ -645,12 +647,23 @@
             'filters/in_memory_url_protocol.cc',
             'filters/in_memory_url_protocol.h',
           ],
+          'defines': [
+            'MEDIA_DISABLE_FFMPEG',
+          ],
+          'direct_dependent_settings': {
+            'defines': [
+              'MEDIA_DISABLE_FFMPEG',
+            ],
+          },
         }],
         ['media_use_libvpx==1', {
           'dependencies': [
             '<(DEPTH)/third_party/libvpx/libvpx.gyp:libvpx',
           ],
         }, {  # media_use_libvpx==0
+          'defines': [
+            'MEDIA_DISABLE_LIBVPX',
+          ],
           'direct_dependent_settings': {
             'defines': [
               'MEDIA_DISABLE_LIBVPX',
@@ -1211,6 +1224,7 @@
         'filters/video_frame_scheduler_unittest.cc',
         'filters/video_frame_stream_unittest.cc',
         'filters/video_renderer_impl_unittest.cc',
+        'filters/vp8_bool_decoder_unittest.cc',
         'midi/midi_manager_unittest.cc',
         'midi/midi_manager_usb_unittest.cc',
         'midi/midi_message_queue_unittest.cc',
@@ -1415,7 +1429,8 @@
       ],
     },
     {
-      # GN version: //media:test_support
+      # GN versions (it is split apart): //media:test_support,
+      # //media/base:test_support, and //media/audio:test_support
       'target_name': 'media_test_support',
       'type': 'static_library',
       'dependencies': [

@@ -85,10 +85,9 @@ CONTENT_EXPORT extern const char kDisableSVG1DOM[];
 CONTENT_EXPORT extern const char kDisableTextBlobs[];
 CONTENT_EXPORT extern const char kDisableThreadedCompositing[];
 CONTENT_EXPORT extern const char kDisableThreadedScrolling[];
-extern const char kDisableV8IdleNotificationAfterCommit[];
+extern const char kDisableV8IdleTasks[];
 CONTENT_EXPORT extern const char kDisableWebSecurity[];
 extern const char kDisableXSLT[];
-extern const char kDisableXSSAuditor[];
 CONTENT_EXPORT extern const char kDomAutomationController[];
 extern const char kEnable2dCanvasClipAntialiasing[];
 CONTENT_EXPORT extern const char kEnableBleedingEdgeRenderingFastPaths[];
@@ -127,6 +126,7 @@ CONTENT_EXPORT extern const char kEnableSlimmingPaint[];
 CONTENT_EXPORT extern const char kEnableSmoothScrolling[];
 CONTENT_EXPORT extern const char kEnableSpatialNavigation[];
 CONTENT_EXPORT extern const char kEnableStatsTable[];
+CONTENT_EXPORT extern const char kEnableStrictMixedContentChecking[];
 CONTENT_EXPORT extern const char kEnableStrictSiteIsolation[];
 CONTENT_EXPORT extern const char kEnableServiceWorkerSync[];
 CONTENT_EXPORT extern const char kEnableTcpFastOpen[];
@@ -135,7 +135,6 @@ CONTENT_EXPORT extern const char kEnableTracing[];
 CONTENT_EXPORT extern const char kEnableTracingOutput[];
 CONTENT_EXPORT extern const char kEnableUserMediaScreenCapturing[];
 extern const char kEnableV8ScriptStreaming[];
-extern const char kEnableV8IdleNotificationAfterCommit[];
 CONTENT_EXPORT extern const char kEnableViewport[];
 CONTENT_EXPORT extern const char kEnableViewportMeta[];
 CONTENT_EXPORT extern const char kMainFrameResizesAreOrientationChanges[];
@@ -233,7 +232,6 @@ extern const char kUseImageTextureTarget[];
 CONTENT_EXPORT extern const char kUseMobileUserAgent[];
 CONTENT_EXPORT extern const char kUseNormalPriorityForTileTaskWorkerThreads[];
 extern const char kUseSurfaces[];
-CONTENT_EXPORT extern const char kDisableSurfaces[];
 extern const char kUtilityCmdPrefix[];
 CONTENT_EXPORT extern const char kUtilityProcess[];
 extern const char kUtilityProcessAllowedDir[];
@@ -259,7 +257,6 @@ CONTENT_EXPORT extern const char kDisableClickDelay[];
 CONTENT_EXPORT extern const char kDisableOverscrollEdgeEffect[];
 CONTENT_EXPORT extern const char kDisablePullToRefreshEffect[];
 CONTENT_EXPORT extern const char kDisableWebRTC[];
-CONTENT_EXPORT extern const char kEnableSpeechRecognition[];
 CONTENT_EXPORT extern const char kForceUseOverlayEmbeddedVideo[];
 CONTENT_EXPORT extern const char kHideScrollbars[];
 extern const char kNetworkCountryIso[];
@@ -280,7 +277,7 @@ CONTENT_EXPORT extern const char kEnableSpeechDispatcher[];
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
 extern const char kDisableCoreAnimationPlugins[];
-extern const char kEnableThreadedEventHandlingMac[];
+extern const char kDisableThreadedEventHandlingMac[];
 #endif
 
 #if defined(OS_WIN)

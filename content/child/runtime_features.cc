@@ -111,9 +111,6 @@ void SetRuntimeFeaturesDefaultsAndUpdateFromArgs(
   if (command_line.HasSwitch(switches::kDisableWebRTC))
     WebRuntimeFeatures::enablePeerConnection(false);
 
-  if (!command_line.HasSwitch(switches::kEnableSpeechRecognition))
-    WebRuntimeFeatures::enableScriptedSpeech(false);
-
   if (command_line.HasSwitch(switches::kEnableExperimentalWebPlatformFeatures))
     WebRuntimeFeatures::enableNotifications(true);
 
@@ -190,6 +187,11 @@ void SetRuntimeFeaturesDefaultsAndUpdateFromArgs(
 
   if (command_line.HasSwitch(switches::kReducedReferrerGranularity))
     WebRuntimeFeatures::enableReducedReferrerGranularity(true);
+
+  if (command_line.HasSwitch(switches::kDisableV8IdleTasks))
+    WebRuntimeFeatures::enableV8IdleTasks(false);
+  else
+    WebRuntimeFeatures::enableV8IdleTasks(true);
 }
 
 }  // namespace content

@@ -125,7 +125,6 @@ class DevToolsAgent;
 class DocumentState;
 class HistoryController;
 class HistoryEntry;
-class ImageResourceFetcher;
 class MouseLockDispatcher;
 class NavigationState;
 class PageState;
@@ -468,11 +467,6 @@ class CONTENT_EXPORT RenderViewImpl
   // appropriate section, add it there. If not, there are some random functions
   // nearer to the top you can add it to.
 
-  // Cannot use std::set unfortunately since linked_ptr<> does not support
-  // operator<.
-  typedef std::vector<linked_ptr<ImageResourceFetcher> >
-      ImageResourceFetcherList;
-
  protected:
   // RenderWidget overrides:
   void OnClose() override;
@@ -755,7 +749,7 @@ class CONTENT_EXPORT RenderViewImpl
   // Starts nav_state_sync_timer_ if it isn't already running.
   void StartNavStateSyncTimerIfNecessary();
 
-#if defined(OS_POSIX) && !defined(OS_MACOSX)
+#if defined(OS_WIN) || (defined(OS_POSIX) && !defined(OS_MACOSX))
   void UpdateFontRenderingFromRendererPrefs();
 #else
   void UpdateFontRenderingFromRendererPrefs() {}

@@ -539,8 +539,8 @@ void RenderThreadImpl::Init() {
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
   is_elastic_overscroll_enabled_ =
-      base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableThreadedEventHandlingMac) &&
+      !base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kDisableThreadedEventHandlingMac) &&
       base::mac::IsOSLionOrLater();
 #else
   is_elastic_overscroll_enabled_ = false;
@@ -820,8 +820,8 @@ bool RenderThreadImpl::Send(IPC::Message* msg) {
   return rv;
 }
 
-base::MessageLoop* RenderThreadImpl::GetMessageLoop() {
-  return message_loop();
+scoped_refptr<base::SingleThreadTaskRunner> RenderThreadImpl::GetTaskRunner() {
+  return GetRendererScheduler()->DefaultTaskRunner();
 }
 
 IPC::SyncChannel* RenderThreadImpl::GetChannel() {
@@ -947,6 +947,8 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
     gin::Debug::SetJitCodeEventHandler(vTune::GetVtuneCodeEventHandler());
 #endif
 
+  SetRuntimeFeaturesDefaultsAndUpdateFromArgs(command_line);
+
   blink_platform_impl_.reset(
       new RendererBlinkPlatformImpl(renderer_scheduler_.get()));
   blink::initialize(blink_platform_impl_.get());
@@ -1033,8 +1035,6 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
 
   EnableBlinkPlatformLogChannels(
       command_line.GetSwitchValueASCII(switches::kBlinkPlatformLogChannels));
-
-  SetRuntimeFeaturesDefaultsAndUpdateFromArgs(command_line);
 
   if (!media::IsMediaLibraryInitialized()) {
     WebRuntimeFeatures::enableWebAudio(false);

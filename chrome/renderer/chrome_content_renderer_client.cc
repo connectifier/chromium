@@ -126,6 +126,10 @@
 #include "extensions/renderer/script_context.h"
 #endif
 
+#if defined(ENABLE_PRINTING)
+#include "chrome/renderer/printing/chrome_print_web_view_helper_delegate.h"
+#endif
+
 #if defined(ENABLE_PRINT_PREVIEW)
 #include "chrome/renderer/pepper/chrome_pdf_print_client.h"
 #endif
@@ -501,13 +505,20 @@ void ChromeContentRendererClient::RenderFrameCreated(
 
 void ChromeContentRendererClient::RenderViewCreated(
     content::RenderView* render_view) {
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+
 #if defined(ENABLE_EXTENSIONS)
   new extensions::ExtensionHelper(render_view, extension_dispatcher_.get());
   extension_dispatcher_->OnRenderViewCreated(render_view);
 #endif
   new PageLoadHistograms(render_view);
 #if defined(ENABLE_PRINTING)
-  new printing::PrintWebViewHelper(render_view);
+  new printing::PrintWebViewHelper(
+      render_view,
+      switches::OutOfProcessPdfEnabled(),
+      command_line->HasSwitch(switches::kDisablePrintPreview),
+      scoped_ptr<printing::PrintWebViewHelper::Delegate>(
+          new ChromePrintWebViewHelperDelegate()));
 #endif
 #if defined(ENABLE_SPELLCHECK)
   new SpellCheckProvider(render_view, spellcheck_.get());
@@ -517,7 +528,6 @@ void ChromeContentRendererClient::RenderViewCreated(
   safe_browsing::MalwareDOMDetails::Create(render_view);
 #endif
 
-  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(switches::kInstantProcess))
     new SearchBox(render_view);
 
@@ -794,6 +804,10 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
         bool show_poster = false;
         GURL poster_url;
         bool cross_origin_main_content = false;
+        bool blocked_for_background_tab =
+            render_frame->IsHidden() &&
+            status_value ==
+                ChromeViewHostMsg_GetPluginInfo_Status::kPlayImportantContent;
         if (render_frame->ShouldThrottleContent(params, frame->document().url(),
                                                 &poster_url,
                                                 &cross_origin_main_content)) {
@@ -814,11 +828,13 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
         //                reduce the chance of future regressions.
         bool is_prerendering =
             prerender::PrerenderHelper::IsPrerendering(render_frame);
-        if (is_prerendering || show_poster) {
+        if (blocked_for_background_tab || is_prerendering || show_poster) {
           placeholder = create_blocked_plugin(
               show_poster ? IDR_PLUGIN_POSTER_HTML : IDR_BLOCKED_PLUGIN_HTML,
               l10n_util::GetStringFUTF16(IDS_PLUGIN_BLOCKED, group_name),
               poster_url);
+          placeholder->set_blocked_for_background_tab(
+              blocked_for_background_tab);
           placeholder->set_blocked_for_prerendering(is_prerendering);
           placeholder->set_power_saver_mode(power_saver_mode);
           placeholder->set_allow_loading(true);

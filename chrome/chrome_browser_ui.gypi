@@ -270,7 +270,6 @@
       'browser/ui/cocoa/bookmarks/bookmark_button_cell.mm',
       'browser/ui/cocoa/bookmarks/bookmark_context_menu_cocoa_controller.h',
       'browser/ui/cocoa/bookmarks/bookmark_context_menu_cocoa_controller.mm',
-      'browser/ui/cocoa/bookmarks/bookmark_drag_drop_cocoa.h',
       'browser/ui/cocoa/bookmarks/bookmark_drag_drop_cocoa.mm',
       'browser/ui/cocoa/bookmarks/bookmark_editor_base_controller.h',
       'browser/ui/cocoa/bookmarks/bookmark_editor_base_controller.mm',
@@ -964,8 +963,6 @@
       'browser/ui/webui/chromeos/login/screenlock_icon_provider.h',
       'browser/ui/webui/chromeos/login/screenlock_icon_source.cc',
       'browser/ui/webui/chromeos/login/screenlock_icon_source.h',
-      'browser/ui/webui/chromeos/login/shutdown_policy_observer.cc',
-      'browser/ui/webui/chromeos/login/shutdown_policy_observer.h',
       'browser/ui/webui/chromeos/login/signin_screen_handler.cc',
       'browser/ui/webui/chromeos/login/signin_screen_handler.h',
       'browser/ui/webui/chromeos/login/supervised_user_creation_screen_handler.cc',
@@ -2000,7 +1997,6 @@
       'browser/ui/views/bookmarks/bookmark_context_menu.cc',
       'browser/ui/views/bookmarks/bookmark_context_menu.h',
       'browser/ui/views/bookmarks/bookmark_drag_drop_views.cc',
-      'browser/ui/views/bookmarks/bookmark_drag_drop_views.h',
       'browser/ui/views/bookmarks/bookmark_editor_view.cc',
       'browser/ui/views/bookmarks/bookmark_editor_view.h',
       'browser/ui/views/bookmarks/bookmark_menu_controller_observer.h',
@@ -2511,8 +2507,8 @@
       'browser/ui/webui/extensions/extension_icon_source.h',
       'browser/ui/webui/extensions/pack_extension_handler.cc',
       'browser/ui/webui/extensions/pack_extension_handler.h',
-      'browser/ui/webui/voicesearch_ui.cc',
-      'browser/ui/webui/voicesearch_ui.h',
+      'browser/ui/webui/voice_search_ui.cc',
+      'browser/ui/webui/voice_search_ui.h',
     ],
     'chrome_browser_ui_global_error_sources': [
       'browser/ui/cocoa/global_error_bubble_controller.h',
@@ -2881,11 +2877,13 @@
               'conditions': [
                 ['mac_views_browser==1', {
                   'sources!': [
+                    'browser/ui/cocoa/bookmarks/bookmark_drag_drop_cocoa.mm',
                     'browser/ui/cocoa/browser_window_factory_cocoa.mm',
                     'browser/ui/cocoa/tab_dialogs_cocoa.mm',
                   ],
                 }, {
                   'sources!': [
+                    'browser/ui/views/bookmarks/bookmark_drag_drop_views.cc',
                     'browser/ui/views/frame/browser_window_factory.cc',
                     'browser/ui/views/tab_dialogs_views.cc',
                   ],
