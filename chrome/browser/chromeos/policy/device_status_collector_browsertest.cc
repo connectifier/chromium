@@ -4,6 +4,10 @@
 
 #include "chrome/browser/chromeos/policy/device_status_collector.h"
 
+#include <string>
+#include <vector>
+
+#include "base/bind.h"
 #include "base/environment.h"
 #include "base/logging.h"
 #include "base/memory/scoped_ptr.h"
@@ -21,9 +25,13 @@
 #include "chrome/browser/chromeos/settings/stub_cros_settings_provider.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/testing_browser_process.h"
+#include "chromeos/dbus/cros_disks_client.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/dbus/shill_device_client.h"
+#include "chromeos/dbus/shill_ipconfig_client.h"
 #include "chromeos/dbus/shill_service_client.h"
+#include "chromeos/disks/disk_mount_manager.h"
+#include "chromeos/disks/mock_disk_mount_manager.h"
 #include "chromeos/network/network_handler.h"
 #include "chromeos/network/network_state.h"
 #include "chromeos/network/network_state_handler.h"
@@ -35,11 +43,14 @@
 #include "content/public/test/test_browser_thread.h"
 #include "content/public/test/test_utils.h"
 #include "policy/proto/device_management_backend.pb.h"
+#include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/cros_system_api/dbus/service_constants.h"
 
+using ::testing::ReturnRef;
 using base::Time;
 using base::TimeDelta;
+using chromeos::disks::DiskMountManager;
 
 namespace em = enterprise_management;
 
@@ -74,12 +85,15 @@ class TestingDeviceStatusCollector : public policy::DeviceStatusCollector {
   TestingDeviceStatusCollector(
       PrefService* local_state,
       chromeos::system::StatisticsProvider* provider,
-      policy::DeviceStatusCollector::LocationUpdateRequester*
-          location_update_requester)
+      const policy::DeviceStatusCollector::LocationUpdateRequester&
+          location_update_requester,
+      const policy::DeviceStatusCollector::VolumeInfoFetcher&
+          volume_info_fetcher)
       : policy::DeviceStatusCollector(
           local_state,
           provider,
-          location_update_requester) {
+          location_update_requester,
+          volume_info_fetcher) {
     // Set the baseline time to a fixed value (1 AM) to prevent test flakiness
     // due to a single activity period spanning two days.
     SetBaselineTime(Time::Now().LocalMidnight() + TimeDelta::FromHours(1));
@@ -104,6 +118,18 @@ class TestingDeviceStatusCollector : public policy::DeviceStatusCollector {
     baseline_offset_periods_ = 0;
   }
 
+  void set_mock_cpu_usage(double total_cpu_usage, int num_processors) {
+    std::vector<double> usage;
+    for (int i = 0; i < num_processors; ++i)
+      usage.push_back(total_cpu_usage / num_processors);
+
+    mock_cpu_usage_ = usage;
+
+    // Refresh our samples.
+    for (int i = 0; i < static_cast<int>(kMaxCPUSamples); ++i)
+      SampleCPUUsage();
+  }
+
  protected:
   virtual void CheckIdleState() override {
     // This should never be called in testing, as it results in a dbus call.
@@ -118,12 +144,18 @@ class TestingDeviceStatusCollector : public policy::DeviceStatusCollector {
         TimeDelta::FromSeconds(poll_interval * baseline_offset_periods_++);
   }
 
+  std::vector<double> GetPerProcessCPUUsage() override {
+    return mock_cpu_usage_;
+  }
+
  private:
   // Baseline time for the fake times returned from GetCurrentTime().
   Time baseline_time_;
 
   // The number of simulated periods since the baseline time.
   int baseline_offset_periods_;
+
+  std::vector<double> mock_cpu_usage_;
 };
 
 // Return the total number of active milliseconds contained in a device
@@ -134,6 +166,33 @@ int64 GetActiveMilliseconds(em::DeviceStatusReportRequest& status) {
     active_milliseconds += status.active_period(i).active_duration();
   }
   return active_milliseconds;
+}
+
+// Mock VolumeInfoFetcher used to return empty VolumeInfo, to avoid warnings
+// and test slowdowns from trying to fetch information about non-existent
+// volumes.
+std::vector<em::VolumeInfo> GetEmptyVolumeInfo(
+    const std::vector<std::string>& mount_points) {
+  return std::vector<em::VolumeInfo>();
+}
+
+std::vector<em::VolumeInfo> GetFakeVolumeInfo(
+    const std::vector<em::VolumeInfo>& volume_info,
+    const std::vector<std::string>& mount_points) {
+  EXPECT_EQ(volume_info.size(), mount_points.size());
+  // Make sure there's a matching mount point for every volume info.
+  for (const em::VolumeInfo& info : volume_info) {
+    bool found = false;
+    for (const std::string& mount_point : mount_points) {
+      if (info.volume_id() == mount_point) {
+        found = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(found) << "Could not find matching mount point for "
+                       << info.volume_id();
+  }
+  return volume_info;
 }
 
 }  // namespace
@@ -160,6 +219,16 @@ class DeviceStatusCollectorTest : public testing::Test {
     scoped_ptr<base::Environment> env(base::Environment::Create());
     env->SetVar("TZ", "UTC");
 
+    // Initialize our mock mounted disk volumes.
+    scoped_ptr<chromeos::disks::MockDiskMountManager> mock_disk_mount_manager =
+        make_scoped_ptr(new chromeos::disks::MockDiskMountManager());
+    AddMountPoint("/mount/volume1");
+    AddMountPoint("/mount/volume2");
+    EXPECT_CALL(*mock_disk_mount_manager, mount_points())
+        .WillRepeatedly(ReturnRef(mount_point_map_));
+
+    // DiskMountManager takes ownership of the MockDiskMountManager.
+    DiskMountManager::InitializeForTesting(mock_disk_mount_manager.release());
     TestingDeviceStatusCollector::RegisterPrefs(prefs_.registry());
 
     // Remove the real DeviceSettingsProvider and replace it with a stub.
@@ -171,17 +240,26 @@ class DeviceStatusCollectorTest : public testing::Test {
         cros_settings_->RemoveSettingsProvider(device_settings_provider_));
     cros_settings_->AddSettingsProvider(&stub_settings_provider_);
 
-    RestartStatusCollector();
+  RestartStatusCollector(base::Bind(&GetEmptyVolumeInfo));
+  }
+
+  void AddMountPoint(const std::string& mount_point) {
+    mount_point_map_.insert(DiskMountManager::MountPointMap::value_type(
+        mount_point,
+        DiskMountManager::MountPointInfo(
+            mount_point, mount_point, chromeos::MOUNT_TYPE_DEVICE,
+            chromeos::disks::MOUNT_CONDITION_NONE)));
   }
 
   virtual ~DeviceStatusCollectorTest() {
     // Finish pending tasks.
     content::BrowserThread::GetBlockingPool()->FlushForTesting();
     message_loop_.RunUntilIdle();
+    DiskMountManager::Shutdown();
 
     // Restore the real DeviceSettingsProvider.
     EXPECT_TRUE(
-      cros_settings_->RemoveSettingsProvider(&stub_settings_provider_));
+        cros_settings_->RemoveSettingsProvider(&stub_settings_provider_));
     cros_settings_->AddSettingsProvider(device_settings_provider_);
   }
 
@@ -190,13 +268,16 @@ class DeviceStatusCollectorTest : public testing::Test {
     cros_settings_->SetBoolean(chromeos::kReportDeviceNetworkInterfaces, false);
   }
 
-  void RestartStatusCollector() {
+  void RestartStatusCollector(
+      const policy::DeviceStatusCollector::VolumeInfoFetcher& fetcher) {
     policy::DeviceStatusCollector::LocationUpdateRequester callback =
         base::Bind(&MockPositionUpdateRequester);
+    std::vector<em::VolumeInfo> expected_volume_info;
     status_collector_.reset(
         new TestingDeviceStatusCollector(&prefs_,
                                          &fake_statistics_provider_,
-                                         &callback));
+                                         callback,
+                                         fetcher));
   }
 
   void GetStatus() {
@@ -260,6 +341,7 @@ class DeviceStatusCollectorTest : public testing::Test {
   ScopedStubEnterpriseInstallAttributes install_attributes_;
   TestingPrefServiceSimple prefs_;
   chromeos::system::ScopedFakeStatisticsProvider fake_statistics_provider_;
+  DiskMountManager::MountPointMap mount_point_map_;
   chromeos::ScopedTestDeviceSettingsService test_device_settings_service_;
   chromeos::ScopedTestCrosSettings test_cros_settings_;
   chromeos::CrosSettings* cros_settings_;
@@ -354,7 +436,7 @@ TEST_F(DeviceStatusCollectorTest, StateKeptInPref) {
   // Process the list a second time after restarting the collector. It should be
   // able to count the active periods found by the original collector, because
   // the results are stored in a pref.
-  RestartStatusCollector();
+  RestartStatusCollector(base::Bind(&GetEmptyVolumeInfo));
   status_collector_->Simulate(test_states,
                               sizeof(test_states) / sizeof(IdleState));
 
@@ -596,7 +678,7 @@ TEST_F(DeviceStatusCollectorTest, Location) {
   // Restart the status collector. Check that the last known location has been
   // retrieved from local state without requesting a geolocation update.
   SetMockPositionToReturnNext(valid_fix);
-  RestartStatusCollector();
+  RestartStatusCollector(base::Bind(&GetEmptyVolumeInfo));
   CheckThatAValidLocationIsReported();
   EXPECT_TRUE(mock_position_to_return_next.get());
 
@@ -654,6 +736,76 @@ TEST_F(DeviceStatusCollectorTest, ReportUsers) {
   EXPECT_EQ(0, status_.user_size());
 }
 
+TEST_F(DeviceStatusCollectorTest, TestVolumeInfo) {
+  std::vector<std::string> expected_mount_points;
+  std::vector<em::VolumeInfo> expected_volume_info;
+  int size = 12345678;
+  for (const auto& mount_info :
+           DiskMountManager::GetInstance()->mount_points()) {
+    expected_mount_points.push_back(mount_info.first);
+    em::VolumeInfo info;
+    info.set_volume_id(mount_info.first);
+    // Just put unique numbers in for storage_total/free.
+    info.set_storage_total(size++);
+    info.set_storage_free(size++);
+    expected_volume_info.push_back(info);
+  }
+
+  EXPECT_FALSE(expected_volume_info.empty());
+
+  RestartStatusCollector(base::Bind(&GetFakeVolumeInfo, expected_volume_info));
+  message_loop_.RunUntilIdle();
+
+  GetStatus();
+  EXPECT_EQ(expected_mount_points.size(),
+            static_cast<size_t>(status_.volume_info_size()));
+
+  // Walk the returned VolumeInfo to make sure it matches.
+  for (const em::VolumeInfo& expected_info : expected_volume_info) {
+    bool found = false;
+    for (const em::VolumeInfo& info : status_.volume_info()) {
+      if (info.volume_id() == expected_info.volume_id()) {
+        EXPECT_EQ(expected_info.storage_total(), info.storage_total());
+        EXPECT_EQ(expected_info.storage_free(), info.storage_free());
+        found = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(found) << "No matching VolumeInfo for "
+                       << expected_info.volume_id();
+  }
+
+  // Now turn off hardware status reporting - should have no data.
+  cros_settings_->SetBoolean(chromeos::kReportDeviceHardwareStatus, false);
+  GetStatus();
+  EXPECT_EQ(0, status_.volume_info_size());
+}
+
+TEST_F(DeviceStatusCollectorTest, TestCPUSamples) {
+  // Mock 100% CPU usage and 2 processors.
+  const int full_cpu_usage = 100;
+  status_collector_->set_mock_cpu_usage(full_cpu_usage, 2);
+  GetStatus();
+  EXPECT_EQ(static_cast<int>(DeviceStatusCollector::kMaxCPUSamples),
+            status_.cpu_utilization_pct().size());
+  for (const auto utilization : status_.cpu_utilization_pct())
+    EXPECT_EQ(full_cpu_usage, utilization);
+
+  // Now set CPU usage to 0.
+  const int idle_cpu_usage = 0;
+  status_collector_->set_mock_cpu_usage(idle_cpu_usage, 2);
+  GetStatus();
+  EXPECT_EQ(static_cast<int>(DeviceStatusCollector::kMaxCPUSamples),
+            status_.cpu_utilization_pct().size());
+  for (const auto utilization : status_.cpu_utilization_pct())
+    EXPECT_EQ(idle_cpu_usage, utilization);
+
+  // Turning off hardware reporting should not report CPU utilization.
+  cros_settings_->SetBoolean(chromeos::kReportDeviceHardwareStatus, false);
+  GetStatus();
+  EXPECT_EQ(0, status_.cpu_utilization_pct().size());
+}
+
 // Fake device state.
 struct FakeDeviceData {
   const char* device_path;
@@ -694,6 +846,8 @@ struct FakeNetworkState {
   int signal_strength;
   const char* connection_status;
   int expected_state;
+  const char* address;
+  const char* gateway;
 };
 
 // List of fake networks - primarily used to make sure that signal strength
@@ -702,33 +856,36 @@ struct FakeNetworkState {
 // network, so we use 1 below.
 static const FakeNetworkState kFakeNetworks[] = {
   { "offline", "/device/wifi", shill::kTypeWifi, 35,
-    shill::kStateOffline, em::NetworkState::OFFLINE },
+    shill::kStateOffline, em::NetworkState::OFFLINE, "", "" },
   { "ethernet", "/device/ethernet", shill::kTypeEthernet, 0,
-    shill::kStateOnline, em::NetworkState::ONLINE },
+    shill::kStateOnline, em::NetworkState::ONLINE,
+    "192.168.0.1", "8.8.8.8" },
   { "wifi", "/device/wifi", shill::kTypeWifi, 23, shill::kStatePortal,
-    em::NetworkState::PORTAL },
+    em::NetworkState::PORTAL, "", "" },
   { "idle", "/device/cellular1", shill::kTypeCellular, 0, shill::kStateIdle,
-    em::NetworkState::IDLE },
+    em::NetworkState::IDLE, "", "" },
   { "carrier", "/device/cellular1", shill::kTypeCellular, 0,
-    shill::kStateCarrier, em::NetworkState::CARRIER },
+    shill::kStateCarrier, em::NetworkState::CARRIER, "", "" },
   { "association", "/device/cellular1", shill::kTypeCellular, 0,
-    shill::kStateAssociation, em::NetworkState::ASSOCIATION },
+    shill::kStateAssociation, em::NetworkState::ASSOCIATION, "", "" },
   { "config", "/device/cellular1", shill::kTypeCellular, 0,
-    shill::kStateConfiguration, em::NetworkState::CONFIGURATION },
+    shill::kStateConfiguration, em::NetworkState::CONFIGURATION, "", "" },
   { "ready", "/device/cellular1", shill::kTypeCellular, 0, shill::kStateReady,
-    em::NetworkState::READY },
+    em::NetworkState::READY, "", "" },
   { "disconnect", "/device/wifi", shill::kTypeWifi, 1,
-    shill::kStateDisconnect, em::NetworkState::DISCONNECT },
+    shill::kStateDisconnect, em::NetworkState::DISCONNECT, "", "" },
   { "failure", "/device/wifi", shill::kTypeWifi, 1, shill::kStateFailure,
-    em::NetworkState::FAILURE },
+    em::NetworkState::FAILURE, "", "" },
   { "activation-failure", "/device/cellular1", shill::kTypeCellular, 0,
-    shill::kStateActivationFailure, em::NetworkState::ACTIVATION_FAILURE },
-  { "unknown", "", shill::kTypeWifi, 1, "unknown", em::NetworkState::UNKNOWN },
+    shill::kStateActivationFailure, em::NetworkState::ACTIVATION_FAILURE,
+    "", "" },
+  { "unknown", "", shill::kTypeWifi, 1, "unknown", em::NetworkState::UNKNOWN,
+    "", "" },
 };
 
 static const FakeNetworkState kUnconfiguredNetwork = {
   "unconfigured", "/device/unconfigured", shill::kTypeWifi, 35,
-  shill::kStateOffline, em::NetworkState::OFFLINE
+  shill::kStateOffline, em::NetworkState::OFFLINE, "", ""
 };
 
 class DeviceStatusCollectorNetworkInterfacesTest
@@ -789,6 +946,22 @@ class DeviceStatusCollectorNetworkInterfacesTest
       service_client->SetServiceProperty(
           fake_network.name, shill::kProfileProperty,
           base::StringValue(fake_network.name));
+      if (strlen(fake_network.address) > 0) {
+        // Set the IP config.
+        base::DictionaryValue ip_config_properties;
+        ip_config_properties.SetStringWithoutPathExpansion(
+            shill::kAddressProperty, fake_network.address);
+        ip_config_properties.SetStringWithoutPathExpansion(
+            shill::kGatewayProperty, fake_network.gateway);
+        chromeos::ShillIPConfigClient::TestInterface* ip_config_test =
+            chromeos::DBusThreadManager::Get()->GetShillIPConfigClient()->
+            GetTestInterface();
+        const std::string kIPConfigPath = "test_ip_config";
+        ip_config_test->AddIPConfig(kIPConfigPath, ip_config_properties);
+        service_client->SetServiceProperty(
+            fake_network.name, shill::kIPConfigProperty,
+            base::StringValue(kIPConfigPath));
+      }
     }
 
     // Now add an unconfigured network - it should not show up in the
@@ -887,6 +1060,14 @@ TEST_F(DeviceStatusCollectorNetworkInterfacesTest, NetworkInterfaces) {
       if (proto_state.has_device_path() == (strlen(state.device_path) > 0) &&
           proto_state.signal_strength() == state.signal_strength &&
           proto_state.connection_state() == state.expected_state) {
+        if (proto_state.has_ip_address())
+          EXPECT_EQ(proto_state.ip_address(), state.address);
+        else
+          EXPECT_EQ(0U, strlen(state.address));
+        if (proto_state.has_gateway())
+          EXPECT_EQ(proto_state.gateway(), state.gateway);
+        else
+          EXPECT_EQ(0U, strlen(state.gateway));
         found_match = true;
         break;
       }

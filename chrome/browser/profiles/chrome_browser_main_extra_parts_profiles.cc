@@ -61,6 +61,7 @@
 #include "chrome/browser/extensions/extension_management.h"
 #include "chrome/browser/search/hotword_service_factory.h"
 #include "chrome/browser/signin/easy_unlock_service_factory.h"
+#include "chrome/browser/ui/bookmarks/enhanced_bookmark_key_service_factory.h"
 #include "extensions/browser/browser_context_keyed_service_factories.h"
 #endif
 
@@ -90,8 +91,8 @@
 #endif
 
 #if defined(ENABLE_SUPERVISED_USERS)
+#include "chrome/browser/supervised_user/legacy/supervised_user_sync_service_factory.h"
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
-#include "chrome/browser/supervised_user/supervised_user_sync_service_factory.h"
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/supervised_user/chromeos/manager_password_service_factory.h"
 #include "chrome/browser/supervised_user/chromeos/supervised_user_password_service_factory.h"
@@ -186,6 +187,7 @@ EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   DownloadServiceFactory::GetInstance();
 #if defined(ENABLE_EXTENSIONS)
   EasyUnlockServiceFactory::GetInstance();
+  EnhancedBookmarkKeyServiceFactory::GetInstance();
 #endif
   FaviconServiceFactory::GetInstance();
   FindBarStateFactory::GetInstance();

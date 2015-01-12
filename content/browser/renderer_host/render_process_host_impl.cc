@@ -1181,7 +1181,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisable3DAPIs,
     switches::kDisableAcceleratedJpegDecoding,
     switches::kDisableAcceleratedVideoDecode,
-    switches::kDisableApplicationCache,
     switches::kDisableBlinkScheduler,
     switches::kDisableBreakpad,
     switches::kDisablePreferCompositingToLCDText,
@@ -1203,7 +1202,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisablePinch,
     switches::kDisablePrefixedEncryptedMedia,
     switches::kDisableSeccompFilterSandbox,
-    switches::kDisableSessionStorage,
     switches::kDisableSharedWorkers,
     switches::kDisableSVG1DOM,
     switches::kDisableThreadedCompositing,
@@ -1211,7 +1209,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableTouchAdjustment,
     switches::kDisableTouchDragDrop,
     switches::kDisableTouchEditing,
-    switches::kDisableV8IdleNotificationAfterCommit,
+    switches::kDisableV8IdleTasks,
     switches::kDomAutomationController,
     switches::kEnableBeginFrameScheduling,
     switches::kEnableBleedingEdgeRenderingFastPaths,
@@ -1249,7 +1247,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableThreadedCompositing,
     switches::kEnableTouchDragDrop,
     switches::kEnableTouchEditing,
-    switches::kEnableV8IdleNotificationAfterCommit,
     switches::kEnableViewport,
     switches::kEnableViewportMeta,
     switches::kEnableVtune,
@@ -1332,7 +1329,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
 #if defined(OS_ANDROID)
     switches::kDisableGestureRequirementForMediaPlayback,
     switches::kDisableWebRTC,
-    switches::kEnableSpeechRecognition,
     switches::kMediaDrmEnableNonCompositing,
     switches::kNetworkCountryIso,
     switches::kDisableWebAudio,
@@ -1343,7 +1339,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableSandboxLogging,
 #endif
 #if defined(OS_MACOSX) && !defined(OS_IOS)
-    switches::kEnableThreadedEventHandlingMac,
+    switches::kDisableThreadedEventHandlingMac,
 #endif
 #if defined(OS_WIN)
     switches::kDisableDirectWrite,

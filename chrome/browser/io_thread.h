@@ -194,6 +194,7 @@ class IOThread : public content::BrowserThreadDelegate {
     Optional<int> quic_load_server_info_timeout_ms;
     Optional<bool> quic_disable_loading_server_info_for_new_servers;
     Optional<float> quic_load_server_info_timeout_srtt_multiplier;
+    Optional<bool> quic_enable_truncated_connection_ids;
     Optional<size_t> quic_max_packet_length;
     net::QuicTagVector quic_connection_options;
     Optional<std::string> quic_user_agent_id;
@@ -355,7 +356,6 @@ class IOThread : public content::BrowserThreadDelegate {
   // QUIC handshake.
   static bool ShouldEnableQuicPacing(
       const base::CommandLine& command_line,
-      base::StringPiece quic_trial_group,
       const VariationParameters& quic_trial_params);
 
   // Returns true if QUIC should always require handshake confirmation during
@@ -383,12 +383,15 @@ class IOThread : public content::BrowserThreadDelegate {
   static float GetQuicLoadServerInfoTimeoutSrttMultiplier(
       const VariationParameters& quic_trial_params);
 
+  // Returns true if QUIC's TruncatedConnectionIds should be enabled.
+  static bool ShouldQuicEnableTruncatedConnectionIds(
+      const VariationParameters& quic_trial_params);
+
   // Returns the maximum length for QUIC packets, based on any flags in
   // |command_line| or the field trial.  Returns 0 if there is an error
   // parsing any of the options, or if the default value should be used.
   static size_t GetQuicMaxPacketLength(
       const base::CommandLine& command_line,
-      base::StringPiece quic_trial_group,
       const VariationParameters& quic_trial_params);
 
   // Returns the QUIC versions specified by any flags in |command_line|

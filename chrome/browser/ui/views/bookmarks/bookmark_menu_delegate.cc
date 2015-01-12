@@ -14,7 +14,6 @@
 #include "chrome/browser/ui/bookmarks/bookmark_utils.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view.h"
-#include "chrome/browser/ui/views/bookmarks/bookmark_drag_drop_views.h"
 #include "chrome/browser/ui/views/event_utils.h"
 #include "chrome/common/pref_names.h"
 #include "components/bookmarks/browser/bookmark_model.h"
@@ -31,6 +30,7 @@
 #include "ui/views/widget/widget.h"
 
 using base::UserMetricsAction;
+using bookmarks::BookmarkModel;
 using bookmarks::BookmarkNodeData;
 using content::PageNavigator;
 using views::MenuItemView;

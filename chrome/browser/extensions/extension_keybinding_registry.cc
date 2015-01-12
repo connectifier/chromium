@@ -80,7 +80,7 @@ void ExtensionKeybindingRegistry::Init() {
   for (const scoped_refptr<const extensions::Extension>& extension :
        registry->enabled_extensions())
     if (ExtensionMatchesFilter(extension.get()))
-      AddExtensionKeybinding(extension.get(), std::string());
+      AddExtensionKeybindings(extension.get(), std::string());
 }
 
 bool ExtensionKeybindingRegistry::ShouldIgnoreCommand(
@@ -167,7 +167,7 @@ void ExtensionKeybindingRegistry::OnExtensionLoaded(
     content::BrowserContext* browser_context,
     const Extension* extension) {
   if (ExtensionMatchesFilter(extension))
-    AddExtensionKeybinding(extension, std::string());
+    AddExtensionKeybindings(extension, std::string());
 }
 
 void ExtensionKeybindingRegistry::OnExtensionUnloaded(
@@ -185,13 +185,12 @@ void ExtensionKeybindingRegistry::Observe(
   switch (type) {
     case extensions::NOTIFICATION_EXTENSION_COMMAND_ADDED:
     case extensions::NOTIFICATION_EXTENSION_COMMAND_REMOVED: {
-      std::pair<const std::string, const std::string>* payload =
-          content::Details<std::pair<const std::string, const std::string> >(
-              details).ptr();
+      ExtensionCommandRemovedDetails* payload =
+          content::Details<ExtensionCommandRemovedDetails>(details).ptr();
 
       const Extension* extension = ExtensionRegistry::Get(browser_context_)
                                        ->enabled_extensions()
-                                       .GetByID(payload->first);
+                                       .GetByID(payload->extension_id);
       // During install and uninstall the extension won't be found. We'll catch
       // those events above, with the LOADED/UNLOADED, so we ignore this event.
       if (!extension)
@@ -199,9 +198,9 @@ void ExtensionKeybindingRegistry::Observe(
 
       if (ExtensionMatchesFilter(extension)) {
         if (type == extensions::NOTIFICATION_EXTENSION_COMMAND_ADDED)
-          AddExtensionKeybinding(extension, payload->second);
+          AddExtensionKeybindings(extension, payload->command_name);
         else
-          RemoveExtensionKeybinding(extension, payload->second);
+          RemoveExtensionKeybinding(extension, payload->command_name);
       }
       break;
     }

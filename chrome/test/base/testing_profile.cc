@@ -104,6 +104,7 @@
 #endif
 
 using base::Time;
+using bookmarks::BookmarkModel;
 using content::BrowserThread;
 using content::DownloadManagerDelegate;
 using testing::NiceMock;
@@ -925,8 +926,8 @@ PrefProxyConfigTracker* TestingProfile::GetProxyConfigTracker() {
 }
 
 void TestingProfile::BlockUntilHistoryProcessesPendingRequests() {
-  HistoryService* history_service =
-      HistoryServiceFactory::GetForProfile(this, Profile::EXPLICIT_ACCESS);
+  HistoryService* history_service = HistoryServiceFactory::GetForProfile(
+      this, ServiceAccessType::EXPLICIT_ACCESS);
   DCHECK(history_service);
   DCHECK(base::MessageLoop::current());
 

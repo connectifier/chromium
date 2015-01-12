@@ -7,6 +7,8 @@
 #include "base/message_loop/message_loop.h"
 #include "base/run_loop.h"
 #include "base/timer/timer.h"
+#include "ui/events/event.h"
+#include "ui/events/keycodes/dom3/dom_code.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gl/gl_surface.h"
@@ -52,7 +54,9 @@ class DemoWindow : public ui::PlatformWindowDelegate {
 
   gfx::Size GetSize() { return platform_window_->GetBounds().size(); }
 
-  void Start() {
+  void Start(const base::Closure& quit_closure) {
+    quit_closure_ = quit_closure;
+
     if (!base::CommandLine::ForCurrentProcess()->HasSwitch(kDisableGpu) &&
         gfx::GLSurface::InitializeOneOff() && StartInProcessGpu()) {
       if (base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -69,7 +73,7 @@ class DemoWindow : public ui::PlatformWindowDelegate {
 
     if (renderer_->Initialize()) {
       timer_.Start(FROM_HERE,
-                   base::TimeDelta::FromMicroseconds(kFrameDelayMilliseconds),
+                   base::TimeDelta::FromMilliseconds(kFrameDelayMilliseconds),
                    renderer_.get(), &ui::Renderer::RenderFrame);
     } else {
       LOG(ERROR) << "Failed to create drawing surface";
@@ -79,14 +83,17 @@ class DemoWindow : public ui::PlatformWindowDelegate {
 
   void Quit() {
     StopAnimation();
-    base::MessageLoop::current()->PostTask(
-        FROM_HERE, base::Bind(&base::DeletePointer<DemoWindow>, this));
+    quit_closure_.Run();
    }
 
   // PlatformWindowDelegate:
    void OnBoundsChanged(const gfx::Rect& new_bounds) override {}
    void OnDamageRect(const gfx::Rect& damaged_region) override {}
-   void DispatchEvent(ui::Event* event) override {}
+   void DispatchEvent(ui::Event* event) override {
+     if (event->IsKeyEvent() &&
+         static_cast<ui::KeyEvent*>(event)->code() == ui::DomCode::KEY_Q)
+       Quit();
+   }
    void OnCloseRequest() override { Quit(); }
    void OnClosed() override {}
    void OnWindowStateChanged(ui::PlatformWindowState new_state) override {}
@@ -115,6 +122,8 @@ class DemoWindow : public ui::PlatformWindowDelegate {
   // Helper for applications that do GL on main thread.
   ui::UiThreadGpu ui_thread_gpu_;
 
+  base::Closure quit_closure_;
+
   DISALLOW_COPY_AND_ASSIGN(DemoWindow);
 };
 
@@ -128,13 +137,12 @@ int main(int argc, char** argv) {
 
   ui::OzonePlatform::InitializeForUI();
 
-  DemoWindow* window = new DemoWindow;
-  window->Start();
-
-  // Run the message loop until there's nothing left to do.
-  // TODO(spang): Should we use QuitClosure instead?
   base::RunLoop run_loop;
-  run_loop.RunUntilIdle();
+
+  scoped_ptr<DemoWindow> window(new DemoWindow);
+  window->Start(run_loop.QuitClosure());
+
+  run_loop.Run();
 
   return 0;
 }

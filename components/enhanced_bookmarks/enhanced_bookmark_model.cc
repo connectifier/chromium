@@ -19,6 +19,8 @@
 #include "ui/base/models/tree_node_iterator.h"
 #include "url/gurl.h"
 
+using bookmarks::BookmarkModel;
+
 namespace {
 const char* kBookmarkBarId = "f_bookmarks_bar";
 
@@ -199,7 +201,7 @@ bool EnhancedBookmarkModel::SetOriginalImage(const BookmarkNode* node,
   image::collections::ImageData data;
 
   // Try to populate the imageData with the existing data.
-  if (decoded != "") {
+  if (!decoded.empty()) {
     // If the parsing fails, something is wrong. Immediately fail.
     bool result = data.ParseFromString(decoded);
     if (!result)
@@ -229,7 +231,7 @@ bool EnhancedBookmarkModel::GetOriginalImage(const BookmarkNode* node,
                                              int* width,
                                              int* height) {
   std::string decoded(DataForMetaInfoField(node, kImageDataKey));
-  if (decoded == "")
+  if (decoded.empty())
     return false;
 
   image::collections::ImageData data;
@@ -248,7 +250,7 @@ bool EnhancedBookmarkModel::GetThumbnailImage(const BookmarkNode* node,
                                               int* width,
                                               int* height) {
   std::string decoded(DataForMetaInfoField(node, kImageDataKey));
-  if (decoded == "")
+  if (decoded.empty())
     return false;
 
   image::collections::ImageData data;
@@ -503,7 +505,7 @@ bool EnhancedBookmarkModel::SetAllImages(const BookmarkNode* node,
   image::collections::ImageData data;
 
   // Try to populate the imageData with the existing data.
-  if (decoded != "") {
+  if (!decoded.empty()) {
     // If the parsing fails, something is wrong. Immediately fail.
     bool result = data.ParseFromString(decoded);
     if (!result)

@@ -85,8 +85,6 @@ class GbmBufferGenerator : public ScanoutBufferGenerator {
 class OzonePlatformGbm : public OzonePlatform {
  public:
   OzonePlatformGbm(bool use_surfaceless) : use_surfaceless_(use_surfaceless) {
-    base::AtExitManager::RegisterTask(
-        base::Bind(&base::DeletePointer<OzonePlatformGbm>, this));
   }
   ~OzonePlatformGbm() override {}
 
@@ -148,7 +146,7 @@ class OzonePlatformGbm : public OzonePlatform {
   }
 
   void InitializeGPU() override {
-    dri_.reset(new DriWrapper(kDefaultGraphicsCardPath));
+    dri_.reset(new DriWrapper(kDefaultGraphicsCardPath, false));
     dri_->Initialize();
     buffer_generator_.reset(new GbmBufferGenerator(dri_.get()));
     screen_manager_.reset(

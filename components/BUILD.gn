@@ -41,6 +41,7 @@ group("all_components") {
     "//components/feedback",
     "//components/gcm_driver",
     "//components/google/core/browser",
+    "//components/history/content/browser",
     "//components/history/core/browser",
     "//components/history/core/common",
     "//components/history/core/test",
@@ -58,6 +59,7 @@ group("all_components") {
     "//components/omnibox",
     "//components/onc",
     "//components/os_crypt",
+    "//components/packed_ct_ev_whitelist",
     "//components/pairing",
     "//components/password_manager/content/browser",
     "//components/password_manager/core/browser",
@@ -123,8 +125,9 @@ group("all_components") {
   }
   if (is_ios) {
     deps -= [
-      "//components/keyed_service/content",
       "//components/copresence_endpoints",
+      "//components/history/content/browser",
+      "//components/keyed_service/content",
     ]
   }
 
@@ -242,6 +245,7 @@ test("components_unittests") {
     "//components/metrics:unit_tests",
     "//components/omnibox:unit_tests",
     "//components/ownership:unit_tests",
+    "//components/packed_ct_ev_whitelist:unit_tests",
     "//components/proximity_auth:unit_tests",
     "//components/variations:unit_tests",
     "//components/web_resource:unit_tests",

@@ -125,6 +125,9 @@ class CreditCard : public AutofillDataModel {
   // the credit cards themselves.
   int Compare(const CreditCard& credit_card) const;
 
+  // Determines if |this| is a local version of the server card |other|.
+  bool IsLocalDuplicateOfServerCard(const CreditCard& other) const;
+
   // Used by tests.
   bool operator==(const CreditCard& credit_card) const;
   bool operator!=(const CreditCard& credit_card) const;
@@ -147,6 +150,8 @@ class CreditCard : public AutofillDataModel {
 
   // Returns the credit card number.
   const base::string16& number() const { return number_; }
+  // Sets |number_| to |number| and computes the appropriate card |type_|.
+  void SetNumber(const base::string16& number);
 
  private:
   // FormGroup:
@@ -168,9 +173,6 @@ class CreditCard : public AutofillDataModel {
 
   // Sets |expiration_year_| to the integer conversion of |text|.
   void SetExpirationYearFromString(const base::string16& text);
-
-  // Sets |number_| to |number| and computes the appropriate card |type_|.
-  void SetNumber(const base::string16& number);
 
   // These setters verify that the month and year are within appropriate
   // ranges.

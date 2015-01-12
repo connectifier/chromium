@@ -233,7 +233,7 @@ NSDictionary* attributeToMethodNameMap = nil;
 }
 
 - (NSValue*)columnIndexRange {
-  if ([self internalRole] != ui::AX_ROLE_CELL)
+  if (!browserAccessibility_->IsCellOrTableHeaderRole())
     return nil;
 
   int column = -1;
@@ -632,6 +632,9 @@ NSDictionary* attributeToMethodNameMap = nil;
     // This control is similar to what VoiceOver calls a "stepper".
     return base::SysUTF16ToNSString(content_client->GetLocalizedString(
         IDS_AX_ROLE_STEPPER));
+  case ui::AX_ROLE_STATUS:
+    return base::SysUTF16ToNSString(content_client->GetLocalizedString(
+        IDS_AX_ROLE_STATUS));
   case ui::AX_ROLE_TOGGLE_BUTTON:
     return base::SysUTF16ToNSString(content_client->GetLocalizedString(
         IDS_AX_ROLE_TOGGLE_BUTTON));
@@ -663,7 +666,7 @@ NSDictionary* attributeToMethodNameMap = nil;
 }
 
 - (NSValue*)rowIndexRange {
-  if ([self internalRole] != ui::AX_ROLE_CELL)
+  if (!browserAccessibility_->IsCellOrTableHeaderRole())
     return nil;
 
   int row = -1;
@@ -1071,7 +1074,7 @@ NSDictionary* attributeToMethodNameMap = nil;
            j < child->PlatformChildCount();
            ++j) {
         BrowserAccessibility* cell = child->PlatformGetChild(j);
-        if (cell->GetRole() != ui::AX_ROLE_CELL)
+        if (!browserAccessibility_->IsCellOrTableHeaderRole())
           continue;
         int colIndex;
         if (!cell->GetIntAttribute(

@@ -162,16 +162,6 @@
     "dependencies": ["permission:hid"],
     "contexts": ["blessed_extension"]
   },
-  "hid.onDeviceAdded": {
-    "channel": "dev",
-    "dependencies": ["permission:hid"],
-    "contexts": ["blessed_extension"]
-  },
-  "hid.onDeviceRemoved": {
-    "channel": "dev",
-    "dependencies": ["permission:hid"],
-    "contexts": ["blessed_extension"]
-  },
   "management": {
     "dependencies": ["permission:management"],
     "contexts": ["blessed_extension"]
@@ -337,6 +327,21 @@
     "contexts": ["blessed_extension"]
   },
   "usb": {
+    "dependencies": ["permission:usb"],
+    "contexts": ["blessed_extension"]
+  },
+  "usb.setConfiguration": {
+    "dependencies": ["permission:usb"],
+    "contexts": ["blessed_extension"],
+    "channel": "dev"
+  },
+  "usb.onDeviceAdded": {
+    "channel": "dev",
+    "dependencies": ["permission:usb"],
+    "contexts": ["blessed_extension"]
+  },
+  "usb.onDeviceRemoved": {
+    "channel": "dev",
     "dependencies": ["permission:usb"],
     "contexts": ["blessed_extension"]
   },

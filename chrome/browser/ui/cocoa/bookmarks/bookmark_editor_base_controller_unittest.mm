@@ -20,6 +20,7 @@
 
 using base::ASCIIToUTF16;
 using bookmarks::BookmarkExpandedStateTracker;
+using bookmarks::BookmarkModel;
 
 class BookmarkEditorBaseControllerTest : public CocoaProfileTest {
  public:
@@ -82,7 +83,7 @@ class BookmarkEditorBaseControllerTest : public CocoaProfileTest {
                    configuration:BookmarkEditor::SHOW_TREE];
   }
 
-  virtual void SetUp() override {
+  void SetUp() override {
     CocoaProfileTest::SetUp();
     ASSERT_TRUE(profile());
 
@@ -92,7 +93,7 @@ class BookmarkEditorBaseControllerTest : public CocoaProfileTest {
     [controller_ runAsModalSheet];
   }
 
-  virtual void TearDown() override {
+  void TearDown() override {
     controller_ = NULL;
     CocoaTest::TearDown();
   }

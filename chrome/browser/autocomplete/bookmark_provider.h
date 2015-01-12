@@ -12,10 +12,10 @@
 #include "components/omnibox/autocomplete_provider.h"
 #include "components/query_parser/snippet.h"
 
-class BookmarkModel;
 class Profile;
 
 namespace bookmarks {
+class BookmarkModel;
 struct BookmarkMatch;
 }
 
@@ -34,10 +34,13 @@ class BookmarkProvider : public AutocompleteProvider {
   // When |minimal_changes| is true short circuit any additional searching and
   // leave the previous matches for this provider unchanged, otherwise perform
   // a complete search for |input| across all bookmark titles.
-  void Start(const AutocompleteInput& input, bool minimal_changes) override;
+  void Start(const AutocompleteInput& input,
+             bool minimal_changes,
+             bool called_due_to_focus) override;
 
   // Sets the BookmarkModel for unit tests.
-  void set_bookmark_model_for_testing(BookmarkModel* bookmark_model) {
+  void set_bookmark_model_for_testing(
+      bookmarks::BookmarkModel* bookmark_model) {
     bookmark_model_ = bookmark_model;
   }
 
@@ -70,7 +73,7 @@ class BookmarkProvider : public AutocompleteProvider {
       bool is_url);
 
   Profile* profile_;
-  BookmarkModel* bookmark_model_;
+  bookmarks::BookmarkModel* bookmark_model_;
 
   // Languages used during the URL formatting.
   std::string languages_;

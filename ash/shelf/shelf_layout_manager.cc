@@ -252,8 +252,7 @@ bool ShelfLayoutManager::SetAlignment(ShelfAlignment alignment) {
     return false;
 
   alignment_ = alignment;
-  if (Shell::GetInstance()->session_state_delegate()->IsUserSessionBlocked() ||
-      state_.is_adding_user_screen) {
+  if (state_.is_screen_locked || state_.is_adding_user_screen) {
     // The shelf will itself move to the bottom while locked. If a request is
     // sent to move while being locked, we postpone the move until the lock
     // screen goes away.
@@ -271,8 +270,7 @@ ShelfAlignment ShelfLayoutManager::GetAlignment() const {
   // bottom alignment. Note: We cannot use state_.is_screen_locked here since
   // that flag gets set later than the SessionStateDelegate reports a locked
   // screen which leads in
-  if (Shell::GetInstance()->session_state_delegate()->IsUserSessionBlocked() ||
-      state_.is_adding_user_screen)
+  if (state_.is_screen_locked || state_.is_adding_user_screen)
     return SHELF_ALIGNMENT_BOTTOM;
   return alignment_;
 }
@@ -1033,7 +1031,7 @@ ShelfAutoHideState ShelfLayoutManager::CalculateAutoHideState(
     return SHELF_AUTO_HIDE_SHOWN;
 
   const std::vector<aura::Window*> windows =
-      ash::MruWindowTracker::BuildWindowList();
+      shell->mru_window_tracker()->BuildWindowListIgnoreModal();
 
   // Process the window list and check if there are any visible windows.
   bool visible_window = false;

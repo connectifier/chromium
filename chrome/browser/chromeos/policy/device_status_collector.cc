@@ -4,23 +4,32 @@
 
 #include "chrome/browser/chromeos/policy/device_status_collector.h"
 
+#include <stdint.h>
 #include <limits>
+#include <sys/statvfs.h>
 
 #include "base/bind.h"
 #include "base/bind_helpers.h"
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/scoped_ptr.h"
+#include "base/posix/eintr_wrapper.h"
 #include "base/prefs/pref_registry_simple.h"
 #include "base/prefs/pref_service.h"
 #include "base/prefs/scoped_user_pref_update.h"
+#include "base/process/process_handle.h"
+#include "base/process/process_iterator.h"
+#include "base/process/process_metrics.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/sys_info.h"
+#include "base/task_runner_util.h"
 #include "base/values.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chromeos/policy/browser_policy_connector_chromeos.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
 #include "chrome/common/chrome_version_info.h"
 #include "chrome/common/pref_names.h"
+#include "chromeos/disks/disk_mount_manager.h"
 #include "chromeos/network/device_state.h"
 #include "chromeos/network/network_handler.h"
 #include "chromeos/network/network_state.h"
@@ -52,6 +61,9 @@ const unsigned int kMaxStoredFutureActivityDays = 2;
 // How often, in seconds, to update the device location.
 const unsigned int kGeolocationPollIntervalSeconds = 30 * 60;
 
+// How often, in seconds, to sample the hardware state.
+static const unsigned int kHardwareStatusSampleIntervalSeconds = 120;
+
 const int64 kMillisecondsPerDay = Time::kMicrosecondsPerDay / 1000;
 
 // Keys for the geolocation status dictionary in local state.
@@ -72,6 +84,28 @@ int64 TimestampToDayKey(Time timestamp) {
   return (Time::FromUTCExploded(exploded) - Time::UnixEpoch()).InMilliseconds();
 }
 
+// Helper function (invoked via blocking pool) to fetch information about
+// mounted disks.
+std::vector<em::VolumeInfo> GetVolumeInfo(
+    const std::vector<std::string>& mount_points) {
+  std::vector<em::VolumeInfo> result;
+  for (const std::string& mount_point : mount_points) {
+    struct statvfs stat = {};  // Zero-clear
+    if (HANDLE_EINTR(statvfs(mount_point.c_str(), &stat)) == 0) {
+      em::VolumeInfo info;
+      info.set_volume_id(mount_point);
+      info.set_storage_total(static_cast<int64_t>(stat.f_blocks) *
+                             stat.f_frsize);
+      info.set_storage_free(static_cast<uint64_t>(stat.f_bavail) *
+                            stat.f_frsize);
+      result.push_back(info);
+    } else {
+      LOG(ERROR) << "Unable to get volume status for " << mount_point;
+    }
+  }
+  return result;
+}
+
 }  // namespace
 
 namespace policy {
@@ -79,7 +113,8 @@ namespace policy {
 DeviceStatusCollector::DeviceStatusCollector(
     PrefService* local_state,
     chromeos::system::StatisticsProvider* provider,
-    LocationUpdateRequester* location_update_requester)
+    const LocationUpdateRequester& location_update_requester,
+    const VolumeInfoFetcher& volume_info_fetcher)
     : max_stored_past_activity_days_(kMaxStoredPastActivityDays),
       max_stored_future_activity_days_(kMaxStoredFutureActivityDays),
       local_state_(local_state),
@@ -87,7 +122,9 @@ DeviceStatusCollector::DeviceStatusCollector(
       last_reported_day_(0),
       duration_for_last_reported_day_(0),
       geolocation_update_in_progress_(false),
+      volume_info_fetcher_(volume_info_fetcher),
       statistics_provider_(provider),
+      location_update_requester_(location_update_requester),
       report_version_info_(false),
       report_activity_times_(false),
       report_boot_mode_(false),
@@ -96,13 +133,19 @@ DeviceStatusCollector::DeviceStatusCollector(
       report_users_(false),
       report_hardware_status_(false),
       weak_factory_(this) {
-  if (location_update_requester)
-    location_update_requester_ = *location_update_requester;
+  if (volume_info_fetcher_.is_null())
+    volume_info_fetcher_ = base::Bind(&GetVolumeInfo);
+
   idle_poll_timer_.Start(FROM_HERE,
                          TimeDelta::FromSeconds(kIdlePollIntervalSeconds),
                          this, &DeviceStatusCollector::CheckIdleState);
+  hardware_status_sampling_timer_.Start(
+      FROM_HERE,
+      TimeDelta::FromSeconds(kHardwareStatusSampleIntervalSeconds),
+      this, &DeviceStatusCollector::SampleHardwareStatus);
 
   cros_settings_ = chromeos::CrosSettings::Get();
+
 
   // Watch for changes to the individual policies that control what the status
   // reports contain.
@@ -213,6 +256,8 @@ void DeviceStatusCollector::UpdateReportingSettings() {
       chromeos::kReportDeviceUsers, &report_users_)) {
     report_users_ = true;
   }
+
+  const bool already_reporting_hardware_status = report_hardware_status_;
   if (!cros_settings_->GetBoolean(
       chromeos::kReportDeviceHardwareStatus, &report_hardware_status_)) {
     report_hardware_status_ = true;
@@ -231,6 +276,14 @@ void DeviceStatusCollector::UpdateReportingSettings() {
     geolocation_update_timer_.Stop();
     position_ = content::Geoposition();
     local_state_->ClearPref(prefs::kDeviceLocation);
+  }
+
+  if (!report_hardware_status_) {
+    ClearCachedHardwareStatus();
+  } else if (!already_reporting_hardware_status) {
+    // Turning on hardware status reporting - fetch an initial sample
+    // immediately instead of waiting for the sampling timer to fire.
+    SampleHardwareStatus();
   }
 }
 
@@ -298,6 +351,11 @@ void DeviceStatusCollector::AddActivePeriod(Time start, Time end) {
   }
 }
 
+void DeviceStatusCollector::ClearCachedHardwareStatus() {
+  volume_info_.clear();
+  cpu_usage_percent_.clear();
+}
+
 void DeviceStatusCollector::IdleStateCallback(IdleState state) {
   // Do nothing if device activity reporting is disabled.
   if (!report_activity_times_)
@@ -321,6 +379,72 @@ void DeviceStatusCollector::IdleStateCallback(IdleState state) {
     PruneStoredActivityPeriods(now);
   }
   last_idle_check_ = now;
+}
+
+void DeviceStatusCollector::SampleHardwareStatus() {
+  // If hardware reporting has been disabled, do nothing here.
+  if (!report_hardware_status_)
+    return;
+
+  // Create list of mounted disk volumes to query status.
+  std::vector<std::string> mount_points;
+  for (const auto& mount_info :
+           chromeos::disks::DiskMountManager::GetInstance()->mount_points()) {
+    // Extract a list of mount points to populate.
+    mount_points.push_back(mount_info.first);
+  }
+
+  // Call out to the blocking pool to measure disk usage.
+  base::PostTaskAndReplyWithResult(
+      content::BrowserThread::GetBlockingPool(),
+      FROM_HERE,
+      base::Bind(volume_info_fetcher_, mount_points),
+      base::Bind(&DeviceStatusCollector::ReceiveVolumeInfo,
+                 weak_factory_.GetWeakPtr()));
+
+  SampleCPUUsage();
+}
+
+void DeviceStatusCollector::SampleCPUUsage() {
+  // Walk the process list and measure CPU utilization.
+  double total_usage = 0;
+  std::vector<double> per_process_usage = GetPerProcessCPUUsage();
+  for (double cpu_usage : per_process_usage) {
+    total_usage += cpu_usage;
+  }
+  cpu_usage_percent_.push_back(total_usage);
+
+  // If our cache of samples is full, throw out old samples to make room for new
+  // sample.
+  if (cpu_usage_percent_.size() > kMaxCPUSamples)
+    cpu_usage_percent_.pop_front();
+}
+
+std::vector<double> DeviceStatusCollector::GetPerProcessCPUUsage() {
+  std::vector<double> cpu_usage;
+  base::ProcessIterator process_iter(nullptr);
+
+  const int num_processors = base::SysInfo::NumberOfProcessors();
+  while (const base::ProcessEntry* process_entry =
+         process_iter.NextProcessEntry()) {
+    base::ProcessHandle process;
+    if (!base::OpenProcessHandle(process_entry->pid(), &process)) {
+      LOG(ERROR) << "Could not create process handle for process "
+                  << process_entry->pid();
+      continue;
+    }
+    scoped_ptr<base::ProcessMetrics> metrics(
+        base::ProcessMetrics::CreateProcessMetrics(process));
+    const double usage = metrics->GetPlatformIndependentCPUUsage();
+    base::CloseProcessHandle(process);
+    DCHECK_LE(0, usage);
+    if (usage > 0) {
+      // Convert CPU usage from "percentage of a single core" to "percentage of
+      // all CPU available".
+      cpu_usage.push_back(usage / num_processors);
+    }
+  }
+  return cpu_usage;
 }
 
 void DeviceStatusCollector::GetActivityTimes(
@@ -490,6 +614,12 @@ void DeviceStatusCollector::GetNetworkInterfaces(
     proto_state->set_signal_strength(state->signal_strength());
     if (!state->device_path().empty())
       proto_state->set_device_path(state->device_path());
+
+    if (!state->ip_address().empty())
+      proto_state->set_ip_address(state->ip_address());
+
+    if (!state->gateway().empty())
+      proto_state->set_gateway(state->gateway());
   }
 }
 
@@ -518,7 +648,16 @@ void DeviceStatusCollector::GetUsers(em::DeviceStatusReportRequest* request) {
 
 void DeviceStatusCollector::GetHardwareStatus(
     em::DeviceStatusReportRequest* status) {
-  // TODO(atwilson): Fill in hardware status fields.
+  // Add volume info.
+  status->clear_volume_info();
+  for (const em::VolumeInfo& info : volume_info_) {
+    *status->add_volume_info() = info;
+  }
+
+  status->clear_cpu_utilization_pct();
+  for (const int cpu_usage : cpu_usage_percent_) {
+    status->add_cpu_utilization_pct(cpu_usage);
+  }
 }
 
 bool DeviceStatusCollector::GetDeviceStatus(
@@ -622,6 +761,12 @@ void DeviceStatusCollector::ReceiveGeolocationUpdate(
   }
 
   ScheduleGeolocationUpdateRequest();
+}
+
+void DeviceStatusCollector::ReceiveVolumeInfo(
+    const std::vector<em::VolumeInfo>& info) {
+  if (report_hardware_status_)
+    volume_info_ = info;
 }
 
 }  // namespace policy

@@ -58,7 +58,8 @@ PlayerUtils.registerEMEEventListeners = function(player) {
     try {
       if (player.testConfig.sessionToLoad) {
         Utils.timeLog('Loading session: ' + player.testConfig.sessionToLoad);
-        var session = message.target.mediaKeys.createSession('persistent');
+        var session =
+            message.target.mediaKeys.createSession('persistent-license');
         addMediaKeySessionListeners(session);
         session.load(player.testConfig.sessionToLoad)
             .catch(function(error) { Utils.failTest(error, KEY_ERROR); });

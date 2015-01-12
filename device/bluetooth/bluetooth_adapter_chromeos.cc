@@ -112,7 +112,8 @@ BluetoothAdapterChromeOS::~BluetoothAdapterChromeOS() {
 }
 
 void BluetoothAdapterChromeOS::DeleteOnCorrectThread() const {
-  if (!ui_task_runner_->DeleteSoon(FROM_HERE, this))
+  if (ui_task_runner_->RunsTasksOnCurrentThread() ||
+      !ui_task_runner_->DeleteSoon(FROM_HERE, this))
     delete this;
 }
 
@@ -385,9 +386,7 @@ void BluetoothAdapterChromeOS::DevicePropertyChanged(
       property_name == properties->trusted.name() ||
       property_name == properties->connected.name() ||
       property_name == properties->uuids.name() ||
-      property_name == properties->rssi.name() ||
-      property_name == properties->connection_rssi.name() ||
-      property_name == properties->connection_tx_power.name())
+      property_name == properties->rssi.name())
     NotifyDeviceChanged(device_chromeos);
 
   // When a device becomes paired, mark it as trusted so that the user does

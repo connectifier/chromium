@@ -15,6 +15,7 @@
 #include "testing/platform_test.h"
 
 using base::ASCIIToUTF16;
+using bookmarks::BookmarkModel;
 
 @interface BookmarkAllTabsControllerOverride : BookmarkAllTabsController
 @end
@@ -60,7 +61,7 @@ class BookmarkAllTabsControllerTest : public CocoaProfileTest {
                    configuration:BookmarkEditor::SHOW_TREE];
   }
 
-  virtual void SetUp() {
+  void SetUp() override {
     CocoaProfileTest::SetUp();
     ASSERT_TRUE(profile());
 
@@ -69,7 +70,7 @@ class BookmarkAllTabsControllerTest : public CocoaProfileTest {
     [controller_ runAsModalSheet];
   }
 
-  virtual void TearDown() {
+  void TearDown() override {
     controller_ = NULL;
     CocoaProfileTest::TearDown();
   }

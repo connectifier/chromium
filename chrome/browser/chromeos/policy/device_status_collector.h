@@ -5,9 +5,12 @@
 #ifndef CHROME_BROWSER_CHROMEOS_POLICY_DEVICE_STATUS_COLLECTOR_H_
 #define CHROME_BROWSER_CHROMEOS_POLICY_DEVICE_STATUS_COLLECTOR_H_
 
+#include <deque>
 #include <string>
+#include <vector>
 
 #include "base/basictypes.h"
+#include "base/callback_forward.h"
 #include "base/callback_list.h"
 #include "base/compiler_specific.h"
 #include "base/memory/ref_counted.h"
@@ -22,6 +25,7 @@
 #include "components/policy/core/common/cloud/cloud_policy_client.h"
 #include "content/public/browser/geolocation_provider.h"
 #include "content/public/common/geoposition.h"
+#include "policy/proto/device_management_backend.pb.h"
 
 namespace chromeos {
 class CrosSettings;
@@ -33,10 +37,6 @@ class StatisticsProvider;
 namespace content {
 class NotificationDetails;
 class NotificationSource;
-}
-
-namespace enterprise_management {
-class DeviceStatusReportRequest;
 }
 
 class PrefRegistrySimple;
@@ -53,10 +53,17 @@ class DeviceStatusCollector : public CloudPolicyClient::StatusProvider {
       const content::GeolocationProvider::LocationUpdateCallback& callback)>
           LocationUpdateRequester;
 
+  using VolumeInfoFetcher = base::Callback<
+    std::vector<enterprise_management::VolumeInfo>(
+        const std::vector<std::string>& mount_points)>;
+
+  // Constructor. Callers can inject their own VolumeInfoFetcher, or if a null
+  // callback is passed, the default implementation will be used.
   DeviceStatusCollector(
       PrefService* local_state,
       chromeos::system::StatisticsProvider* provider,
-      LocationUpdateRequester* location_update_requester);
+      const LocationUpdateRequester& location_update_requester,
+      const VolumeInfoFetcher& volume_info_fetcher);
   virtual ~DeviceStatusCollector();
 
   // CloudPolicyClient::StatusProvider:
@@ -71,6 +78,9 @@ class DeviceStatusCollector : public CloudPolicyClient::StatusProvider {
   // How often, in seconds, to poll to see if the user is idle.
   static const unsigned int kIdlePollIntervalSeconds = 30;
 
+  // The total number of CPU samples cached internally.
+  static const unsigned int kMaxCPUSamples = 10;
+
  protected:
   // Check whether the user has been idle for a certain period of time.
   virtual void CheckIdleState();
@@ -80,6 +90,13 @@ class DeviceStatusCollector : public CloudPolicyClient::StatusProvider {
 
   // Callback which receives the results of the idle state check.
   void IdleStateCallback(IdleState state);
+
+  // Samples the current CPU usage and updates our cache of samples.
+  void SampleCPUUsage();
+
+  // Returns the percentage of total CPU that each process uses. Virtual so it
+  // can be mocked.
+  virtual std::vector<double> GetPerProcessCPUUsage();
 
   // The number of days in the past to store device activity.
   // This is kept in case device status uploads fail for a number of days.
@@ -103,6 +120,13 @@ class DeviceStatusCollector : public CloudPolicyClient::StatusProvider {
                                  int64 max_day_key);
 
   void AddActivePeriod(base::Time start, base::Time end);
+
+  // Samples the current hardware status to be sent up with the next device
+  // status update.
+  void SampleHardwareStatus();
+
+  // Clears the cached hardware status.
+  void ClearCachedHardwareStatus();
 
   // Callbacks from chromeos::VersionLoader.
   void OnOSVersion(const std::string& version);
@@ -132,6 +156,10 @@ class DeviceStatusCollector : public CloudPolicyClient::StatusProvider {
   // content::GeolocationUpdateCallback implementation.
   void ReceiveGeolocationUpdate(const content::Geoposition&);
 
+  // Callback invoked to update our cached disk information.
+  void ReceiveVolumeInfo(
+      const std::vector<enterprise_management::VolumeInfo>& info);
+
   // How often to poll to see if the user is idle.
   int poll_interval_seconds_;
 
@@ -151,12 +179,23 @@ class DeviceStatusCollector : public CloudPolicyClient::StatusProvider {
   bool geolocation_update_in_progress_;
 
   base::RepeatingTimer<DeviceStatusCollector> idle_poll_timer_;
+  base::RepeatingTimer<DeviceStatusCollector> hardware_status_sampling_timer_;
   base::OneShotTimer<DeviceStatusCollector> geolocation_update_timer_;
 
   std::string os_version_;
   std::string firmware_version_;
 
   content::Geoposition position_;
+
+  // Cached disk volume information.
+  std::vector<enterprise_management::VolumeInfo> volume_info_;
+
+  // Cached percentage-of-CPU-used data (contains multiple samples taken
+  // periodically every kHardwareStatusSampleIntervalSeconds).
+  std::deque<int> cpu_usage_percent_;
+
+  // Callback invoked to fetch information about the mounted disk volumes.
+  VolumeInfoFetcher volume_info_fetcher_;
 
   chromeos::system::StatisticsProvider* statistics_provider_;
 

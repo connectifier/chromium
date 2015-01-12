@@ -36,6 +36,7 @@
 using base::Time;
 using base::TimeDelta;
 using base::UTF8ToUTF16;
+using bookmarks::BookmarkModel;
 using content::BrowserThread;
 
 namespace history {
@@ -84,6 +85,9 @@ class AndroidProviderBackendDelegate : public HistoryBackend::Delegate {
   void NotifyURLsModified(const history::URLRows& rows) override {
     modified_details_.reset(new history::URLRows(rows));
   }
+  void NotifyKeywordSearchTermUpdated(const URLRow& row,
+                                      KeywordID keyword_id,
+                                      const base::string16& term) override {}
   void BroadcastNotifications(
       int type,
       scoped_ptr<HistoryDetails> details) override {

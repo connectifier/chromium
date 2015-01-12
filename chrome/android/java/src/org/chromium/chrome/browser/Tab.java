@@ -43,6 +43,7 @@ import org.chromium.chrome.browser.tabmodel.TabModel.TabSelectionType;
 import org.chromium.chrome.browser.tabmodel.TabModelBase;
 import org.chromium.chrome.browser.toolbar.ToolbarModel;
 import org.chromium.chrome.browser.ui.toolbar.ToolbarModelSecurityLevel;
+import org.chromium.components.navigation_interception.InterceptNavigationDelegate;
 import org.chromium.content.browser.ContentView;
 import org.chromium.content.browser.ContentViewClient;
 import org.chromium.content.browser.ContentViewCore;
@@ -54,6 +55,7 @@ import org.chromium.content_public.common.TopControlsState;
 import org.chromium.printing.PrintManagerDelegateImpl;
 import org.chromium.printing.PrintingController;
 import org.chromium.printing.PrintingControllerImpl;
+import org.chromium.ui.WindowOpenDisposition;
 import org.chromium.ui.base.Clipboard;
 import org.chromium.ui.base.LocalizationUtils;
 import org.chromium.ui.base.PageTransition;
@@ -144,6 +146,9 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     /** {@link ContentViewCore} showing the current page, or {@code null} if the tab is frozen. */
     private ContentViewCore mContentViewCore;
 
+    /** The parent view of the ContentView and the InfoBarContainer. */
+    private FrameLayout mContentViewParent;
+
     /** A list of Tab observers.  These are used to broadcast Tab events to listeners. */
     private final ObserverList<TabObserver> mObservers = new ObserverList<TabObserver>();
 
@@ -166,7 +171,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      */
     private boolean mGroupedWithParent = true;
 
-    private boolean mIsClosing = false;
+    private boolean mIsClosing;
+    private boolean mIsShowingErrorPage;
 
     private Bitmap mFavicon;
 
@@ -247,6 +253,13 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      * Indicates if mTitle should be displayed from right to left.
      */
     private boolean mIsTitleDirectionRtl;
+
+    /**
+     * The mInterceptNavigationDelegate will be consulted for top-level frame navigations. This
+     * allows presenting the intent picker to the user so that a native Android application can be
+     * used if available.
+     */
+    private InterceptNavigationDelegate mInterceptNavigationDelegate;
 
     private FullscreenManager mFullscreenManager;
     private float mPreviousFullscreenTopControlsOffsetY = Float.NaN;
@@ -411,6 +424,13 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
             return mFullscreenManager == null
                     ? false : mFullscreenManager.getPersistentFullscreenMode();
         }
+
+        @Override
+        public void openNewTab(String url, String extraHeaders, byte[] postData, int disposition,
+                boolean isRendererInitiated) {
+            Tab.this.openNewTab(
+                    url, extraHeaders, postData, disposition, true, isRendererInitiated);
+        }
     }
 
     /**
@@ -482,6 +502,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
                 observer.onDidFailLoad(Tab.this, isProvisionalLoad, isMainFrame, errorCode,
                         description, failingUrl);
             }
+
+            if (isMainFrame) didFailPageLoad(errorCode);
         }
 
         @Override
@@ -499,6 +521,11 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         @Override
         public void didCommitProvisionalLoadForFrame(long frameId, boolean isMainFrame, String url,
                 int transitionType) {
+            if (isMainFrame && UmaUtils.isRunningApplicationStart()) {
+                nativeRecordStartupToCommitUma();
+                UmaUtils.setRunningApplicationStart(false);
+            }
+
             if (isMainFrame) {
                 mIsTabStateDirty = true;
                 updateTitle();
@@ -757,6 +784,13 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     }
 
     /**
+     * @return Whether the {@link Tab} is currently showing an error page.
+     */
+    public boolean isShowingErrorPage() {
+        return mIsShowingErrorPage;
+    }
+
+    /**
      * @return Whether or not the tab has something valid to render.
      */
     public boolean isReady() {
@@ -769,8 +803,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      *         This can be {@code null}, if the tab is frozen or being initialized or destroyed.
      */
     public View getView() {
-        return mNativePage != null ? mNativePage.getView() :
-                (mContentViewCore != null ? mContentViewCore.getContainerView() : null);
+        return mNativePage != null ? mNativePage.getView() : mContentViewParent;
     }
 
     /**
@@ -1084,6 +1117,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
             // Updating the timestamp has to happen after the showInternal() call since subclasses
             // may use it for logging.
             mTimestampMillis = System.currentTimeMillis();
+
+            for (TabObserver observer : mObservers) observer.onShown(this);
         } finally {
             TraceEvent.end("Tab.show");
         }
@@ -1114,6 +1149,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         }
 
         hideInternal();
+
+        for (TabObserver observer : mObservers) observer.onHidden(this);
     }
 
     /**
@@ -1229,6 +1266,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      * @param showingErrorPage Whether an error page is being shown.
      */
     protected void didStartPageLoad(String validatedUrl, boolean showingErrorPage) {
+        mIsShowingErrorPage = showingErrorPage;
+
         updateTitle();
         removeSadTabIfPresent();
         mInfoBarContainer.onPageStarted();
@@ -1238,6 +1277,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         }
 
         clearHungRendererState();
+
+        for (TabObserver observer : mObservers) observer.onPageLoadStarted(this);
     }
 
     /**
@@ -1247,6 +1288,16 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         mIsTabStateDirty = true;
         updateTitle();
         updateFullscreenEnabledState();
+
+        for (TabObserver observer : mObservers) observer.onPageLoadFinished(this);
+    }
+
+    /**
+     * Called when a page has failed loading.
+     * @param errorCode The error code causing the page to fail loading.
+     */
+    protected void didFailPageLoad(int errorCode) {
+        for (TabObserver observer : mObservers) observer.onPageLoadFailed(this, errorCode);
     }
 
     /**
@@ -1294,6 +1345,18 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         cvc.getContainerView().setOnHierarchyChangeListener(this);
         cvc.getContainerView().setOnSystemUiVisibilityChangeListener(this);
 
+        // Wrap the ContentView in a FrameLayout, which will contain both the ContentView and the
+        // InfoBarContainer. The alternative -- placing the InfoBarContainer inside the ContentView
+        // -- causes problems since then the ContentView would contain both real views (the
+        // infobars) and virtual views (the web page elements), which breaks Android accessibility.
+        // http://crbug.com/416663
+        if (mContentViewParent != null) {
+            assert false;
+            mContentViewParent.removeAllViews();
+        }
+        mContentViewParent = new FrameLayout(mContext);
+        mContentViewParent.addView(cvc.getContainerView());
+
         mWebContentsDelegate = createWebContentsDelegate();
         mWebContentsObserver = new TabWebContentsObserver(mContentViewCore.getWebContents());
         mVoiceSearchTabHelper = new VoiceSearchTabHelper(mContentViewCore.getWebContents());
@@ -1312,9 +1375,9 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
             // initialized.
             WebContents webContents = mContentViewCore.getWebContents();
             mInfoBarContainer = new InfoBarContainer(
-                    mContext, getId(), mContentViewCore.getContainerView(), webContents);
+                    mContext, getId(), mContentViewParent, webContents);
         } else {
-            mInfoBarContainer.onParentViewChanged(getId(), mContentViewCore.getContainerView());
+            mInfoBarContainer.onParentViewChanged(getId(), mContentViewParent);
         }
 
         if (AppBannerManager.isEnabled() && mAppBannerManager == null) {
@@ -1519,13 +1582,12 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         // If we have no content or a native page, return null.
         if (getContentViewCore() == null) return null;
 
-        if (mFavicon != null) return mFavicon;
+        // Use the cached favicon only if the page wasn't changed.
+        if (mFavicon != null && mFaviconUrl != null && mFaviconUrl.equals(getUrl())) {
+            return mFavicon;
+        }
 
-        // Cache the result so we don't keep querying it.
-        mFavicon = nativeGetFavicon(mNativeTabAndroid);
-        // Invalidate the favicon URL so that if we do get a favicon for this page we don't drop it.
-        mFaviconUrl = null;
-        return mFavicon;
+        return nativeGetFavicon(mNativeTabAndroid);
     }
 
     /**
@@ -1641,6 +1703,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      */
     public void setClosing(boolean closing) {
         mIsClosing = closing;
+
+        for (TabObserver observer : mObservers) observer.onClosingStateChanged(this, closing);
     }
 
     /**
@@ -1705,9 +1769,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
 
         destroyContentViewCoreInternal(mContentViewCore);
 
-        if (mInfoBarContainer != null && mInfoBarContainer.getParent() != null) {
-            mInfoBarContainer.removeFromParentView();
-        }
+        mContentViewParent.removeAllViews();
+        mContentViewParent = null;
         mContentViewCore.destroy();
         mContentViewCore = null;
 
@@ -1781,7 +1844,6 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         boolean needUpdate = false;
         String url = getUrl();
         boolean pageUrlChanged = !url.equals(mFaviconUrl);
-
         // This method will be called multiple times if the page has more than one favicon.
         // we are trying to use the 16x16 DP icon here, Bitmap.createScaledBitmap will return
         // the origin bitmap if it is already 16x16 DP.
@@ -2201,6 +2263,86 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     }
 
     /**
+     * Request that this tab receive focus. Currently, this function requests focus for the main
+     * View (usually a ContentView).
+     */
+    public void requestFocus() {
+        View view = getView();
+        if (view != null) view.requestFocus();
+    }
+
+    @CalledByNative
+    protected void openNewTab(String url, String extraHeaders, byte[] postData, int disposition,
+            boolean hasParent, boolean isRendererInitiated) {
+        if (isClosing()) return;
+
+        boolean incognito = isIncognito();
+        TabLaunchType tabLaunchType = TabLaunchType.FROM_LONGPRESS_FOREGROUND;
+        Tab parentTab = hasParent ? this : null;
+
+        switch (disposition) {
+            case WindowOpenDisposition.NEW_WINDOW: // fall through
+            case WindowOpenDisposition.NEW_FOREGROUND_TAB:
+                break;
+            case WindowOpenDisposition.NEW_POPUP: // fall through
+            case WindowOpenDisposition.NEW_BACKGROUND_TAB:
+                tabLaunchType = TabLaunchType.FROM_LONGPRESS_BACKGROUND;
+                break;
+            case WindowOpenDisposition.OFF_THE_RECORD:
+                assert incognito;
+                incognito = true;
+                break;
+            default:
+                assert false;
+        }
+
+        // If shouldIgnoreNewTab returns true, the intent is handled by another
+        // activity. As a result, don't launch a new tab to open the URL.
+        if (shouldIgnoreNewTab(url, incognito)) return;
+
+        LoadUrlParams loadUrlParams = new LoadUrlParams(url);
+        loadUrlParams.setVerbatimHeaders(extraHeaders);
+        loadUrlParams.setPostData(postData);
+        loadUrlParams.setIsRendererInitiated(isRendererInitiated);
+        openNewTab(loadUrlParams, tabLaunchType, parentTab, incognito);
+    }
+
+    /**
+     * Asks the Tab to open another Tab with the given parameters.  Must be implemented by
+     * subclasses because the Tab itself has no access to a TabModel.
+     * @param params Parameters for loading a URL in the new Tab.
+     * @param launchType How the Tab is being launched.
+     * @param parentTab Tab that is spawning a new Tab.
+     * @param incognito Whether the new Tab is supposed to be incognito.
+     */
+    protected void openNewTab(
+            LoadUrlParams params, TabLaunchType launchType, Tab parentTab, boolean incognito) {
+        assert false : "Subclasses must implement this method.";
+    }
+
+    /**
+     * @return True if the Tab should block the creation of new tabs via {@link #openNewTab}.
+     */
+    protected boolean shouldIgnoreNewTab(String url, boolean incognito) {
+        return false;
+    }
+
+    /**
+     * See {@link #mInterceptNavigationDelegate}.
+     */
+    protected InterceptNavigationDelegate getInterceptNavigationDelegate() {
+        return mInterceptNavigationDelegate;
+    }
+
+    /**
+     * See {@link #mInterceptNavigationDelegate}.
+     */
+    protected void setInterceptNavigationDelegate(InterceptNavigationDelegate delegate) {
+        mInterceptNavigationDelegate = delegate;
+        nativeSetInterceptNavigationDelegate(mNativeTabAndroid, delegate);
+    }
+
+    /**
      * Ensures the counter is at least as high as the specified value.  The counter should always
      * point to an unused ID (which will be handed out next time a request comes in).  Exposed so
      * that anything externally loading tabs and ids can set enforce new tabs start at the correct
@@ -2234,4 +2376,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     private native void nativeUpdateTopControlsState(
             long nativeTabAndroid, int constraints, int current, boolean animate);
     private native void nativeSearchByImageInNewTabAsync(long nativeTabAndroid);
+    private native void nativeSetInterceptNavigationDelegate(long nativeTabAndroid,
+            InterceptNavigationDelegate delegate);
+    private static native void nativeRecordStartupToCommitUma();
 }

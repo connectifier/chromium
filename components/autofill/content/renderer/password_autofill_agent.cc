@@ -541,6 +541,9 @@ PasswordAutofillAgent::PasswordAutofillAgent(content::RenderFrame* render_frame)
       username_selection_start_(0),
       did_stop_loading_(false),
       weak_ptr_factory_(this) {
+  save_password_on_in_page_navigation_ =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          autofill::switches::kEnablePasswordSaveOnInPageNavigation);
   Send(new AutofillHostMsg_PasswordAutofillAgentConstructed(routing_id()));
 }
 
@@ -957,6 +960,8 @@ void PasswordAutofillAgent::FrameWillClose() {
 }
 
 void PasswordAutofillAgent::DidCommitProvisionalLoad(bool is_new_navigation) {
+  if (!save_password_on_in_page_navigation_)
+    return;
   blink::WebFrame* frame = render_frame()->GetWebFrame();
   // TODO(dvadym): check if we need to check if it is main frame navigation
   // http://crbug.com/443155
@@ -987,9 +992,8 @@ void PasswordAutofillAgent::DidStopLoading() {
   did_stop_loading_ = true;
 }
 
-void PasswordAutofillAgent::FrameDetached(blink::WebFrame* frame) {
-  if (frame == render_frame()->GetWebFrame())
-    FrameClosing();
+void PasswordAutofillAgent::FrameDetached() {
+  FrameClosing();
 }
 
 void PasswordAutofillAgent::WillSendSubmitEvent(
@@ -1377,11 +1381,6 @@ void PasswordAutofillAgent::LegacyPasswordAutofillAgent::DidStopLoading() {
 void PasswordAutofillAgent::LegacyPasswordAutofillAgent::
     DidStartProvisionalLoad(blink::WebLocalFrame* navigated_frame) {
   agent_->LegacyDidStartProvisionalLoad(navigated_frame);
-}
-
-void PasswordAutofillAgent::LegacyPasswordAutofillAgent::FrameDetached(
-    blink::WebFrame* frame) {
-  agent_->FrameDetached(frame);
 }
 
 }  // namespace autofill

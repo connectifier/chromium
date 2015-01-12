@@ -13,6 +13,7 @@
 #include "base/run_loop.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
+#include "base/test/simple_test_clock.h"
 #include "net/base/cache_type.h"
 #include "net/base/elements_upload_data_stream.h"
 #include "net/base/host_port_pair.h"
@@ -25,6 +26,7 @@
 #include "net/cert/cert_status_flags.h"
 #include "net/disk_cache/disk_cache.h"
 #include "net/http/http_byte_range.h"
+#include "net/http/http_cache_transaction.h"
 #include "net/http/http_request_headers.h"
 #include "net/http/http_request_info.h"
 #include "net/http/http_response_headers.h"
@@ -3745,15 +3747,13 @@ TEST(HttpCache, GET_Crazy416) {
   RemoveMockTransaction(&transaction);
 }
 
-// Tests that we store partial responses that can't be validated, as they can
-// be used for requests that don't require revalidation.
+// Tests that we don't store partial responses that can't be validated.
 TEST(HttpCache, RangeGET_NoStrongValidators) {
   MockHttpCache cache;
   std::string headers;
 
-  // Write to the cache (40-49).
-  MockTransaction transaction(kRangeGET_TransactionOK);
-  AddMockTransaction(&transaction);
+  // Attempt to write to the cache (40-49).
+  ScopedMockTransaction transaction(kRangeGET_TransactionOK);
   transaction.response_headers = "Content-Length: 10\n"
                                  "Cache-Control: max-age=3600\n"
                                  "ETag: w/\"foo\"\n";
@@ -3764,29 +3764,26 @@ TEST(HttpCache, RangeGET_NoStrongValidators) {
   EXPECT_EQ(0, cache.disk_cache()->open_count());
   EXPECT_EQ(1, cache.disk_cache()->create_count());
 
-  // Now verify that there's cached data.
+  // Now verify that there's no cached data.
   RunTransactionTestWithResponse(cache.http_cache(), kRangeGET_TransactionOK,
                                  &headers);
 
   Verify206Response(headers, 40, 49);
-  EXPECT_EQ(1, cache.network_layer()->transaction_count());
-  EXPECT_EQ(1, cache.disk_cache()->open_count());
-  EXPECT_EQ(1, cache.disk_cache()->create_count());
-
-  RemoveMockTransaction(&transaction);
+  EXPECT_EQ(2, cache.network_layer()->transaction_count());
+  EXPECT_EQ(0, cache.disk_cache()->open_count());
+  EXPECT_EQ(2, cache.disk_cache()->create_count());
 }
 
-// Tests failures to validate cache partial responses that lack strong
-// validators.
-TEST(HttpCache, RangeGET_NoValidation) {
+// Tests failures to conditionalize byte range requests.
+TEST(HttpCache, RangeGET_NoConditionalization) {
   MockHttpCache cache;
+  cache.FailConditionalizations();
   std::string headers;
 
   // Write to the cache (40-49).
-  MockTransaction transaction(kRangeGET_TransactionOK);
-  AddMockTransaction(&transaction);
+  ScopedMockTransaction transaction(kRangeGET_TransactionOK);
   transaction.response_headers = "Content-Length: 10\n"
-                                 "ETag: w/\"foo\"\n";
+                                 "ETag: \"foo\"\n";
   RunTransactionTestWithResponse(cache.http_cache(), transaction, &headers);
 
   Verify206Response(headers, 40, 49);
@@ -3802,20 +3799,18 @@ TEST(HttpCache, RangeGET_NoValidation) {
   EXPECT_EQ(2, cache.network_layer()->transaction_count());
   EXPECT_EQ(1, cache.disk_cache()->open_count());
   EXPECT_EQ(2, cache.disk_cache()->create_count());
-
-  RemoveMockTransaction(&transaction);
 }
 
 // Tests that restarting a partial request when the cached data cannot be
 // revalidated logs an event.
 TEST(HttpCache, RangeGET_NoValidation_LogsRestart) {
   MockHttpCache cache;
+  cache.FailConditionalizations();
 
   // Write to the cache (40-49).
   ScopedMockTransaction transaction(kRangeGET_TransactionOK);
-  transaction.response_headers =
-      "Content-Length: 10\n"
-      "ETag: w/\"foo\"\n";
+  transaction.response_headers = "Content-Length: 10\n"
+                                 "ETag: \"foo\"\n";
   RunTransactionTest(cache.http_cache(), transaction);
 
   // Now verify that the cached data is not used.
@@ -3825,6 +3820,84 @@ TEST(HttpCache, RangeGET_NoValidation_LogsRestart) {
 
   EXPECT_TRUE(LogContainsEventType(
       log, net::NetLog::TYPE_HTTP_CACHE_RESTART_PARTIAL_REQUEST));
+}
+
+// Tests that a failure to conditionalize a regular request (no range) with a
+// sparse entry results in a full response.
+TEST(HttpCache, GET_NoConditionalization) {
+  MockHttpCache cache;
+  cache.FailConditionalizations();
+  std::string headers;
+
+  // Write to the cache (40-49).
+  ScopedMockTransaction transaction(kRangeGET_TransactionOK);
+  transaction.response_headers = "Content-Length: 10\n"
+                                 "ETag: \"foo\"\n";
+  RunTransactionTestWithResponse(cache.http_cache(), transaction, &headers);
+
+  Verify206Response(headers, 40, 49);
+  EXPECT_EQ(1, cache.network_layer()->transaction_count());
+  EXPECT_EQ(0, cache.disk_cache()->open_count());
+  EXPECT_EQ(1, cache.disk_cache()->create_count());
+
+  // Now verify that the cached data is not used.
+  // Don't ask for a range. The cache will attempt to use the cached data but
+  // should discard it as it cannot be validated. A regular request should go
+  // to the server and a new entry should be created.
+  transaction.request_headers = EXTRA_HEADER;
+  transaction.data = "Not a range";
+  RunTransactionTestWithResponse(cache.http_cache(), transaction, &headers);
+
+  EXPECT_EQ(0U, headers.find("HTTP/1.1 200 OK\n"));
+  EXPECT_EQ(2, cache.network_layer()->transaction_count());
+  EXPECT_EQ(1, cache.disk_cache()->open_count());
+  EXPECT_EQ(2, cache.disk_cache()->create_count());
+
+  // The last response was saved.
+  RunTransactionTest(cache.http_cache(), transaction);
+  EXPECT_EQ(3, cache.network_layer()->transaction_count());
+  EXPECT_EQ(2, cache.disk_cache()->open_count());
+  EXPECT_EQ(2, cache.disk_cache()->create_count());
+}
+
+// Verifies that conditionalization failures when asking for a range that would
+// require the cache to modify the range to ask, result in a network request
+// that matches the user's one.
+TEST(HttpCache, RangeGET_NoConditionalization2) {
+  MockHttpCache cache;
+  cache.FailConditionalizations();
+  std::string headers;
+
+  // Write to the cache (40-49).
+  ScopedMockTransaction transaction(kRangeGET_TransactionOK);
+  transaction.response_headers = "Content-Length: 10\n"
+                                 "ETag: \"foo\"\n";
+  RunTransactionTestWithResponse(cache.http_cache(), transaction, &headers);
+
+  Verify206Response(headers, 40, 49);
+  EXPECT_EQ(1, cache.network_layer()->transaction_count());
+  EXPECT_EQ(0, cache.disk_cache()->open_count());
+  EXPECT_EQ(1, cache.disk_cache()->create_count());
+
+  // Now verify that the cached data is not used.
+  // Ask for a range that extends before and after the cached data so that the
+  // cache would normally mix data from three sources. After deleting the entry,
+  // the response will come from a single network request.
+  transaction.request_headers = "Range: bytes = 20-59\r\n" EXTRA_HEADER;
+  transaction.data = "rg: 20-29 rg: 30-39 rg: 40-49 rg: 50-59 ";
+  transaction.response_headers = kRangeGET_TransactionOK.response_headers;
+  RunTransactionTestWithResponse(cache.http_cache(), transaction, &headers);
+
+  Verify206Response(headers, 20, 59);
+  EXPECT_EQ(2, cache.network_layer()->transaction_count());
+  EXPECT_EQ(1, cache.disk_cache()->open_count());
+  EXPECT_EQ(2, cache.disk_cache()->create_count());
+
+  // The last response was saved.
+  RunTransactionTest(cache.http_cache(), transaction);
+  EXPECT_EQ(2, cache.network_layer()->transaction_count());
+  EXPECT_EQ(2, cache.disk_cache()->open_count());
+  EXPECT_EQ(2, cache.disk_cache()->create_count());
 }
 
 // Tests that we cache partial responses that lack content-length.
@@ -7023,6 +7096,115 @@ TEST(HttpCache, ReceivedBytesRange) {
   EXPECT_EQ(range_response_size * 2, received_bytes);
 
   RemoveMockTransaction(&kRangeGET_TransactionOK);
+}
+
+class HttpCachePrefetchValidationTest : public ::testing::Test {
+ protected:
+  static const int kMaxAgeSecs = 100;
+  static const int kRequireValidationSecs = kMaxAgeSecs + 1;
+
+  HttpCachePrefetchValidationTest() : transaction_(kSimpleGET_Transaction) {
+    DCHECK_LT(kMaxAgeSecs, prefetch_reuse_mins() * net::kNumSecondsPerMinute);
+
+    clock_ = new base::SimpleTestClock();
+    cache_.http_cache()->SetClockForTesting(make_scoped_ptr(clock_));
+    cache_.network_layer()->SetClock(clock_);
+
+    transaction_.response_headers = "Cache-Control: max-age=100\n";
+  }
+
+  bool TransactionRequiredNetwork(int load_flags) {
+    int pre_transaction_count = transaction_count();
+    transaction_.load_flags = load_flags;
+    RunTransactionTest(cache_.http_cache(), transaction_);
+    return pre_transaction_count != transaction_count();
+  }
+
+  void AdvanceTime(int seconds) {
+    clock_->Advance(base::TimeDelta::FromSeconds(seconds));
+  }
+
+  int prefetch_reuse_mins() { return net::HttpCache::kPrefetchReuseMins; }
+
+  // How many times this test has sent requests to the (fake) origin
+  // server. Every test case needs to make at least one request to initialise
+  // the cache.
+  int transaction_count() {
+    return cache_.network_layer()->transaction_count();
+  }
+
+  MockHttpCache cache_;
+  ScopedMockTransaction transaction_;
+  std::string response_headers_;
+  base::SimpleTestClock* clock_;
+};
+
+TEST_F(HttpCachePrefetchValidationTest, SkipValidationShortlyAfterPrefetch) {
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_PREFETCH));
+  AdvanceTime(kRequireValidationSecs);
+  EXPECT_FALSE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+}
+
+TEST_F(HttpCachePrefetchValidationTest, ValidateLongAfterPrefetch) {
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_PREFETCH));
+  AdvanceTime(prefetch_reuse_mins() * net::kNumSecondsPerMinute);
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+}
+
+TEST_F(HttpCachePrefetchValidationTest, SkipValidationOnceOnly) {
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_PREFETCH));
+  AdvanceTime(kRequireValidationSecs);
+  EXPECT_FALSE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+}
+
+TEST_F(HttpCachePrefetchValidationTest, SkipValidationOnceReadOnly) {
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_PREFETCH));
+  AdvanceTime(kRequireValidationSecs);
+  EXPECT_FALSE(TransactionRequiredNetwork(net::LOAD_ONLY_FROM_CACHE));
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+}
+
+TEST_F(HttpCachePrefetchValidationTest, BypassCacheOverwritesPrefetch) {
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_PREFETCH));
+  AdvanceTime(kRequireValidationSecs);
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_BYPASS_CACHE));
+  AdvanceTime(kRequireValidationSecs);
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+}
+
+TEST_F(HttpCachePrefetchValidationTest,
+       SkipValidationOnExistingEntryThatNeedsValidation) {
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+  AdvanceTime(kRequireValidationSecs);
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_PREFETCH));
+  AdvanceTime(kRequireValidationSecs);
+  EXPECT_FALSE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+}
+
+TEST_F(HttpCachePrefetchValidationTest,
+       SkipValidationOnExistingEntryThatDoesNotNeedValidation) {
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+  EXPECT_FALSE(TransactionRequiredNetwork(net::LOAD_PREFETCH));
+  AdvanceTime(kRequireValidationSecs);
+  EXPECT_FALSE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+}
+
+TEST_F(HttpCachePrefetchValidationTest, PrefetchMultipleTimes) {
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_PREFETCH));
+  EXPECT_FALSE(TransactionRequiredNetwork(net::LOAD_PREFETCH));
+  AdvanceTime(kRequireValidationSecs);
+  EXPECT_FALSE(TransactionRequiredNetwork(net::LOAD_NORMAL));
+}
+
+TEST_F(HttpCachePrefetchValidationTest, ValidateOnDelayedSecondPrefetch) {
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_PREFETCH));
+  AdvanceTime(kRequireValidationSecs);
+  EXPECT_TRUE(TransactionRequiredNetwork(net::LOAD_PREFETCH));
+  AdvanceTime(kRequireValidationSecs);
+  EXPECT_FALSE(TransactionRequiredNetwork(net::LOAD_NORMAL));
 }
 
 // Framework for tests of stale-while-revalidate related functionality.  With

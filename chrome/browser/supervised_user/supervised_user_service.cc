@@ -16,18 +16,18 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
-#include "chrome/browser/supervised_user/custodian_profile_downloader_service.h"
-#include "chrome/browser/supervised_user/custodian_profile_downloader_service_factory.h"
 #include "chrome/browser/supervised_user/experimental/supervised_user_blacklist_downloader.h"
-#include "chrome/browser/supervised_user/permission_request_creator_sync.h"
+#include "chrome/browser/supervised_user/legacy/custodian_profile_downloader_service.h"
+#include "chrome/browser/supervised_user/legacy/custodian_profile_downloader_service_factory.h"
+#include "chrome/browser/supervised_user/legacy/permission_request_creator_sync.h"
+#include "chrome/browser/supervised_user/legacy/supervised_user_pref_mapping_service.h"
+#include "chrome/browser/supervised_user/legacy/supervised_user_pref_mapping_service_factory.h"
+#include "chrome/browser/supervised_user/legacy/supervised_user_registration_utility.h"
+#include "chrome/browser/supervised_user/legacy/supervised_user_shared_settings_service_factory.h"
 #include "chrome/browser/supervised_user/supervised_user_constants.h"
-#include "chrome/browser/supervised_user/supervised_user_pref_mapping_service.h"
-#include "chrome/browser/supervised_user/supervised_user_pref_mapping_service_factory.h"
-#include "chrome/browser/supervised_user/supervised_user_registration_utility.h"
 #include "chrome/browser/supervised_user/supervised_user_service_observer.h"
 #include "chrome/browser/supervised_user/supervised_user_settings_service.h"
 #include "chrome/browser/supervised_user/supervised_user_settings_service_factory.h"
-#include "chrome/browser/supervised_user/supervised_user_shared_settings_service_factory.h"
 #include "chrome/browser/supervised_user/supervised_user_site_list.h"
 #include "chrome/browser/supervised_user/supervised_user_whitelist_service.h"
 #include "chrome/browser/sync/profile_sync_service.h"
@@ -103,20 +103,11 @@ void SupervisedUserService::URLFilterContext::SetDefaultFilteringBehavior(
 }
 
 void SupervisedUserService::URLFilterContext::LoadWhitelists(
-    ScopedVector<SupervisedUserSiteList> site_lists) {
-  // SupervisedUserURLFilter::LoadWhitelists takes ownership of |site_lists|,
-  // so we make an additional copy of it.
-  // TODO(bauerb): This is kinda ugly.
-  ScopedVector<SupervisedUserSiteList> site_lists_copy;
-  for (const SupervisedUserSiteList* site_list : site_lists)
-    site_lists_copy.push_back(site_list->Clone());
-
-  ui_url_filter_->LoadWhitelists(site_lists.Pass());
-  BrowserThread::PostTask(
-      BrowserThread::IO,
-      FROM_HERE,
-      base::Bind(&SupervisedUserURLFilter::LoadWhitelists,
-                 io_url_filter_, base::Passed(&site_lists_copy)));
+    const std::vector<scoped_refptr<SupervisedUserSiteList> >& site_lists) {
+  ui_url_filter_->LoadWhitelists(site_lists);
+  BrowserThread::PostTask(BrowserThread::IO, FROM_HERE,
+                          base::Bind(&SupervisedUserURLFilter::LoadWhitelists,
+                                     io_url_filter_, site_lists));
 }
 
 void SupervisedUserService::URLFilterContext::LoadBlacklist(
@@ -282,25 +273,6 @@ SupervisedUserURLFilter* SupervisedUserService::GetURLFilterForUIThread() {
 
 SupervisedUserWhitelistService* SupervisedUserService::GetWhitelistService() {
   return whitelist_service_.get();
-}
-
-// Items not on any list must return -1 (CATEGORY_NOT_ON_LIST in history.js).
-// Items on a list, but with no category, must return 0 (CATEGORY_OTHER).
-#define CATEGORY_NOT_ON_LIST -1;
-#define CATEGORY_OTHER 0;
-
-int SupervisedUserService::GetCategory(const GURL& url) {
-  std::vector<SupervisedUserSiteList::Site*> sites;
-  GetURLFilterForUIThread()->GetSites(url, &sites);
-  if (sites.empty())
-    return CATEGORY_NOT_ON_LIST;
-
-  return (*sites.begin())->category_id;
-}
-
-// static
-void SupervisedUserService::GetCategoryNames(CategoryList* list) {
-  SupervisedUserSiteList::GetCategoryNames(list);
 }
 
 std::string SupervisedUserService::GetCustodianEmailAddress() const {
@@ -593,8 +565,8 @@ void SupervisedUserService::OnDefaultFilteringBehaviorChanged() {
 }
 
 void SupervisedUserService::OnSiteListsChanged(
-    ScopedVector<SupervisedUserSiteList> site_lists) {
-  url_filter_context_.LoadWhitelists(site_lists.Pass());
+    const std::vector<scoped_refptr<SupervisedUserSiteList> >& site_lists) {
+  url_filter_context_.LoadWhitelists(site_lists);
 }
 
 void SupervisedUserService::OnSiteListUpdated() {

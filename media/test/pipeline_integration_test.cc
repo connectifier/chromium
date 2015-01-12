@@ -9,6 +9,7 @@
 #include "build/build_config.h"
 #include "media/base/cdm_callback_promise.h"
 #include "media/base/cdm_context.h"
+#include "media/base/cdm_key_information.h"
 #include "media/base/decoder_buffer.h"
 #include "media/base/media.h"
 #include "media/base/media_keys.h"
@@ -146,13 +147,14 @@ class FakeEncryptedMedia {
     virtual ~AppBase() {}
 
     virtual void OnSessionMessage(const std::string& web_session_id,
-                                  const std::vector<uint8>& message,
-                                  const GURL& destination_url) = 0;
+                                  MediaKeys::MessageType message_type,
+                                  const std::vector<uint8>& message) = 0;
 
     virtual void OnSessionClosed(const std::string& web_session_id) = 0;
 
     virtual void OnSessionKeysChange(const std::string& web_session_id,
-                                     bool has_additional_usable_key) = 0;
+                                     bool has_additional_usable_key,
+                                     CdmKeysInfo keys_info) = 0;
 
     // Errors are not expected unless overridden.
     virtual void OnSessionError(const std::string& web_session_id,
@@ -181,9 +183,9 @@ class FakeEncryptedMedia {
 
   // Callbacks for firing session events. Delegate to |app_|.
   void OnSessionMessage(const std::string& web_session_id,
-                        const std::vector<uint8>& message,
-                        const GURL& destination_url) {
-    app_->OnSessionMessage(web_session_id, message, destination_url);
+                        MediaKeys::MessageType message_type,
+                        const std::vector<uint8>& message) {
+    app_->OnSessionMessage(web_session_id, message_type, message);
   }
 
   void OnSessionClosed(const std::string& web_session_id) {
@@ -191,8 +193,10 @@ class FakeEncryptedMedia {
   }
 
   void OnSessionKeysChange(const std::string& web_session_id,
-                           bool has_additional_usable_key) {
-    app_->OnSessionKeysChange(web_session_id, has_additional_usable_key);
+                           bool has_additional_usable_key,
+                           CdmKeysInfo keys_info) {
+    app_->OnSessionKeysChange(web_session_id, has_additional_usable_key,
+                              keys_info.Pass());
   }
 
   void OnSessionError(const std::string& web_session_id,
@@ -275,8 +279,8 @@ class KeyProvidingApp : public FakeEncryptedMedia::AppBase {
   }
 
   void OnSessionMessage(const std::string& web_session_id,
-                        const std::vector<uint8>& message,
-                        const GURL& destination_url) override {
+                        MediaKeys::MessageType message_type,
+                        const std::vector<uint8>& message) override {
     EXPECT_FALSE(web_session_id.empty());
     EXPECT_FALSE(message.empty());
     EXPECT_EQ(current_session_id_, web_session_id);
@@ -287,7 +291,8 @@ class KeyProvidingApp : public FakeEncryptedMedia::AppBase {
   }
 
   void OnSessionKeysChange(const std::string& web_session_id,
-                           bool has_additional_usable_key) override {
+                           bool has_additional_usable_key,
+                           CdmKeysInfo keys_info) override {
     EXPECT_EQ(current_session_id_, web_session_id);
     EXPECT_EQ(has_additional_usable_key, true);
   }
@@ -296,9 +301,9 @@ class KeyProvidingApp : public FakeEncryptedMedia::AppBase {
                                 const std::vector<uint8>& init_data,
                                 AesDecryptor* decryptor) override {
     if (current_session_id_.empty()) {
-      decryptor->CreateSession(init_data_type, kInitData, arraysize(kInitData),
-                               MediaKeys::TEMPORARY_SESSION,
-                               CreateSessionPromise(RESOLVED));
+      decryptor->CreateSessionAndGenerateRequest(
+          MediaKeys::TEMPORARY_SESSION, init_data_type, kInitData,
+          arraysize(kInitData), CreateSessionPromise(RESOLVED));
       EXPECT_FALSE(current_session_id_.empty());
     }
 
@@ -342,9 +347,10 @@ class RotatingKeyProvidingApp : public KeyProvidingApp {
     prev_init_data_ = init_data;
     ++num_distint_need_key_calls_;
 
-    decryptor->CreateSession(init_data_type, vector_as_array(&init_data),
-                             init_data.size(), MediaKeys::TEMPORARY_SESSION,
-                             CreateSessionPromise(RESOLVED));
+    decryptor->CreateSessionAndGenerateRequest(
+        MediaKeys::TEMPORARY_SESSION, init_data_type,
+        vector_as_array(&init_data), init_data.size(),
+        CreateSessionPromise(RESOLVED));
 
     std::vector<uint8> key_id;
     std::vector<uint8> key;
@@ -399,8 +405,8 @@ class RotatingKeyProvidingApp : public KeyProvidingApp {
 class NoResponseApp : public FakeEncryptedMedia::AppBase {
  public:
   void OnSessionMessage(const std::string& web_session_id,
-                        const std::vector<uint8>& message,
-                        const GURL& default_url) override {
+                        MediaKeys::MessageType message_type,
+                        const std::vector<uint8>& message) override {
     EXPECT_FALSE(web_session_id.empty());
     EXPECT_FALSE(message.empty());
     FAIL() << "Unexpected Message";
@@ -412,7 +418,8 @@ class NoResponseApp : public FakeEncryptedMedia::AppBase {
   }
 
   void OnSessionKeysChange(const std::string& web_session_id,
-                           bool has_additional_usable_key) override {
+                           bool has_additional_usable_key,
+                           CdmKeysInfo keys_info) override {
     EXPECT_FALSE(web_session_id.empty());
     EXPECT_EQ(has_additional_usable_key, true);
   }

@@ -188,15 +188,15 @@ def _ParseRevisionsFromDEPSFileManually(deps_file_contents):
   return dict(re_results)
 
 
-def _WaitUntilBuildIsReady(fetch_build_func, bot_name, builder_host,
-                           builder_port, build_request_id, max_timeout):
+def _WaitUntilBuildIsReady(fetch_build_func, bot_name, builder_type,
+                           build_request_id, max_timeout):
   """Waits until build is produced by bisect builder on try server.
 
   Args:
     fetch_build_func: Function to check and download build from cloud storage.
     bot_name: Builder bot name on try server.
-    builder_host Try server host name.
-    builder_port: Try server port.
+    builder_type: Builder type, e.g. "perf" or "full". Refer to the constants
+        |fetch_build| which determine the valid values that can be passed.
     build_request_id: A unique ID of the build request posted to try server.
     max_timeout: Maximum time to wait for the build.
 
@@ -224,12 +224,12 @@ def _WaitUntilBuildIsReady(fetch_build_func, bot_name, builder_host,
       if not build_num:
         # Get the build number on try server for the current build.
         build_num = request_build.GetBuildNumFromBuilder(
-            build_request_id, bot_name, builder_host, builder_port)
+            build_request_id, bot_name, builder_type)
       # Check the status of build using the build number.
       # Note: Build is treated as PENDING if build number is not found
       # on the the try server.
       build_status, status_link = request_build.GetBuildStatus(
-          build_num, bot_name, builder_host, builder_port)
+          build_num, bot_name, builder_type)
       if build_status == request_build.FAILED:
         return (None, 'Failed to produce build, log: %s' % status_link)
     elapsed_time = time.time() - start_time
@@ -787,13 +787,15 @@ class BisectPerformanceMetrics(object):
       return destination_dir
     return None
 
-  def _DownloadAndUnzipBuild(self, revision, depot, build_type='Release'):
+  def _DownloadAndUnzipBuild(self, revision, depot, build_type='Release',
+                             create_patch=False):
     """Downloads the build archive for the given revision.
 
     Args:
       revision: The git revision to download.
       depot: The name of a dependency repository. Should be in DEPOT_NAMES.
       build_type: Target build type, e.g. Release', 'Debug', 'Release_x64' etc.
+      create_patch: Create a patch with any locally modified files.
 
     Returns:
       True if download succeeds, otherwise False.
@@ -802,7 +804,11 @@ class BisectPerformanceMetrics(object):
     patch_sha = None
     if depot != 'chromium':
       # Create a DEPS patch with new revision for dependency repository.
-      revision, patch = self.CreateDEPSPatch(depot, revision)
+      self._CreateDEPSPatch(depot, revision)
+      create_patch = True
+
+    if create_patch:
+      revision, patch = self._CreatePatch(revision)
 
     if patch:
       # Get the SHA of the DEPS changes patch.
@@ -884,8 +890,7 @@ class BisectPerformanceMetrics(object):
         '%s-%s-%s' % (git_revision, deps_patch, time.time()))
 
     # Revert any changes to DEPS file.
-    source_control.CheckoutFileAtRevision(
-        bisect_utils.FILE_DEPS, git_revision, cwd=self.src_cwd)
+    bisect_utils.CheckRunGit(['reset', '--hard', 'HEAD'], cwd=self.src_cwd)
 
     bot_name = self._GetBuilderName(self.opts.target_platform)
     build_timeout = self._GetBuilderBuildTime()
@@ -898,8 +903,8 @@ class BisectPerformanceMetrics(object):
       return None
 
     archive_filename, error_msg = _WaitUntilBuildIsReady(
-        fetch_build_func, bot_name, self.opts.builder_host,
-        self.opts.builder_port, build_request_id, build_timeout)
+        fetch_build_func, bot_name, self.opts.builder_type, build_request_id,
+        build_timeout)
     if not archive_filename:
       logging.warn('%s [revision: %s]', error_msg, git_revision)
     return archive_filename
@@ -1011,7 +1016,8 @@ class BisectPerformanceMetrics(object):
 
   def IsDownloadable(self, depot):
     """Checks if build can be downloaded based on target platform and depot."""
-    if self.opts.target_platform in ['chromium', 'android']:
+    if (self.opts.target_platform in ['chromium', 'android']
+        and self.opts.builder_type == fetch_build.PERF_BUILDER):
       return (depot == 'chromium' or
               'chromium' in bisect_utils.DEPOT_DEPS_NAME[depot]['from'] or
               'v8' in bisect_utils.DEPOT_DEPS_NAME[depot]['from'])
@@ -1103,15 +1109,12 @@ class BisectPerformanceMetrics(object):
       logging.warn('Something went wrong while updating DEPS file. [%s]', e)
     return False
 
-  def CreateDEPSPatch(self, depot, revision):
-    """Modifies DEPS and returns diff as text.
+  def _CreateDEPSPatch(self, depot, revision):
+    """Checks out the DEPS file at the specified revision and modifies it.
 
     Args:
       depot: Current depot being bisected.
       revision: A git hash revision of the dependency repository.
-
-    Returns:
-      A tuple with git hash of chromium revision and DEPS patch text.
     """
     deps_file_path = os.path.join(self.src_cwd, bisect_utils.FILE_DEPS)
     if not os.path.exists(deps_file_path):
@@ -1125,33 +1128,50 @@ class BisectPerformanceMetrics(object):
     if ('chromium' in bisect_utils.DEPOT_DEPS_NAME[depot]['from'] or
         'v8' in bisect_utils.DEPOT_DEPS_NAME[depot]['from']):
       # Checkout DEPS file for the current chromium revision.
-      if source_control.CheckoutFileAtRevision(
+      if not source_control.CheckoutFileAtRevision(
           bisect_utils.FILE_DEPS, chromium_sha, cwd=self.src_cwd):
-        if self.UpdateDeps(revision, depot, deps_file_path):
-          diff_command = [
-              'diff',
-              '--src-prefix=',
-              '--dst-prefix=',
-              '--no-ext-diff',
-               bisect_utils.FILE_DEPS,
-          ]
-          diff_text = bisect_utils.CheckRunGit(diff_command, cwd=self.src_cwd)
-          return (chromium_sha, ChangeBackslashToSlashInPatch(diff_text))
-        else:
-          raise RuntimeError(
-              'Failed to update DEPS file for chromium: [%s]' % chromium_sha)
-      else:
         raise RuntimeError(
             'DEPS checkout Failed for chromium revision : [%s]' % chromium_sha)
-    return (None, None)
 
-  def ObtainBuild(self, depot, revision=None):
+      if not self.UpdateDeps(revision, depot, deps_file_path):
+        raise RuntimeError(
+            'Failed to update DEPS file for chromium: [%s]' % chromium_sha)
+
+  def _CreatePatch(self, revision):
+    """Creates a patch from currently modified files.
+
+    Args:
+      depot: Current depot being bisected.
+      revision: A git hash revision of the dependency repository.
+
+    Returns:
+      A tuple with git hash of chromium revision and DEPS patch text.
+    """
+    # Get current chromium revision (git hash).
+    chromium_sha = bisect_utils.CheckRunGit(['rev-parse', 'HEAD']).strip()
+    if not chromium_sha:
+      raise RuntimeError('Failed to determine Chromium revision for %s' %
+                         revision)
+    # Checkout DEPS file for the current chromium revision.
+    diff_command = [
+        'diff',
+        '--src-prefix=',
+        '--dst-prefix=',
+        '--no-ext-diff',
+        'HEAD',
+    ]
+    diff_text = bisect_utils.CheckRunGit(diff_command)
+    return (chromium_sha, ChangeBackslashToSlashInPatch(diff_text))
+
+  def ObtainBuild(
+      self, depot, revision=None, create_patch=False):
     """Obtains a build by either downloading or building directly.
 
     Args:
       depot: Dependency repository name.
       revision: A git commit hash. If None is given, the currently checked-out
           revision is built.
+      create_patch: Create a patch with any locally modified files.
 
     Returns:
       True for success.
@@ -1165,7 +1185,8 @@ class BisectPerformanceMetrics(object):
     # Fetch build archive for the given revision from the cloud storage when
     # the storage bucket is passed.
     if self.IsDownloadable(depot) and revision:
-      build_success = self._DownloadAndUnzipBuild(revision, depot)
+      build_success = self._DownloadAndUnzipBuild(
+          revision, depot, build_type='Release', create_patch=create_patch)
     else:
       # Build locally.
       build_success = self.builder.Build(depot, self.opts)
@@ -1389,7 +1410,7 @@ class BisectPerformanceMetrics(object):
     Returns:
       True if successful.
     """
-    if self.opts.target_platform == 'android':
+    if 'android' in self.opts.target_platform:
       if not builder.SetupAndroidBuildEnvironment(self.opts,
           path_to_src=self.src_cwd):
         return False
@@ -1423,7 +1444,8 @@ class BisectPerformanceMetrics(object):
 
     return False
 
-  def RunTest(self, revision, depot, command, metric, skippable=False):
+  def RunTest(self, revision, depot, command, metric, skippable=False,
+      skip_sync=False, create_patch=False, force_build=False):
     """Performs a full sync/build/run of the specified revision.
 
     Args:
@@ -1431,6 +1453,9 @@ class BisectPerformanceMetrics(object):
       depot: The depot that's being used at the moment (src, webkit, etc.)
       command: The command to execute the performance test.
       metric: The performance metric being tested.
+      skip_sync: Skip the sync step.
+      create_patch: Create a patch with any locally modified files.
+      force_build: Force a local build.
 
     Returns:
       On success, a tuple containing the results of the performance test.
@@ -1444,7 +1469,7 @@ class BisectPerformanceMetrics(object):
       sync_client = 'gclient'
 
     # Do the syncing for all depots.
-    if not self.opts.debug_ignore_sync:
+    if not (self.opts.debug_ignore_sync or skip_sync):
       if not self._SyncRevision(depot, revision, sync_client):
         return ('Failed to sync: [%s]' % str(revision), BUILD_RESULT_FAIL)
 
@@ -1460,7 +1485,9 @@ class BisectPerformanceMetrics(object):
     # Obtain a build for this revision. This may be done by requesting a build
     # from another builder, waiting for it and downloading it.
     start_build_time = time.time()
-    build_success = self.ObtainBuild(depot, revision)
+    revision_to_build = revision if not force_build else None
+    build_success = self.ObtainBuild(
+        depot, revision=revision_to_build, create_patch=create_patch)
     if not build_success:
       return ('Failed to build revision: [%s]' % str(revision),
               BUILD_RESULT_FAIL)
@@ -1511,11 +1538,34 @@ class BisectPerformanceMetrics(object):
     # When using gclient to sync, you need to specify the depot you
     # want so that all the dependencies sync properly as well.
     # i.e. gclient sync src@<SHA1>
-    if sync_client == 'gclient':
+    if sync_client == 'gclient' and revision:
       revision = '%s@%s' % (bisect_utils.DEPOT_DEPS_NAME[depot]['src'],
           revision)
+      if depot == 'chromium' and self.opts.target_platform == 'android-chrome':
+        return self._SyncRevisionsForAndroidChrome(revision)
 
     return source_control.SyncToRevision(revision, sync_client)
+
+  def _SyncRevisionsForAndroidChrome(self, revision):
+    """Syncs android-chrome and chromium repos to particular revision.
+
+    This is a special case for android-chrome as the gclient sync for chromium
+    overwrites the android-chrome revision to TOT. Therefore both the repos
+    are synced to known revisions.
+
+    Args:
+      revision: Git hash of the Chromium to sync.
+
+    Returns:
+      True if successful, False otherwise.
+    """
+    revisions_list = [revision]
+    current_android_rev = source_control.GetCurrentRevision(
+        self.depot_registry.GetDepotDir('android-chrome'))
+    revisions_list.append(
+        '%s@%s' % (bisect_utils.DEPOT_DEPS_NAME['android-chrome']['src'],
+                   current_android_rev))
+    return not bisect_utils.RunGClientAndSync(revisions_list)
 
   def _CheckIfRunPassed(self, current_value, known_good_value, known_bad_value):
     """Given known good and bad values, decide if the current_value passed
@@ -1950,6 +2000,147 @@ class BisectPerformanceMetrics(object):
 
     return None
 
+  def _GatherResultsFromRevertedCulpritCL(
+      self, results, target_depot, command_to_run, metric):
+    """Gathers performance results with/without culprit CL.
+
+    Attempts to revert the culprit CL against ToT and runs the
+    performance tests again with and without the CL, adding the results to
+    the over bisect results.
+
+    Args:
+      results: BisectResults from the bisect.
+      target_depot: The target depot we're bisecting.
+      command_to_run: Specify the command to execute the performance test.
+      metric: The performance metric to monitor.
+    """
+    run_results_tot, run_results_reverted = self._RevertCulpritCLAndRetest(
+      results, target_depot, command_to_run, metric)
+
+    results.AddRetestResults(run_results_tot, run_results_reverted)
+
+    if len(results.culprit_revisions) != 1:
+      return
+
+    # Cleanup reverted files if anything is left.
+    _, _, culprit_depot = results.culprit_revisions[0]
+    bisect_utils.CheckRunGit(['reset', '--hard', 'HEAD'],
+        cwd=self.depot_registry.GetDepotDir(culprit_depot))
+
+  def _RevertCL(self, culprit_revision, culprit_depot):
+    """Reverts the specified revision in the specified depot."""
+    if self.opts.output_buildbot_annotations:
+      bisect_utils.OutputAnnotationStepStart(
+          'Reverting culprit CL: %s' % culprit_revision)
+    _, return_code = bisect_utils.RunGit(
+        ['revert', '--no-commit', culprit_revision],
+        cwd=self.depot_registry.GetDepotDir(culprit_depot))
+    if return_code:
+      bisect_utils.OutputAnnotationStepWarning()
+      bisect_utils.OutputAnnotationStepText('Failed to revert CL cleanly.')
+    if self.opts.output_buildbot_annotations:
+      bisect_utils.OutputAnnotationStepClosed()
+    return not return_code
+
+  def _RevertCulpritCLAndRetest(
+      self, results, target_depot, command_to_run, metric):
+    """Reverts the culprit CL against ToT and runs the performance test.
+
+    Attempts to revert the culprit CL against ToT and runs the
+    performance tests again with and without the CL.
+
+    Args:
+      results: BisectResults from the bisect.
+      target_depot: The target depot we're bisecting.
+      command_to_run: Specify the command to execute the performance test.
+      metric: The performance metric to monitor.
+
+    Returns:
+      A tuple with the results of running the CL at ToT/reverted.
+    """
+    # Might want to retest ToT with a revert of the CL to confirm that
+    # performance returns.
+    if results.confidence < bisect_utils.HIGH_CONFIDENCE:
+      return (None, None)
+
+    # If there were multiple culprit CLs, we won't try to revert.
+    if len(results.culprit_revisions) != 1:
+      return (None, None)
+
+    culprit_revision, _, culprit_depot = results.culprit_revisions[0]
+
+    if not self._SyncRevision(target_depot, None, 'gclient'):
+      return (None, None)
+
+    head_revision = bisect_utils.CheckRunGit(['log', '--format=%H', '-1'])
+    head_revision = head_revision.strip()
+
+    if not self._RevertCL(culprit_revision, culprit_depot):
+      return (None, None)
+
+    # If the culprit CL happened to be in a depot that gets pulled in, we
+    # can't revert the change and issue a try job to build, since that would
+    # require modifying both the DEPS file and files in another depot.
+    # Instead, we build locally.
+    force_build = (culprit_depot != target_depot)
+    if force_build:
+      results.warnings.append(
+          'Culprit CL is in another depot, attempting to revert and build'
+          ' locally to retest. This may not match the performance of official'
+          ' builds.')
+
+    run_results_reverted = self._RunTestWithAnnotations(
+        'Re-Testing ToT with reverted culprit',
+        'Failed to run reverted CL.',
+        head_revision, target_depot, command_to_run, metric, force_build)
+
+    # Clear the reverted file(s).
+    bisect_utils.RunGit(['reset', '--hard', 'HEAD'],
+        cwd=self.depot_registry.GetDepotDir(culprit_depot))
+
+    # Retesting with the reverted CL failed, so bail out of retesting against
+    # ToT.
+    if run_results_reverted[1]:
+      return (None, None)
+
+    run_results_tot = self._RunTestWithAnnotations(
+        'Re-Testing ToT',
+        'Failed to run ToT.',
+        head_revision, target_depot, command_to_run, metric, force_build)
+
+    return (run_results_tot, run_results_reverted)
+
+  def _RunTestWithAnnotations(self, step_text, error_text, head_revision,
+      target_depot, command_to_run, metric, force_build):
+    """Runs the performance test and outputs start/stop annotations.
+
+    Args:
+      results: BisectResults from the bisect.
+      target_depot: The target depot we're bisecting.
+      command_to_run: Specify the command to execute the performance test.
+      metric: The performance metric to monitor.
+      force_build: Whether to force a build locally.
+
+    Returns:
+      Results of the test.
+    """
+    if self.opts.output_buildbot_annotations:
+      bisect_utils.OutputAnnotationStepStart(step_text)
+
+    # Build and run the test again with the reverted culprit CL against ToT.
+    run_test_results = self.RunTest(
+        head_revision, target_depot, command_to_run,
+        metric, skippable=False, skip_sync=True, create_patch=True,
+        force_build=force_build)
+
+    if self.opts.output_buildbot_annotations:
+      if run_test_results[1]:
+        bisect_utils.OutputAnnotationStepWarning()
+        bisect_utils.OutputAnnotationStepText(error_text)
+      bisect_utils.OutputAnnotationStepClosed()
+
+    return run_test_results
+
   def Run(self, command_to_run, bad_revision_in, good_revision_in, metric):
     """Given known good and bad revisions, run a binary search on all
     intermediate revisions to determine the CL where the performance regression
@@ -1964,7 +2155,6 @@ class BisectPerformanceMetrics(object):
     Returns:
       A BisectResults object.
     """
-
     # Choose depot to bisect first
     target_depot = 'chromium'
     if self.opts.target_platform == 'android-chrome':
@@ -2221,8 +2411,13 @@ class BisectPerformanceMetrics(object):
           self.printer.PrintPartialResults(bisect_state)
           bisect_utils.OutputAnnotationStepClosed()
 
-      return BisectResults(bisect_state, self.depot_registry, self.opts,
-                           self.warnings)
+      results = BisectResults(bisect_state, self.depot_registry, self.opts,
+                              self.warnings)
+
+      self._GatherResultsFromRevertedCulpritCL(
+          results, target_depot, command_to_run, metric)
+
+      return results
     else:
       # Weren't able to sync and retrieve the revision range.
       error = ('An error occurred attempting to retrieve revision range: '
@@ -2318,8 +2513,7 @@ class BisectOptions(object):
     self.debug_fake_first_test_mean = 0
     self.target_arch = 'ia32'
     self.target_build_type = 'Release'
-    self.builder_host = None
-    self.builder_port = None
+    self.builder_type = 'perf'
     self.bisect_mode = bisect_utils.BISECT_MODE_MEAN
     self.improvement_direction = 0
     self.bug_id = ''
@@ -2421,12 +2615,12 @@ class BisectOptions(object):
                        choices=['Release', 'Debug'],
                        help='The target build type. Choices are "Release" '
                             '(default), or "Debug".')
-    group.add_argument('--builder_host', dest='builder_host',
-                       help='Host address of server to produce build by '
-                            'posting try job request.')
-    group.add_argument('--builder_port', dest='builder_port', type=int,
-                       help='HTTP port of the server to produce build by '
-                            'posting try job request.')
+    group.add_argument('--builder_type', default=fetch_build.PERF_BUILDER,
+                       choices=[fetch_build.PERF_BUILDER,
+                                fetch_build.FULL_BUILDER],
+                       help='Type of builder to get build from. This '
+                            'determines both the bot that builds and the '
+                            'place where archived builds are downloaded from.')
 
   @staticmethod
   def _AddDebugOptionsGroup(parser):

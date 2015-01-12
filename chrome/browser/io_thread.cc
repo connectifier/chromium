@@ -45,7 +45,6 @@
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_delegate.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_network_delegate.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_prefs.h"
-#include "components/data_reduction_proxy/core/browser/data_reduction_proxy_protocol.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_settings.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_params.h"
 #include "components/policy/core/common/policy_service.h"
@@ -1070,6 +1069,8 @@ void IOThread::InitializeNetworkSessionParamsFromGlobals(
       &params->quic_disable_loading_server_info_for_new_servers);
   globals.quic_load_server_info_timeout_srtt_multiplier.CopyToIfSet(
       &params->quic_load_server_info_timeout_srtt_multiplier);
+  globals.quic_enable_truncated_connection_ids.CopyToIfSet(
+      &params->quic_enable_truncated_connection_ids);
   globals.enable_quic_port_selection.CopyToIfSet(
       &params->enable_quic_port_selection);
   globals.quic_max_packet_length.CopyToIfSet(&params->quic_max_packet_length);
@@ -1232,6 +1233,8 @@ void IOThread::ConfigureQuicGlobals(
         ShouldDisableLoadingServerInfoForNewServers(quic_trial_params));
     float load_server_info_timeout_srtt_multiplier =
         GetQuicLoadServerInfoTimeoutSrttMultiplier(quic_trial_params);
+    globals->quic_enable_truncated_connection_ids.set(
+        ShouldQuicEnableTruncatedConnectionIds(quic_trial_params));
     if (load_server_info_timeout_srtt_multiplier != 0) {
       globals->quic_load_server_info_timeout_srtt_multiplier.set(
           load_server_info_timeout_srtt_multiplier);
@@ -1240,14 +1243,12 @@ void IOThread::ConfigureQuicGlobals(
         ShouldEnableQuicPortSelection(command_line));
     globals->quic_connection_options =
         GetQuicConnectionOptions(command_line, quic_trial_params);
-    if (ShouldEnableQuicPacing(command_line, quic_trial_group,
-                               quic_trial_params)) {
+    if (ShouldEnableQuicPacing(command_line, quic_trial_params)) {
       globals->quic_connection_options.push_back(net::kPACE);
     }
   }
 
   size_t max_packet_length = GetQuicMaxPacketLength(command_line,
-                                                    quic_trial_group,
                                                     quic_trial_params);
   if (max_packet_length != 0) {
     globals->quic_max_packet_length.set(max_packet_length);
@@ -1311,7 +1312,6 @@ bool IOThread::ShouldEnableQuicPortSelection(
 
 bool IOThread::ShouldEnableQuicPacing(
     const base::CommandLine& command_line,
-    base::StringPiece quic_trial_group,
     const VariationParameters& quic_trial_params) {
   if (command_line.HasSwitch(switches::kEnableQuicPacing))
     return true;
@@ -1335,10 +1335,7 @@ net::QuicTagVector IOThread::GetQuicConnectionOptions(
   VariationParameters::const_iterator it =
       quic_trial_params.find("connection_options");
   if (it == quic_trial_params.end()) {
-    // TODO(rch): remove support for deprecated congestion_options.
-    it = quic_trial_params.find("congestion_options");
-    if (it == quic_trial_params.end())
-      return net::QuicTagVector();
+    return net::QuicTagVector();
   }
 
   return net::QuicUtils::ParseQuicConnectionOptions(it->second);
@@ -1421,9 +1418,16 @@ float IOThread::GetQuicLoadServerInfoTimeoutSrttMultiplier(
 }
 
 // static
+bool IOThread::ShouldQuicEnableTruncatedConnectionIds(
+    const VariationParameters& quic_trial_params) {
+  return LowerCaseEqualsASCII(
+      GetVariationParam(quic_trial_params, "enable_truncated_connection_ids"),
+      "true");
+}
+
+// static
 size_t IOThread::GetQuicMaxPacketLength(
     const base::CommandLine& command_line,
-    base::StringPiece quic_trial_group,
     const VariationParameters& quic_trial_params) {
   if (command_line.HasSwitch(switches::kQuicMaxPacketLength)) {
     unsigned value;

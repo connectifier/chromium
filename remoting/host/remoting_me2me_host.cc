@@ -26,7 +26,6 @@
 #include "ipc/ipc_channel_proxy.h"
 #include "ipc/ipc_listener.h"
 #include "media/base/media.h"
-#include "net/base/network_change_notifier.h"
 #include "net/socket/client_socket_factory.h"
 #include "net/socket/ssl_server_socket.h"
 #include "net/url_request/url_fetcher.h"
@@ -45,13 +44,12 @@
 #include "remoting/host/config_watcher.h"
 #include "remoting/host/desktop_environment.h"
 #include "remoting/host/desktop_session_connector.h"
-#include "remoting/host/dns_blackhole_checker.h"
-#include "remoting/host/heartbeat_sender.h"
 #include "remoting/host/host_change_notification_listener.h"
 #include "remoting/host/host_config.h"
 #include "remoting/host/host_event_logger.h"
 #include "remoting/host/host_exit_codes.h"
 #include "remoting/host/host_main.h"
+#include "remoting/host/host_signaling_manager.h"
 #include "remoting/host/host_status_logger.h"
 #include "remoting/host/ipc_constants.h"
 #include "remoting/host/ipc_desktop_environment.h"
@@ -143,15 +141,19 @@ const char kWindowIdSwitchName[] = "window-id";
 // of the process.
 const int kShutdownTimeoutSeconds = 15;
 
+// Maximum time to wait for reporting host-offline-reason to the service,
+// before continuing normal process shutdown.
+const int kHostOfflineReasonTimeoutSeconds = 10;
+
 }  // namespace
 
 namespace remoting {
 
-class HostProcess
-    : public ConfigWatcher::Delegate,
-      public HostChangeNotificationListener::Listener,
-      public IPC::Listener,
-      public base::RefCountedThreadSafe<HostProcess> {
+class HostProcess : public ConfigWatcher::Delegate,
+                    public HostSignalingManager::Listener,
+                    public HostChangeNotificationListener::Listener,
+                    public IPC::Listener,
+                    public base::RefCountedThreadSafe<HostProcess> {
  public:
   // |shutdown_watchdog| is armed when shutdown is started, and should be kept
   // alive as long as possible until the process exits (since destroying the
@@ -171,7 +173,8 @@ class HostProcess
   // HostChangeNotificationListener::Listener overrides.
   void OnHostDeleted() override;
 
-  // Initializes the pairing registry on Windows.
+  // Handler of the ChromotingDaemonNetworkMsg_InitializePairingRegistry IPC
+  // message.
   void OnInitializePairingRegistry(
       IPC::PlatformFileForTransit privileged_key,
       IPC::PlatformFileForTransit unprivileged_key);
@@ -204,8 +207,8 @@ class HostProcess
     //   STOPPING->STOPPED
     //   STOPPED->STARTED
     //
-    // |host_| must be NULL in INITIALIZING and STOPPED states and not-NULL in
-    // all other states.
+    // |host_| must be nullptr in INITIALIZING and STOPPED states and not
+    // nullptr in all other states.
   };
 
   friend class base::RefCountedThreadSafe<HostProcess>;
@@ -253,23 +256,35 @@ class HostProcess
   bool OnPairingPolicyUpdate(base::DictionaryValue* policies);
   bool OnGnubbyAuthPolicyUpdate(base::DictionaryValue* policies);
 
+  scoped_ptr<HostSignalingManager> CreateHostSignalingManager();
+
   void StartHost();
 
-  void OnHeartbeatSuccessful();
-  void OnUnknownHostIdError();
-
-  void OnAuthFailed();
+  // Overrides for HostSignalingManager::Listener interface.
+  void OnHeartbeatSuccessful() override;
+  void OnUnknownHostIdError() override;
+  void OnAuthFailed() override;
 
   void RestartHost();
 
   // Stops the host and shuts down the process with the specified |exit_code|.
   void ShutdownHost(HostExitCodes exit_code);
 
-  void ScheduleHostShutdown();
+  // Private helper used by ShutdownHost method to initiate sending of
+  // host-offline-reason before continuing shutdown.
+  void SendOfflineReasonAndShutdownOnNetworkThread(HostExitCodes exit_code);
 
   void ShutdownOnNetworkThread();
 
   void OnPolicyWatcherShutdown();
+
+#if defined(OS_WIN)
+  // Initializes the pairing registry on Windows. This should be invoked on the
+  // network thread.
+  void InitializePairingRegistry(
+      IPC::PlatformFileForTransit privileged_key,
+      IPC::PlatformFileForTransit unprivileged_key);
+#endif  // defined(OS_WIN)
 
   // Crashes the process in response to a daemon's request. The daemon passes
   // the location of the code that detected the fatal error resulted in this
@@ -279,9 +294,6 @@ class HostProcess
                const int& line_number);
 
   scoped_ptr<ChromotingHostContext> context_;
-
-  // Created on the UI thread but used from the network thread.
-  scoped_ptr<net::NetworkChangeNotifier> network_change_notifier_;
 
   // Accessed on the UI thread.
   scoped_ptr<IPC::ChannelProxy> daemon_channel_;
@@ -332,10 +344,10 @@ class HostProcess
   // Used to specify which window to stream, if enabled.
   webrtc::WindowId window_id_;
 
-  scoped_ptr<OAuthTokenGetter> oauth_token_getter_;
-  scoped_ptr<XmppSignalStrategy> signal_strategy_;
-  scoped_ptr<SignalingConnector> signaling_connector_;
-  scoped_ptr<HeartbeatSender> heartbeat_sender_;
+  // Used to send heartbeats while running, and the reason for going offline
+  // when shutting down.
+  scoped_ptr<HostSignalingManager> host_signaling_manager_;
+
   scoped_ptr<HostChangeNotificationListener> host_change_notification_listener_;
   scoped_ptr<HostStatusLogger> host_status_logger_;
   scoped_ptr<HostEventLogger> host_event_logger_;
@@ -352,9 +364,11 @@ class HostProcess
   int* exit_code_out_;
   bool signal_parent_;
 
-  scoped_ptr<PairingRegistry::Delegate> pairing_registry_delegate_;
+  scoped_refptr<PairingRegistry> pairing_registry_;
 
   ShutdownWatchdog* shutdown_watchdog_;
+
+  DISALLOW_COPY_AND_ASSIGN(HostProcess);
 };
 
 HostProcess::HostProcess(scoped_ptr<ChromotingHostContext> context,
@@ -376,7 +390,7 @@ HostProcess::HostProcess(scoped_ptr<ChromotingHostContext> context,
       enable_window_capture_(false),
       window_id_(0),
 #if defined(REMOTING_MULTI_PROCESS)
-      desktop_session_connector_(NULL),
+      desktop_session_connector_(nullptr),
 #endif  // defined(REMOTING_MULTI_PROCESS)
       self_(this),
       exit_code_out_(exit_code_out),
@@ -608,24 +622,31 @@ void HostProcess::CreateAuthenticatorFactory() {
     return;
   }
 
-  scoped_refptr<PairingRegistry> pairing_registry = NULL;
-  if (allow_pairing_) {
-    if (!pairing_registry_delegate_)
-      pairing_registry_delegate_ = CreatePairingRegistryDelegate();
-
-    if (pairing_registry_delegate_) {
-      pairing_registry = new PairingRegistry(context_->file_task_runner(),
-                                             pairing_registry_delegate_.Pass());
-    }
-  }
-
   scoped_ptr<protocol::AuthenticatorFactory> factory;
 
   if (third_party_auth_config_.is_empty()) {
+    scoped_refptr<PairingRegistry> pairing_registry;
+    if (allow_pairing_) {
+      // On Windows |pairing_registry_| is initialized in
+      // InitializePairingRegistry().
+#if !defined(OS_WIN)
+      if (!pairing_registry_) {
+        scoped_ptr<PairingRegistry::Delegate> delegate =
+            CreatePairingRegistryDelegate();
+
+        pairing_registry_ = new PairingRegistry(context_->file_task_runner(),
+                                                delegate.Pass());
+      }
+#endif  // defined(OS_WIN)
+
+      pairing_registry = pairing_registry_;
+    }
+
     factory = protocol::Me2MeHostAuthenticatorFactory::CreateWithSharedSecret(
         use_service_account_, host_owner_, local_certificate, key_pair_,
         host_secret_hash_, pairing_registry);
 
+    host_->set_pairing_registry(pairing_registry);
   } else if (third_party_auth_config_.is_valid()) {
     scoped_ptr<protocol::TokenValidatorFactory> token_validator_factory(
         new TokenValidatorFactoryImpl(
@@ -652,8 +673,6 @@ void HostProcess::CreateAuthenticatorFactory() {
   factory.reset(new PamAuthorizationFactory(factory.Pass()));
 #endif
   host_->SetAuthenticatorFactory(factory.Pass());
-
-  host_->set_pairing_registry(pairing_registry);
 }
 
 // IPC::Listener implementation.
@@ -763,23 +782,21 @@ void HostProcess::ShutdownOnUiThread() {
   DCHECK(context_->ui_task_runner()->BelongsToCurrentThread());
 
   // Tear down resources that need to be torn down on the UI thread.
-  network_change_notifier_.reset();
   daemon_channel_.reset();
   desktop_environment_factory_.reset();
 
   // It is now safe for the HostProcess to be deleted.
-  self_ = NULL;
+  self_ = nullptr;
 
 #if defined(OS_LINUX)
   // Cause the global AudioPipeReader to be freed, otherwise the audio
   // thread will remain in-use and prevent the process from exiting.
   // TODO(wez): DesktopEnvironmentFactory should own the pipe reader.
   // See crbug.com/161373 and crbug.com/104544.
-  AudioCapturerLinux::InitializePipeReader(NULL, base::FilePath());
+  AudioCapturerLinux::InitializePipeReader(nullptr, base::FilePath());
 #endif
 }
 
-// Overridden from HeartbeatSender::Listener
 void HostProcess::OnUnknownHostIdError() {
   LOG(ERROR) << "Host ID not found.";
   ShutdownHost(kInvalidHostIdExitCode);
@@ -803,25 +820,44 @@ void HostProcess::OnHostDeleted() {
 void HostProcess::OnInitializePairingRegistry(
     IPC::PlatformFileForTransit privileged_key,
     IPC::PlatformFileForTransit unprivileged_key) {
-  DCHECK(!pairing_registry_delegate_);
+  DCHECK(context_->ui_task_runner()->BelongsToCurrentThread());
 
 #if defined(OS_WIN)
-  // Initialize the pairing registry delegate.
-  scoped_ptr<PairingRegistryDelegateWin> delegate(
-      new PairingRegistryDelegateWin());
-  bool result = delegate->SetRootKeys(
-      reinterpret_cast<HKEY>(
-          IPC::PlatformFileForTransitToPlatformFile(privileged_key)),
-      reinterpret_cast<HKEY>(
-          IPC::PlatformFileForTransitToPlatformFile(unprivileged_key)));
-  if (!result)
-    return;
-
-  pairing_registry_delegate_ = delegate.Pass();
+  context_->network_task_runner()->PostTask(FROM_HERE, base::Bind(
+      &HostProcess::InitializePairingRegistry,
+      this, privileged_key, unprivileged_key));
 #else  // !defined(OS_WIN)
   NOTREACHED();
 #endif  // !defined(OS_WIN)
 }
+
+#if defined(OS_WIN)
+void HostProcess::InitializePairingRegistry(
+    IPC::PlatformFileForTransit privileged_key,
+    IPC::PlatformFileForTransit unprivileged_key) {
+  DCHECK(context_->network_task_runner()->BelongsToCurrentThread());
+  // |privileged_key| can be nullptr but not |unprivileged_key|.
+  DCHECK(unprivileged_key);
+  // |pairing_registry_| should only be initialized once.
+  DCHECK(!pairing_registry_);
+
+  HKEY privileged_hkey = reinterpret_cast<HKEY>(
+      IPC::PlatformFileForTransitToPlatformFile(privileged_key));
+  HKEY unprivileged_hkey = reinterpret_cast<HKEY>(
+      IPC::PlatformFileForTransitToPlatformFile(unprivileged_key));
+
+  scoped_ptr<PairingRegistryDelegateWin> delegate(
+      new PairingRegistryDelegateWin());
+  delegate->SetRootKeys(privileged_hkey, unprivileged_hkey);
+
+  pairing_registry_ = new PairingRegistry(context_->file_task_runner(),
+                                          delegate.Pass());
+
+  // (Re)Create the authenticator factory now that |pairing_registry_| has been
+  // initialized.
+  CreateAuthenticatorFactory();
+}
+#endif  // !defined(OS_WIN)
 
 // Applies the host config, returning true if successful.
 bool HostProcess::ApplyConfig(const base::DictionaryValue& config) {
@@ -866,7 +902,8 @@ bool HostProcess::ApplyConfig(const base::DictionaryValue& config) {
   }
 
   if (!oauth_refresh_token_.empty()) {
-    // SignalingConnector is responsible for getting OAuth token.
+    // SignalingConnector (inside HostSignalingManager) is responsible for
+    // getting OAuth token.
     xmpp_server_config_.auth_token = "";
     xmpp_server_config_.auth_service = "oauth2";
   } else if (!config.GetString(kXmppAuthServiceConfigPath,
@@ -1246,44 +1283,32 @@ bool HostProcess::OnGnubbyAuthPolicyUpdate(base::DictionaryValue* policies) {
   return true;
 }
 
+scoped_ptr<HostSignalingManager> HostProcess::CreateHostSignalingManager() {
+  DCHECK(!host_id_.empty());  // |ApplyConfig| should already have been run.
+
+  scoped_ptr<OAuthTokenGetter::OAuthCredentials> oauth_credentials(
+      new OAuthTokenGetter::OAuthCredentials(xmpp_server_config_.username,
+                                             oauth_refresh_token_,
+                                             use_service_account_));
+
+  return HostSignalingManager::Create(this, context_->network_task_runner(),
+                                      context_->url_request_context_getter(),
+                                      xmpp_server_config_, talkgadget_prefix_,
+                                      host_id_, key_pair_, directory_bot_jid_,
+                                      oauth_credentials.Pass());
+}
+
 void HostProcess::StartHost() {
   DCHECK(context_->network_task_runner()->BelongsToCurrentThread());
   DCHECK(!host_);
-  DCHECK(!signal_strategy_.get());
+  DCHECK(!host_signaling_manager_);
+
   DCHECK(state_ == HOST_INITIALIZING || state_ == HOST_STOPPING_TO_RESTART ||
-         state_ == HOST_STOPPED) << state_;
+         state_ == HOST_STOPPED)
+      << "state_ = " << state_;
   state_ = HOST_STARTED;
 
-  signal_strategy_.reset(
-      new XmppSignalStrategy(net::ClientSocketFactory::GetDefaultFactory(),
-                             context_->url_request_context_getter(),
-                             xmpp_server_config_));
-
-  scoped_ptr<DnsBlackholeChecker> dns_blackhole_checker(
-      new DnsBlackholeChecker(context_->url_request_context_getter(),
-                              talkgadget_prefix_));
-
-  // Create a NetworkChangeNotifier for use by the signaling connector.
-  network_change_notifier_.reset(net::NetworkChangeNotifier::Create());
-
-  signaling_connector_.reset(new SignalingConnector(
-      signal_strategy_.get(),
-      dns_blackhole_checker.Pass(),
-      base::Bind(&HostProcess::OnAuthFailed, this)));
-
-  if (!oauth_refresh_token_.empty()) {
-    scoped_ptr<OAuthTokenGetter::OAuthCredentials> oauth_credentials;
-    oauth_credentials.reset(
-        new OAuthTokenGetter::OAuthCredentials(
-            xmpp_server_config_.username, oauth_refresh_token_,
-            use_service_account_));
-
-    oauth_token_getter_.reset(new OAuthTokenGetter(
-        oauth_credentials.Pass(), context_->url_request_context_getter(),
-        false));
-
-    signaling_connector_->EnableOAuth(oauth_token_getter_.get());
-  }
+  host_signaling_manager_ = CreateHostSignalingManager();
 
   uint32 network_flags = 0;
   if (allow_nat_traversal_) {
@@ -1307,15 +1332,14 @@ void HostProcess::StartHost() {
   }
 
   host_.reset(new ChromotingHost(
-      signal_strategy_.get(),
+      host_signaling_manager_->signal_strategy(),
       desktop_environment_factory_.get(),
-      CreateHostSessionManager(signal_strategy_.get(), network_settings,
+      CreateHostSessionManager(host_signaling_manager_->signal_strategy(),
+                               network_settings,
                                context_->url_request_context_getter()),
-      context_->audio_task_runner(),
-      context_->input_task_runner(),
+      context_->audio_task_runner(), context_->input_task_runner(),
       context_->video_capture_task_runner(),
-      context_->video_encode_task_runner(),
-      context_->network_task_runner(),
+      context_->video_encode_task_runner(), context_->network_task_runner(),
       context_->ui_task_runner()));
 
   if (enable_vp9_) {
@@ -1337,17 +1361,13 @@ void HostProcess::StartHost() {
   host_->SetMaximumSessionDuration(base::TimeDelta::FromHours(20));
 #endif
 
-  heartbeat_sender_.reset(new HeartbeatSender(
-      base::Bind(&HostProcess::OnHeartbeatSuccessful, base::Unretained(this)),
-      base::Bind(&HostProcess::OnUnknownHostIdError, base::Unretained(this)),
-      host_id_, signal_strategy_.get(), key_pair_, directory_bot_jid_));
-
   host_change_notification_listener_.reset(new HostChangeNotificationListener(
-      this, host_id_, signal_strategy_.get(), directory_bot_jid_));
+      this, host_id_, host_signaling_manager_->signal_strategy(),
+      directory_bot_jid_));
 
-  host_status_logger_.reset(
-      new HostStatusLogger(host_->AsWeakPtr(), ServerLogEntry::ME2ME,
-                           signal_strategy_.get(), directory_bot_jid_));
+  host_status_logger_.reset(new HostStatusLogger(
+      host_->AsWeakPtr(), ServerLogEntry::ME2ME,
+      host_signaling_manager_->signal_strategy(), directory_bot_jid_));
 
   // Set up reporting the host status notifications.
 #if defined(REMOTING_MULTI_PROCESS)
@@ -1376,6 +1396,16 @@ void HostProcess::RestartHost() {
   ShutdownOnNetworkThread();
 }
 
+void HostProcess::SendOfflineReasonAndShutdownOnNetworkThread(
+    HostExitCodes exit_code) {
+  DCHECK(context_->network_task_runner()->BelongsToCurrentThread());
+  DCHECK(host_signaling_manager_);
+  host_signaling_manager_.release()->SendHostOfflineReasonAndDelete(
+      ExitCodeToString(exit_code),
+      base::TimeDelta::FromSeconds(kHostOfflineReasonTimeoutSeconds));
+  ShutdownOnNetworkThread();
+}
+
 void HostProcess::ShutdownHost(HostExitCodes exit_code) {
   DCHECK(context_->network_task_runner()->BelongsToCurrentThread());
 
@@ -1384,14 +1414,14 @@ void HostProcess::ShutdownHost(HostExitCodes exit_code) {
   switch (state_) {
     case HOST_INITIALIZING:
       state_ = HOST_STOPPING;
-      ShutdownOnNetworkThread();
+      DCHECK(!host_signaling_manager_);
+      host_signaling_manager_ = CreateHostSignalingManager();
+      SendOfflineReasonAndShutdownOnNetworkThread(exit_code);
       break;
 
     case HOST_STARTED:
       state_ = HOST_STOPPING;
-      heartbeat_sender_->SetHostOfflineReason(
-          ExitCodeToString(exit_code), base::Bind(base::DoNothing));
-      ScheduleHostShutdown();
+      SendOfflineReasonAndShutdownOnNetworkThread(exit_code);
       break;
 
     case HOST_STOPPING_TO_RESTART:
@@ -1405,28 +1435,14 @@ void HostProcess::ShutdownHost(HostExitCodes exit_code) {
   }
 }
 
-// TODO(weitaosu): shut down the host once we get an ACK for the offline status
-//                  XMPP message.
-void HostProcess::ScheduleHostShutdown() {
-  // Delay the shutdown by 2 second to allow SendOfflineStatus to complete.
-  context_->network_task_runner()->PostDelayedTask(
-      FROM_HERE,
-      base::Bind(&HostProcess::ShutdownOnNetworkThread, base::Unretained(this)),
-      base::TimeDelta::FromSeconds(2));
-}
-
 void HostProcess::ShutdownOnNetworkThread() {
   DCHECK(context_->network_task_runner()->BelongsToCurrentThread());
 
   host_.reset();
   host_event_logger_.reset();
   host_status_logger_.reset();
-  heartbeat_sender_.reset();
+  host_signaling_manager_.reset();
   host_change_notification_listener_.reset();
-  signaling_connector_.reset();
-  oauth_token_getter_.reset();
-  signal_strategy_.reset();
-  network_change_notifier_.reset();
 
   if (state_ == HOST_STOPPING_TO_RESTART) {
     StartHost();
@@ -1477,7 +1493,7 @@ int HostProcessMain() {
   // Required for any calls into GTK functions, such as the Disconnect and
   // Continue windows, though these should not be used for the Me2Me case
   // (crbug.com/104377).
-  gtk_init(NULL, NULL);
+  gtk_init(nullptr, nullptr);
 #endif
 
   // Enable support for SSL server sockets, which must be done while still

@@ -9,6 +9,7 @@
 #include "base/cpu.h"
 #include "base/message_loop/message_loop.h"
 #include "base/message_loop/message_loop_proxy.h"
+#include "base/metrics/field_trial.h"
 #include "base/metrics/histogram.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/rand_util.h"
@@ -32,6 +33,7 @@
 #include "net/quic/quic_connection_helper.h"
 #include "net/quic/quic_crypto_client_stream_factory.h"
 #include "net/quic/quic_default_packet_writer.h"
+#include "net/quic/quic_flags.h"
 #include "net/quic/quic_http_stream.h"
 #include "net/quic/quic_protocol.h"
 #include "net/quic/quic_server_id.h"
@@ -565,6 +567,7 @@ QuicStreamFactory::QuicStreamFactory(
     int load_server_info_timeout,
     bool disable_loading_server_info_for_new_servers,
     float load_server_info_timeout_srtt_multiplier,
+    bool enable_truncated_connection_ids,
     const QuicTagVector& connection_options)
     : require_confirmation_(true),
       host_resolver_(host_resolver),
@@ -587,6 +590,7 @@ QuicStreamFactory::QuicStreamFactory(
           disable_loading_server_info_for_new_servers),
       load_server_info_timeout_srtt_multiplier_(
           load_server_info_timeout_srtt_multiplier),
+      enable_truncated_connection_ids_(enable_truncated_connection_ids),
       port_seed_(random_generator_->RandUint64()),
       check_persisted_supports_quic_(true),
       task_runner_(nullptr),
@@ -929,6 +933,11 @@ int QuicStreamFactory::CreateSession(
     const AddressList& address_list,
     const BoundNetLog& net_log,
     QuicClientSession** session) {
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/422516 is fixed.
+  tracked_objects::ScopedTracker tracking_profile1(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "422516 QuicStreamFactory::CreateSession1"));
+
   bool enable_port_selection = enable_port_selection_;
   if (enable_port_selection &&
       ContainsKey(gone_away_aliases_, server_id)) {
@@ -951,7 +960,19 @@ int QuicStreamFactory::CreateSession(
           bind_type,
           base::Bind(&PortSuggester::SuggestPort, port_suggester),
           net_log.net_log(), net_log.source()));
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/422516 is fixed.
+  tracked_objects::ScopedTracker tracking_profile2(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "422516 QuicStreamFactory::CreateSession2"));
+
   int rv = socket->Connect(addr);
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/422516 is fixed.
+  tracked_objects::ScopedTracker tracking_profile3(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "422516 QuicStreamFactory::CreateSession3"));
+
   if (rv != OK) {
     HistogramCreateSessionFailure(CREATION_ERROR_CONNECTING_SOCKET);
     return rv;
@@ -1004,6 +1025,11 @@ int QuicStreamFactory::CreateSession(
         clock_.get(), random_generator_));
   }
 
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/422516 is fixed.
+  tracked_objects::ScopedTracker tracking_profile4(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "422516 QuicStreamFactory::CreateSession4"));
+
   QuicConnection* connection = new QuicConnection(connection_id,
                                                   addr,
                                                   helper_.get(),
@@ -1014,18 +1040,30 @@ int QuicStreamFactory::CreateSession(
                                                   supported_versions_);
   connection->set_max_packet_length(max_packet_length_);
 
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/422516 is fixed.
+  tracked_objects::ScopedTracker tracking_profile5(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "422516 QuicStreamFactory::CreateSession5"));
+
   InitializeCachedStateInCryptoConfig(server_id, server_info);
 
   QuicConfig config = config_;
   config.set_max_undecryptable_packets(kMaxUndecryptablePackets);
-  config.SetInitialFlowControlWindowToSend(kInitialReceiveWindowSize);
   config.SetInitialStreamFlowControlWindowToSend(kInitialReceiveWindowSize);
   config.SetInitialSessionFlowControlWindowToSend(kInitialReceiveWindowSize);
   int64 srtt = GetServerNetworkStatsSmoothedRttInMicroseconds(server_id);
   if (srtt > 0)
     config.SetInitialRoundTripTimeUsToSend(static_cast<uint32>(srtt));
+  if (FLAGS_allow_truncated_connection_ids_for_quic &&
+      enable_truncated_connection_ids_)
+    config.SetBytesForConnectionIdToSend(0);
 
   if (quic_server_info_factory_ && !server_info) {
+    // TODO(vadimt): Remove ScopedTracker below once crbug.com/422516 is fixed.
+    tracked_objects::ScopedTracker tracking_profile6(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "422516 QuicStreamFactory::CreateSession6"));
+
     // Start the disk cache loading so that we can persist the newer QUIC server
     // information and/or inform the disk cache that we have reused
     // |server_info|.
@@ -1039,6 +1077,12 @@ int QuicStreamFactory::CreateSession(
       base::MessageLoop::current()->message_loop_proxy().get(),
       net_log.net_log());
   all_sessions_[*session] = server_id;  // owning pointer
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/422516 is fixed.
+  tracked_objects::ScopedTracker tracking_profile7(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "422516 QuicStreamFactory::CreateSession7"));
+
   (*session)->InitializeSession(server_id,  &crypto_config_,
                                 quic_crypto_client_stream_factory_);
   bool closed_during_initialize =
