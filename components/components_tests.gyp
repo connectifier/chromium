@@ -95,12 +95,12 @@
             'content_settings/core/common/content_settings_pattern_unittest.cc',
             'crx_file/id_util_unittest.cc',
             'data_reduction_proxy/core/browser/data_reduction_proxy_auth_request_handler_unittest.cc',
+            'data_reduction_proxy/core/browser/data_reduction_proxy_bypass_protocol_unittest.cc',
             'data_reduction_proxy/core/browser/data_reduction_proxy_configurator_unittest.cc',
             'data_reduction_proxy/core/browser/data_reduction_proxy_interceptor_unittest.cc',
             'data_reduction_proxy/core/browser/data_reduction_proxy_metrics_unittest.cc',
             'data_reduction_proxy/core/browser/data_reduction_proxy_network_delegate_unittest.cc',
             'data_reduction_proxy/core/browser/data_reduction_proxy_prefs_unittest.cc',
-            'data_reduction_proxy/core/browser/data_reduction_proxy_protocol_unittest.cc',
             'data_reduction_proxy/core/browser/data_reduction_proxy_settings_unittest.cc',
             'data_reduction_proxy/core/browser/data_reduction_proxy_statistics_prefs_unittest.cc',
             'data_reduction_proxy/core/browser/data_reduction_proxy_tamper_detection_unittest.cc',
@@ -190,6 +190,8 @@
             'os_crypt/keychain_password_mac_unittest.mm',
             'os_crypt/os_crypt_unittest.cc',
             'ownership/owner_key_util_impl_unittest.cc',
+            'packed_ct_ev_whitelist/bit_stream_reader_unittest.cc',
+            'packed_ct_ev_whitelist/packed_ct_ev_whitelist_unittest.cc',
             'password_manager/core/browser/affiliation_fetcher_unittest.cc',
             'password_manager/core/browser/affiliation_utils_unittest.cc',
             'password_manager/core/browser/browser_save_password_progress_logger_unittest.cc',
@@ -351,6 +353,9 @@
             'components.gyp:content_settings_core_browser',
             'components.gyp:content_settings_core_common',
             'components.gyp:content_settings_core_test_support',
+            
+            # Dependencies of packed CT EV white list
+            'components.gyp:packed_ct_ev_whitelist',
 
             # Dependencies of crash
             'components.gyp:crash_test_support',
@@ -448,6 +453,7 @@
 
             # Dependencies of rappor
             'components.gyp:rappor',
+            'components.gyp:rappor_test_support',
 
             # Dependencies of search
             'components.gyp:search',
@@ -552,6 +558,9 @@
 
                 # Dependencies of error_page
                 'components.gyp:error_page_renderer',
+
+                # Dependencies of history
+                'components.gyp:history_content_browser',
 
                 # Dependencies of
                 # intercept_navigation_resource_throttle_unittest.cc
@@ -805,7 +814,9 @@
               'sources': [
                 'pairing/message_buffer_unittest.cc',
                 'timers/alarm_timer_unittest.cc',
+                'wifi_sync/wifi_credential_unittest.cc',
                 'wifi_sync/wifi_security_class_chromeos_unittest.cc',
+                'wifi_sync/wifi_security_class_unittest.cc',
               ],
               'sources!': [
                 'storage_monitor/storage_monitor_linux_unittest.cc',

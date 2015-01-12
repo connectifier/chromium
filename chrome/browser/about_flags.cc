@@ -668,14 +668,6 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnableSpdy4)
   },
   {
-    "enable-async-dns",
-    IDS_FLAGS_ENABLE_ASYNC_DNS_NAME,
-    IDS_FLAGS_ENABLE_ASYNC_DNS_DESCRIPTION,
-    kOsWin | kOsMac | kOsLinux | kOsCrOS,
-    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableAsyncDns,
-                              switches::kDisableAsyncDns)
-  },
-  {
     "disable-media-source",
     IDS_FLAGS_DISABLE_MEDIA_SOURCE_NAME,
     IDS_FLAGS_DISABLE_MEDIA_SOURCE_DESCRIPTION,
@@ -1024,6 +1016,14 @@ const Experiment kExperiments[] = {
         password_manager::switches::kDisablePasswordLink)
   },
   {
+     "enable-password-save-in-page-navigation",
+     IDS_FLAGS_ENABLE_SAVE_PASSOWRD_ON_IN_PAGE_NAVIGATION_NAME,
+     IDS_FLAGS_ENABLE_SAVE_PASSOWRD_ON_IN_PAGE_NAVIGATION_DESCRIPTION,
+     kOsAll,
+     SINGLE_VALUE_TYPE(
+             autofill::switches::kEnablePasswordSaveOnInPageNavigation)
+  },
+  {
     "enable-deferred-image-decoding",
     IDS_FLAGS_ENABLE_DEFERRED_IMAGE_DECODING_NAME,
     IDS_FLAGS_ENABLE_DEFERRED_IMAGE_DECODING_DESCRIPTION,
@@ -1281,11 +1281,11 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(keyboard::switches::kEnableExperimentalInputViewFeatures)
   },
   {
-    "disable-smart-virtual-keyboard",
-    IDS_FLAGS_DISABLE_SMART_VIRTUAL_KEYBOARD_NAME,
-    IDS_FLAGS_DISABLE_SMART_VIRTUAL_KEYBOARD_DESCRIPTION,
+    "auto-virtual-keyboard",
+    IDS_FLAGS_ENABLE_AUTO_VIRTUAL_KEYBOARD_NAME,
+    IDS_FLAGS_ENABLE_AUTO_VIRTUAL_KEYBOARD_DESCRIPTION,
     kOsCrOS,
-    SINGLE_VALUE_TYPE(keyboard::switches::kDisableSmartVirtualKeyboard)
+    SINGLE_VALUE_TYPE(keyboard::switches::kEnableAutoVirtualKeyboard)
   },
 #endif
   {
@@ -2103,6 +2103,13 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_WIFI_CREDENTIAL_SYNC_DESCRIPTION,
     kOsCrOS,
     SINGLE_VALUE_TYPE(switches::kEnableWifiCredentialSync)
+  },
+  {
+    "enable-potentially-annoying-security-features",
+    IDS_FLAGS_EXPERIMENTAL_SECURITY_FEATURES_NAME,
+    IDS_FLAGS_EXPERIMENTAL_SECURITY_FEATURES_DESCRIPTION,
+    kOsAll,
+    SINGLE_VALUE_TYPE(switches::kEnablePotentiallyAnnoyingSecurityFeatures)
   },
 #endif
 

@@ -86,9 +86,6 @@ const char kDisableAccelerated2dCanvas[]    = "disable-accelerated-2d-canvas";
 const char kDisableAcceleratedVideoDecode[] =
     "disable-accelerated-video-decode";
 
-// Disable the ApplicationCache.
-const char kDisableApplicationCache[]       = "disable-application-cache";
-
 // Disable limits on the number of backing stores. Can prevent blinking for
 // users with many windows/tabs and lots of memory.
 const char kDisableBackingStoreLimit[]      = "disable-backing-store-limit";
@@ -170,9 +167,6 @@ const char kDisableImplSidePainting[]       = "disable-impl-side-painting";
 // Prevent Java from running.
 const char kDisableJava[]                   = "disable-java";
 
-// Don't execute JavaScript (browser JS like the new tab page still runs).
-const char kDisableJavaScript[]             = "disable-javascript";
-
 // Don't kill a child process when it sends a bad IPC message.  Apart
 // from testing, it is a bad idea from a security perspective to enable
 // this switch.
@@ -226,9 +220,6 @@ const char kDisableRendererAccessibility[]  = "disable-renderer-accessibility";
 // Disable the seccomp filter sandbox (seccomp-bpf) (Linux only).
 const char kDisableSeccompFilterSandbox[]   = "disable-seccomp-filter-sandbox";
 
-// Disable session storage.
-const char kDisableSessionStorage[]         = "disable-session-storage";
-
 // Disable the setuid sandbox (Linux only).
 const char kDisableSetuidSandbox[]          = "disable-setuid-sandbox";
 
@@ -262,9 +253,6 @@ const char kDisableV8IdleTasks[]            = "disable-v8-idle-tasks";
 
 // Don't enforce the same-origin policy. (Used by people testing their sites.)
 const char kDisableWebSecurity[]            = "disable-web-security";
-
-// Disables support for XSLT.
-const char kDisableXSLT[]                   = "disable-xslt";
 
 // Specifies if the |DOMAutomationController| needs to be bound in the
 // renderer. This binding happens on per-frame basis and hence can potentially
@@ -433,6 +421,11 @@ const char kEnableStrictSiteIsolation[]     = "enable-strict-site-isolation";
 // from overriding that decision.
 const char kEnableStrictMixedContentChecking[] =
     "enable-strict-mixed-content-checking";
+
+// Blocks insecure usage of number of powerful features (geolocation, for
+// example) that we haven't yet deprecated for the web at large.
+const char kEnableStrictPowerfulFeatureRestrictions[] =
+    "enable-strict-powerful-feature-restrictions";
 
 // Enable support for sync events in ServiceWorkers.
 const char kEnableServiceWorkerSync[]       = "enable-service-worker-sync";

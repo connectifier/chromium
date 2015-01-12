@@ -13,6 +13,7 @@
 #include "content/renderer/pepper/content_decryptor_delegate.h"
 #include "content/renderer/pepper/pepper_plugin_instance_impl.h"
 #include "media/base/audio_decoder_config.h"
+#include "media/base/cdm_key_information.h"
 #include "media/base/data_buffer.h"
 #include "media/base/decoder_buffer.h"
 #include "media/base/key_systems.h"
@@ -123,6 +124,7 @@ void PpapiDecryptor::CreateSessionAndGenerateRequest(
 }
 
 void PpapiDecryptor::LoadSession(
+    SessionType session_type,
     const std::string& web_session_id,
     scoped_ptr<media::NewSessionCdmPromise> promise) {
   DVLOG(2) << __FUNCTION__;
@@ -132,7 +134,7 @@ void PpapiDecryptor::LoadSession(
     promise->reject(INVALID_STATE_ERROR, 0, "CdmDelegate() does not exist.");
     return;
   }
-  CdmDelegate()->LoadSession(web_session_id, promise.Pass());
+  CdmDelegate()->LoadSession(session_type, web_session_id, promise.Pass());
 }
 
 void PpapiDecryptor::UpdateSession(
@@ -385,14 +387,15 @@ void PpapiDecryptor::OnDecoderInitialized(StreamType stream_type,
 }
 
 void PpapiDecryptor::OnSessionMessage(const std::string& web_session_id,
-                                      const std::vector<uint8>& message,
-                                      const GURL& destination_url) {
+                                      MessageType message_type,
+                                      const std::vector<uint8>& message) {
   DCHECK(render_loop_proxy_->BelongsToCurrentThread());
-  session_message_cb_.Run(web_session_id, message, destination_url);
+  session_message_cb_.Run(web_session_id, message_type, message);
 }
 
 void PpapiDecryptor::OnSessionKeysChange(const std::string& web_session_id,
-                                         bool has_additional_usable_key) {
+                                         bool has_additional_usable_key,
+                                         media::CdmKeysInfo keys_info) {
   DCHECK(render_loop_proxy_->BelongsToCurrentThread());
 
   // TODO(jrummell): Handling resume playback should be done in the media
@@ -400,7 +403,8 @@ void PpapiDecryptor::OnSessionKeysChange(const std::string& web_session_id,
   if (has_additional_usable_key)
     AttemptToResumePlayback();
 
-  session_keys_change_cb_.Run(web_session_id, has_additional_usable_key);
+  session_keys_change_cb_.Run(web_session_id, has_additional_usable_key,
+                              keys_info.Pass());
 }
 
 void PpapiDecryptor::OnSessionExpirationUpdate(

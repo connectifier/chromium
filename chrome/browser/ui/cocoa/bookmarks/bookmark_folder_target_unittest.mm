@@ -15,6 +15,8 @@
 #import "third_party/ocmock/OCMock/OCMock.h"
 #include "third_party/ocmock/gtest_support.h"
 
+using bookmarks::BookmarkModel;
+
 @interface OCMockObject(PreventRetainCycle)
 - (void)clearRecordersAndExpectations;
 @end
@@ -33,7 +35,7 @@
 
 class BookmarkFolderTargetTest : public CocoaProfileTest {
  public:
-  virtual void SetUp() {
+  void SetUp() override {
     CocoaProfileTest::SetUp();
     ASSERT_TRUE(profile());
 

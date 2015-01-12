@@ -31,7 +31,6 @@
 #include "base/time/time.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
-#include "chrome/browser/history/download_row.h"
 #include "chrome/browser/history/history_backend.h"
 #include "chrome/browser/history/history_notifications.h"
 #include "chrome/browser/history/in_memory_history_backend.h"
@@ -46,6 +45,7 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
 #include "components/dom_distiller/core/url_constants.h"
+#include "components/history/core/browser/download_row.h"
 #include "components/history/core/browser/history_client.h"
 #include "components/history/core/browser/history_service_observer.h"
 #include "components/history/core/browser/history_types.h"
@@ -187,6 +187,14 @@ class HistoryService::BackendDelegate : public HistoryBackend::Delegate {
         base::Bind(&HistoryService::NotifyURLsModified,
                    history_service_,
                    changed_urls));
+  }
+
+  void NotifyKeywordSearchTermUpdated(const history::URLRow& row,
+                                      KeywordID keyword_id,
+                                      const base::string16& term) override {
+    service_task_runner_->PostTask(
+        FROM_HERE, base::Bind(&HistoryService::NotifyKeywordSearchTermUpdated,
+                              history_service_, row, keyword_id, term));
   }
 
   void BroadcastNotifications(
@@ -1278,6 +1286,15 @@ void HistoryService::NotifyHistoryServiceBeingDeleted() {
   DCHECK(thread_checker_.CalledOnValidThread());
   FOR_EACH_OBSERVER(history::HistoryServiceObserver, observers_,
                     HistoryServiceBeingDeleted(this));
+}
+
+void HistoryService::NotifyKeywordSearchTermUpdated(
+    const history::URLRow& row,
+    history::KeywordID keyword_id,
+    const base::string16& term) {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  FOR_EACH_OBSERVER(history::HistoryServiceObserver, observers_,
+                    OnKeywordSearchTermUpdated(this, row, keyword_id, term));
 }
 
 scoped_ptr<base::CallbackList<void(const std::set<GURL>&)>::Subscription>

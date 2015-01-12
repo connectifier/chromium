@@ -24,6 +24,7 @@
 #include "testing/gtest/include/gtest/gtest.h"
 
 using bookmarks::BookmarkMatch;
+using bookmarks::BookmarkModel;
 
 // The bookmark corpus against which we will simulate searches.
 struct BookmarksTestInfo {
@@ -267,7 +268,7 @@ TEST_F(BookmarkProviderTest, Positions) {
                             metrics::OmniboxEventProto::INVALID_SPEC, false,
                             false, false, true,
                             ChromeAutocompleteSchemeClassifier(profile_.get()));
-    provider_->Start(input, false);
+    provider_->Start(input, false, false);
     const ACMatches& matches(provider_->matches());
     // Validate number of results is as expected.
     EXPECT_LE(matches.size(), query_data[i].match_count)
@@ -348,7 +349,7 @@ TEST_F(BookmarkProviderTest, Rankings) {
                             metrics::OmniboxEventProto::INVALID_SPEC, false,
                             false, false, true,
                             ChromeAutocompleteSchemeClassifier(profile_.get()));
-    provider_->Start(input, false);
+    provider_->Start(input, false, false);
     const ACMatches& matches(provider_->matches());
     // Validate number and content of results is as expected.
     for (size_t j = 0; j < std::max(query_data[i].match_count, matches.size());
@@ -448,7 +449,7 @@ TEST_F(BookmarkProviderTest, StripHttpAndAdjustOffsets) {
                             metrics::OmniboxEventProto::INVALID_SPEC, false,
                             false, false, true,
                             ChromeAutocompleteSchemeClassifier(profile_.get()));
-    provider_->Start(input, false);
+    provider_->Start(input, false, false);
     const ACMatches& matches(provider_->matches());
     ASSERT_EQ(1U, matches.size()) << description;
     const AutocompleteMatch& match = matches[0];
@@ -471,4 +472,14 @@ TEST_F(BookmarkProviderTest, StripHttpAndAdjustOffsets) {
       EXPECT_EQ(style, match.contents_class[i].style) << description;
     }
   }
+}
+
+TEST_F(BookmarkProviderTest, DoesNotProvideMatchesOnFocus) {
+  AutocompleteInput input(base::ASCIIToUTF16("foo"),
+                          base::string16::npos, std::string(), GURL(),
+                          metrics::OmniboxEventProto::INVALID_SPEC, false,
+                          false, false, true,
+                          ChromeAutocompleteSchemeClassifier(profile_.get()));
+  provider_->Start(input, false, true);
+  EXPECT_TRUE(provider_->matches().empty());
 }

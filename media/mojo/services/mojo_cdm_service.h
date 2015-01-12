@@ -32,7 +32,8 @@ class MojoCdmService
       mojo::Array<uint8_t> init_data,
       const mojo::Callback<void(mojo::CdmPromiseResultPtr, mojo::String)>&
           callback) final;
-  void LoadSession(const mojo::String& session_id,
+  void LoadSession(mojo::ContentDecryptionModule::SessionType session_type,
+                   const mojo::String& session_id,
                    const mojo::Callback<void(mojo::CdmPromiseResultPtr,
                                              mojo::String)>& callback) final;
   void UpdateSession(
@@ -51,10 +52,11 @@ class MojoCdmService
  private:
   // Callbacks for firing session events.
   void OnSessionMessage(const std::string& session_id,
-                        const std::vector<uint8_t>& message,
-                        const GURL& destination_url);
+                        MediaKeys::MessageType message_type,
+                        const std::vector<uint8_t>& message);
   void OnSessionKeysChange(const std::string& session_id,
-                           bool has_additional_usable_key);
+                           bool has_additional_usable_key,
+                           CdmKeysInfo keys_info);
   void OnSessionExpirationUpdate(const std::string& session_id,
                                  const base::Time& new_expiry_time);
   void OnSessionClosed(const std::string& session_id);

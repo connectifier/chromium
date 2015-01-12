@@ -69,6 +69,7 @@ class CONTENT_EXPORT V4L2VideoEncodeAccelerator
   // Record for codec input buffers.
   struct InputRecord {
     InputRecord();
+    ~InputRecord();
     bool at_device;
     scoped_refptr<media::VideoFrame> frame;
   };
@@ -76,6 +77,7 @@ class CONTENT_EXPORT V4L2VideoEncodeAccelerator
   // Record for output buffers.
   struct OutputRecord {
     OutputRecord();
+    ~OutputRecord();
     bool at_device;
     linked_ptr<BitstreamBufferRef> buffer_ref;
     void* address;
@@ -187,6 +189,9 @@ class CONTENT_EXPORT V4L2VideoEncodeAccelerator
   // Destroy these buffers.
   void DestroyInputBuffers();
   void DestroyOutputBuffers();
+
+  // Set controls in |ctrls| and return true if successful.
+  bool SetExtCtrls(std::vector<struct v4l2_ext_control> ctrls);
 
   // Our original calling message loop for the child thread.
   const scoped_refptr<base::MessageLoopProxy> child_message_loop_proxy_;

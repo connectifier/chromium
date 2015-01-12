@@ -1980,6 +1980,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="BackgroundMode.OnStartup.AutoLaunchState"
+    enum="AutoLaunchState">
+  <owner>gab@chromium.org</owner>
+  <summary>
+    Logged during BackgroundModeManager's initialization. Indicates the
+    AutoLaunchState the current browser process was launched in.
+  </summary>
+</histogram>
+
+<histogram name="BackgroundMode.OnStartup.IsBackgroundModePrefEnabled"
+    enum="BooleanEnabled">
+  <owner>gab@chromium.org</owner>
+  <summary>
+    Logged during BackgroundModeManager's initialization. Indicates the state of
+    the kBackgroundModeEnabled pref on startup.
+  </summary>
+</histogram>
+
 <histogram name="BatteryStatus.NumberBatteriesLinux"
     enum="BatteryStatusNumberBatteries">
   <owner>timvolodine@chromium.org</owner>
@@ -2123,6 +2141,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     Records the context type names used to create canvas rendering contexts.
+  </summary>
+</histogram>
+
+<histogram name="CAPSUpdater.Step" enum="CAPSUpdaterStep">
+  <owner>cpu@chromium.org</owner>
+  <summary>
+    Tracks the component updater steps for the Chrome Crash Service.
   </summary>
 </histogram>
 
@@ -10399,6 +10424,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Hotword.SharedModuleReinstallLanguage" enum="LanguageCode">
+  <owner>amistry@chromium.org</owner>
+  <owner>rlp@chromium.org</owner>
+  <owner>somast@chromium.org</owner>
+  <summary>
+    Language, switched to by the user, that triggered a hotword shared module
+    reinstall.
+  </summary>
+</histogram>
+
 <histogram name="HttpCache.AsyncValidationDuration" units="milliseconds">
   <owner>ricea@chromium.org</owner>
   <summary>
@@ -10675,6 +10710,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     The breakdown of input method usage by input method IDs. Recorded when the
     user presses keys on physical or on-screen keyboard.
   </summary>
+</histogram>
+
+<histogram name="InputMethod.ImeSwitch" enum="IMESwitchType">
+  <owner>shuchen@chromium.org</owner>
+  <summary>The trigger type of input method switches by user.</summary>
 </histogram>
 
 <histogram name="InputMethod.VirtualKeyboard.BackspaceCount">
@@ -11269,6 +11309,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="interstitial.captive_portal"
+    enum="CaptivePortalBlockingPageEvent">
+  <owner>meacer@chromium.org</owner>
+  <summary>
+    User action when the user is shown a captive portal error page.
+  </summary>
+</histogram>
+
 <histogram name="interstitial.common_name_invalid_time" units="milliseconds">
   <obsolete>
     Removed on 8/1/13.
@@ -11468,6 +11516,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     the user accepts the SSL warning.  This is only recorded for overridable SSL
     warnings.  Timing begins when user first focuses on the page.
   </summary>
+</histogram>
+
+<histogram name="interstitial.ssl_error_handler" enum="SSLErrorHandlerEvent">
+  <owner>meacer@chromium.org</owner>
+  <summary>The type of action that the SSL error handler takes.</summary>
 </histogram>
 
 <histogram name="interstitial.ssl_error_type" enum="SSLErrorTypes">
@@ -26060,6 +26113,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Power.DarkResumeWakeDurationMs" units="milliseconds">
+  <owner>chirantan@chromium.org</owner>
+  <summary>
+    The amount of time a system spent awake every time it woke up in dark
+    resume.
+  </summary>
+</histogram>
+
+<histogram name="Power.DarkResumeWakeupsPerHour">
+  <owner>chirantan@chromium.org</owner>
+  <summary>
+    The number of times a system woke up in dark resume in an hour.  Note that
+    this value is scaled up or down to an hour based on the amount of time the
+    system spent in suspend.  So if the system suspended for 20 minutes and woke
+    up 3 times, it would report a value of 9.
+  </summary>
+</histogram>
+
 <histogram name="Power.ExternalBrightnessReadResult"
     enum="ExternalDisplayReceiveResult">
   <owner>derat@chromium.org</owner>
@@ -27665,8 +27736,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Profile.NumberOfManagedProfiles">
   <owner>pam@chromium.org</owner>
   <summary>
-    Counts the number of locally managed profiles on a user's machine when
-    Chrome starts up, among cases with at least one profile.
+    Counts the number of locally managed profiles on a user's machine at least
+    every 24 hours while Chrome is running, among cases with at least one
+    profile. Always de-dupe the results with Show User Counts.
   </summary>
 </histogram>
 
@@ -27674,7 +27746,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>bcwhite@chromium.org</owner>
   <owner>rlp@chromium.org</owner>
   <summary>
-    Counts the number of profiles on a user's machine when Chrome starts up.
+    Counts the number of profiles on a user's machine at least every 24 hours
+    while Chrome is running. Always de-dupe the results with Show User Counts.
   </summary>
 </histogram>
 
@@ -27702,12 +27775,21 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Profile.NumberOfProfilesWithAuthErrors">
+  <owner>mlerman@chromium.org</owner>
+  <summary>
+    Counts the type GAIA authentication errors on a user's machine when Chrome
+    starts up. The types of errors are broken down in Signin.AuthError.
+  </summary>
+</histogram>
+
 <histogram name="Profile.NumberOfSignedInProfiles">
   <owner>bcwhite@chromium.org</owner>
   <owner>rlp@chromium.org</owner>
   <summary>
-    Counts the number of signed-in profiles on a user's machine when Chrome
-    starts up.
+    Counts the number of signed-in profiles on a user's machine at least every
+    24 hours while Chrome is running. Always de-dupe the results with Show User
+    Counts.
   </summary>
 </histogram>
 
@@ -27727,8 +27809,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>mlerman@chromium.org</owner>
   <summary>
     Counts the number of signed-in profiles that are using the GAIA image as the
-    avatar icon. This is counted when a profile is loaded, including when Chrome
-    starts up.
+    avatar icon. This is counted at least every 24 hours while Chrome is
+    running, so always de-dupe the results with Show User Counts.
   </summary>
 </histogram>
 
@@ -27736,7 +27818,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>mlerman@chromium.org</owner>
   <summary>
     Counts the number of profiles unused within the past 28 days on a user's
-    machine when Chrome starts up.
+    machine. This is counts at least every 24 hours while Chrome is running, so
+    always de-dupe the results with Show User Counts.
   </summary>
 </histogram>
 
@@ -31304,6 +31387,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SBOffDomainInclusion.Detected" enum="ContentResourceType">
+  <obsolete>
+    Deprecated 01/2015.
+  </obsolete>
   <owner>gab@chromium.org</owner>
   <summary>
     Logs the resource type of each resource request for which an off-domain
@@ -31338,6 +31424,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="SBOffDomainInclusion.Suspicious" enum="ContentResourceType">
+  <owner>gab@chromium.org</owner>
+  <summary>
+    Logs the resource type of each resource request for which an off-domain
+    inclusion was detected by the OffDomainInclusionDetector and considered
+    suspicious.
+  </summary>
+</histogram>
+
+<histogram name="SBOffDomainInclusion.Whitelisted" enum="ContentResourceType">
+  <owner>gab@chromium.org</owner>
+  <summary>
+    Logs the resource type of each resource request for which an off-domain
+    inclusion was detected by the OffDomainInclusionDetector and ignored because
+    it was present on the inclusion whitelist.
+  </summary>
+</histogram>
+
 <histogram name="Sdch3.Advertisement_Count">
   <owner>rdsmith@chromium.org</owner>
   <summary>
@@ -31361,6 +31465,23 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     dictionary is loaded shortly after the first Google query performed in each
     session, and allows future SDCH transactions to be encoded/decoded using
     that dictionary.
+  </summary>
+</histogram>
+
+<histogram name="Sdch3.DictionaryFate" enum="SdchDictionaryFate">
+  <owner>rdsmith@chromium.org&gt;</owner>
+  <summary>
+    The fate, both on input and output, of dictionary requests.  There is
+    intended to be two entries in this histogram for each Get-Dictionary seen
+    (except failed requests are not currently tracked).
+  </summary>
+</histogram>
+
+<histogram name="Sdch3.DictionaryUseCount">
+  <owner>rdsmith@chromium.org</owner>
+  <summary>
+    The number of times a dictionary has been successfully used for decoding,
+    recorded at the time it is evicted from the manager.
   </summary>
 </histogram>
 
@@ -32591,6 +32712,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Signin.AndroidSigninPromo" enum="AndroidSigninPromoAction">
   <owner>guohui@chromium.org</owner>
   <summary>Track how a user interfacts with the android signin promo.</summary>
+</histogram>
+
+<histogram name="Signin.AuthError" enum="GoogleServiceAuthError">
+  <owner>mlerman@chromium.org</owner>
+  <summary>
+    Log the type of GAIA authentication error that occur whenever the error
+    state changes.
+  </summary>
 </histogram>
 
 <histogram name="Signin.DuringFirstRun">
@@ -36020,6 +36149,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Startup.FirstCommitNavigationTime" units="milliseconds">
+  <owner>pasko@chromium.org</owner>
+  <summary>
+    The time from the earliest entry point in the browser process to the moment
+    the first navigation is committed, i.e. when renderer gets the first byte of
+    the document.
+  </summary>
+</histogram>
+
 <histogram name="Startup.FirstWebContents.MainFrameLoad" units="milliseconds">
   <owner>erikchen@chromium.org</owner>
   <summary>
@@ -36275,6 +36413,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     True if a created blob exceeded the internal in-memory storage memory limit
     for blobs.
+  </summary>
+</histogram>
+
+<histogram name="Storage.Blob.ItemCount" units="Blob Items">
+  <owner>dmurph@chromium.org</owner>
+  <summary>
+    The number of blob items in a blob, recorded at blob construction. (Blobs
+    are immutable, so this won't change afterwards).
   </summary>
 </histogram>
 
@@ -39230,6 +39376,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Measures the time elapsed on Chrome OS between when Chrome is started, and
     when the login prompt is again visible after a logout.  This statistic is
     only collected when preceeded by a logout.
+  </summary>
+</histogram>
+
+<histogram name="Uptime.DBusCrash" units="ms">
+  <owner>derat@chromium.org</owner>
+  <summary>
+    The system uptime on Chrome OS when the dbus-daemon process crashes,
+    resulting in a reboot.
   </summary>
 </histogram>
 
@@ -42600,6 +42754,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="11" label="User edited autofilled field (once)"/>
 </enum>
 
+<enum name="AutoLaunchState" type="int">
+  <int value="0" label="AUTO_LAUNCH_NONE"/>
+  <int value="1" label="AUTO_LAUNCH_BACKGROUND"/>
+  <int value="2" label="AUTO_LAUNCH_FOREGROUND"/>
+  <int value="3" label="AUTO_LAUNCH_FOREGROUND_USELESS"/>
+</enum>
+
 <enum name="BackingStoreResults" type="int">
   <int value="0" label="Unused"/>
   <int value="1" label="Success"/>
@@ -42975,6 +43136,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="webkit-3d"/>
   <int value="2" label="experimental-webgl"/>
   <int value="3" label="webgl"/>
+</enum>
+
+<enum name="CAPSUpdaterStep" type="int">
+  <int value="0" label="CAPS component ready"/>
+  <int value="1" label="CAPS component missing"/>
+  <int value="2" label="CAPS Service failed to start"/>
+  <int value="3" label="CAPS Service started"/>
+</enum>
+
+<enum name="CaptivePortalBlockingPageEvent" type="int">
+  <int value="0" label="SHOW_ALL"/>
+  <int value="1" label="OPEN_LOGIN_PAGE"/>
 </enum>
 
 <enum name="CaptivePortalDetectResult" type="int">
@@ -46495,6 +46668,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="942" label="CRYPTOTOKENPRIVATE_REQUESTPERMISSION"/>
   <int value="943" label="BLUETOOTHPRIVATE_DISCONNECTALL"/>
   <int value="944" label="FILEMANAGERPRIVATE_GETMIMETYPE"/>
+  <int value="945" label="USB_SETCONFIGURATION"/>
+  <int value="946" label="EASYUNLOCKPRIVATE_GETCONNECTIONINFO"/>
+  <int value="947" label="FILEMANAGERPRIVATE_COMPUTECHECKSUM"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -48710,6 +48886,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="Aggressive"/>
 </enum>
 
+<enum name="IMESwitchType" type="int">
+  <int value="0" label="By tray menu">IME switches by tray menu</int>
+  <int value="1" label="By accelerator">IME switches by accelerator</int>
+</enum>
+
 <enum name="IMEVKLayout" type="int">
   <int value="0" label="Compact"/>
   <int value="1" label="CompactSymbol"/>
@@ -50079,6 +50260,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="593707592" label="disable-network-portal-notification"/>
   <int value="598827460" label="enable-roboto-font-ui"/>
   <int value="606288133" label="enable-print-preview-register-promos"/>
+  <int value="610545308" label="enable-potentially-annoying-security-features"/>
   <int value="625273056" label="disable-boot-animation"/>
   <int value="630947363" label="touch-events"/>
   <int value="643725031" label="disable-touch-feedback"/>
@@ -50198,6 +50380,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1861251313"
       label="enable-message-center-always-scroll-up-upon-notification-removal"/>
   <int value="1865799183" label="javascript-harmony"/>
+  <int value="1896456311" label="enable-password-save-in-page-navigation"/>
   <int value="1900529524" label="disable-touch-drag-drop"/>
   <int value="1906942630" label="enable-easy-unlock"/>
   <int value="1930901873" label="disable-sync-app-list"/>
@@ -53351,6 +53534,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2031327332" label="PPB_TextInput(Dev);0.1"/>
   <int value="2056532375" label="PPB_Audio;1.0"/>
   <int value="2062775054" label="PPB_IMEInputEvent(Dev);0.1"/>
+  <int value="2070539867" label="PPB_ContentDecryptor_Private;0.13"/>
   <int value="2070630224" label="PPB_AudioInput(Dev);0.3"/>
   <int value="2095945999" label="PPB_NetAddress_Private;0.1"/>
   <int value="2098849894" label="PPB_ContentDecryptor_Private;0.10"/>
@@ -55513,6 +55697,21 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="3" label="SCT_STATUS_OK"/>
 </enum>
 
+<enum name="SdchDictionaryFate" type="int">
+  <summary>
+    Fate of an Sdch dictionary, on load and eviction. See
+    net/sdch/sdch_owner.cc.
+  </summary>
+  <int value="1" label="GET_IGNORED"/>
+  <int value="2" label="FETCH_FAILED"/>
+  <int value="3" label="FETCH_IGNORED_NO_SPACE"/>
+  <int value="4" label="FETCH_MANAGER_REFUSED"/>
+  <int value="5" label="ADDED"/>
+  <int value="6" label="EVICT_FOR_DICT"/>
+  <int value="7" label="EVICT_FOR_MEMORY"/>
+  <int value="8" label="EVICT_FOR_DESTRUCTION"/>
+</enum>
+
 <enum name="SdchProblemCode" type="int">
   <summary>
     SDCH problem codes, listed in net/base/sdch_problem_code_list.h
@@ -55546,8 +55745,12 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="31" label="DICTIONARY_SELECTED_FOR_SSL"/>
   <int value="32" label="DICTIONARY_ALREADY_LOADED"/>
   <int value="33" label="DICTIONARY_SELECTED_FROM_NON_HTTP"/>
-  <int value="34" label="DICTIONARY_IS_TOO_LARGE"/>
-  <int value="35" label="DICTIONARY_COUNT_EXCEEDED"/>
+  <int value="34" label="defunct (DICTIONARY_IS_TOO_LARGE)">
+    Recorded in separate histogram; see Sdch3.DictionaryFate.
+  </int>
+  <int value="35" label="defunct (DICTIONARY_COUNT_EXCEEDED)">
+    Recorded in separate histogram; see Sdch3.DictionaryFate.
+  </int>
   <int value="36" label="defunct">
     DICTIONARY_PREVIOUSLY_SCHEDULED_TO_DOWNLOAD used instead
   </int>
@@ -55560,6 +55763,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   </int>
   <int value="39" label="DICTIONARY_PREVIOUSLY_SCHEDULED_TO_DOWNLOAD"/>
   <int value="40" label="ATTEMPT_TO_DECODE_NON_HTTP_DATA"/>
+  <int value="44" label="DICTIONARY_NO_ROOM"/>
   <int value="50" label="MULTIENCODING_FOR_NON_SDCH_REQUEST"/>
   <int value="51" label="SDCH_CONTENT_ENCODE_FOR_NON_SDCH_REQUEST"/>
   <int value="52" label="UNADVERTISED_DICTIONARY_USED"/>
@@ -56850,6 +57054,14 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="52245" label="TLS_DHE_RSA_WITH_CHACHA20_POLY1305"/>
 </enum>
 
+<enum name="SSLErrorHandlerEvent" type="int">
+  <int value="0" label="HANDLE_ALL"/>
+  <int value="1" label="SHOW_CAPTIVE_PORTAL_INTERSTITIAL_NONOVERRIDABLE"/>
+  <int value="2" label="SHOW_CAPTIVE_PORTAL_INTERSTITIAL_OVERRIDABLE"/>
+  <int value="3" label="SHOW_SSL_INTERSTITIAL_NONOVERRIDABLE"/>
+  <int value="4" label="SHOW_SSL_INTERSTITIAL_OVERRIDABLE"/>
+</enum>
+
 <enum name="SSLErrorTypes" type="int">
   <int value="0" label="CERT_COMMON_NAME_INVALID"/>
   <int value="1" label="CERT_DATE_INVALID"/>
@@ -58018,6 +58230,9 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="5" label="HOLE"/>
   <int value="6" label="NATIVE_TEXTURE"/>
   <int value="7" label="YV12J"/>
+  <int value="8" label="NV12"/>
+  <int value="9" label="YV24"/>
+  <int value="10" label="ARGB"/>
 </enum>
 
 <enum name="VideoPlayerCastAPIExtensionStatus" type="int">
@@ -62014,6 +62229,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="Download" label="Download"/>
   <suffix name="CsdWhitelist" label="CsdWhitelist"/>
   <suffix name="DownloadWhitelist" label="DownloadWhitelist"/>
+  <suffix name="InclusionWhitelist" label="InclusionWhitelist"/>
   <suffix name="ExtensionBlacklist" label="ExtensionBlacklist"/>
   <suffix name="SideEffectFreeWhitelist" label="SideEffectFreeWhitelist"/>
   <suffix name="IPBlacklist" label="IPBlacklist"/>

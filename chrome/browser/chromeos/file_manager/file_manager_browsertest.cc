@@ -1039,13 +1039,11 @@ INSTANTIATE_TEST_CASE_P(
         TestParameter(NOT_IN_GUEST_MODE, "executeDefaultTaskOnDrive")));
 
 // Slow tests are disabled on debug build. http://crbug.com/327719
-#if !defined(NDEBUG)
-#define MAYBE_DefaultActionDialog DISABLED_DefaultActionDialog
-#else
-#define MAYBE_DefaultActionDialog DefaultActionDialog
-#endif
+// In addition, this test in particular has become very flaky as of this CL:
+//   https://codereview.chromium.org/838193002/
+// Disable completely until further investigation. See: http://crbug.com/444574.
 WRAPPED_INSTANTIATE_TEST_CASE_P(
-    MAYBE_DefaultActionDialog,
+    DISABLED_DefaultActionDialog,
     FileManagerBrowserTest,
     ::testing::Values(
         TestParameter(NOT_IN_GUEST_MODE, "defaultActionDialogOnDownloads"),
@@ -1385,14 +1383,7 @@ IN_PROC_BROWSER_TEST_F(GalleryBrowserTestInGuestMode,
   StartTest();
 }
 
-// Uninitialized memory access under ChromeOS MSAN (http://crbug.com/445908)
-#if defined(OS_CHROMEOS) && defined(MEMORY_SANITIZER)
-#define MAYBE_TraverseSlideImagesOnDrive DISABLED_TraverseSlideImagesOnDrive
-#else
-#define MAYBE_TraverseSlideImagesOnDrive TraverseSlideImagesOnDrive
-#endif
-
-IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, MAYBE_TraverseSlideImagesOnDrive) {
+IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, TraverseSlideImagesOnDrive) {
   AddScript("gallery/slide_mode.js");
   set_test_case_name("traverseSlideImagesOnDrive");
   StartTest();
@@ -1436,14 +1427,7 @@ IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, DeleteImageOnDrive) {
   StartTest();
 }
 
-// Uninitialized memory access under ChromeOS MSAN (http://crbug.com/445908)
-#if defined(OS_CHROMEOS) && defined(MEMORY_SANITIZER)
-#define MAYBE_RotateImageOnDownloads DISABLED_RotateImageOnDownloads
-#else
-#define MAYBE_RotateImageOnDownloads RotateImageOnDownloads
-#endif
-
-IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, MAYBE_RotateImageOnDownloads) {
+IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, RotateImageOnDownloads) {
   AddScript("gallery/photo_editor.js");
   set_test_case_name("rotateImageOnDownloads");
   StartTest();
@@ -1456,94 +1440,45 @@ IN_PROC_BROWSER_TEST_F(GalleryBrowserTestInGuestMode,
   StartTest();
 }
 
-// Uninitialized memory access under ChromeOS MSAN (http://crbug.com/445908)
-#if defined(OS_CHROMEOS) && defined(MEMORY_SANITIZER)
-#define MAYBE_RotateImageOnDrive DISABLED_RotateImageOnDrive
-#else
-#define MAYBE_RotateImageOnDrive RotateImageOnDrive
-#endif
-
-IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, MAYBE_RotateImageOnDrive) {
+IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, RotateImageOnDrive) {
   AddScript("gallery/photo_editor.js");
   set_test_case_name("rotateImageOnDrive");
   StartTest();
 }
 
-// Uninitialized memory access under ChromeOS MSAN (http://crbug.com/445908)
-#if defined(OS_CHROMEOS) && defined(MEMORY_SANITIZER)
-#define MAYBE_CropImageOnDownloads DISABLED_CropImageOnDownloads
-#else
-#define MAYBE_CropImageOnDownloads CropImageOnDownloads
-#endif
-
-IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, MAYBE_CropImageOnDownloads) {
+IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, CropImageOnDownloads) {
   AddScript("gallery/photo_editor.js");
   set_test_case_name("cropImageOnDownloads");
   StartTest();
 }
-
-// Uninitialized memory access under ChromeOS MSAN (http://crbug.com/445908)
-#if defined(OS_CHROMEOS) && defined(MEMORY_SANITIZER)
-#define MAYBE_CropImageOnDownloads DISABLED_CropImageOnDownloads
-#else
-#define MAYBE_CropImageOnDownloads CropImageOnDownloads
-#endif
 
 IN_PROC_BROWSER_TEST_F(GalleryBrowserTestInGuestMode,
-                       MAYBE_CropImageOnDownloads) {
+                       CropImageOnDownloads) {
   AddScript("gallery/photo_editor.js");
   set_test_case_name("cropImageOnDownloads");
   StartTest();
 }
 
-// Uninitialized memory access under ChromeOS MSAN (http://crbug.com/445908)
-#if defined(OS_CHROMEOS) && defined(MEMORY_SANITIZER)
-#define MAYBE_CropImageOnDrive DISABLED_CropImageOnDrive
-#else
-#define MAYBE_CropImageOnDrive CropImageOnDrive
-#endif
-
-IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, MAYBE_CropImageOnDrive) {
+IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, CropImageOnDrive) {
   AddScript("gallery/photo_editor.js");
   set_test_case_name("cropImageOnDrive");
   StartTest();
 }
 
-// Uninitialized memory access under ChromeOS MSAN (http://crbug.com/445908)
-#if defined(OS_CHROMEOS) && defined(MEMORY_SANITIZER)
-#define MAYBE_ExposureImageOnDownloads DISABLED_ExposureImageOnDownloads
-#else
-#define MAYBE_ExposureImageOnDownloads ExposureImageOnDownloads
-#endif
-
-IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, MAYBE_ExposureImageOnDownloads) {
+IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, ExposureImageOnDownloads) {
   AddScript("gallery/photo_editor.js");
   set_test_case_name("exposureImageOnDownloads");
   StartTest();
 }
-
-// Uninitialized memory access under ChromeOS MSAN (http://crbug.com/445908)
-#if defined(OS_CHROMEOS) && defined(MEMORY_SANITIZER)
-#define MAYBE_ExposureImageOnDownloads DISABLED_ExposureImageOnDownloads
-#else
-#define MAYBE_ExposureImageOnDownloads ExposureImageOnDownloads
-#endif
 
 IN_PROC_BROWSER_TEST_F(GalleryBrowserTestInGuestMode,
-                       MAYBE_ExposureImageOnDownloads) {
+                       ExposureImageOnDownloads) {
   AddScript("gallery/photo_editor.js");
   set_test_case_name("exposureImageOnDownloads");
   StartTest();
 }
 
-// Uninitialized memory access under ChromeOS MSAN (http://crbug.com/445908)
-#if defined(OS_CHROMEOS) && defined(MEMORY_SANITIZER)
-#define MAYBE_ExposureImageOnDrive DISABLED_ExposureImageOnDrive
-#else
-#define MAYBE_ExposureImageOnDrive ExposureImageOnDrive
-#endif
-
-IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, MAYBE_ExposureImageOnDrive) {
+IN_PROC_BROWSER_TEST_F(GalleryBrowserTest, ExposureImageOnDrive) {
   AddScript("gallery/photo_editor.js");
   set_test_case_name("exposureImageOnDrive");
   StartTest();

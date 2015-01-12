@@ -210,6 +210,9 @@ dictionary EntryProperties {
   // True if the file is available on metered connection.
   boolean? isAvailableWhenMetered;
 
+  // True if the file has local change (has not been fully synced to the cloud).
+  boolean? isDirty;
+
   // URL to the custom icon for this file.
   DOMString? customIconUrl;
 
@@ -290,7 +293,7 @@ dictionary VolumeMetadata {
 
   // Flag that specifies whether the volume contains media.
   boolean hasMedia;
-  
+
   // Additional data about mount, for example, that the filesystem is not
   // supported.
   MountCondition? mountCondition;
@@ -560,6 +563,9 @@ callback GetProfilesCallback = void(ProfileInfo[] profiles,
 callback ResolveEntriesCallback =
     void([instanceOf=FileEntry] object[] entries);
 
+// |checksum| Result checksum.
+callback ComputeChecksumCallback = void(DOMString checksum);
+
 interface Functions {
   // Logout the current user for navigating to the re-authentication screen for
   // the Google account.
@@ -816,6 +822,12 @@ interface Functions {
   // Opens inspector window.
   // |type| InspectionType which specifies how to open inspector.
   static void openInspector(InspectionType type);
+
+  // Computes an MD5 checksum for the given file.
+  // |fileURL| The URL of the file to checksum.
+  // |callback|
+  static void computeChecksum(DOMString fileURL,
+                              ComputeChecksumCallback callback);
 };
 
 interface Events {

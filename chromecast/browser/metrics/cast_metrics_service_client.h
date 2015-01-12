@@ -47,6 +47,7 @@ class CastMetricsServiceClient : public ::metrics::MetricsServiceClient {
       net::URLRequestContextGetter* request_context);
 
   void Initialize(CastService* cast_service);
+  void Finalize();
 
   // metrics::MetricsServiceClient implementation:
   void SetMetricsClientId(const std::string& client_id) override;
@@ -89,7 +90,7 @@ class CastMetricsServiceClient : public ::metrics::MetricsServiceClient {
   std::string client_id_;
 
 #if defined(OS_LINUX)
-  scoped_ptr<ExternalMetrics> external_metrics_;
+  ExternalMetrics* external_metrics_;
 #endif  // defined(OS_LINUX)
   const scoped_refptr<base::MessageLoopProxy> metrics_service_loop_;
   scoped_ptr< ::metrics::MetricsStateManager> metrics_state_manager_;

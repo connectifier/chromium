@@ -79,6 +79,8 @@
 #include "chrome/browser/ui/webui/ntp/ntp_login_handler.h"
 #endif
 
+using bookmarks::BookmarkModel;
+
 static const char kStringsJsFile[] = "strings.js";
 static const char kHistoryJsFile[] = "history.js";
 static const char kOtherDevicesJsFile[] = "other_devices.js";
@@ -482,7 +484,7 @@ void BrowsingHistoryHandler::QueryHistory(
   results_info_value_.Clear();
 
   HistoryService* hs = HistoryServiceFactory::GetForProfile(
-      profile, Profile::EXPLICIT_ACCESS);
+      profile, ServiceAccessType::EXPLICIT_ACCESS);
   hs->QueryHistory(search_text,
                    options,
                    base::Bind(&BrowsingHistoryHandler::QueryComplete,
@@ -570,8 +572,8 @@ void BrowsingHistoryHandler::HandleRemoveVisits(const base::ListValue* args) {
     return;
   }
 
-  HistoryService* history_service =
-      HistoryServiceFactory::GetForProfile(profile, Profile::EXPLICIT_ACCESS);
+  HistoryService* history_service = HistoryServiceFactory::GetForProfile(
+      profile, ServiceAccessType::EXPLICIT_ACCESS);
   history::WebHistoryService* web_history =
       WebHistoryServiceFactory::GetForProfile(profile);
 

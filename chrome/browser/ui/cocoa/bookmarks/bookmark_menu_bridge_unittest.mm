@@ -19,6 +19,7 @@
 #include "ui/base/l10n/l10n_util.h"
 
 using base::ASCIIToUTF16;
+using bookmarks::BookmarkModel;
 
 class TestBookmarkMenuBridge : public BookmarkMenuBridge {
  public:
@@ -38,8 +39,7 @@ class TestBookmarkMenuBridge : public BookmarkMenuBridge {
 // TODO(jrg): see refactor comment in bookmark_bar_state_controller_unittest.mm
 class BookmarkMenuBridgeTest : public CocoaProfileTest {
  public:
-
-   virtual void SetUp() {
+  void SetUp() override {
      CocoaProfileTest::SetUp();
      ASSERT_TRUE(profile());
 

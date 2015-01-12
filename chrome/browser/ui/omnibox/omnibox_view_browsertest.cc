@@ -53,6 +53,7 @@ using base::ASCIIToUTF16;
 using base::UTF16ToUTF8;
 using base::Time;
 using base::TimeDelta;
+using bookmarks::BookmarkModel;
 
 namespace {
 
@@ -289,7 +290,7 @@ class OmniboxViewTest : public InProcessBrowserTest,
   void AddHistoryEntry(const TestHistoryEntry& entry, const Time& time) {
     Profile* profile = browser()->profile();
     HistoryService* history_service = HistoryServiceFactory::GetForProfile(
-        profile, Profile::EXPLICIT_ACCESS);
+        profile, ServiceAccessType::EXPLICIT_ACCESS);
     ASSERT_TRUE(history_service);
 
     if (!history_service->BackendLoaded()) {

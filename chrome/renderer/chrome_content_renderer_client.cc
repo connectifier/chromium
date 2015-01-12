@@ -182,11 +182,6 @@ const char* const kPredefinedAllowedCompositorOrigins[] = {
   "6EAED1924DB611B6EEF2A664BD077BE7EAD33B8F",  // see crbug.com/383937
   "4EB74897CB187C7633357C2FE832E0AD6A44883A"   // see crbug.com/383937
 };
-
-const char* const kPredefinedAllowedVideoDecodeOrigins[] = {
-  "6EAED1924DB611B6EEF2A664BD077BE7EAD33B8F",  // see crbug.com/383937
-  "4EB74897CB187C7633357C2FE832E0AD6A44883A"   // see crbug.com/383937
-};
 #endif
 
 void AppendParams(const std::vector<base::string16>& additional_names,
@@ -284,9 +279,6 @@ ChromeContentRendererClient::ChromeContentRendererClient() {
 #if defined(ENABLE_PLUGINS)
   for (size_t i = 0; i < arraysize(kPredefinedAllowedCompositorOrigins); ++i)
     allowed_compositor_origins_.insert(kPredefinedAllowedCompositorOrigins[i]);
-  for (size_t i = 0; i < arraysize(kPredefinedAllowedVideoDecodeOrigins); ++i)
-    allowed_video_decode_origins_.insert(
-        kPredefinedAllowedVideoDecodeOrigins[i]);
 #endif
 }
 
@@ -697,8 +689,16 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
 
     if ((status_value ==
              ChromeViewHostMsg_GetPluginInfo_Status::kUnauthorized ||
+         status_value == ChromeViewHostMsg_GetPluginInfo_Status::kClickToPlay ||
          status_value == ChromeViewHostMsg_GetPluginInfo_Status::kBlocked) &&
         observer->IsPluginTemporarilyAllowed(identifier)) {
+      status_value = ChromeViewHostMsg_GetPluginInfo_Status::kAllowed;
+    }
+
+    // Allow full-screen plug-ins for left-click-to-play.
+    if (status_value == ChromeViewHostMsg_GetPluginInfo_Status::kClickToPlay &&
+        !frame->parent() && !frame->opener() &&
+        frame->document().isPluginDocument()) {
       status_value = ChromeViewHostMsg_GetPluginInfo_Status::kAllowed;
     }
 
@@ -901,6 +901,16 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
               group_name,
               identifier));
         }
+        observer->DidBlockContentType(content_type, group_name);
+        break;
+      }
+      case ChromeViewHostMsg_GetPluginInfo_Status::kClickToPlay: {
+        placeholder = create_blocked_plugin(
+            IDR_CLICK_TO_PLAY_PLUGIN_HTML,
+            l10n_util::GetStringFUTF16(IDS_PLUGIN_LOAD, group_name), GURL());
+        placeholder->set_allow_loading(true);
+        RenderThread::Get()->RecordAction(
+            UserMetricsAction("Plugin_ClickToPlay"));
         observer->DidBlockContentType(content_type, group_name);
         break;
       }
@@ -1557,23 +1567,6 @@ bool ChromeContentRendererClient::IsPluginAllowedToUseCompositorAPI(
           switches::kEnablePepperTesting))
     return true;
   if (IsExtensionOrSharedModuleWhitelisted(url, allowed_compositor_origins_))
-    return true;
-
-  chrome::VersionInfo::Channel channel = chrome::VersionInfo::GetChannel();
-  return channel <= chrome::VersionInfo::CHANNEL_DEV;
-#else
-  return false;
-#endif
-}
-
-bool ChromeContentRendererClient::IsPluginAllowedToUseVideoDecodeAPI(
-    const GURL& url) {
-#if defined(ENABLE_PLUGINS) && defined(ENABLE_EXTENSIONS)
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnablePepperTesting))
-    return true;
-
-  if (IsExtensionOrSharedModuleWhitelisted(url, allowed_video_decode_origins_))
     return true;
 
   chrome::VersionInfo::Channel channel = chrome::VersionInfo::GetChannel();

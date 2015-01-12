@@ -2,11 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <libdrm/drm_fourcc.h>
 #include <linux/videodev2.h>
 
 #include "base/numerics/safe_conversions.h"
 #include "content/common/gpu/media/generic_v4l2_video_device.h"
+#if defined(ARCH_CPU_ARMEL)
 #include "content/common/gpu/media/tegra_v4l2_video_device.h"
+#endif
+
+// TODO(posciak): remove this once V4L2 headers are updated.
+#define V4L2_PIX_FMT_VP9 v4l2_fourcc('V', 'P', '9', '0')
 
 namespace content {
 
@@ -20,9 +26,11 @@ scoped_ptr<V4L2Device> V4L2Device::Create(Type type) {
   if (generic_device->Initialize())
     return generic_device.Pass();
 
+#if defined(ARCH_CPU_ARMEL)
   scoped_ptr<TegraV4L2Device> tegra_device(new TegraV4L2Device(type));
   if (tegra_device->Initialize())
     return tegra_device.Pass();
+#endif
 
   LOG(ERROR) << "Failed to create V4L2Device";
   return scoped_ptr<V4L2Device>();
@@ -39,6 +47,9 @@ media::VideoFrame::Format V4L2Device::V4L2PixFmtToVideoFrameFormat(
     case V4L2_PIX_FMT_YUV420:
     case V4L2_PIX_FMT_YUV420M:
       return media::VideoFrame::I420;
+
+    case V4L2_PIX_FMT_RGB32:
+      return media::VideoFrame::ARGB;
 
     default:
       LOG(FATAL) << "Add more cases as needed";
@@ -71,9 +82,32 @@ uint32 V4L2Device::VideoCodecProfileToV4L2PixFmt(
   } else if (profile >= media::VP8PROFILE_MIN &&
              profile <= media::VP8PROFILE_MAX) {
     return V4L2_PIX_FMT_VP8;
+  } else if (profile >= media::VP9PROFILE_MIN &&
+             profile <= media::VP9PROFILE_MAX) {
+    return V4L2_PIX_FMT_VP9;
   } else {
     LOG(FATAL) << "Add more cases as needed";
     return 0;
+  }
+}
+
+// static
+uint32_t V4L2Device::V4L2PixFmtToDrmFormat(uint32_t format) {
+  switch (format) {
+    case V4L2_PIX_FMT_NV12:
+    case V4L2_PIX_FMT_NV12M:
+      return DRM_FORMAT_NV12;
+
+    case V4L2_PIX_FMT_YUV420:
+    case V4L2_PIX_FMT_YUV420M:
+      return DRM_FORMAT_YUV420;
+
+    case V4L2_PIX_FMT_RGB32:
+      return DRM_FORMAT_ARGB8888;
+
+    default:
+      DVLOG(1) << "Add more cases as needed";
+      return 0;
   }
 }
 
