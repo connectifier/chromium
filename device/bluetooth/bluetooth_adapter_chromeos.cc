@@ -73,6 +73,8 @@ base::WeakPtr<BluetoothAdapter> BluetoothAdapterChromeOS::CreateAdapter() {
 }
 
 void BluetoothAdapterChromeOS::Shutdown() {
+  if (is_shutdown_)
+    return;
   is_shutdown_ = true;
   DBusThreadManager::Get()->GetBluetoothAdapterClient()->RemoveObserver(this);
   DBusThreadManager::Get()->GetBluetoothDeviceClient()->RemoveObserver(this);
@@ -115,8 +117,7 @@ BluetoothAdapterChromeOS::BluetoothAdapterChromeOS()
 }
 
 BluetoothAdapterChromeOS::~BluetoothAdapterChromeOS() {
-  // DCHECK(is_shutdown_);
-  LOG_IF(INFO, !is_shutdown_) << "~BluetoothAdapterChromeOS() not shutdown.";
+  Shutdown();
 }
 
 void BluetoothAdapterChromeOS::DeleteOnCorrectThread() const {
