@@ -115,8 +115,7 @@ BluetoothAdapterChromeOS::BluetoothAdapterChromeOS()
 }
 
 BluetoothAdapterChromeOS::~BluetoothAdapterChromeOS() {
-  // DCHECK(is_shutdown_);
-  LOG_IF(INFO, !is_shutdown_) << "~BluetoothAdapterChromeOS() not shutdown.";
+  DCHECK(is_shutdown_);
 }
 
 void BluetoothAdapterChromeOS::DeleteOnCorrectThread() const {

@@ -240,7 +240,7 @@ class BluetoothAdapterClientImpl
   dbus::ObjectManager* object_manager_;
 
   // List of observers interested in event notifications from us.
-  ObserverList<BluetoothAdapterClient::Observer, true> observers_;
+  ObserverList<BluetoothAdapterClient::Observer> observers_;
 
   // Weak pointer factory for generating 'this' pointers that might live longer
   // than we do.
