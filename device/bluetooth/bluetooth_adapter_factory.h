@@ -29,6 +29,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterFactory {
   // use.
   static void GetAdapter(const AdapterCallback& callback);
 
+  // Shutdown the adapter, ending reliance on other objects, and resulting in
+  // |IsPresent| returning false.
+  static void Shutdown();
+
   // Sets the shared instance of the default adapter for testing purposes only,
   // no reference is retained after completion of the call, removing the last
   // reference will reset the factory.
