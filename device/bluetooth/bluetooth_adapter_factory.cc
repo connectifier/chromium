@@ -12,6 +12,10 @@
 #include "base/memory/weak_ptr.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 
+#if defined(OS_CHROMEOS)
+#include "device/bluetooth/bluetooth_adapter_chromeos.h"
+#endif
+
 #if defined(OS_MACOSX)
 #include "base/mac/mac_util.h"
 #endif
@@ -98,7 +102,8 @@ void BluetoothAdapterFactory::GetAdapter(const AdapterCallback& callback) {
 // static
 void BluetoothAdapterFactory::OnDBusThreadManagerShutdown() {
   if (default_adapter.Get()) {
-    default_adapter.Get()->OnDBusThreadManagerShutdown();
+    static_cast<chromeos::BluetoothAdapterChromeOS*>(
+        default_adapter.Get().get())->OnDBusThreadManagerShutdown();
   }
 }
 #endif
