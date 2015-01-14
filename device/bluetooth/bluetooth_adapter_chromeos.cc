@@ -76,6 +76,9 @@ void BluetoothAdapterChromeOS::Shutdown() {
   if (is_shutdown_)
     return;
   is_shutdown_ = true;
+  DCHECK(DBusThreadManager::IsInitialized())
+      << "Call BluetoothAdapterFactory::Shutdown() before "
+         "DBusThreadManager::Shutdown().";
   DBusThreadManager::Get()->GetBluetoothAdapterClient()->RemoveObserver(this);
   DBusThreadManager::Get()->GetBluetoothDeviceClient()->RemoveObserver(this);
   DBusThreadManager::Get()->GetBluetoothInputClient()->RemoveObserver(this);
