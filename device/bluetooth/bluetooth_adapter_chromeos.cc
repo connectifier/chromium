@@ -72,8 +72,26 @@ base::WeakPtr<BluetoothAdapter> BluetoothAdapterChromeOS::CreateAdapter() {
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }
 
+void BluetoothAdapterChromeOS::Shutdown() {
+  if (is_shutdown_)
+    return;
+  is_shutdown_ = true;
+  DBusThreadManager::Get()->GetBluetoothAdapterClient()->RemoveObserver(this);
+  DBusThreadManager::Get()->GetBluetoothDeviceClient()->RemoveObserver(this);
+  DBusThreadManager::Get()->GetBluetoothInputClient()->RemoveObserver(this);
+
+  VLOG(1) << "Unregistering pairing agent";
+  DBusThreadManager::Get()->GetBluetoothAgentManagerClient()->UnregisterAgent(
+      dbus::ObjectPath(kAgentPath), base::Bind(&base::DoNothing),
+      base::Bind(&OnUnregisterAgentError));
+
+  agent_.reset();
+  STLDeleteValues(&devices_);
+}
+
 BluetoothAdapterChromeOS::BluetoothAdapterChromeOS()
-    : num_discovery_sessions_(0),
+    : is_shutdown_(false),
+      num_discovery_sessions_(0),
       discovery_request_pending_(false),
       weak_ptr_factory_(this) {
   ui_task_runner_ = base::ThreadTaskRunnerHandle::Get();
@@ -99,16 +117,7 @@ BluetoothAdapterChromeOS::BluetoothAdapterChromeOS()
 }
 
 BluetoothAdapterChromeOS::~BluetoothAdapterChromeOS() {
-  DBusThreadManager::Get()->GetBluetoothAdapterClient()->RemoveObserver(this);
-  DBusThreadManager::Get()->GetBluetoothDeviceClient()->RemoveObserver(this);
-  DBusThreadManager::Get()->GetBluetoothInputClient()->RemoveObserver(this);
-
-  VLOG(1) << "Unregistering pairing agent";
-  DBusThreadManager::Get()->GetBluetoothAgentManagerClient()->
-      UnregisterAgent(
-          dbus::ObjectPath(kAgentPath),
-          base::Bind(&base::DoNothing),
-          base::Bind(&OnUnregisterAgentError));
+  Shutdown();
 }
 
 void BluetoothAdapterChromeOS::DeleteOnCorrectThread() const {
@@ -175,7 +184,7 @@ bool BluetoothAdapterChromeOS::IsInitialized() const {
 }
 
 bool BluetoothAdapterChromeOS::IsPresent() const {
-  return !object_path_.value().empty();
+  return !is_shutdown_ && !object_path_.value().empty();
 }
 
 bool BluetoothAdapterChromeOS::IsPowered() const {

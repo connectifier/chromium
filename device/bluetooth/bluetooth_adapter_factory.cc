@@ -95,6 +95,13 @@ void BluetoothAdapterFactory::GetAdapter(const AdapterCallback& callback) {
 }
 
 // static
+void BluetoothAdapterFactory::Shutdown() {
+  if (default_adapter.Get()) {
+    default_adapter.Get()->Shutdown();
+  }
+}
+
+// static
 void BluetoothAdapterFactory::SetAdapterForTesting(
     scoped_refptr<BluetoothAdapter> adapter) {
   default_adapter.Get() = adapter->GetWeakPtrForTesting();
