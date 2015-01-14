@@ -441,7 +441,7 @@ void Shell::PlatformExit() {
   delete platform_;
   platform_ = NULL;
 #if defined(OS_CHROMEOS)
-  device::BluetoothAdapterFactory::Shutdown();
+  device::BluetoothAdapterFactory::OnDBusThreadManagerShutdown();
   chromeos::DBusThreadManager::Shutdown();
 #endif
   aura::Env::DeleteInstance();

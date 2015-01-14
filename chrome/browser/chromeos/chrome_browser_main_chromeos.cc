@@ -240,7 +240,7 @@ class DBusServices {
     CrosDBusService::Shutdown();
     PowerDataCollector::Shutdown();
     PowerPolicyController::Shutdown();
-    device::BluetoothAdapterFactory::Shutdown();
+    device::BluetoothAdapterFactory::OnDBusThreadManagerShutdown();
 
     // NOTE: This must only be called if Initialize() was called.
     DBusThreadManager::Shutdown();

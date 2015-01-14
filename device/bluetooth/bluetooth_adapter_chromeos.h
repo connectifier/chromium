@@ -44,7 +44,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
   static base::WeakPtr<BluetoothAdapter> CreateAdapter();
 
   // BluetoothAdapter:
-  void Shutdown() override;
+  void OnDBusThreadManagerShutdown() override;
   void DeleteOnCorrectThread() const override;
   virtual void AddObserver(
       device::BluetoothAdapter::Observer* observer) override;
@@ -242,8 +242,8 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
   // ended (with either success or failure).
   void ProcessQueuedDiscoveryRequests();
 
-  // Set in |Shutdown()| and used to force |IsPresent()| to return false.
-  bool is_shutdown_;
+  // Set in |OnDBusThreadManagerShutdown()|, makes IsPresent()| return false.
+  bool dbus_is_shutdown_;
 
   // Number of discovery sessions that have been added.
   int num_discovery_sessions_;

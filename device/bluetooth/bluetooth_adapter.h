@@ -188,9 +188,11 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapter
   static base::WeakPtr<BluetoothAdapter> CreateAdapter(
       const InitCallback& init_callback);
 
-  // Shutdown the adapter, ending reliance on other objects, and resulting in
-  // |IsPresent| returning false.
-  virtual void Shutdown();
+#if defined(OS_CHROMEOS)
+  // Shutdown the adapter, ending reliance DBusThreadManager, and resulting in
+  // the adapter's |IsPresent| returning false.
+  virtual void OnDBusThreadManagerShutdown();
+#endif
 
   // Returns a weak pointer to an existing adapter for testing purposes only.
   base::WeakPtr<BluetoothAdapter> GetWeakPtrForTesting();

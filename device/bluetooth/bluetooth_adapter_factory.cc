@@ -94,12 +94,14 @@ void BluetoothAdapterFactory::GetAdapter(const AdapterCallback& callback) {
 
 }
 
+#if defined(OS_CHROMEOS)
 // static
-void BluetoothAdapterFactory::Shutdown() {
+void BluetoothAdapterFactory::OnDBusThreadManagerShutdown() {
   if (default_adapter.Get()) {
-    default_adapter.Get()->Shutdown();
+    default_adapter.Get()->OnDBusThreadManagerShutdown();
   }
 }
+#endif
 
 // static
 void BluetoothAdapterFactory::SetAdapterForTesting(

@@ -24,9 +24,11 @@ base::WeakPtr<BluetoothAdapter> BluetoothAdapter::CreateAdapter(
 }
 #endif  // !defined(OS_CHROMEOS) && !defined(OS_WIN) && !defined(OS_MACOSX)
 
-void BluetoothAdapter::Shutdown() {
+#if defined(OS_CHROMEOS)
+void BluetoothAdapter::OnDBusThreadManagerShutdown() {
   NOTIMPLEMENTED();
 }
+#endif
 
 BluetoothAdapter::BluetoothAdapter()
     : weak_ptr_factory_(this) {
