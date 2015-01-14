@@ -12,6 +12,7 @@ namespace content {
 struct CONTENT_EXPORT BluetoothDevice {
     std::string instance_id;
     base::string16 name;
+    uint32 class;
 };
 
 }  // namespace content

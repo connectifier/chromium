@@ -78,6 +78,7 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
         content::BluetoothDevice device_ipc;
         device_ipc.instance_id = device->GetAddress();
         device_ipc.name = device->GetName();
+        device_ipc.class = device->GetBluetoothClass();
         Send(new BluetoothMsg_RequestDeviceSuccess(thread_id, request_id,
                                                    device_ipc));
       }
