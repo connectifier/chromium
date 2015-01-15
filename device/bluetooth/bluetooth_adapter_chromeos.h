@@ -43,8 +43,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
  public:
   static base::WeakPtr<BluetoothAdapter> CreateAdapter();
 
-  // Shutdown the adapter, ending reliance DBusThreadManager, and resulting in
-  // the adapter's |IsPresent| returning false.
+  // Shutdown the adapter: tear down and clean up all objects owned by
+  // BluetoothAdapter. After this call, the BluetoothAdapter will behave as if
+  // no Bluetooth controller exists in the local system. |IsPresent| will return
+  // false. No futher use of DBusThreadManager will be made.
   void OnDBusThreadManagerShutdown();
 
   // BluetoothAdapter:

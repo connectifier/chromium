@@ -30,8 +30,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterFactory {
   static void GetAdapter(const AdapterCallback& callback);
 
 #if defined(OS_CHROMEOS)
-  // Shutdown the adapter, ending reliance DBusThreadManager, and resulting in
-  // the adapter's |IsPresent| returning false.
+  // Calls |BluetoothAdapterChromeOS::OnDBusThreadManagerShutdown|.
   static void OnDBusThreadManagerShutdown();
 #endif
 
