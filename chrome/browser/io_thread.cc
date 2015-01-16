@@ -178,20 +178,6 @@ scoped_ptr<net::HostResolver> CreateGlobalHostResolver(net::NetLog* net_log) {
 
   net::HostResolver::Options options;
 
-  // Use the concurrency override from the command-line, if any.
-  if (command_line.HasSwitch(switches::kHostResolverParallelism)) {
-    std::string s =
-        command_line.GetSwitchValueASCII(switches::kHostResolverParallelism);
-
-    // Parse the switch (it should be a positive integer formatted as decimal).
-    int n;
-    if (base::StringToInt(s, &n) && n > 0) {
-      options.max_concurrent_resolves = static_cast<size_t>(n);
-    } else {
-      LOG(ERROR) << "Invalid switch for host resolver parallelism: " << s;
-    }
-  }
-
   // Use the retry attempts override from the command-line, if any.
   if (command_line.HasSwitch(switches::kHostResolverRetryAttempts)) {
     std::string s =
@@ -505,6 +491,8 @@ IOThread::IOThread(
       chrome_browser_net::ConfigureAsyncDnsFieldTrial());
   local_state->SetDefaultPrefValue(prefs::kBuiltInDnsClientEnabled,
                                    dns_client_enabled_default);
+  chrome_browser_net::LogAsyncDnsPrefSource(
+      local_state->FindPreference(prefs::kBuiltInDnsClientEnabled));
 
   dns_client_enabled_.Init(prefs::kBuiltInDnsClientEnabled,
                            local_state,

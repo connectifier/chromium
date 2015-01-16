@@ -11,6 +11,7 @@ android_webview_manifest_file := $(call my-dir)/AndroidManifest.xml
 # Resources.
 android_webview_resources_dirs := \
     $(call my-dir)/../java/res \
+    $(call my-dir)/../apk/java/res \
     $(call intermediates-dir-for,GYP,shared)/android_webview_jarjar_content_resources/jarjar_res \
     $(call intermediates-dir-for,GYP,shared)/android_webview_jarjar_ui_resources/jarjar_res \
     $(call intermediates-dir-for,GYP,ui_strings_grd)/ui_strings_grd/res_grit \
@@ -21,8 +22,9 @@ android_webview_asset_dirs := \
     $(call intermediates-dir-for,APPS,webviewchromium-paks)
 
 android_webview_aapt_flags := --auto-add-overlay
-android_webview_aapt_flags += --extra-packages org.chromium.ui
+android_webview_aapt_flags += --extra-packages org.chromium.android_webview
 android_webview_aapt_flags += --extra-packages org.chromium.content
+android_webview_aapt_flags += --extra-packages org.chromium.ui
 android_webview_aapt_flags += -0 pak
 
 android_webview_system_pak_targets := \

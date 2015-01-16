@@ -56,8 +56,6 @@ _VERSION_SPECIFIC_FILTER = {}
 _VERSION_SPECIFIC_FILTER['HEAD'] = [
     # https://code.google.com/p/chromedriver/issues/detail?id=992
     'ChromeDownloadDirTest.testDownloadDirectoryOverridesExistingPreferences',
-    # https://code.google.com/p/chromedriver/issues/detail?id=1016
-    'ChromeDriverBaseTest.testShadowDomClick',
 ]
 _VERSION_SPECIFIC_FILTER['37'] = [
     # https://code.google.com/p/chromedriver/issues/detail?id=954
@@ -136,8 +134,6 @@ _ANDROID_NEGATIVE_FILTER['chrome'] = (
         'ChromeDriverTest.testShouldHandleNewWindowLoadingProperly',
         # Android doesn't support multiple sessions on one device.
         'SessionHandlingTest.testGetSessions',
-        # https://code.google.com/p/chromedriver/issues/detail?id=1016
-        'ChromeDriverBaseTest.testShadowDomClick',
     ]
 )
 _ANDROID_NEGATIVE_FILTER['chrome_stable'] = (
@@ -157,6 +153,7 @@ _ANDROID_NEGATIVE_FILTER['chromedriver_webview_shell'] = (
         # https://code.google.com/p/chromedriver/issues/detail?id=913
         'ChromeDriverTest.testChromeDriverSendLargeData',
         'PerformanceLoggerTest.testPerformanceLogger',
+        'ChromeDriverTest.testShadowDom*',
     ]
 )
 
@@ -570,6 +567,29 @@ class ChromeDriverTest(ChromeDriverBaseTest):
     self._driver.MouseMoveTo(div, 10, 10)
     self.assertEquals(1, len(self._driver.FindElements('tag name', 'br')))
 
+  def testMoveToElementAndClick(self):
+    self._driver.Load(self.GetHttpUrlForFile('/chromedriver/multiline.html'))
+
+    # Check that link element spans two lines and that the first ClientRect is
+    # above the second.
+    link = self._driver.FindElements('tag name', 'a')[0]
+    client_rects = self._driver.ExecuteScript(
+        'return arguments[0].getClientRects();', link)
+    self.assertEquals(2, len(client_rects))
+    self.assertTrue(client_rects[0]['bottom'] < client_rects[1]['top'])
+
+    # Check that the center of the link's bounding ClientRect is outside the
+    # element.
+    bounding_client_rect = self._driver.ExecuteScript(
+        'return arguments[0].getBoundingClientRect();', link)
+    center = bounding_client_rect['left'] + bounding_client_rect['width'] / 2
+    self.assertTrue(client_rects[1]['right'] < center)
+    self.assertTrue(center < client_rects[0]['left'])
+
+    self._driver.MouseMoveTo(link)
+    self._driver.MouseClick()
+    self.assertTrue(self._driver.GetCurrentUrl().endswith('#top'))
+
   def testMouseClick(self):
     div = self._driver.ExecuteScript(
         'document.body.innerHTML = "<div>old</div>";'
@@ -816,8 +836,19 @@ class ChromeDriverTest(ChromeDriverBaseTest):
         '/chromedriver/shadow_dom_test.html'))
     elem = self._driver.FindElement("css", "* /deep/ #olderButton")
     elem.Click()
-    # the butotn's onClicked handler changes the text box's value
+    # the button's onClicked handler changes the text box's value
     self.assertEqual("Button Was Clicked", self._driver.ExecuteScript(
+        'return document.querySelector("* /deep/ #olderTextBox").value;'))
+
+  def testShadowDomHover(self):
+    """Checks that chromedriver can call HoverOver on an element in a
+    shadow DOM."""
+    self._driver.Load(self.GetHttpUrlForFile(
+        '/chromedriver/shadow_dom_test.html'))
+    elem = self._driver.FindElement("css", "* /deep/ #olderButton")
+    elem.HoverOver()
+    # the button's onMouseOver handler changes the text box's value
+    self.assertEqual("Button Was Hovered Over", self._driver.ExecuteScript(
         'return document.querySelector("* /deep/ #olderTextBox").value;'))
 
   def testShadowDomStaleReference(self):

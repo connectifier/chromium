@@ -18,14 +18,18 @@ namespace net {
 namespace {
 
 // We want to put some space between a protected packet and the FEC packet to
-// avoid losing them both within the same loss episode. On the other hand,
-// we expect to be able to recover from any loss in about an RTT.
-// We resolve this tradeoff by sending an FEC packet atmost half an RTT,
-// or equivalently, half the max number of in-flight packets,  the first
-// protected packet. Since we don't want to delay an FEC packet past half an
-// RTT, we set the max FEC group size to be half the current congestion window.
+// avoid losing them both within the same loss episode. On the other hand, we
+// expect to be able to recover from any loss in about an RTT. We resolve this
+// tradeoff by sending an FEC packet atmost half an RTT, or equivalently, half
+// the max number of in-flight packets,  the first protected packet. Since we
+// don't want to delay an FEC packet past half an RTT, we set the max FEC group
+// size to be half the current congestion window.
 const float kMaxPacketsInFlightMultiplierForFecGroupSize = 0.5;
 const float kRttMultiplierForFecTimeout = 0.5;
+
+// Minimum timeout for FEC alarm, set to half the minimum Tail Loss Probe
+// timeout of 10ms.
+const int64 kMinFecTimeoutMs = 5u;
 
 }  // namespace
 
@@ -183,7 +187,13 @@ QuicConsumedData QuicPacketGenerator::ConsumeData(
     ++frames_created;
 
     // We want to track which packet this stream frame ends up in.
-    frame.stream_frame->notifier = notifier;
+    if (FLAGS_quic_attach_ack_notifiers_to_packets) {
+      if (notifier != nullptr) {
+        ack_notifiers_.insert(notifier);
+      }
+    } else {
+      frame.stream_frame->notifier = notifier;
+    }
 
     if (!AddFrame(frame)) {
       LOG(DFATAL) << "Failed to add stream frame.";
@@ -229,10 +239,7 @@ QuicConsumedData QuicPacketGenerator::ConsumeData(
 
   // Try to close FEC group since we've either run out of data to send or we're
   // blocked. If not in batch mode, force close the group.
-  // TODO(jri): This method should be called with flush=false here
-  // once the timer-based FEC sending is done, to separate FEC sending from
-  // the end of batch operations.
-  MaybeSendFecPacketAndCloseGroup(!InBatchMode());
+  MaybeSendFecPacketAndCloseGroup(/*flush=*/false);
 
   DCHECK(InBatchMode() || !packet_creator_.HasPendingFrames());
   return QuicConsumedData(total_bytes_consumed, fin_consumed);
@@ -259,15 +266,10 @@ void QuicPacketGenerator::SendQueuedFrames(bool flush) {
       SerializeAndSendPacket();
     }
   }
-
-  if (!InBatchMode() || flush) {
-    if (packet_creator_.HasPendingFrames()) {
-      SerializeAndSendPacket();
-    }
-    // Ensure the FEC group is closed at the end of this method unless other
-    // writes are pending.
-    MaybeSendFecPacketAndCloseGroup(true);
+  if (packet_creator_.HasPendingFrames() && (flush || !InBatchMode())) {
+    SerializeAndSendPacket();
   }
+  MaybeSendFecPacketAndCloseGroup(flush);
 }
 
 void QuicPacketGenerator::MaybeStartFecProtection() {
@@ -293,9 +295,7 @@ void QuicPacketGenerator::MaybeStartFecProtection() {
 }
 
 void QuicPacketGenerator::MaybeSendFecPacketAndCloseGroup(bool force) {
-  if (!packet_creator_.IsFecProtected() ||
-      packet_creator_.HasPendingFrames() ||
-      !packet_creator_.ShouldSendFec(force)) {
+  if (!ShouldSendFecPacket(force)) {
     return;
   }
   // TODO(jri): SerializeFec can return a NULL packet, and this should
@@ -311,6 +311,36 @@ void QuicPacketGenerator::MaybeSendFecPacketAndCloseGroup(bool force) {
     packet_creator_.StopFecProtectingPackets();
     DCHECK(!packet_creator_.IsFecProtected());
   }
+}
+
+bool QuicPacketGenerator::ShouldSendFecPacket(bool force) {
+  return packet_creator_.IsFecProtected() &&
+         !packet_creator_.HasPendingFrames() &&
+         packet_creator_.ShouldSendFec(force);
+}
+
+void QuicPacketGenerator::OnFecTimeout() {
+  DCHECK(!InBatchMode());
+  if (!ShouldSendFecPacket(true)) {
+    LOG(DFATAL) << "No FEC packet to send on FEC timeout.";
+    return;
+  }
+  // Flush out any pending frames in the generator and the creator, and then
+  // send out FEC packet.
+  SendQueuedFrames(true);
+  MaybeSendFecPacketAndCloseGroup(/*flush=*/true);
+}
+
+QuicTime::Delta QuicPacketGenerator::GetFecTimeout(
+    QuicPacketSequenceNumber sequence_number) {
+  // Do not set up FEC alarm for |sequence_number| it is not the first packet in
+  // the current group.
+  if (packet_creator_.IsFecGroupOpen() &&
+      (sequence_number == packet_creator_.fec_group_number())) {
+    return QuicTime::Delta::Max(
+        fec_timeout_, QuicTime::Delta::FromMilliseconds(kMinFecTimeoutMs));
+  }
+  return QuicTime::Delta::Infinite();
 }
 
 bool QuicPacketGenerator::InBatchMode() {
@@ -389,8 +419,15 @@ bool QuicPacketGenerator::AddFrame(const QuicFrame& frame) {
 void QuicPacketGenerator::SerializeAndSendPacket() {
   SerializedPacket serialized_packet = packet_creator_.SerializePacket();
   DCHECK(serialized_packet.packet);
+
+  // There may be AckNotifiers interested in this packet.
+  if (FLAGS_quic_attach_ack_notifiers_to_packets) {
+    serialized_packet.notifiers.swap(ack_notifiers_);
+    ack_notifiers_.clear();
+  }
+
   delegate_->OnSerializedPacket(serialized_packet);
-  MaybeSendFecPacketAndCloseGroup(false);
+  MaybeSendFecPacketAndCloseGroup(/*flush=*/false);
 
   // The packet has now been serialized, safe to delete pending frames.
   if (FLAGS_quic_disallow_multiple_pending_ack_frames) {

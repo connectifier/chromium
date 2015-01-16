@@ -460,13 +460,8 @@ void AutofillOptionsHandler::LoadAutofillData() {
   web_ui()->CallJavascriptFunction("AutofillOptions.setAddressList", addresses);
 
   base::ListValue credit_cards;
-  const std::vector<CreditCard*>& cards = personal_data_->GetCreditCards();
-  for (std::vector<CreditCard*>::const_iterator iter = cards.begin();
-       iter != cards.end(); ++iter) {
-    const CreditCard* card = *iter;
-    if (card->record_type() != CreditCard::LOCAL_CARD)
-      continue;
-
+  const std::vector<CreditCard*>& cards = personal_data_->GetLocalCreditCards();
+  for (const CreditCard* card : cards) {
     // TODO(estade): this should be a dictionary.
     base::ListValue* entry = new base::ListValue();
     entry->Append(new base::StringValue(card->guid()));
@@ -697,15 +692,7 @@ void AutofillOptionsHandler::ValidatePhoneNumbers(const base::ListValue* args) {
 }
 
 void AutofillOptionsHandler::RemaskServerCards(const base::ListValue* args) {
-  const std::vector<CreditCard*>& cards = personal_data_->GetCreditCards();
-  for (const auto card : cards) {
-    CreditCard card_copy = *card;
-    if (card_copy.record_type() == CreditCard::FULL_SERVER_CARD) {
-      card_copy.set_record_type(CreditCard::MASKED_SERVER_CARD);
-      card_copy.SetNumber(card->LastFourDigits());
-      personal_data_->UpdateServerCreditCard(card_copy);
-    }
-  }
+  personal_data_->ResetFullServerCards();
 }
 
 bool AutofillOptionsHandler::IsPersonalDataLoaded() const {

@@ -42,7 +42,7 @@ namespace content {
 class CONTENT_EXPORT V4L2VideoEncodeAccelerator
     : public media::VideoEncodeAccelerator {
  public:
-  explicit V4L2VideoEncodeAccelerator(scoped_ptr<V4L2Device> device);
+  explicit V4L2VideoEncodeAccelerator(const scoped_refptr<V4L2Device>& device);
   virtual ~V4L2VideoEncodeAccelerator();
 
   // media::VideoEncodeAccelerator implementation.
@@ -154,9 +154,8 @@ class CONTENT_EXPORT V4L2VideoEncodeAccelerator
   // Error notification (using PostTask() to child thread, if necessary).
   void NotifyError(Error error);
 
-  // Set the encoder_thread_ state (using PostTask to encoder thread, if
-  // necessary).
-  void SetEncoderState(State state);
+  // Set the encoder_state_ to kError and notify the client (if necessary).
+  void SetErrorState(Error error);
 
   //
   // Other utility functions.  Called on encoder_thread_, unless
@@ -225,7 +224,7 @@ class CONTENT_EXPORT V4L2VideoEncodeAccelerator
   std::list<scoped_refptr<media::VideoFrame> > encoder_input_queue_;
 
   // Encoder device.
-  scoped_ptr<V4L2Device> device_;
+  scoped_refptr<V4L2Device> device_;
 
   // Input queue state.
   bool input_streamon_;

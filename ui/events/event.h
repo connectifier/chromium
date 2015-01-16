@@ -518,8 +518,10 @@ class EVENTS_EXPORT TouchEvent : public LocatedEvent {
   int touch_id() const { return touch_id_; }
   // A unique identifier for this event.
   uint64 unique_event_id() const { return unique_event_id_; }
-  float radius_x() const { return radius_x_; }
-  float radius_y() const { return radius_y_; }
+  // If we aren't provided with a radius on one axis, use the
+  // information from the other axis.
+  float radius_x() const { return radius_x_ > 0 ? radius_x_ : radius_y_; }
+  float radius_y() const { return radius_y_ > 0 ? radius_y_ : radius_x_; }
   float rotation_angle() const { return rotation_angle_; }
   float force() const { return force_; }
 
@@ -749,9 +751,6 @@ class EVENTS_EXPORT KeyEvent : public Event {
   void set_is_char(bool is_char) { is_char_ = is_char; }
 
  private:
-  // True if the key press originated from a 'right' key (VKEY_RSHIFT, etc.).
-  bool IsRightSideKey() const;
-
   // Determine key_ and character_ on a keystroke event from code_ and flags().
   void ApplyLayout() const;
 

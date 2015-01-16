@@ -808,35 +808,42 @@ function testExecuteScript() {
   document.body.appendChild(webview);
 }
 
-// This test verifies that the call of executeScript will fail and return null
-// if the webview has been navigated to another source.
+// This test verifies that the call to executeScript will fail and return null
+// if the webview has been navigated between the time the call was made and the
+// time it arrives in the guest process.
 function testExecuteScriptIsAbortedWhenWebViewSourceIsChanged() {
   var webview = document.createElement('webview');
-  var initial = true;
-  var navigationOccur = false;
-  var newSrc = 'data:text/html,trigger navigation';
-  webview.addEventListener('loadstart', function() {
-    if (initial) {
-      webview.setAttribute('src', newSrc);
-      navigationOccur = true;
-    }
-    initial = false;
-  });
-  webview.addEventListener('loadstop', function() {
-    webview.executeScript(
-      {code:'document.body.style.backgroundColor = "red";'},
-      function(results) {
-        if (navigationOccur) {
-          // Expect a null results because the executeScript failed;
-          // return "red", otherwise.
+  webview.addEventListener('loadstop', function onLoadStop(e) {
+    window.console.log('2. Inject script to trigger a guest-initiated ' +
+        'navigation.');
+    var navUrl = 'data:text/html,trigger nav';
+    webview.executeScript({
+      code: 'window.location.href = "' + navUrl + '";'
+    });
+
+    window.console.log('3. Listening for the load that will be started as a ' +
+        'result of 2.');
+    webview.addEventListener('loadstart', function onLoadStart(e) {
+      embedder.test.assertEq('about:blank', webview.src);
+      window.console.log('4. Attempting to inject script into about:blank. ' +
+          'This is expected to fail.');
+      webview.executeScript(
+        { code: 'document.body.style.backgroundColor = "red";' },
+        function(results) {
+          window.console.log(
+              '5. Verify that executeScript has, indeed, failed.');
           embedder.test.assertEq(null, results);
+          embedder.test.assertEq(navUrl, webview.src);
           embedder.test.succeed();
         }
-        navigationOccur = false;
-      }
-    );
+      );
+      webview.removeEventListener('loadstart', onLoadStart);
+    });
+    webview.removeEventListener('loadstop', onLoadStop);
   });
-  webview.setAttribute('src', "about:blank");
+
+  window.console.log('1. Performing initial navigation.');
+  webview.setAttribute('src', 'about:blank');
   document.body.appendChild(webview);
 }
 
@@ -1120,6 +1127,18 @@ function testNewWindowNoReferrerLink() {
 // do not fire the 'contentload' event.
 function testContentLoadEvent() {
   var webview = document.createElement('webview');
+  webview.addEventListener('contentload', function(e) {
+    embedder.test.succeed();
+  });
+  webview.setAttribute('src', 'data:text/html,trigger navigation');
+  document.body.appendChild(webview);
+}
+
+// This test verifies that the load event fires when the a new page is
+// loaded even if the <webview> is set to display:none.
+function testContentLoadEventWithDisplayNone() {
+  var webview = document.createElement('webview');
+  webview.style.display = 'none';
   webview.addEventListener('contentload', function(e) {
     embedder.test.succeed();
   });
@@ -2075,6 +2094,7 @@ embedder.test.testList = {
   'testNewWindowNoPreventDefault': testNewWindowNoPreventDefault,
   'testNewWindowNoReferrerLink': testNewWindowNoReferrerLink,
   'testContentLoadEvent': testContentLoadEvent,
+  'testContentLoadEventWithDisplayNone': testContentLoadEventWithDisplayNone,
   'testDeclarativeWebRequestAPI': testDeclarativeWebRequestAPI,
   'testDeclarativeWebRequestAPISendMessage':
       testDeclarativeWebRequestAPISendMessage,

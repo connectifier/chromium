@@ -281,14 +281,18 @@ ChromeRenderProcessObserver::ChromeRenderProcessObserver(
   net::NetModule::SetResourceProvider(chrome_common_net::NetResourceProvider);
 
 #if defined(OS_WIN)
-  // Need to patch a few functions for font loading to work correctly.
-  base::FilePath pdf;
-  if (PathService::Get(chrome::FILE_PDF_PLUGIN, &pdf) &&
-      base::PathExists(pdf)) {
-    g_iat_patch_createdca.Patch(
-        pdf.value().c_str(), "gdi32.dll", "CreateDCA", CreateDCAPatch);
-    g_iat_patch_get_font_data.Patch(
-        pdf.value().c_str(), "gdi32.dll", "GetFontData", GetFontDataPatch);
+  // TODO(scottmg): http://crbug.com/448473. This code should be removed once
+  // PDF is always OOP and/or PDF is made to use Skia instead of GDI directly.
+  if (!command_line.HasSwitch(switches::kEnableOutOfProcessPdf)) {
+    // Need to patch a few functions for font loading to work correctly.
+    base::FilePath pdf;
+    if (PathService::Get(chrome::FILE_PDF_PLUGIN, &pdf) &&
+        base::PathExists(pdf)) {
+      g_iat_patch_createdca.Patch(pdf.value().c_str(), "gdi32.dll", "CreateDCA",
+                                  CreateDCAPatch);
+      g_iat_patch_get_font_data.Patch(pdf.value().c_str(), "gdi32.dll",
+                                      "GetFontData", GetFontDataPatch);
+    }
   }
 #endif
 
@@ -305,6 +309,8 @@ ChromeRenderProcessObserver::ChromeRenderProcessObserver(
 #endif
   // Setup initial set of crash dump data for Field Trials in this renderer.
   chrome_variations::SetChildProcessLoggingVariationList();
+  // Listen for field trial activations to report them to the browser.
+  base::FieldTrialList::AddObserver(this);
 }
 
 ChromeRenderProcessObserver::~ChromeRenderProcessObserver() {
@@ -371,8 +377,8 @@ void ChromeRenderProcessObserver::OnSetFieldTrialGroup(
       base::FieldTrialList::CreateFieldTrial(field_trial_name, group_name);
   // TODO(mef): Remove this check after the investigation of 359406 is complete.
   CHECK(trial) << field_trial_name << ":" << group_name;
-  // Ensure the trial is marked as "used" by calling group() on it. This is
-  // needed to ensure the trial is properly reported in renderer crash reports.
+  // Ensure the trial is marked as "used" by calling group() on it if it is
+  // marked as activated.
   trial->group();
   chrome_variations::SetChildProcessLoggingVariationList();
 }
@@ -384,4 +390,11 @@ void ChromeRenderProcessObserver::OnGetV8HeapStats() {
 const RendererContentSettingRules*
 ChromeRenderProcessObserver::content_setting_rules() const {
   return &content_setting_rules_;
+}
+
+void ChromeRenderProcessObserver::OnFieldTrialGroupFinalized(
+    const std::string& trial_name,
+    const std::string& group_name) {
+  content::RenderThread::Get()->Send(
+      new ChromeViewHostMsg_FieldTrialActivated(trial_name));
 }

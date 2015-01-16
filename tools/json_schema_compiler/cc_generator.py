@@ -60,9 +60,9 @@ class _Generator(object):
         .Append('//')
         .Append()
       )
-      for property in self._namespace.properties.values():
+      for prop in self._namespace.properties.values():
         property_code = self._type_helper.GeneratePropertyValues(
-            property,
+            prop,
             'const %(type)s %(name)s = %(value)s;',
             nodoc=True)
         if property_code:
@@ -385,17 +385,12 @@ class _Generator(object):
         # maps, so we need to unwrap them.
         needs_unwrap = (
             not self._type_helper.IsCopyable(type_.additional_properties))
-        cpp_type = self._type_helper.GetCppType(type_.additional_properties,
-                                                is_in_container=True)
-        (c.Sblock('for (std::map<std::string, %s>::const_iterator it =' %
-                      cpp_util.PadForGenerics(cpp_type))
-          .Append('       additional_properties.begin();')
-          .Append('   it != additional_properties.end(); ++it) {')
+        (c.Sblock('for (const auto& it : additional_properties) {')
           .Cblock(self._CreateValueFromType(
-              'value->SetWithoutPathExpansion(it->first, %s);',
+              'value->SetWithoutPathExpansion(it.first, %s);',
               type_.additional_properties.name,
               type_.additional_properties,
-              '%sit->second' % ('*' if needs_unwrap else '')))
+              '%sit.second' % ('*' if needs_unwrap else '')))
           .Eblock('}')
         )
 
@@ -454,8 +449,7 @@ class _Generator(object):
 
     # Results::Create function
     if function.callback:
-      c.Concat(self._GenerateCreateCallbackArguments(function_namespace,
-                                                     'Results',
+      c.Concat(self._GenerateCreateCallbackArguments('Results',
                                                      function.callback))
 
     c.Append('}  // namespace %s' % function_namespace)
@@ -467,10 +461,8 @@ class _Generator(object):
     event_namespace = cpp_util.Classname(event.name)
     (c.Append('namespace %s {' % event_namespace)
       .Append()
-      .Cblock(self._GenerateEventNameConstant(None, event))
-      .Cblock(self._GenerateCreateCallbackArguments(event_namespace,
-                                                    None,
-                                                    event))
+      .Cblock(self._GenerateEventNameConstant(event))
+      .Cblock(self._GenerateCreateCallbackArguments(None, event))
       .Append('}  // namespace %s' % event_namespace)
     )
     return c
@@ -494,7 +486,7 @@ class _Generator(object):
       # not support passing a namespace as an argument.
       item_type = self._type_helper.FollowRef(underlying_type.item_type)
       if item_type.property_type == PropertyType.ENUM:
-        vardot = '(%s)%s' % (var, '->' if is_ptr else '.')
+        varname = ('*' if is_ptr else '') + '(%s)' % var
 
         maybe_namespace = ''
         if type_.item_type.property_type == PropertyType.REF:
@@ -504,11 +496,9 @@ class _Generator(object):
         # Scope the std::vector variable declaration inside braces.
         (c.Sblock('{')
           .Append('std::vector<std::string> %s;' % enum_list_var)
-          .Append('for (std::vector<%s>::const_iterator it = %sbegin();'
-              % (self._type_helper.GetCppType(item_type), vardot))
-          .Sblock('    it != %send(); ++it) {' % vardot)
-          .Append('%s.push_back(%sToString(*it));' % (enum_list_var,
-                                                      maybe_namespace))
+          .Append('for (const auto& it : %s) {' % varname)
+          .Append('%s.push_back(%sToString(it));' % (enum_list_var,
+                                                     maybe_namespace))
           .Eblock('}'))
 
         # Because the std::vector above is always created for both required and
@@ -856,11 +846,10 @@ class _Generator(object):
       cpp_type = self._type_helper.GetCppType(item_type, is_in_container=True)
       c.Append('%s.reset(new std::vector<%s>);' %
                    (dst_var, cpp_util.PadForGenerics(cpp_type)))
-    (c.Sblock('for (base::ListValue::const_iterator it = %s->begin(); '
-                   'it != %s->end(); ++it) {' % (src_var, src_var))
+    (c.Sblock('for (const auto& it : *(%s)) {' % src_var)
       .Append('%s tmp;' % self._type_helper.GetCppType(item_type))
       .Concat(self._GenerateStringToEnumConversion(item_type,
-                                                   '(*it)',
+                                                   '(it)',
                                                    'tmp',
                                                    failure_value))
       .Append('%s%spush_back(tmp);' % (dst_var, accessor))
@@ -884,7 +873,6 @@ class _Generator(object):
     cpp_type_namespace = ''
     if type_.namespace != self._namespace:
       cpp_type_namespace = '%s::' % type_.namespace.unix_name
-    cpp_type_name = self._type_helper.GetCppType(type_)
     (c.Append('std::string %s;' % enum_as_string)
       .Sblock('if (!%s->GetAsString(&%s)) {' % (src_var, enum_as_string))
       .Concat(self._GenerateError(
@@ -965,7 +953,7 @@ class _Generator(object):
 
     c.Sblock('%s%s %sParse%s(const std::string& enum_string) {' %
                  (maybe_namespace, classname, maybe_namespace, classname))
-    for i, enum_value in enumerate(
+    for _, enum_value in enumerate(
           self._type_helper.FollowRef(type_).enum_values):
       # This is broken up into all ifs with no else ifs because we get
       # "fatal error C1061: compiler limit : blocks nested too deeply"
@@ -979,7 +967,6 @@ class _Generator(object):
     return c
 
   def _GenerateCreateCallbackArguments(self,
-                                       cpp_namespace,
                                        function_scope,
                                        callback):
     """Generate all functions to create Value parameters for a callback.
@@ -1017,7 +1004,7 @@ class _Generator(object):
     })
     return c
 
-  def _GenerateEventNameConstant(self, function_scope, event):
+  def _GenerateEventNameConstant(self, event):
     """Generates a constant string array for the event name.
     """
     c = Code()

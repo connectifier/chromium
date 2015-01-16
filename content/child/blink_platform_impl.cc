@@ -154,13 +154,6 @@ class ConvertableToTraceFormatWrapper
   blink::WebConvertableToTraceFormat convertable_;
 };
 
-bool isHostnameReservedIPAddress(const std::string& host) {
-  net::IPAddressNumber address;
-  if (!net::ParseURLHostnameToNumber(host, &address))
-    return false;
-  return net::IsIPAddressReserved(address);
-}
-
 }  // namespace
 
 static int ToMessageID(WebLocalizedString::Name name) {
@@ -498,12 +491,11 @@ WebURLError BlinkPlatformImpl::cancelledError(
 }
 
 bool BlinkPlatformImpl::isReservedIPAddress(
-    const blink::WebSecurityOrigin& securityOrigin) const {
-  return isHostnameReservedIPAddress(securityOrigin.host().utf8());
-}
-
-bool BlinkPlatformImpl::isReservedIPAddress(const blink::WebURL& url) const {
-  return isHostnameReservedIPAddress(GURL(url).host());
+    const blink::WebString& host) const {
+  net::IPAddressNumber address;
+  if (!net::ParseURLHostnameToNumber(host.utf8(), &address))
+    return false;
+  return net::IsIPAddressReserved(address);
 }
 
 blink::WebThread* BlinkPlatformImpl::createThread(const char* name) {
@@ -601,10 +593,10 @@ long* BlinkPlatformImpl::getTraceSamplingState(
   return NULL;
 }
 
-COMPILE_ASSERT(
+static_assert(
     sizeof(blink::Platform::TraceEventHandle) ==
         sizeof(base::debug::TraceEventHandle),
-    TraceEventHandle_types_must_be_same_size);
+    "TraceEventHandle types must be same size");
 
 blink::Platform::TraceEventHandle BlinkPlatformImpl::addTraceEvent(
     char phase,

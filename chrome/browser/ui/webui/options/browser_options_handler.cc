@@ -25,7 +25,6 @@
 #include "chrome/browser/auto_launch_trial.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
-#include "chrome/browser/chrome_page_zoom.h"
 #include "chrome/browser/custom_home_pages_table_model.h"
 #include "chrome/browser/download/download_prefs.h"
 #include "chrome/browser/gpu/gpu_mode_manager.h"
@@ -79,6 +78,7 @@
 #include "components/search_engines/template_url_service.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/signin/core/common/profile_management_switches.h"
+#include "components/ui/zoom/page_zoom.h"
 #include "components/user_manager/user_type.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/download_manager.h"
@@ -110,6 +110,7 @@
 #include "chrome/browser/browser_process_platform_part.h"
 #include "chrome/browser/chromeos/accessibility/accessibility_util.h"
 #include "chrome/browser/chromeos/chromeos_utils.h"
+#include "chrome/browser/chromeos/login/users/wallpaper/wallpaper_manager.h"
 #include "chrome/browser/chromeos/net/wake_on_wifi_manager.h"
 #include "chrome/browser/chromeos/policy/browser_policy_connector_chromeos.h"
 #include "chrome/browser/chromeos/profiles/profile_helper.h"
@@ -126,10 +127,6 @@
 #include "ui/chromeos/accessibility_types.h"
 #include "ui/gfx/image/image_skia.h"
 #endif  // defined(OS_CHROMEOS)
-
-#if defined(OS_CHROMEOS) && !defined(USE_ATHENA)
-#include "chrome/browser/chromeos/login/users/wallpaper/wallpaper_manager.h"
-#endif
 
 #if defined(OS_WIN)
 #include "chrome/browser/extensions/settings_api_helpers.h"
@@ -1001,11 +998,9 @@ void BrowserOptionsHandler::InitializePage() {
                                       std::string()))
              .Get(policy::key::kUserAvatarImage));
 
-#if !defined(USE_ATHENA)
   OnWallpaperManagedChanged(
       chromeos::WallpaperManager::Get()->IsPolicyControlled(
           user_manager::UserManager::Get()->GetActiveUser()->email()));
-#endif
 
   policy::ConsumerManagementService* consumer_management =
       g_browser_process->platform_part()->browser_policy_connector_chromeos()->
@@ -1404,11 +1399,6 @@ void BrowserOptionsHandler::OnAccountPictureManagedChanged(bool managed) {
 }
 
 void BrowserOptionsHandler::OnWallpaperManagedChanged(bool managed) {
-#if defined(USE_ATHENA)
-  // In Athena, we don't allow customizing wallpaper right now.
-  // TODO(mukai|bshe): remove this.  http://crbug.com/408734
-  managed = true;
-#endif
   web_ui()->CallJavascriptFunction("BrowserOptions.setWallpaperManaged",
                                    base::FundamentalValue(managed));
 }
@@ -1818,11 +1808,7 @@ void BrowserOptionsHandler::HandleRefreshExtensionControlIndicators(
 #if defined(OS_CHROMEOS)
 void BrowserOptionsHandler::HandleOpenWallpaperManager(
     const base::ListValue* args) {
-#if !defined(USE_ATHENA)
   ash::Shell::GetInstance()->user_wallpaper_delegate()->OpenSetWallpaperPage();
-#else
-  NOTIMPLEMENTED();
-#endif
 }
 
 void BrowserOptionsHandler::VirtualKeyboardChangeCallback(
@@ -1926,7 +1912,7 @@ void BrowserOptionsHandler::SetupPageZoomSelector() {
   // Generate a vector of zoom factors from an array of known presets along with
   // the default factor added if necessary.
   std::vector<double> zoom_factors =
-      chrome_page_zoom::PresetZoomFactors(default_zoom_factor);
+      ui_zoom::PageZoom::PresetZoomFactors(default_zoom_factor);
 
   // Iterate through the zoom factors and and build the contents of the
   // selector that will be sent to the javascript handler.

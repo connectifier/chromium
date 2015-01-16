@@ -329,9 +329,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
             extends ChromeWebContentsDelegateAndroid {
         @Override
         public void onLoadProgressChanged(int progress) {
-            for (TabObserver observer : mObservers) {
-                observer.onLoadProgressChanged(Tab.this, progress);
-            }
+            notifyLoadProgress(progress);
         }
 
         @Override
@@ -1089,6 +1087,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     /**
      * Called on the foreground tab when the Activity is stopped.
      */
+    // TODO(changwan): remove this
     public void onActivityStop() {
         hide();
     }
@@ -1553,6 +1552,14 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         }
     }
 
+    /**
+     * Notify the observers that the load progress has changed.
+     * @param progress The current percentage of progress.
+     */
+    protected void notifyLoadProgress(int progress) {
+        for (TabObserver observer : mObservers) observer.onLoadProgressChanged(Tab.this, progress);
+    }
+
     protected void notifyFaviconChanged() {
         RewindableIterator<TabObserver> observers = getTabObservers();
         while (observers.hasNext()) {
@@ -1769,7 +1776,9 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
 
         destroyContentViewCoreInternal(mContentViewCore);
 
-        mContentViewParent.removeAllViews();
+        if (mInfoBarContainer != null && mInfoBarContainer.getParent() != null) {
+            mInfoBarContainer.removeFromParentView();
+        }
         mContentViewParent = null;
         mContentViewCore.destroy();
         mContentViewCore = null;

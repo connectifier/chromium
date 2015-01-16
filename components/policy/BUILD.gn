@@ -62,9 +62,10 @@ if (enable_configuration_policy) {
   constants_header_path = "$policy_gen_dir/policy_constants.h"
   constants_source_path = "$policy_gen_dir/policy_constants.cc"
   protobuf_decoder_path = "$policy_gen_dir/cloud_policy_generated.cc"
-  app_restrictions_path = "$android_resources_gen_dir/xml/app_restrictions.xml"
+  app_restrictions_path =
+      "$android_resources_gen_dir/xml-v21/app_restrictions.xml"
   app_resources_path =
-      "$android_resources_gen_dir/values/restriction_values.xml"
+      "$android_resources_gen_dir/values-v21/restriction_values.xml"
 
   action("cloud_policy_code_generate") {
     script = "tools/generate_policy_source.py"

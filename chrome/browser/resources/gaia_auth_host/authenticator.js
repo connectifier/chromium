@@ -22,6 +22,7 @@ cr.define('cr.login', function() {
   var SIGN_IN_HEADER = 'google-accounts-signin';
   var EMBEDDED_FORM_HEADER = 'google-accounts-embedded';
   var SAML_HEADER = 'google-accounts-saml';
+  var SERVICE_ID = 'chromeoslogin';
 
   /**
    * The source URL parameter for the constrained signin flow.
@@ -47,6 +48,22 @@ cr.define('cr.login', function() {
     DEFAULT: 0,
     SAML: 1
   };
+
+  /**
+   * Supported Authenticator params.
+   * @type {!Array.<string>}
+   * @const
+   */
+  var SUPPORTED_PARAMS = [
+    'gaiaUrl',       // Gaia url to use;
+    'gaiaPath',      // Gaia path to use without a leading slash;
+    'hl',            // Language code for the user interface;
+    'email',         // Pre-fill the email field in Gaia UI;
+    'service',       // Name of Gaia service;
+    'continueUrl',   // Continue url to use;
+    'frameUrl',      // Initial frame URL to use. If empty defaults to gaiaUrl.
+    'constrained'    // Whether the extension is loaded in a constrained window;
+  ];
 
   /**
    * Initializes the authenticator component.
@@ -111,6 +128,10 @@ cr.define('cr.login', function() {
         ['responseHeaders']);
     window.addEventListener(
         'message', this.onMessageFromWebview_.bind(this), false);
+    window.addEventListener(
+        'popstate', this.onPopState_.bind(this), false);
+
+    this.loaded_ = false;
   };
 
   /**
@@ -119,13 +140,14 @@ cr.define('cr.login', function() {
   Authenticator.prototype.reload = function() {
     this.webview_.src = this.reloadUrl_;
     this.authFlow_ = AuthFlow.DEFAULT;
+    this.loaded_ = false;
   };
 
   Authenticator.prototype.constructInitialFrameUrl_ = function(data) {
     var url = this.idpOrigin_ + (data.gaiaPath || IDP_PATH);
 
     url = appendParam(url, 'continue', this.continueUrl_);
-    url = appendParam(url, 'service', data.service);
+    url = appendParam(url, 'service', data.service || SERVICE_ID);
     if (data.hl)
       url = appendParam(url, 'hl', data.hl);
     if (data.email)
@@ -143,16 +165,15 @@ cr.define('cr.login', function() {
     var currentUrl = details.url;
 
     if (currentUrl.lastIndexOf(this.continueUrlWithoutParams_, 0) == 0) {
-      if (currentUrl.indexOf('ntp=1') >= 0) {
+      if (currentUrl.indexOf('ntp=1') >= 0)
         this.skipForNow_ = true;
-      }
+
       this.onAuthCompleted_();
       return;
     }
 
-    if (currentUrl.indexOf('https') != 0) {
+    if (currentUrl.indexOf('https') != 0)
       this.trusted_ = false;
-    }
 
     if (this.isConstrainedWindow_) {
       var isEmbeddedPage = false;
@@ -171,9 +192,35 @@ cr.define('cr.login', function() {
       }
     }
 
-    if (currentUrl.lastIndexOf(this.idpOrigin_) == 0) {
+    this.updateHistoryState_(currentUrl);
+
+    // Posts a message to IdP pages to initiate communication.
+    if (currentUrl.lastIndexOf(this.idpOrigin_) == 0)
       this.webview_.contentWindow.postMessage({}, currentUrl);
-    }
+  };
+
+  /**
+    * Manually updates the history. Invoked upon completion of a webview
+    * navigation.
+    * @param {string} url Request URL.
+    * @private
+    */
+  Authenticator.prototype.updateHistoryState_ = function(url) {
+    if (history.state && history.state.url != url)
+      history.pushState({url: url}, '');
+    else
+      history.replaceState({url: url});
+  };
+
+  /**
+   * Invoked when the history state is changed.
+   * @param {object} e The popstate event being triggered.
+   * @private
+   */
+  Authenticator.prototype.onPopState_ = function(e) {
+    var state = e.state;
+    if (state && state.url)
+      this.webview_.src = state.url;
   };
 
   /**
@@ -217,7 +264,7 @@ cr.define('cr.login', function() {
    */
   Authenticator.prototype.onMessageFromWebview_ = function(e) {
     // The event origin does not have a trailing slash.
-    if (e.origin != this.idpOrigin_.substring(0, this.idpOrigin_ - 1)) {
+    if (e.origin != this.idpOrigin_.substring(0, this.idpOrigin_.length - 1)) {
       return;
     }
 
@@ -243,7 +290,7 @@ cr.define('cr.login', function() {
         new CustomEvent('authCompleted',
                         {detail: {email: this.email_,
                                   gaiaId: this.gaiaId_,
-                                  password: this.password_,
+                                  password: this.password_ || '',
                                   usingSAML: this.authFlow_ == AuthFlow.SAML,
                                   chooseWhatToSync: this.chooseWhatToSync_,
                                   skipForNow: this.skipForNow_,
@@ -266,12 +313,14 @@ cr.define('cr.login', function() {
   Authenticator.prototype.onLoadStop_ = function(e) {
     if (!this.loaded_) {
       this.loaded_ = true;
+      this.webview_.focus();
       this.dispatchEvent(new Event('ready'));
     }
   };
 
   Authenticator.AuthFlow = AuthFlow;
   Authenticator.AuthMode = AuthMode;
+  Authenticator.SUPPORTED_PARAMS = SUPPORTED_PARAMS;
 
   return {
     // TODO(guohui, xiyuan): Rename GaiaAuthHost to Authenticator once the old

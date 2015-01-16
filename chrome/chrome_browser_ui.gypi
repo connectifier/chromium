@@ -793,6 +793,8 @@
       'browser/ui/passwords/manage_passwords_icon.h',
       'browser/ui/passwords/manage_passwords_ui_controller.cc',
       'browser/ui/passwords/manage_passwords_ui_controller.h',
+      'browser/ui/passwords/manage_passwords_view_utils.cc',
+      'browser/ui/passwords/manage_passwords_view_utils.h',
       'browser/ui/passwords/password_bubble_experiment.cc',
       'browser/ui/passwords/password_bubble_experiment.h',
       'browser/ui/passwords/password_manager_presenter.cc',
@@ -1259,8 +1261,6 @@
       'browser/ui/athena/extensions/extension_install_ui_factory_athena.cc',
       'browser/ui/views/athena/athena_util.cc',
       'browser/ui/views/athena/athena_util.h',
-      'browser/ui/views/athena/chrome_browser_main_extra_parts_athena.cc',
-      'browser/ui/views/athena/chrome_browser_main_extra_parts_athena.h',
     ],
     # Used when not using mobile and not using Athena.
     'chrome_browser_ui_non_athena_non_mobile_sources': [
@@ -1333,6 +1333,8 @@
       'browser/ui/views/frame/browser_desktop_window_tree_host.h',
       'browser/ui/views/frame/browser_desktop_window_tree_host_x11.cc',
       'browser/ui/views/frame/browser_desktop_window_tree_host_x11.h',
+      'browser/ui/views/frame/desktop_browser_frame_auralinux.cc',
+      'browser/ui/views/frame/desktop_browser_frame_auralinux.h',
       'browser/ui/views/frame/native_browser_frame_factory_auralinux.cc',
       'browser/ui/views/frame/native_browser_frame_factory_desktop_ash.cc',
       'browser/ui/views/javascript_app_modal_dialog_views_x11.cc',
@@ -1854,6 +1856,8 @@
       'browser/ui/views/find_bar_view.h',
       'browser/ui/views/hung_renderer_view.cc',
       'browser/ui/views/hung_renderer_view.h',
+      'browser/ui/views/infobars/confirm_infobar.cc',
+      'browser/ui/views/infobars/confirm_infobar.h',
       'browser/ui/views/passwords/credentials_item_view.cc',
       'browser/ui/views/passwords/credentials_item_view.h',
       'browser/ui/views/passwords/manage_password_items_view.cc',
@@ -2150,8 +2154,6 @@
       'browser/ui/views/importer/import_lock_dialog_view.h',
       'browser/ui/views/infobars/alternate_nav_infobar_view.cc',
       'browser/ui/views/infobars/alternate_nav_infobar_view.h',
-      'browser/ui/views/infobars/confirm_infobar.cc',
-      'browser/ui/views/infobars/confirm_infobar.h',
       'browser/ui/views/infobars/extension_infobar.cc',
       'browser/ui/views/infobars/extension_infobar.h',
       'browser/ui/views/infobars/infobar_background.cc',
@@ -2877,12 +2879,14 @@
                   'sources!': [
                     'browser/ui/cocoa/bookmarks/bookmark_drag_drop_cocoa.mm',
                     'browser/ui/cocoa/browser_window_factory_cocoa.mm',
+                    'browser/ui/cocoa/infobars/confirm_infobar_controller.mm',
                     'browser/ui/cocoa/tab_dialogs_cocoa.mm',
                   ],
                 }, {
                   'sources!': [
                     'browser/ui/views/bookmarks/bookmark_drag_drop_views.cc',
                     'browser/ui/views/frame/browser_window_factory.cc',
+                    'browser/ui/views/infobar/confirm_infobar.cc'
                     'browser/ui/views/tab_dialogs_views.cc',
                   ],
                 }],
@@ -3009,6 +3013,7 @@
           'dependencies': [
             'installer_util_strings',
             'metro_utils',
+            '../components/components.gyp:browser_watcher',
             '../google_update/google_update.gyp:google_update',
             '../third_party/iaccessible2/iaccessible2.gyp:iaccessible2',
             '../third_party/isimpledom/isimpledom.gyp:isimpledom',

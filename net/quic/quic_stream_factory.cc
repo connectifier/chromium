@@ -1054,8 +1054,7 @@ int QuicStreamFactory::CreateSession(
   int64 srtt = GetServerNetworkStatsSmoothedRttInMicroseconds(server_id);
   if (srtt > 0)
     config.SetInitialRoundTripTimeUsToSend(static_cast<uint32>(srtt));
-  if (FLAGS_allow_truncated_connection_ids_for_quic &&
-      enable_truncated_connection_ids_)
+  if (enable_truncated_connection_ids_)
     config.SetBytesForConnectionIdToSend(0);
 
   if (quic_server_info_factory_ && !server_info) {
@@ -1130,6 +1129,11 @@ int64 QuicStreamFactory::GetServerNetworkStatsSmoothedRttInMicroseconds(
 void QuicStreamFactory::InitializeCachedStateInCryptoConfig(
     const QuicServerId& server_id,
     const scoped_ptr<QuicServerInfo>& server_info) {
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/422516 is fixed.
+  tracked_objects::ScopedTracker tracking_profile1(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "422516 QuicStreamFactory::InitializeCachedStateInCryptoConfig1"));
+
   // |server_info| will be NULL, if a non-empty server config already exists in
   // the memory cache. This is a minor optimization to avoid LookupOrCreate.
   if (!server_info)
@@ -1142,7 +1146,7 @@ void QuicStreamFactory::InitializeCachedStateInCryptoConfig(
 
   if (http_server_properties_) {
     if (quic_supported_servers_at_startup_.empty()) {
-      for (const std::pair<net::HostPortPair, net::AlternateProtocolInfo>&
+      for (const std::pair<const net::HostPortPair, net::AlternateProtocolInfo>&
                key_value : http_server_properties_->alternate_protocol_map()) {
         if (key_value.second.protocol == QUIC) {
           quic_supported_servers_at_startup_.insert(key_value.first);
@@ -1160,6 +1164,11 @@ void QuicStreamFactory::InitializeCachedStateInCryptoConfig(
           server_info->state().server_config.empty());
     }
   }
+
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/422516 is fixed.
+  tracked_objects::ScopedTracker tracking_profile2(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "422516 QuicStreamFactory::InitializeCachedStateInCryptoConfig2"));
 
   if (!cached->Initialize(server_info->state().server_config,
                           server_info->state().source_address_token,

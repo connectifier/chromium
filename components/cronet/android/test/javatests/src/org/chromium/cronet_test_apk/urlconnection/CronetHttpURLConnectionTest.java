@@ -149,11 +149,10 @@ public class CronetHttpURLConnectionTest extends CronetTestBase {
         try {
             urlConnection.connect();
             fail();
-        } catch (IOException e) {
-            assertTrue(e instanceof java.net.UnknownHostException
-                    || e instanceof UrlRequestException);
-            assertTrue((e.getMessage().contains("Unable to resolve host")
-                    || e.getMessage().contains("net::ERR_NAME_NOT_RESOLVED")));
+        } catch (java.net.UnknownHostException e) {
+            // Expected.
+        } catch (UrlRequestException e) {
+            // Expected.
         }
         checkExceptionsAreThrown(urlConnection);
     }

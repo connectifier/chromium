@@ -606,6 +606,17 @@ void PersonalDataManager::UpdateServerCreditCard(
   Refresh();
 }
 
+void PersonalDataManager::ResetFullServerCards() {
+  for (const CreditCard* card : server_credit_cards_) {
+    CreditCard card_copy = *card;
+    if (card_copy.record_type() == CreditCard::FULL_SERVER_CARD) {
+      card_copy.set_record_type(CreditCard::MASKED_SERVER_CARD);
+      card_copy.SetNumber(card->LastFourDigits());
+      UpdateServerCreditCard(card_copy);
+    }
+  }
+}
+
 void PersonalDataManager::RemoveByGUID(const std::string& guid) {
   if (is_off_the_record_)
     return;
@@ -653,6 +664,11 @@ const std::vector<AutofillProfile*>& PersonalDataManager::GetProfiles() const {
 
 const std::vector<AutofillProfile*>& PersonalDataManager::web_profiles() const {
   return web_profiles_.get();
+}
+
+const std::vector<CreditCard*>& PersonalDataManager::GetLocalCreditCards()
+    const {
+  return local_credit_cards_.get();
 }
 
 const std::vector<CreditCard*>& PersonalDataManager::GetCreditCards() const {

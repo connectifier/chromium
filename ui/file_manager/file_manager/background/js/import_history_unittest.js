@@ -52,7 +52,9 @@ function setUp() {
 
   storage = new TestRecordStorage();
 
-  var history = new importer.PersistentImportHistory(storage);
+  var history = new importer.PersistentImportHistory(
+      importer.createMetadataHashcode,
+      storage);
   historyProvider = history.refresh();
 }
 
@@ -314,6 +316,10 @@ function setupChromeApis() {
   chrome = {};
   chrome.fileManagerPrivate = {};
   chrome.fileManagerPrivate.onFileTransfersUpdated = {
+    addListener: function() {}
+  };
+  chrome.syncFileSystem = {};
+  chrome.syncFileSystem.onFileStatusChanged = {
     addListener: function() {}
   };
 }

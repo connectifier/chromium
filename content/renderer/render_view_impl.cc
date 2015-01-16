@@ -1017,6 +1017,7 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
       prefs.allow_displaying_insecure_content);
   settings->setAllowRunningOfInsecureContent(
       prefs.allow_running_insecure_content);
+  settings->setDisableReadingFromCanvas(prefs.disable_reading_from_canvas);
   settings->setStrictMixedContentChecking(prefs.strict_mixed_content_checking);
   settings->setStrictPowerfulFeatureRestrictions(
       prefs.strict_powerful_feature_restrictions);
@@ -1134,6 +1135,10 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
 #if defined(OS_WIN)
   settings->setShowContextMenuOnMouseUp(true);
 #endif
+
+  web_view->setDefaultPageScaleLimits(
+      prefs.default_minimum_page_scale_factor,
+      prefs.default_maximum_page_scale_factor);
 }
 
 /*static*/
