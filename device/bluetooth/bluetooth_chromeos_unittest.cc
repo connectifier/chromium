@@ -3318,4 +3318,49 @@ TEST_F(BluetoothChromeOSTest, GetConnectionInfoForConnectedDevice) {
   EXPECT_EQ(4, conn_info.max_transmit_power);
 }
 
+// Verifies OnDBusThreadManagerShutdown shuts down the adapter as expected.
+TEST_F(BluetoothChromeOSTest, OnDBusThreadManagerShutdown) {
+  // Set up and adapter, power, discoverable, start discovery.
+  GetAdapter();
+  adapter_->SetPowered(true, base::Bind(&BluetoothChromeOSTest::Callback,
+                                        base::Unretained(this)),
+                       base::Bind(&BluetoothChromeOSTest::ErrorCallback,
+                                  base::Unretained(this)));
+  adapter_->SetDiscoverable(true, base::Bind(&BluetoothChromeOSTest::Callback,
+                                             base::Unretained(this)),
+                            base::Bind(&BluetoothChromeOSTest::ErrorCallback,
+                                       base::Unretained(this)));
+  adapter_->StartDiscoverySession(
+      base::Bind(&BluetoothChromeOSTest::DiscoverySessionCallback,
+                 base::Unretained(this)),
+      base::Bind(&BluetoothChromeOSTest::ErrorCallback,
+                 base::Unretained(this)));
+
+  // Validate running adapter state.
+  EXPECT_NE("", adapter_->GetAddress());
+  EXPECT_NE("", adapter_->GetName());
+  EXPECT_TRUE(adapter_->IsInitialized());
+  EXPECT_TRUE(adapter_->IsPresent());
+  EXPECT_TRUE(adapter_->IsPowered());
+  EXPECT_TRUE(adapter_->IsDiscoverable());
+  EXPECT_TRUE(adapter_->IsDiscovering());
+  EXPECT_NE(dbus::ObjectPath(""), static_cast<BluetoothAdapterChromeOS*>(
+                                      adapter_.get())->object_path());
+
+  // OnDBusThreadManagerShutdown
+  static_cast<BluetoothAdapterChromeOS*>(adapter_.get())
+      ->OnDBusThreadManagerShutdown();
+
+  // Validate post shutdown state.
+  EXPECT_EQ("", adapter_->GetAddress());
+  EXPECT_EQ("", adapter_->GetName());
+  EXPECT_TRUE(adapter_->IsInitialized());
+  EXPECT_FALSE(adapter_->IsPresent());
+  EXPECT_FALSE(adapter_->IsPowered());
+  EXPECT_FALSE(adapter_->IsDiscoverable());
+  EXPECT_FALSE(adapter_->IsDiscovering());
+  EXPECT_EQ(dbus::ObjectPath(""), static_cast<BluetoothAdapterChromeOS*>(
+                                      adapter_.get())->object_path());
+}
+
 }  // namespace chromeos

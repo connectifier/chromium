@@ -29,9 +29,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterFactory {
   // use.
   static void GetAdapter(const AdapterCallback& callback);
 
-  // Shutdown the adapter, ending reliance on other objects, and resulting in
-  // the adapter's |IsPresent| returning false.
-  static void Shutdown();
+#if defined(OS_CHROMEOS)
+  // Calls |BluetoothAdapterChromeOS::OnDBusThreadManagerShutdown|.
+  static void OnDBusThreadManagerShutdown();
+#endif
 
   // Sets the shared instance of the default adapter for testing purposes only,
   // no reference is retained after completion of the call, removing the last
