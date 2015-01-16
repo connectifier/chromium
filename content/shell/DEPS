@@ -3,7 +3,6 @@ include_rules = [
 
   # For chromeos build config
   "+chromeos/dbus",
-  "+device/bluetooth",  # BluetoothAdapterFactory::OnDBusThreadManagerShutdown.
 
   # The content_shell is the canonical sample embedder, so it only uses
   # content's public API.
