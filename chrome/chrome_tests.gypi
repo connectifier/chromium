@@ -282,6 +282,7 @@
       'browser/extensions/subscribe_page_action_browsertest.cc',
       'browser/extensions/web_contents_browsertest.cc',
       'browser/extensions/webstore_inline_installer_browsertest.cc',
+      'browser/extensions/webstore_installer_browsertest.cc',
       'browser/extensions/webstore_installer_test.cc',
       'browser/extensions/webstore_installer_test.h',
       'browser/extensions/webstore_reinstaller_browsertest.cc',
@@ -337,6 +338,7 @@
       'browser/media_galleries/fileapi/media_file_validator_browsertest.cc',
       'browser/media_galleries/media_galleries_dialog_controller_mock.cc',
       'browser/media_galleries/media_galleries_dialog_controller_mock.h',
+      'browser/memory_details_browsertest.cc',
       'browser/metrics/metrics_service_browsertest.cc',
       'browser/net/cookie_policy_browsertest.cc',
       'browser/net/dns_probe_browsertest.cc',
@@ -753,9 +755,11 @@
     'chrome_browser_tests_remoting_sources': [
       'test/remoting/auth_browsertest.cc',
       'test/remoting/fullscreen_browsertest.cc',
+      'test/remoting/it2me_browsertest.cc',
       'test/remoting/key_code_conv.cc',
       'test/remoting/key_code_conv.h',
       'test/remoting/key_code_map.h',
+      'test/remoting/key_code_test_map.h',
       'test/remoting/launch_browsertest.cc',
       'test/remoting/me2me_browsertest.cc',
       'test/remoting/page_load_notification_observer.cc',
@@ -764,6 +768,8 @@
       'test/remoting/qunit_browser_test_runner.cc',
       'test/remoting/remote_desktop_browsertest.cc',
       'test/remoting/remote_desktop_browsertest.h',
+      'test/remoting/remote_test_helper.cc',
+      'test/remoting/remote_test_helper.h',
       'test/remoting/scrollbar_browsertest.cc',
       'test/remoting/unauthenticated_browsertest.cc',
       'test/remoting/waiter.cc',
@@ -890,7 +896,7 @@
       'browser/task_manager/task_manager_browsertest_util.cc',
       'browser/ui/autofill/autofill_popup_controller_interactive_uitest.cc',
       'browser/ui/browser_focus_uitest.cc',
-      'browser/ui/cocoa/apps/quit_with_apps_controller_mac_interactive_uitest.cc',
+      'browser/ui/cocoa/apps/quit_with_apps_controller_mac_interactive_uitest.mm',
       'browser/ui/cocoa/panels/panel_cocoa_browsertest.mm',
       'browser/ui/exclusive_access/flash_fullscreen_interactive_browsertest.cc',
       'browser/ui/exclusive_access/fullscreen_controller_interactive_browsertest.cc',
@@ -1307,6 +1313,7 @@
       'browser/sync/test/integration/two_client_autofill_sync_test.cc',
       'browser/sync/test/integration/two_client_bookmarks_sync_test.cc',
       'browser/sync/test/integration/two_client_dictionary_sync_test.cc',
+      'browser/sync/test/integration/two_client_e2e_test.cc',
       'browser/sync/test/integration/two_client_extension_settings_and_app_settings_sync_test.cc',
       'browser/sync/test/integration/two_client_extensions_sync_test.cc',
       'browser/sync/test/integration/two_client_passwords_sync_test.cc',
@@ -1344,6 +1351,8 @@
       'browser/sync/test/integration/passwords_helper.h',
       'browser/sync/test/integration/p2p_invalidation_forwarder.cc',
       'browser/sync/test/integration/p2p_invalidation_forwarder.h',
+      'browser/sync/test/integration/p2p_sync_refresher.cc',
+      'browser/sync/test/integration/p2p_sync_refresher.h',
       'browser/sync/test/integration/preferences_helper.cc',
       'browser/sync/test/integration/preferences_helper.h',
       'browser/sync/test/integration/profile_sync_service_harness.cc',
@@ -2005,7 +2014,7 @@
             'browser/ui/autofill/autofill_dialog_controller_browsertest.cc',
           ]
         }],
-        ['disable_nacl==0 and use_athena==0', {
+        ['disable_nacl==0', {
           'sources':[
             'browser/extensions/extension_nacl_browsertest.cc',
             'browser/nacl_host/test/gdb_debug_stub_browsertest.cc',
@@ -2091,29 +2100,6 @@
         ['use_aura==1 or toolkit_views==1', {
           'dependencies': [
             '../ui/events/events.gyp:events_test_support',
-          ],
-        }],
-        ['use_athena==1', {
-          'dependencies': [
-            '../dbus/dbus.gyp:dbus_test_support',
-            '../build/linux/system.gyp:dbus',
-            '../ui/login/login.gyp:login_resources',
-            '../athena/resources/athena_resources.gyp:athena_pak',
-            '../athena/athena.gyp:athena_browsertest_support',
-          ],
-          'sources!': [
-             '<@(chrome_browser_tests_sources)',
-          ],
-          'sources': [
-            '../athena/content/app_activity_browsertest.cc',
-            '../athena/content/chrome/web_activity_browsertest.cc',
-            '../athena/content/chrome/web_activity_helpers_browsertest.cc',
-            '../athena/content/content_proxy_browsertest.cc',
-            '../athena/main/placeholder_for_browsertest.cc',
-            '../athena/test/chrome/athena_app_browser_test.cc',
-            '../athena/test/chrome/athena_app_browser_test.h',
-            '../athena/test/chrome/athena_chrome_browser_test.cc',
-            '../athena/test/chrome/athena_chrome_browser_test.h',
           ],
         }],
         ['chromeos == 1', {
@@ -2309,7 +2295,7 @@
             }],
           ],
         }],
-        ['chromeos == 1 and use_athena == 0', {
+        ['chromeos == 1', {
           'sources': [
             'browser/extensions/api/networking_private/networking_private_apitest.cc',
             'browser/extensions/api/networking_private/networking_private_chromeos_apitest.cc',
@@ -2321,7 +2307,7 @@
             '../ui/views/views.gyp:views',
           ],
         }],
-        ['OS!="android" and OS!="ios" and use_athena==0', {
+        ['OS!="android" and OS!="ios"', {
           'sources': [
             'browser/copresence/chrome_whispernet_client_browsertest.cc',
           ],
@@ -2376,7 +2362,7 @@
             'renderer/printing/print_web_view_helper_browsertest.cc',
           ],
         }],
-        ['enable_mdns==1 and use_athena==0', {
+        ['enable_mdns==1', {
           'sources' : [
             'browser/ui/webui/local_discovery/local_discovery_ui_browsertest.cc',
           ]

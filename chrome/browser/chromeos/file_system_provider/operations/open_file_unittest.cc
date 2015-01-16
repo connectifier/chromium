@@ -60,7 +60,6 @@ class CallbackLogger {
 
  private:
   ScopedVector<Event> events_;
-  bool dispatch_reply_;
 
   DISALLOW_COPY_AND_ASSIGN(CallbackLogger);
 };
@@ -70,9 +69,9 @@ class CallbackLogger {
 class FileSystemProviderOperationsOpenFileTest : public testing::Test {
  protected:
   FileSystemProviderOperationsOpenFileTest() {}
-  virtual ~FileSystemProviderOperationsOpenFileTest() {}
+  ~FileSystemProviderOperationsOpenFileTest() override {}
 
-  virtual void SetUp() override {
+  void SetUp() override {
     file_system_info_ = ProvidedFileSystemInfo(
         kExtensionId,
         MountOptions(kFileSystemId, "" /* display_name */),

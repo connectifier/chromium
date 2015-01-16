@@ -20,12 +20,12 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
-#include "chrome/browser/idle.h"
 #include "chromeos/system/version_loader.h"
 #include "components/policy/core/common/cloud/cloud_policy_client.h"
 #include "content/public/browser/geolocation_provider.h"
 #include "content/public/common/geoposition.h"
 #include "policy/proto/device_management_backend.pb.h"
+#include "ui/base/idle/idle.h"
 
 namespace chromeos {
 class CrosSettings;
@@ -64,14 +64,14 @@ class DeviceStatusCollector : public CloudPolicyClient::StatusProvider {
       chromeos::system::StatisticsProvider* provider,
       const LocationUpdateRequester& location_update_requester,
       const VolumeInfoFetcher& volume_info_fetcher);
-  virtual ~DeviceStatusCollector();
+  ~DeviceStatusCollector() override;
 
   // CloudPolicyClient::StatusProvider:
-  virtual bool GetDeviceStatus(
+  bool GetDeviceStatus(
       enterprise_management::DeviceStatusReportRequest* status) override;
-  virtual bool GetSessionStatus(
+  bool GetSessionStatus(
       enterprise_management::SessionStatusReportRequest* status) override;
-  virtual void OnSubmittedSuccessfully() override;
+  void OnSubmittedSuccessfully() override;
 
   static void RegisterPrefs(PrefRegistrySimple* registry);
 
@@ -89,7 +89,7 @@ class DeviceStatusCollector : public CloudPolicyClient::StatusProvider {
   virtual base::Time GetCurrentTime();
 
   // Callback which receives the results of the idle state check.
-  void IdleStateCallback(IdleState state);
+  void IdleStateCallback(ui::IdleState state);
 
   // Samples the current CPU usage and updates our cache of samples.
   void SampleCPUUsage();
@@ -159,9 +159,6 @@ class DeviceStatusCollector : public CloudPolicyClient::StatusProvider {
   // Callback invoked to update our cached disk information.
   void ReceiveVolumeInfo(
       const std::vector<enterprise_management::VolumeInfo>& info);
-
-  // How often to poll to see if the user is idle.
-  int poll_interval_seconds_;
 
   PrefService* local_state_;
 

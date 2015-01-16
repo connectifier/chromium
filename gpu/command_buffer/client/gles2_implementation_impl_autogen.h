@@ -41,7 +41,37 @@ void GLES2Implementation::BindBufferBase(GLenum target,
   GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glBindBufferBase("
                      << GLES2Util::GetStringIndexedBufferTarget(target) << ", "
                      << index << ", " << buffer << ")");
-  helper_->BindBufferBase(target, index, buffer);
+  if (IsBufferReservedId(buffer)) {
+    SetGLError(GL_INVALID_OPERATION, "BindBufferBase", "buffer reserved id");
+    return;
+  }
+  BindBufferBaseHelper(target, index, buffer);
+  CheckGLError();
+}
+
+void GLES2Implementation::BindBufferRange(GLenum target,
+                                          GLuint index,
+                                          GLuint buffer,
+                                          GLintptr offset,
+                                          GLsizeiptr size) {
+  GPU_CLIENT_SINGLE_THREAD_CHECK();
+  GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glBindBufferRange("
+                     << GLES2Util::GetStringIndexedBufferTarget(target) << ", "
+                     << index << ", " << buffer << ", " << offset << ", "
+                     << size << ")");
+  if (offset < 0) {
+    SetGLError(GL_INVALID_VALUE, "glBindBufferRange", "offset < 0");
+    return;
+  }
+  if (size < 0) {
+    SetGLError(GL_INVALID_VALUE, "glBindBufferRange", "size < 0");
+    return;
+  }
+  if (IsBufferReservedId(buffer)) {
+    SetGLError(GL_INVALID_OPERATION, "BindBufferRange", "buffer reserved id");
+    return;
+  }
+  BindBufferRangeHelper(target, index, buffer, offset, size);
   CheckGLError();
 }
 
@@ -77,7 +107,11 @@ void GLES2Implementation::BindSampler(GLuint unit, GLuint sampler) {
   GPU_CLIENT_SINGLE_THREAD_CHECK();
   GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glBindSampler(" << unit << ", "
                      << sampler << ")");
-  helper_->BindSampler(unit, sampler);
+  if (IsSamplerReservedId(sampler)) {
+    SetGLError(GL_INVALID_OPERATION, "BindSampler", "sampler reserved id");
+    return;
+  }
+  BindSamplerHelper(unit, sampler);
   CheckGLError();
 }
 
@@ -100,7 +134,12 @@ void GLES2Implementation::BindTransformFeedback(GLenum target,
   GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glBindTransformFeedback("
                      << GLES2Util::GetStringTransformFeedbackBindTarget(target)
                      << ", " << transformfeedback << ")");
-  helper_->BindTransformFeedback(target, transformfeedback);
+  if (IsTransformFeedbackReservedId(transformfeedback)) {
+    SetGLError(GL_INVALID_OPERATION, "BindTransformFeedback",
+               "transformfeedback reserved id");
+    return;
+  }
+  BindTransformFeedbackHelper(target, transformfeedback);
   CheckGLError();
 }
 

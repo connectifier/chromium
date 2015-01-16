@@ -17,9 +17,11 @@
 #include "content/child/thread_safe_sender.h"
 #include "content/child/webmessageportchannel_impl.h"
 #include "content/common/service_worker/service_worker_messages.h"
+#include "content/common/service_worker/service_worker_types.h"
 #include "content/public/common/url_utils.h"
 #include "third_party/WebKit/public/platform/WebServiceWorkerClientsInfo.h"
 #include "third_party/WebKit/public/platform/WebServiceWorkerProviderClient.h"
+#include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
 
 using blink::WebServiceWorkerError;
@@ -102,8 +104,11 @@ void ServiceWorkerDispatcher::RegisterServiceWorker(
       script_url.possibly_invalid_spec().size() > GetMaxURLChars()) {
     scoped_ptr<WebServiceWorkerRegistrationCallbacks>
         owned_callbacks(callbacks);
-    scoped_ptr<WebServiceWorkerError> error(new WebServiceWorkerError(
-        WebServiceWorkerError::ErrorTypeSecurity, "URL too long"));
+    std::string error_message(kServiceWorkerRegisterErrorPrefix);
+    error_message += "The provided scriptURL or scope is too long.";
+    scoped_ptr<WebServiceWorkerError> error(
+        new WebServiceWorkerError(WebServiceWorkerError::ErrorTypeSecurity,
+                                  blink::WebString::fromUTF8(error_message)));
     callbacks->onError(error.release());
     return;
   }
@@ -127,8 +132,11 @@ void ServiceWorkerDispatcher::UnregisterServiceWorker(
   if (pattern.possibly_invalid_spec().size() > GetMaxURLChars()) {
     scoped_ptr<WebServiceWorkerUnregistrationCallbacks>
         owned_callbacks(callbacks);
-    scoped_ptr<WebServiceWorkerError> error(new WebServiceWorkerError(
-        WebServiceWorkerError::ErrorTypeSecurity, "URL too long"));
+    std::string error_message(kServiceWorkerUnregisterErrorPrefix);
+    error_message += "The provided scope is too long.";
+    scoped_ptr<WebServiceWorkerError> error(
+        new WebServiceWorkerError(WebServiceWorkerError::ErrorTypeSecurity,
+                                  blink::WebString::fromUTF8(error_message)));
     callbacks->onError(error.release());
     return;
   }
@@ -151,8 +159,11 @@ void ServiceWorkerDispatcher::GetRegistration(
   if (document_url.possibly_invalid_spec().size() > GetMaxURLChars()) {
     scoped_ptr<WebServiceWorkerRegistrationCallbacks>
         owned_callbacks(callbacks);
-    scoped_ptr<WebServiceWorkerError> error(new WebServiceWorkerError(
-        WebServiceWorkerError::ErrorTypeSecurity, "URL too long"));
+    std::string error_message(kServiceWorkerGetRegistrationErrorPrefix);
+    error_message += "The provided documentURL is too long.";
+    scoped_ptr<WebServiceWorkerError> error(
+        new WebServiceWorkerError(WebServiceWorkerError::ErrorTypeSecurity,
+                                  blink::WebString::fromUTF8(error_message)));
     callbacks->onError(error.release());
     return;
   }
@@ -185,18 +196,18 @@ void ServiceWorkerDispatcher::RemoveProviderContext(
   worker_to_provider_.erase(provider_context->controller_handle_id());
 }
 
-void ServiceWorkerDispatcher::AddScriptClient(
+void ServiceWorkerDispatcher::AddProviderClient(
     int provider_id,
     blink::WebServiceWorkerProviderClient* client) {
   DCHECK(client);
-  DCHECK(!ContainsKey(script_clients_, provider_id));
-  script_clients_[provider_id] = client;
+  DCHECK(!ContainsKey(provider_clients_, provider_id));
+  provider_clients_[provider_id] = client;
 }
 
-void ServiceWorkerDispatcher::RemoveScriptClient(int provider_id) {
+void ServiceWorkerDispatcher::RemoveProviderClient(int provider_id) {
   // This could be possibly called multiple times to ensure termination.
-  if (ContainsKey(script_clients_, provider_id))
-    script_clients_.erase(provider_id);
+  if (ContainsKey(provider_clients_, provider_id))
+    provider_clients_.erase(provider_id);
 }
 
 ServiceWorkerDispatcher*
@@ -484,27 +495,47 @@ void ServiceWorkerDispatcher::OnSetVersionAttributes(
     int provider_id,
     int registration_handle_id,
     int changed_mask,
-    const ServiceWorkerVersionAttributes& attributes) {
+    const ServiceWorkerVersionAttributes& attrs) {
   TRACE_EVENT1("ServiceWorker",
                "ServiceWorkerDispatcher::OnSetVersionAttributes",
                "Thread ID", thread_id);
+
   ChangedVersionAttributesMask mask(changed_mask);
-  if (mask.installing_changed()) {
-    SetInstallingServiceWorker(provider_id,
-                               registration_handle_id,
-                               attributes.installing);
+  ProviderContextMap::iterator provider = provider_contexts_.find(provider_id);
+  if (provider != provider_contexts_.end() &&
+      provider->second->registration_handle_id() == registration_handle_id) {
+    if (mask.installing_changed()) {
+      worker_to_provider_.erase(provider->second->installing_handle_id());
+      if (attrs.installing.handle_id != kInvalidServiceWorkerHandleId)
+        worker_to_provider_[attrs.installing.handle_id] = provider->second;
+    }
+    if (mask.waiting_changed()) {
+      worker_to_provider_.erase(provider->second->waiting_handle_id());
+      if (attrs.waiting.handle_id != kInvalidServiceWorkerHandleId)
+        worker_to_provider_[attrs.waiting.handle_id] = provider->second;
+    }
+    if (mask.active_changed()) {
+      worker_to_provider_.erase(provider->second->active_handle_id());
+      if (attrs.active.handle_id != kInvalidServiceWorkerHandleId)
+        worker_to_provider_[attrs.active.handle_id] = provider->second;
+    }
+    provider->second->SetVersionAttributes(mask, attrs);
   }
-  if (mask.waiting_changed()) {
-    SetWaitingServiceWorker(provider_id,
-                            registration_handle_id,
-                            attributes.waiting);
+
+  RegistrationObjectMap::iterator found =
+      registrations_.find(registration_handle_id);
+  if (found != registrations_.end()) {
+    // Populate the version fields (eg. .installing) with new worker objects.
+    if (mask.installing_changed())
+      found->second->SetInstalling(GetServiceWorker(attrs.installing, false));
+    if (mask.waiting_changed())
+      found->second->SetWaiting(GetServiceWorker(attrs.waiting, false));
+    if (mask.active_changed())
+      found->second->SetActive(GetServiceWorker(attrs.active, false));
   }
-  if (mask.active_changed()) {
-    SetActiveServiceWorker(provider_id,
-                           registration_handle_id,
-                           attributes.active);
+
+  if (mask.active_changed())
     SetReadyRegistration(provider_id, registration_handle_id);
-  }
 }
 
 void ServiceWorkerDispatcher::OnUpdateFound(
@@ -517,69 +548,6 @@ void ServiceWorkerDispatcher::OnUpdateFound(
     found->second->OnUpdateFound();
 }
 
-void ServiceWorkerDispatcher::SetInstallingServiceWorker(
-    int provider_id,
-    int registration_handle_id,
-    const ServiceWorkerObjectInfo& info) {
-  ProviderContextMap::iterator provider = provider_contexts_.find(provider_id);
-  if (provider != provider_contexts_.end() &&
-      provider->second->registration_handle_id() == registration_handle_id) {
-    worker_to_provider_.erase(provider->second->installing_handle_id());
-    if (info.handle_id != kInvalidServiceWorkerHandleId)
-      worker_to_provider_[info.handle_id] = provider->second;
-    provider->second->OnSetInstallingServiceWorker(info);
-  }
-
-  RegistrationObjectMap::iterator found =
-      registrations_.find(registration_handle_id);
-  if (found != registrations_.end()) {
-    // Populate the .installing field with the new worker object.
-    found->second->SetInstalling(GetServiceWorker(info, false));
-  }
-}
-
-void ServiceWorkerDispatcher::SetWaitingServiceWorker(
-    int provider_id,
-    int registration_handle_id,
-    const ServiceWorkerObjectInfo& info) {
-  ProviderContextMap::iterator provider = provider_contexts_.find(provider_id);
-  if (provider != provider_contexts_.end() &&
-      provider->second->registration_handle_id() == registration_handle_id) {
-    worker_to_provider_.erase(provider->second->waiting_handle_id());
-    if (info.handle_id != kInvalidServiceWorkerHandleId)
-      worker_to_provider_[info.handle_id] = provider->second;
-    provider->second->OnSetWaitingServiceWorker(info);
-  }
-
-  RegistrationObjectMap::iterator found =
-      registrations_.find(registration_handle_id);
-  if (found != registrations_.end()) {
-    // Populate the .waiting field with the new worker object.
-    found->second->SetWaiting(GetServiceWorker(info, false));
-  }
-}
-
-void ServiceWorkerDispatcher::SetActiveServiceWorker(
-    int provider_id,
-    int registration_handle_id,
-    const ServiceWorkerObjectInfo& info) {
-  ProviderContextMap::iterator provider = provider_contexts_.find(provider_id);
-  if (provider != provider_contexts_.end() &&
-      provider->second->registration_handle_id() == registration_handle_id) {
-    worker_to_provider_.erase(provider->second->active_handle_id());
-    if (info.handle_id != kInvalidServiceWorkerHandleId)
-      worker_to_provider_[info.handle_id] = provider->second;
-    provider->second->OnSetActiveServiceWorker(info);
-  }
-
-  RegistrationObjectMap::iterator found =
-      registrations_.find(registration_handle_id);
-  if (found != registrations_.end()) {
-    // Populate the .active field with the new worker object.
-    found->second->SetActive(GetServiceWorker(info, false));
-  }
-}
-
 void ServiceWorkerDispatcher::SetReadyRegistration(
     int provider_id,
     int registration_handle_id) {
@@ -590,8 +558,8 @@ void ServiceWorkerDispatcher::SetReadyRegistration(
     return;
   }
 
-  ScriptClientMap::iterator client = script_clients_.find(provider_id);
-  if (client == script_clients_.end())
+  ProviderClientMap::iterator client = provider_clients_.find(provider_id);
+  if (client == provider_clients_.end())
     return;
 
   ServiceWorkerRegistrationObjectInfo info =
@@ -629,8 +597,8 @@ void ServiceWorkerDispatcher::OnSetControllerServiceWorker(
     provider->second->OnSetControllerServiceWorker(info);
   }
 
-  ScriptClientMap::iterator found = script_clients_.find(provider_id);
-  if (found != script_clients_.end()) {
+  ProviderClientMap::iterator found = provider_clients_.find(provider_id);
+  if (found != provider_clients_.end()) {
     // Populate the .controller field with the new worker object.
     found->second->setController(GetServiceWorker(info, false),
                                  should_notify_controllerchange);
@@ -650,8 +618,8 @@ void ServiceWorkerDispatcher::OnPostMessage(
                "ServiceWorkerDispatcher::OnPostMessage",
                "Thread ID", thread_id);
 
-  ScriptClientMap::iterator found = script_clients_.find(provider_id);
-  if (found == script_clients_.end()) {
+  ProviderClientMap::iterator found = provider_clients_.find(provider_id);
+  if (found == provider_clients_.end()) {
     // For now we do no queueing for messages sent to nonexistent / unattached
     // client.
     return;
@@ -675,10 +643,10 @@ void ServiceWorkerDispatcher::OnGetClientInfo(int thread_id,
                                               int request_id,
                                               int provider_id) {
   blink::WebServiceWorkerClientInfo info;
-  ScriptClientMap::iterator found = script_clients_.find(provider_id);
+  ProviderClientMap::iterator found = provider_clients_.find(provider_id);
   // TODO(ksakamoto): Could we track these values in the browser side? Except
   // for |isFocused|, it would be pretty easy.
-  if (found != script_clients_.end() && found->second->getClientInfo(&info)) {
+  if (found != provider_clients_.end() && found->second->getClientInfo(&info)) {
     ServiceWorkerClientInfo result;
     result.client_id = info.clientID;
     result.page_visibility_state = info.pageVisibilityState;

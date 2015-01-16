@@ -12,11 +12,12 @@ bool BrowserPluginGuestDelegate::CanRunInDetachedState() const {
 
 WebContents* BrowserPluginGuestDelegate::CreateNewGuestWindow(
     const WebContents::CreateParams& create_params) {
-  return NULL;
+  NOTREACHED();
+  return nullptr;
 }
 
 WebContents* BrowserPluginGuestDelegate::GetOwnerWebContents() const {
-  return NULL;
+  return nullptr;
 }
 
 bool BrowserPluginGuestDelegate::Find(int request_id,

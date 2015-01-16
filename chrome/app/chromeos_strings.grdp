@@ -178,6 +178,9 @@ Press any key to continue exploring.
     Enter
   </message>
 
+  <message name="IDS_FILE_BROWSER_STATUS_COLUMN_LABEL" desc="Status column label.  This column reflects the cloud import status of files.  The status is an icon depicting whether a file has been imported, and if so, where to - for example, a Drive icon if a file has been imported to Google Drive.  For unimported files, this column is blank. ">
+    Status
+  </message>
   <message name="IDS_FILE_BROWSER_TYPE_COLUMN_LABEL" desc="Type column label.">
     Type
   </message>
@@ -443,16 +446,19 @@ Press any key to continue exploring.
     Share
   </message>
   <message name="IDS_FILE_BROWSER_CLOUD_IMPORT_BUTTON_LABEL" desc="Label for button that initiates media backup to the cloud.">
-    Import photos &amp; videos to Google Drive
+    Import <ph name="FILE_COUNT">$1<ex>5</ex></ph> files to Google Drive
   </message>
-  <message name="IDS_FILE_BROWSER_CLOUD_IMPORT_INSUFFICIENT_SPACE_BUTTON_LABEL" desc="Label for button that tells user there is not enough space to perform a cloud import.">
+  <message name="IDS_FILE_BROWSER_CLOUD_IMPORT_EMPTY_SCAN_BUTTON_LABEL" desc="Message to user that no new files were found, so cloud import is not possible.">
+    No new media
+  </message>
+  <message name="IDS_FILE_BROWSER_CLOUD_IMPORT_INSUFFICIENT_SPACE_BUTTON_LABEL" desc="Message to user that there is not enough space to perform a cloud import.">
     Insufficient space on your device!
   </message>
   <message name="IDS_FILE_BROWSER_CLOUD_IMPORT_SCANNING_BUTTON_LABEL" desc="Label for button showing that scanning is in progress...prior to being enabled when scanning is complete.">
     Scanning your media...
   </message>
   <message name="IDS_FILE_BROWSER_CLOUD_IMPORT_ITEMS_REMAINING" desc="File Manager status message.">
-    Importing $1 files...
+    Importing <ph name="FILE_COUNT">$1<ex>5</ex></ph> files...
   </message>
 
   <message name="IDS_FILE_BROWSER_COPY_FILE_NAME" desc="File Manager status message.">
@@ -1120,11 +1126,11 @@ Press any key to continue exploring.
   <message name="IDS_FLAGS_DISABLE_DISPLAY_COLOR_CALIBRATION_DESCRIPTION" desc="Description for the flag to disable the color calibration of the display.">
     Disable calibrating the color of the display even if the display supports the feature.
   </message>
-  <message name="IDS_FLAGS_USE_MEMORY_PRESSURE_NAME" desc="Name for the flag to enable memory pressure handling on ChromeOS.">
-    Enable memory pressure handling
+  <message name="IDS_FLAGS_DISABLE_MEMORY_PRESSURE_NAME" desc="Name for the flag to disable memory pressure handling on ChromeOS.">
+    Disable memory pressure handling
   </message>
-  <message name="IDS_FLAGS_USE_MEMORY_PRESSURE_DESCRIPTION" desc="Description for the flag to enable memory pressure handling on ChromeOS.">
-    Enables enhanced memory pressure handling on ChromeOS.
+  <message name="IDS_FLAGS_DISABLE_MEMORY_PRESSURE_DESCRIPTION" desc="Description for the flag to disable memory pressure handling on ChromeOS.">
+    Disable enhanced memory pressure handling on ChromeOS.
   </message>
   <message name="IDS_FLAGS_WAKE_ON_PACKETS_NAME" desc="Name for the flag to enable wake on packets.">
     Wake On Packets

@@ -33,7 +33,6 @@
 #include "chrome/renderer/content_settings_observer.h"
 #include "chrome/renderer/external_extension.h"
 #include "chrome/renderer/loadtimes_extension_bindings.h"
-#include "chrome/renderer/media/cast_ipc_dispatcher.h"
 #include "chrome/renderer/media/chrome_key_systems.h"
 #include "chrome/renderer/net/net_error_helper.h"
 #include "chrome/renderer/net_benchmarking_extension.h"
@@ -49,7 +48,6 @@
 #include "chrome/renderer/prerender/prerender_media_load_deferrer.h"
 #include "chrome/renderer/prerender/prerenderer_client.h"
 #include "chrome/renderer/principals_extension_bindings.h"
-#include "chrome/renderer/printing/print_web_view_helper.h"
 #include "chrome/renderer/safe_browsing/malware_dom_details.h"
 #include "chrome/renderer/safe_browsing/phishing_classifier_delegate.h"
 #include "chrome/renderer/searchbox/search_bouncer.h"
@@ -71,6 +69,7 @@
 #include "components/visitedlink/renderer/visitedlink_slave.h"
 #include "components/web_cache/renderer/web_cache_render_process_observer.h"
 #include "content/public/common/content_constants.h"
+#include "content/public/renderer/plugin_instance_throttler.h"
 #include "content/public/renderer/render_frame.h"
 #include "content/public/renderer/render_thread.h"
 #include "content/public/renderer/render_view.h"
@@ -113,6 +112,7 @@
 #include "chrome/renderer/extensions/extension_frame_helper.h"
 #include "chrome/renderer/extensions/renderer_permissions_policy_delegate.h"
 #include "chrome/renderer/extensions/resource_request_policy.h"
+#include "chrome/renderer/media/cast_ipc_dispatcher.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_set.h"
 #include "extensions/common/extension_urls.h"
@@ -128,6 +128,7 @@
 
 #if defined(ENABLE_PRINTING)
 #include "chrome/renderer/printing/chrome_print_web_view_helper_delegate.h"
+#include "components/printing/renderer/print_web_view_helper.h"
 #endif
 
 #if defined(ENABLE_PRINT_PREVIEW)
@@ -152,6 +153,8 @@ using autofill::PasswordAutofillAgent;
 using autofill::PasswordGenerationAgent;
 using base::ASCIIToUTF16;
 using base::UserMetricsAction;
+using content::PluginInstanceThrottler;
+using content::PluginPowerSaverMode;
 using content::RenderFrame;
 using content::RenderThread;
 using content::WebPluginInfo;
@@ -342,8 +345,10 @@ void ChromeContentRendererClient::RenderThreadStarted() {
 #if defined(ENABLE_WEBRTC)
   thread->AddFilter(webrtc_logging_message_filter_.get());
 #endif
+#if defined(ENABLE_EXTENSIONS)
   thread->AddFilter(new CastIPCDispatcher(
       content::RenderThread::Get()->GetIOMessageLoopProxy()));
+#endif
 
   thread->RegisterExtension(extensions_v8::ExternalExtension::Get());
   thread->RegisterExtension(extensions_v8::LoadTimesExtension::Get());
@@ -528,10 +533,6 @@ void ChromeContentRendererClient::RenderViewCreated(
   new password_manager::CredentialManagerClient(render_view);
 }
 
-void ChromeContentRendererClient::SetNumberOfViews(int number_of_views) {
-  base::debug::SetCrashKeyValue(crash_keys::kNumberOfViews,
-                                base::IntToString(number_of_views));
-}
 
 SkBitmap* ChromeContentRendererClient::GetSadPluginBitmap() {
   return const_cast<SkBitmap*>(ResourceBundle::GetSharedInstance().
@@ -798,9 +799,10 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
         }
 #endif  // !defined(DISABLE_NACL) && defined(ENABLE_EXTENSIONS)
 
-        RenderFrame::PluginPowerSaverMode power_saver_mode =
-            RenderFrame::POWER_SAVER_MODE_ESSENTIAL;
+        scoped_ptr<content::PluginInstanceThrottler> throttler;
 #if defined(ENABLE_PLUGINS)
+        PluginPowerSaverMode power_saver_mode =
+            PluginPowerSaverMode::POWER_SAVER_MODE_ESSENTIAL;
         bool show_poster = false;
         GURL poster_url;
         bool cross_origin_main_content = false;
@@ -811,15 +813,20 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
         if (render_frame->ShouldThrottleContent(params, frame->document().url(),
                                                 &poster_url,
                                                 &cross_origin_main_content)) {
-          if (status_value ==
-              ChromeViewHostMsg_GetPluginInfo_Status::kPlayImportantContent) {
+          // TODO(tommycli): Apply throttler behavior to all plugins.
+          if (plugin.name == base::ASCIIToUTF16(content::kFlashPluginName) &&
+              status_value == ChromeViewHostMsg_GetPluginInfo_Status::
+                                  kPlayImportantContent) {
             power_saver_mode =
-                RenderFrame::POWER_SAVER_MODE_PERIPHERAL_THROTTLED;
+                PluginPowerSaverMode::POWER_SAVER_MODE_PERIPHERAL_THROTTLED;
             show_poster = poster_url.is_valid();
           } else {
             power_saver_mode =
-                RenderFrame::POWER_SAVER_MODE_PERIPHERAL_UNTHROTTLED;
+                PluginPowerSaverMode::POWER_SAVER_MODE_PERIPHERAL_UNTHROTTLED;
           }
+
+          throttler = content::PluginInstanceThrottler::Get(render_frame, url,
+                                                            power_saver_mode);
         }
 
         // Delay loading plugins if prerendering.
@@ -844,9 +851,8 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
           render_frame->WhitelistContentOrigin(content_origin);
         }
 #endif  // defined(ENABLE_PLUGINS)
-
         return render_frame->CreatePlugin(frame, plugin, params,
-                                          power_saver_mode);
+                                          throttler.Pass());
       }
       case ChromeViewHostMsg_GetPluginInfo_Status::kNPAPINotSupported: {
         RenderThread::Get()->RecordAction(

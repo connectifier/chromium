@@ -87,7 +87,7 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
   //
   // This gives the derived class an opportunity to perform additional
   // initialization.
-  virtual void DidInitialize() {}
+  virtual void DidInitialize(const base::DictionaryValue& create_params) {}
 
   // This method is called when the initial set of frames within the page have
   // completed loading.
@@ -183,7 +183,8 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
   void Init(const base::DictionaryValue& create_params,
             const WebContentsCreatedCallback& callback);
 
-  void InitWithWebContents(content::WebContents* guest_web_contents);
+  void InitWithWebContents(const base::DictionaryValue& create_params,
+                           content::WebContents* guest_web_contents);
 
   bool IsViewType(const char* const view_type) const {
     return !strcmp(GetViewType(), view_type);
@@ -230,6 +231,8 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
   // Returns whether this GuestView is embedded in an extension/app.
   bool in_extension() const { return !owner_extension_id_.empty(); }
 
+  bool can_owner_receive_events() const { return !!view_instance_id_; }
+
   // Returns the user browser context of the embedder.
   content::BrowserContext* browser_context() const { return browser_context_; }
 
@@ -251,6 +254,8 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
   void SetOpener(GuestViewBase* opener);
 
   // BrowserPluginGuestDelegate implementation.
+  content::WebContents* CreateNewGuestWindow(
+      const content::WebContents::CreateParams& create_params) final;
   void DidAttach(int guest_proxy_routing_id) final;
   void DidDetach() final;
   void ElementSizeChanged(const gfx::Size& size) final;
@@ -284,10 +289,11 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
 
   void SendQueuedEvents();
 
-  void CompleteInit(const WebContentsCreatedCallback& callback,
+  void CompleteInit(scoped_ptr<base::DictionaryValue> create_params,
+                    const WebContentsCreatedCallback& callback,
                     content::WebContents* guest_web_contents);
 
-  void SetUpAutoSize();
+  void SetUpAutoSize(const base::DictionaryValue& params);
 
   void StartTrackingEmbedderZoomLevel();
   void StopTrackingEmbedderZoomLevel();
@@ -302,6 +308,7 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
   // WebContentsDelegate implementation.
   void ActivateContents(content::WebContents* contents) final;
   void DeactivateContents(content::WebContents* contents) final;
+  void ContentsZoomChange(bool zoom_in) override;
   void RunFileChooser(content::WebContents* web_contents,
                       const content::FileChooserParams& params) override;
   bool ShouldFocusPageAfterCrash() final;

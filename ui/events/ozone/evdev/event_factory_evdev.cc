@@ -62,9 +62,8 @@ struct OpenInputDeviceParams {
 
 #if defined(USE_EVDEV_GESTURES)
 bool UseGesturesLibraryForDevice(const EventDeviceInfo& devinfo) {
-  if ((devinfo.HasAbsXY() || devinfo.HasMTAbsXY()) &&
-      !devinfo.IsMappedToScreen())
-    return true;  // touchpad
+  if (devinfo.HasTouchpad())
+    return true;
 
   if (devinfo.HasRelXY())
     return true;  // mouse
@@ -315,6 +314,49 @@ void EventFactoryEvdev::WarpCursorTo(gfx::AcceleratedWidget widget,
   }
 }
 
+void EventFactoryEvdev::DisableInternalTouchpad() {
+  for (const auto& it : converters_) {
+    EventConverterEvdev* converter = it.second;
+    if (converter->type() == InputDeviceType::INPUT_DEVICE_INTERNAL &&
+        converter->HasTouchpad()) {
+      DCHECK(!converter->HasKeyboard());
+      converter->set_ignore_events(true);
+    }
+  }
+}
+
+void EventFactoryEvdev::EnableInternalTouchpad() {
+  for (const auto& it : converters_) {
+    EventConverterEvdev* converter = it.second;
+    if (converter->type() == InputDeviceType::INPUT_DEVICE_INTERNAL &&
+        converter->HasTouchpad()) {
+      DCHECK(!converter->HasKeyboard());
+      converter->set_ignore_events(false);
+    }
+  }
+}
+
+void EventFactoryEvdev::DisableInternalKeyboardExceptKeys(
+    scoped_ptr<std::set<DomCode>> excepted_keys) {
+  for (const auto& it : converters_) {
+    EventConverterEvdev* converter = it.second;
+    if (converter->type() == InputDeviceType::INPUT_DEVICE_INTERNAL &&
+        converter->HasKeyboard()) {
+      converter->SetAllowedKeys(excepted_keys.Pass());
+    }
+  }
+}
+
+void EventFactoryEvdev::EnableInternalKeyboard() {
+  for (const auto& it : converters_) {
+    EventConverterEvdev* converter = it.second;
+    if (converter->type() == InputDeviceType::INPUT_DEVICE_INTERNAL &&
+        converter->HasKeyboard()) {
+      converter->AllowAllKeys();
+    }
+  }
+}
+
 void EventFactoryEvdev::NotifyDeviceChange(
     const EventConverterEvdev& converter) {
   if (converter.HasTouchscreen())
@@ -329,9 +371,12 @@ void EventFactoryEvdev::NotifyTouchscreensUpdated() {
   std::vector<TouchscreenDevice> touchscreens;
   for (auto it = converters_.begin(); it != converters_.end(); ++it) {
     if (it->second->HasTouchscreen()) {
+      // TODO(spang): Extract the number of touch-points supported by the
+      // device.
+      const int touch_points = 11;
       touchscreens.push_back(TouchscreenDevice(
           it->second->id(), it->second->type(), std::string() /* Device name */,
-          it->second->GetTouchscreenSize()));
+          it->second->GetTouchscreenSize(), touch_points));
     }
   }
 

@@ -130,6 +130,8 @@ struct CONTENT_EXPORT WebPreferences {
   bool text_blobs_enabled;
   bool allow_displaying_insecure_content;
   bool allow_running_insecure_content;
+  // If true, taints all <canvas> elements, regardless of origin.
+  bool disable_reading_from_canvas;
   // Strict mixed content checking disables both displaying and running insecure
   // mixed content, and disables embedder notifications that such content was
   // requested (thereby preventing user override).
@@ -211,6 +213,12 @@ struct CONTENT_EXPORT WebPreferences {
   bool ignore_main_frame_overflow_hidden_quirk;
   bool report_screen_size_in_physical_pixels_quirk;
 #endif
+
+  // Default (used if the page or UA doesn't override these) values for page
+  // scale limits. These are set directly on the WebView so there's no analogue
+  // in WebSettings.
+  float default_minimum_page_scale_factor;
+  float default_maximum_page_scale_factor;
 
   // We try to keep the default values the same as the default values in
   // chrome, except for the cases where it would require lots of extra work for

@@ -315,7 +315,7 @@ SupervisedUserURLFilter::GetFilteringBehaviorForURL(
 
   // Look for patterns matching the hostname, with a value that is different
   // from the default (a value of true in the map meaning allowed).
-  for (const std::pair<std::string, bool>& host_entry : host_map_) {
+  for (const auto& host_entry : host_map_) {
     if ((host_entry.second == (default_behavior_ == BLOCK)) &&
         HostMatchesPattern(host, host_entry.first)) {
       return host_entry.second ? ALLOW : BLOCK;
@@ -445,6 +445,15 @@ void SupervisedUserURLFilter::InitAsyncURLChecker(
 
 bool SupervisedUserURLFilter::HasAsyncURLChecker() const {
   return !!async_url_checker_;
+}
+
+void SupervisedUserURLFilter::Clear() {
+  default_behavior_ = ALLOW;
+  SetContents(make_scoped_ptr(new Contents()));
+  url_map_.clear();
+  host_map_.clear();
+  blacklist_ = nullptr;
+  async_url_checker_.reset();
 }
 
 void SupervisedUserURLFilter::AddObserver(Observer* observer) {

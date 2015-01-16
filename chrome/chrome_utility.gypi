@@ -26,8 +26,6 @@
     'chrome_utility_extensions_sources': [
       'utility/extensions/extensions_handler.cc',
       'utility/extensions/extensions_handler.h',
-      'utility/extensions/unpacker.cc',
-      'utility/extensions/unpacker.h',
       'utility/image_writer/disk_unmounter_mac.cc',
       'utility/image_writer/disk_unmounter_mac.h',
       'utility/image_writer/error_messages.cc',
@@ -103,6 +101,7 @@
       'dependencies': [
         '../base/base.gyp:base',
         '../components/components_strings.gyp:components_strings',
+        '../components/components.gyp:search_engines',
         '../components/components.gyp:url_fixer',
         '../content/content.gyp:content_common',
         '../content/content.gyp:content_utility',

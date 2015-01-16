@@ -22,9 +22,9 @@
     'protobuf_decoder_path':
         '<(policy_out_dir)/policy/cloud_policy_generated.cc',
     'app_restrictions_path':
-        '<(android_resources_out_dir)/xml/app_restrictions.xml',
+        '<(android_resources_out_dir)/xml-v21/app_restrictions.xml',
     'app_resources_path':
-        '<(android_resources_out_dir)/values/restriction_values.xml',
+        '<(android_resources_out_dir)/values-v21/restriction_values.xml',
     # This is the "full" protobuf, which defines one protobuf message per
     # policy. It is also the format currently used by the server.
     'chrome_settings_proto_path':

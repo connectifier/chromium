@@ -111,7 +111,6 @@ IPC_ENUM_TRAITS_MAX_VALUE(PP_NetworkList_Type, PP_NETWORKLIST_TYPE_CELLULAR)
 IPC_ENUM_TRAITS(PP_PrintOrientation_Dev)
 IPC_ENUM_TRAITS(PP_PrintOutputFormat_Dev)
 IPC_ENUM_TRAITS(PP_PrintScalingOption_Dev)
-IPC_ENUM_TRAITS_MAX_VALUE(PP_PrintDuplexMode_Dev, PP_PRINTDUPLEXMODE_SHORT_EDGE)
 IPC_ENUM_TRAITS(PP_PrivateFontCharset)
 IPC_ENUM_TRAITS(PP_ResourceImage)
 IPC_ENUM_TRAITS(PP_ResourceString)
@@ -209,17 +208,9 @@ IPC_STRUCT_TRAITS_BEGIN(PP_PrintSettings_Dev)
   IPC_STRUCT_TRAITS_MEMBER(format)
 IPC_STRUCT_TRAITS_END()
 
-IPC_STRUCT_TRAITS_BEGIN(PP_PrintRange_Dev)
-  IPC_STRUCT_TRAITS_MEMBER(from)
-  IPC_STRUCT_TRAITS_MEMBER(to)
-IPC_STRUCT_TRAITS_END()
-
 IPC_STRUCT_TRAITS_BEGIN(PP_PdfPrintPresetOptions_Dev)
   IPC_STRUCT_TRAITS_MEMBER(is_scaling_disabled)
   IPC_STRUCT_TRAITS_MEMBER(copies)
-  IPC_STRUCT_TRAITS_MEMBER(duplex)
-  IPC_STRUCT_TRAITS_MEMBER(page_range)
-  IPC_STRUCT_TRAITS_MEMBER(page_range_count)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(PP_URLComponent_Dev)
@@ -1134,11 +1125,12 @@ IPC_MESSAGE_ROUTED5(PpapiHostMsg_PPBInstance_PromiseRejected,
                     PP_CdmExceptionCode /* exception_code */,
                     int32_t /* system_code */,
                     ppapi::proxy::SerializedVar /* error_description, String */)
-IPC_MESSAGE_ROUTED4(PpapiHostMsg_PPBInstance_SessionMessage,
+IPC_MESSAGE_ROUTED5(PpapiHostMsg_PPBInstance_SessionMessage,
                     PP_Instance /* instance */,
                     ppapi::proxy::SerializedVar /* web_session_id, String */,
                     PP_CdmMessageType /* message_type */,
-                    ppapi::proxy::SerializedVar /* message, ArrayBuffer */)
+                    ppapi::proxy::SerializedVar /* message, ArrayBuffer */,
+                    ppapi::proxy::SerializedVar /* destination_url, String */)
 IPC_MESSAGE_ROUTED4(PpapiHostMsg_PPBInstance_SessionKeysChange,
                     PP_Instance /* instance */,
                     std::string /* web_session_id */,

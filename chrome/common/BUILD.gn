@@ -59,12 +59,12 @@ static_library("common") {
     "//components/json_schema",
     "//components/metrics",
     "//components/policy:policy_component_common",
+    "//components/printing/common:printing_common",
     "//components/translate/core/common",
     "//components/variations",
     "//content/public/common",
     "//crypto",
     "//extensions/common:common_constants",
-    "//media/cast:net",
     "//net",
     "//skia",
     "//third_party/icu",
@@ -107,6 +107,7 @@ static_library("common") {
       "//extensions/common/api",
       "//extensions:extensions_resources",
       "//extensions/strings",
+      "//media/cast:net",
     ]
   }
 

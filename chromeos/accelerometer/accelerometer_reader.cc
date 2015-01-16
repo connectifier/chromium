@@ -9,6 +9,7 @@
 #include "base/bind.h"
 #include "base/files/file_util.h"
 #include "base/location.h"
+#include "base/memory/singleton.h"
 #include "base/message_loop/message_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
@@ -57,6 +58,10 @@ const int kDelayBetweenReadsMs = 100;
 
 // The mean acceleration due to gravity on Earth in m/s^2.
 const float kMeanGravity = 9.80665f;
+
+// The maximum deviation from the acceleration expected due to gravity under
+// which to detect hinge angle and screen rotation in m/s^2
+const float kDeviationFromGravityThreshold = 1.0f;
 
 // Reads |path| to the unsigned int pointed to by |value|. Returns true on
 // success or false on failure.
@@ -183,12 +188,9 @@ AccelerometerReader::ConfigurationData::ConfigurationData()
 AccelerometerReader::ConfigurationData::~ConfigurationData() {
 }
 
-AccelerometerReader::AccelerometerReader()
-    : configuration_(new AccelerometerReader::Configuration()),
-      weak_factory_(this) {
-}
-
-AccelerometerReader::~AccelerometerReader() {
+// static
+AccelerometerReader* AccelerometerReader::GetInstance() {
+  return Singleton<AccelerometerReader>::get();
 }
 
 void AccelerometerReader::Initialize(
@@ -206,10 +208,26 @@ void AccelerometerReader::Initialize(
 
 void AccelerometerReader::AddObserver(Observer* observer) {
   observers_.AddObserver(observer);
+  observer->OnAccelerometerUpdated(update_);
 }
 
 void AccelerometerReader::RemoveObserver(Observer* observer) {
   observers_.RemoveObserver(observer);
+}
+
+bool AccelerometerReader::IsReadingStable(const ui::AccelerometerUpdate& update,
+                                          ui::AccelerometerSource source) {
+  return update.has(source) &&
+         std::abs(update.get(source).Length() - kMeanGravity) <=
+             kDeviationFromGravityThreshold;
+}
+
+AccelerometerReader::AccelerometerReader()
+    : configuration_(new AccelerometerReader::Configuration()),
+      weak_factory_(this) {
+}
+
+AccelerometerReader::~AccelerometerReader() {
 }
 
 void AccelerometerReader::OnInitialized(

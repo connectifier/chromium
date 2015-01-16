@@ -54,9 +54,6 @@ const char kBlinkPlatformLogChannels[]      = "blink-platform-log-channels";
 // is enabled.
 const char kBlockCrossSiteDocuments[]     = "block-cross-site-documents";
 
-// Causes the browser process to throw an assertion on startup.
-const char kBrowserAssertTest[]             = "assert-test";
-
 // Causes the browser process to crash on startup.
 const char kBrowserCrashTest[]              = "crash-test";
 
@@ -202,13 +199,13 @@ const char kDisablePepper3d[]               = "disable-pepper-3d";
 // Disables compositor-accelerated touch-screen pinch gestures.
 const char kDisablePinch[]                  = "disable-pinch";
 
-// Prevent plugins from running.
-const char kDisablePlugins[]                = "disable-plugins";
-
 // Disable discovering third-party plug-ins. Effectively loading only
 // ones shipped with the browser plus third-party ones as specified by
 // --extra-plugin-dir and --load-plugin switches.
 const char kDisablePluginsDiscovery[]       = "disable-plugins-discovery";
+
+// Taints all <canvas> elements, regardless of origin.
+const char kDisableReadingFromCanvas[]      = "disable-reading-from-canvas";
 
 // Disables remote web font support. SVG font should always work whether this
 // option is specified or not.
@@ -297,6 +294,9 @@ const char kEnableBrowserSideNavigation[]   = "enable-browser-side-navigation";
 
 // Defer image decoding in WebKit until painting.
 const char kEnableDeferredImageDecoding[]   = "enable-deferred-image-decoding";
+
+// Enables Delay Agnostic AEC in WebRTC.
+const char kEnableDelayAgnosticAec[]        = "enable-delay-agnostic-aec";
 
 // Enables delegated renderer.
 const char kEnableDelegatedRenderer[]       = "enable-delegated-renderer";
@@ -665,9 +665,6 @@ const char kRegisterPepperPlugins[]         = "register-pepper-plugins";
 
 // Enables remote debug over HTTP on the specified port.
 const char kRemoteDebuggingPort[]           = "remote-debugging-port";
-
-// Causes the renderer process to throw an assertion on launch.
-const char kRendererAssertTest[]            = "renderer-assert-test";
 
 // On POSIX only: the contents of this flag are prepended to the renderer
 // command line. Useful values might be "valgrind" or "xterm -e gdb --args".

@@ -1182,6 +1182,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="AsyncDNS.PrefDefaultSource" enum="AsyncDNSPrefDefaultSource">
+  <owner>ttuttle@chromium.org</owner>
+  <summary>
+    The source of the async DNS preference's default. Logged at startup, when
+    the IO thread is created.
+  </summary>
+</histogram>
+
+<histogram name="AsyncDNS.PrefSource" enum="AsyncDNSPrefSource">
+  <owner>ttuttle@chromium.org</owner>
+  <summary>
+    The source of the async DNS preference's value. Logged at startup, when the
+    IO thread is created.
+  </summary>
+</histogram>
+
 <histogram name="AsyncDNS.ResolveError" enum="NetErrorCodes">
   <owner>ttuttle@chromium.org</owner>
   <summary>
@@ -7222,11 +7238,23 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Event.Latency.TouchToFirstScrollUpdateSwap"
+    units="microseconds">
+  <owner>rbyers@chromium.org</owner>
+  <summary>
+    Time between initial creation of a touch event and the frame swap caused by
+    by the generated ScrollUpdate gesture event if that ScrollUpdate is the
+    first such in a given scroll gesture event sequence. If no swap was induced
+    by the event, no recording is made.
+  </summary>
+</histogram>
+
 <histogram name="Event.Latency.TouchToScrollUpdateSwap" units="microseconds">
   <owner>rbyers@chromium.org</owner>
   <summary>
-    Time between initial creation of touch event and the resulting frame from
-    ScrollUpdate is swapped.
+    Time between initial creation of a touch event and the frame swap caused by
+    by the generated ScrollUpdate gesture event. If no swap was induced by the
+    event, no recording is made.
   </summary>
 </histogram>
 
@@ -11423,8 +11451,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="interstitial.ssl.cause.nonoverridable"
-    enum="SSLNonAttackCauses">
+<histogram name="interstitial.ssl.cause.nonoverridable" enum="SSLErrorCauses">
   <owner>felt@chromium.org</owner>
   <summary>
     Possible non-attack causes of the non-overridable SSL interstitial. Many
@@ -11439,7 +11466,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="interstitial.ssl.cause.overridable" enum="SSLNonAttackCauses">
+<histogram name="interstitial.ssl.cause.overridable" enum="SSLErrorCauses">
   <owner>felt@chromium.org</owner>
   <summary>
     Possible non-attack causes of the overridable SSL interstitial. Many errors
@@ -11451,6 +11478,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     CERT_COMMON_NAME_INVALID, so one should look at the bucket count of WWW
     mismatch divided by the bucket count of CERT_COMMON_NAME_INVALID in the
     histogram interstitial.ssl_error_type.
+  </summary>
+</histogram>
+
+<histogram name="interstitial.ssl.connection_type"
+    enum="ResourcePrefetchPredictorNetworkType">
+  <owner>felt@chromium.org</owner>
+  <summary>
+    The histogram shows the connection types associated with SSL warnings. E.g.,
+    do more warnings occur on WiFi?
   </summary>
 </histogram>
 
@@ -11486,6 +11522,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="interstitial.ssl.severity_score.authority_invalid" units="%">
+  <obsolete>
+    Deprecated Jan 2015 (M42).
+  </obsolete>
   <owner>felt@chromium.org</owner>
   <summary>
     The likelihood of a |CERT_AUTHORITY_INVALID| error being an attack.
@@ -11493,6 +11532,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="interstitial.ssl.severity_score.common_name_invalid" units="%">
+  <obsolete>
+    Deprecated Jan 2015 (M42).
+  </obsolete>
   <owner>felt@chromium.org</owner>
   <summary>
     The likelihood of a |CERT_COMMON_NAME_INVALID| error being an attack.
@@ -11500,6 +11542,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="interstitial.ssl.severity_score.date_invalid" units="%">
+  <obsolete>
+    Deprecated Jan 2015 (M42).
+  </obsolete>
   <owner>felt@chromium.org</owner>
   <summary>
     The likelihood of a |CERT_DATE_INVALID| error being an attack.
@@ -12979,6 +13024,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>scherkus@chromium.org</owner>
   <summary>
     Pixel format color range of HTML5 video. Emitted on video load.
+  </summary>
+</histogram>
+
+<histogram name="Media.VideoDecoderFallback" enum="BooleanDidFallBack">
+  <owner>watk@chromium.org</owner>
+  <summary>
+    Whether Chrome had to fall back to a secondary video decoder after the
+    primary decoder failed reinitialization.
   </summary>
 </histogram>
 
@@ -26543,7 +26596,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Prerender.Event" enum="PrerenderEvent">
-  <owner>tburkard@chromium.org</owner>
+  <obsolete>
+    Deprecated Dec 12 2014.
+  </obsolete>
   <summary>
     Enumeration of what events related to prerendering have occurred.
   </summary>
@@ -27241,6 +27296,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Prerender.SessionStorageNamespaceMergeTime"
     units="milliseconds">
+  <obsolete>
+    Deprecated Dec 12 2014.
+  </obsolete>
   <owner>tburkard@chromium.org</owner>
   <summary>Time to perform the session storage namespace merge.</summary>
 </histogram>
@@ -28350,6 +28408,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     For each upload to the Rappor server, log the response received from the
     server.
   </summary>
+</histogram>
+
+<histogram name="RecoveryComponent.Event" enum="RecoveryComponentEvent">
+  <owner>robertshield@chromium.org</owner>
+  <summary>Log each stage of a recovery component event.</summary>
 </histogram>
 
 <histogram name="Renderer.AcceleratedFixedRootBackground"
@@ -39586,6 +39649,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time spent compiling functions lazily on first run.</summary>
 </histogram>
 
+<histogram name="V8.CompileScript" units="milliseconds">
+  <owner>yangguo@chromium.org</owner>
+  <summary>
+    Total time spent in compiling a script (incl. parsing/caching).
+  </summary>
+</histogram>
+
 <histogram name="V8.CompileSerialize" units="milliseconds">
   <owner>vogelheim@chromium.org</owner>
   <summary>Time spent serializing code, used by V8 code caching.</summary>
@@ -40907,6 +40977,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>bashi@chromium.org</owner>
   <owner>kenjibaheux@chromium.org</owner>
   <summary>The success or failure of web fonts CORS-enabled fetching.</summary>
+</histogram>
+
+<histogram name="WebFont.DecodeSpeed" units="KB/s">
+  <owner>kenjibaheux@chromium.org</owner>
+  <owner>ksakamoto@chromium.org</owner>
+  <summary>
+    Uncompressed font image size divided by the duration of time OTS takes to
+    decode the font image, in kilobytes per second.
+  </summary>
 </histogram>
 
 <histogram name="WebFont.DiskCache.EntryAge.Evict" units="hours">
@@ -42429,6 +42508,23 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="7" label="NO_ADDRESSES"/>
 </enum>
 
+<enum name="AsyncDNSPrefDefaultSource" type="int">
+  <int value="0" label="PLATFORM"/>
+  <int value="1" label="FIELD_TRIAL"/>
+  <int value="2" label="HARD_CODED_DEFAULT"/>
+</enum>
+
+<enum name="AsyncDNSPrefSource" type="int">
+  <int value="0" label="MANAGED_PREF"/>
+  <int value="1" label="SUPERVISED_PREF"/>
+  <int value="2" label="EXTENSION_PREF"/>
+  <int value="3" label="COMMAND_LINE_PREF"/>
+  <int value="4" label="USER_PREF"/>
+  <int value="5" label="RECOMMENDED_PREF"/>
+  <int value="6" label="DEFAULT_PREF"/>
+  <int value="7" label="UNKNOWN_PREF"/>
+</enum>
+
 <enum name="AsyncDNSResolveStatus" type="int">
   <int value="0" label="DNS_SUCCESS">Succeeded with async DNS.</int>
   <int value="1" label="PROC_SUCCESS">
@@ -42919,6 +43015,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <enum name="BooleanDidEvict" type="int">
   <int value="0" label="Did not evict"/>
   <int value="1" label="Did evict"/>
+</enum>
+
+<enum name="BooleanDidFallBack" type="int">
+  <int value="0" label="Did not fall back"/>
+  <int value="1" label="Did fall back"/>
 </enum>
 
 <enum name="BooleanDistillable" type="int">
@@ -46671,6 +46772,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="945" label="USB_SETCONFIGURATION"/>
   <int value="946" label="EASYUNLOCKPRIVATE_GETCONNECTIONINFO"/>
   <int value="947" label="FILEMANAGERPRIVATE_COMPUTECHECKSUM"/>
+  <int value="948" label="PRINTERPROVIDERINTERNAL_REPORTPRINTRESULT"/>
+  <int value="949" label="PRINTERPROVIDERINTERNAL_REPORTPRINTERCAPABILITY"/>
+  <int value="950" label="PRINTERPROVIDERINTERNAL_REPORTPRINTERS"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -50084,6 +50188,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1838482444" label="disable-settings-window"/>
   <int value="-1835975804" label="disable-offline-auto-reload"/>
   <int value="-1833149810" label="enable-accessibility-tab-switcher"/>
+  <int value="-1821058653" label="enable-delay-agnostic-aec"/>
   <int value="-1767470652" label="out-of-process-pdf"/>
   <int value="-1746767834" label="ssl-interstitial-v2-gray"/>
   <int value="-1740519217" label="disable-software-rasterizer"/>
@@ -50095,6 +50200,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1703308540" label="disable-webaudio"/>
   <int value="-1696366449" label="disable-permissions-bubbles"/>
   <int value="-1692384483" label="disambiguate-autofill-server-name-types"/>
+  <int value="-1691668194" label="enable-new-bookmark-apps"/>
   <int value="-1662447331" label="wake-on-packets"/>
   <int value="-1654344175" label="disable-extension-info-dialog"/>
   <int value="-1619757314" label="touch-scrolling-mode"/>
@@ -50139,6 +50245,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1102212525" label="enable-tcp-fastopen"/>
   <int value="-1078093206" label="ash-debug-shortcuts"/>
   <int value="-1077752943" label="enable-password-generation"/>
+  <int value="-1056310158" label="disable-memory-pressure-chromeos"/>
   <int value="-1052782474" label="enable-cloud-devices"/>
   <int value="-1052415111" label="malware-interstitial-v2"/>
   <int value="-1022971520" label="enable-search-button-in-omnibox-for-str"/>
@@ -55135,6 +55242,19 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="3" label="Show More"/>
 </enum>
 
+<enum name="RecoveryComponentEvent" type="int">
+  <int value="0" label="RunningNonElevated"/>
+  <int value="1" label="ElevationNeeded"/>
+  <int value="2" label="RunFailed"/>
+  <int value="3" label="RunSucceeded"/>
+  <int value="4" label="RunSkipped"/>
+  <int value="5" label="RunningElevated"/>
+  <int value="6" label="RunElevatedFailed"/>
+  <int value="7" label="RunElevatedSucceeded"/>
+  <int value="8" label="RunElevatedSkipped"/>
+  <int value="9" label="DownloadError"/>
+</enum>
+
 <enum name="RemotePlaybackDeviceType" type="int">
   <int value="0" label="Cast Generic Media Player"/>
   <int value="1" label="Cast YouTube Player"/>
@@ -57054,35 +57174,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="52245" label="TLS_DHE_RSA_WITH_CHACHA20_POLY1305"/>
 </enum>
 
-<enum name="SSLErrorHandlerEvent" type="int">
-  <int value="0" label="HANDLE_ALL"/>
-  <int value="1" label="SHOW_CAPTIVE_PORTAL_INTERSTITIAL_NONOVERRIDABLE"/>
-  <int value="2" label="SHOW_CAPTIVE_PORTAL_INTERSTITIAL_OVERRIDABLE"/>
-  <int value="3" label="SHOW_SSL_INTERSTITIAL_NONOVERRIDABLE"/>
-  <int value="4" label="SHOW_SSL_INTERSTITIAL_OVERRIDABLE"/>
-</enum>
-
-<enum name="SSLErrorTypes" type="int">
-  <int value="0" label="CERT_COMMON_NAME_INVALID"/>
-  <int value="1" label="CERT_DATE_INVALID"/>
-  <int value="2" label="CERT_AUTHORITY_INVALID"/>
-  <int value="3" label="CERT_CONTAINS_ERRORS"/>
-  <int value="4" label="CERT_NO_REVOCATION_MECHANISM"/>
-  <int value="5" label="CERT_REVOKED"/>
-  <int value="6" label="CERT_INVALID"/>
-  <int value="7" label="CERT_WEAK_SIGNATURE_ALGORITHM"/>
-  <int value="8" label="CERT_WEAK_KEY"/>
-  <int value="9" label="UNKNOWN"/>
-</enum>
-
-<enum name="SSLIsExpiredAndDecision" type="int">
-  <int value="0" label="EXPIRED_AND_PROCEED"/>
-  <int value="1" label="EXPIRED_AND_DO_NOT_PROCEED"/>
-  <int value="2" label="NOT_EXPIRED_AND_PROCEED"/>
-  <int value="3" label="NOT_EXPIRED_AND_DO_NOT_PROCEED"/>
-</enum>
-
-<enum name="SSLNonAttackCauses" type="int">
+<enum name="SSLErrorCauses" type="int">
   <int value="0" label="CLOCK_PAST: System clock set early"/>
   <int value="1" label="CLOCK_FUTURE: System clock set late"/>
   <int value="2"
@@ -57135,6 +57227,40 @@ To add a new entry, add it with any value and run test to compute valid value.
       label="AUTHORTIY_ERROR_CAPTIVE_PORTAL: Captive portal was detected">
     This cause is recorded only for CERT_AUTHORITY_INVALID errors.
   </int>
+  <int value="11" label="SELF_SIGNED: The cert is self-signed">
+    This cause is recorded only for CERT_AUTHORITY_INVALID errors.
+  </int>
+  <int value="12" label="EXPIRED_RECENTLY: Cert expired within last 28 days.">
+
+  </int>
+</enum>
+
+<enum name="SSLErrorHandlerEvent" type="int">
+  <int value="0" label="HANDLE_ALL"/>
+  <int value="1" label="SHOW_CAPTIVE_PORTAL_INTERSTITIAL_NONOVERRIDABLE"/>
+  <int value="2" label="SHOW_CAPTIVE_PORTAL_INTERSTITIAL_OVERRIDABLE"/>
+  <int value="3" label="SHOW_SSL_INTERSTITIAL_NONOVERRIDABLE"/>
+  <int value="4" label="SHOW_SSL_INTERSTITIAL_OVERRIDABLE"/>
+</enum>
+
+<enum name="SSLErrorTypes" type="int">
+  <int value="0" label="CERT_COMMON_NAME_INVALID"/>
+  <int value="1" label="CERT_DATE_INVALID"/>
+  <int value="2" label="CERT_AUTHORITY_INVALID"/>
+  <int value="3" label="CERT_CONTAINS_ERRORS"/>
+  <int value="4" label="CERT_NO_REVOCATION_MECHANISM"/>
+  <int value="5" label="CERT_REVOKED"/>
+  <int value="6" label="CERT_INVALID"/>
+  <int value="7" label="CERT_WEAK_SIGNATURE_ALGORITHM"/>
+  <int value="8" label="CERT_WEAK_KEY"/>
+  <int value="9" label="UNKNOWN"/>
+</enum>
+
+<enum name="SSLIsExpiredAndDecision" type="int">
+  <int value="0" label="EXPIRED_AND_PROCEED"/>
+  <int value="1" label="EXPIRED_AND_DO_NOT_PROCEED"/>
+  <int value="2" label="NOT_EXPIRED_AND_PROCEED"/>
+  <int value="3" label="NOT_EXPIRED_AND_DO_NOT_PROCEED"/>
 </enum>
 
 <enum name="SSLProtocolNegotiation" type="int">
@@ -58708,6 +58834,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="Fast"
       label="Fast start by skipping normal chrome.dll startup."/>
   <affected-histogram name="Startup.AppListFirstPaintWarmStart"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="AsyncDNSPref">
+  <suffix name="Disabled"/>
+  <suffix name="Enabled"/>
+  <affected-histogram name="AsyncDNS.PrefDefaultSource"/>
+  <affected-histogram name="AsyncDNS.PrefSource"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="AsyncSlowStart">
@@ -61853,39 +61986,28 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="Prerender.TimeUntilUsed2"/>
 </histogram_suffixes>
 
-<histogram_suffixes name="Profile.AndroidAccountManagementMenu" separator=".">
-  <suffix name="NonGAIA" label="Interaction was not initiated from GAIA"/>
-  <suffix name="GAIASignout"
-      label="GAIA-initiated interaction indicating a service type of Signout"/>
-  <suffix name="GAIASignoutIncognito"
-      label="GAIA-initiated interaction indicating a service type of Signout
-             and go Incogntio"/>
-  <suffix name="GAIAAddSession"
-      label="GAIA-initiated interaction indicating a service type of Add a
-             Session"/>
-  <suffix name="GAIAReAuth"
-      label="GAIA-initiated interaction indicating a service type of
-             Reauthenticate this user"/>
-  <suffix name="GAIADefault"
-      label="GAIA-initiated interaction indicating the default service type"/>
-  <affected-histogram name="Profile.AndroidAccountManagementMenu"/>
-</histogram_suffixes>
-
-<histogram_suffixes name="Profile.DesktopMenu" separator=".">
+<histogram_suffixes name="ProfileMenuGAIASource" separator=".">
   <suffix name="NonGAIA" label="Interaction was not initiated from GAIA"/>
   <suffix name="GAIASignout"
       label="GAIA-initiated interaction indicating a service type of Signout"/>
   <suffix name="GAIAIncognito"
       label="GAIA-initiated interaction indicating a service type of
-             Incogntio"/>
+             Incognito (used for DesktopMenu)"/>
+  <suffix name="GAIASignoutIncognito"
+      label="GAIA-initiated interaction indicating a service type of Signout
+             and go Incognito (used for AndroidAccountManagementMenu)"/>
   <suffix name="GAIAAddSession"
       label="GAIA-initiated interaction indicating a service type of Add a
              Session"/>
   <suffix name="GAIAReAuth"
       label="GAIA-initiated interaction indicating a service type of
              Reauthenticate this user"/>
+  <suffix name="GAIASignup"
+      label="GAIA-initiated interaction indicating a service type of Add an
+             account"/>
   <suffix name="GAIADefault"
       label="GAIA-initiated interaction indicating the default service type"/>
+  <affected-histogram name="Profile.AndroidAccountManagementMenu"/>
   <affected-histogram name="Profile.DesktopMenu"/>
 </histogram_suffixes>
 
@@ -62637,6 +62759,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="WebFont.DiskCache.ReuseCount.Evict"/>
   <affected-histogram name="WebFont.DiskCache.ReuseCount.Hit"/>
   <affected-histogram name="WebFont.DiskCacheHit"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="WebFontFormat" separator=".">
+  <suffix name="SFNT" label="TrueType/OpenType fonts"/>
+  <suffix name="WOFF" label="WOFF 1.0 fonts"/>
+  <suffix name="WOFF2" label="WOFF 2.0 fonts"/>
+  <affected-histogram name="WebFont.DecodeSpeed"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="WebStoreLinkExperiment">

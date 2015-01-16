@@ -25,6 +25,7 @@ extern "C" void NSAccessibilityUnregisterUniqueIdForUIElement(id element);
 
 using ui::AXNodeData;
 using content::BrowserAccessibility;
+using content::BrowserAccessibilityDelegate;
 using content::BrowserAccessibilityManager;
 using content::BrowserAccessibilityManagerMac;
 using content::ContentClient;
@@ -391,15 +392,35 @@ NSDictionary* attributeToMethodNameMap = nil;
 }
 
 - (NSString*)invalid {
-  base::string16 invalidUTF;
-  if (!browserAccessibility_->GetHtmlAttribute("aria-invalid", &invalidUTF))
-    return NULL;
-  NSString* invalid = base::SysUTF16ToNSString(invalidUTF);
-  if ([invalid isEqualToString:@"false"] ||
-      [invalid isEqualToString:@""]) {
+  int invalidState;
+  if (!browserAccessibility_->GetIntAttribute(
+      ui::AX_ATTR_INVALID_STATE, &invalidState))
     return @"false";
+
+  switch (invalidState) {
+  case ui::AX_INVALID_STATE_FALSE:
+    return @"false";
+  case ui::AX_INVALID_STATE_TRUE:
+    return @"true";
+  case ui::AX_INVALID_STATE_SPELLING:
+    return @"spelling";
+  case ui::AX_INVALID_STATE_GRAMMAR:
+    return @"grammar";
+  case ui::AX_INVALID_STATE_OTHER:
+    {
+      std::string ariaInvalidValue;
+      if (browserAccessibility_->GetStringAttribute(
+          ui::AX_ATTR_ARIA_INVALID_VALUE,
+          &ariaInvalidValue))
+        return base::SysUTF8ToNSString(ariaInvalidValue);
+      // Return @"true" since we cannot be more specific about the value.
+      return @"true";
+    }
+  default:
+    NOTREACHED();
   }
-  return invalid;
+
+  return @"false";
 }
 
 - (NSString*)placeholder {
@@ -514,9 +535,22 @@ NSDictionary* attributeToMethodNameMap = nil;
   if (!browserAccessibility_)
     return NSZeroPoint;
 
-  gfx::Rect bounds(origin.x, origin.y, size.width, size.height);
-  gfx::Point point = [self delegate]->AccessibilityOriginInScreen(bounds);
-  return NSMakePoint(point.x(), point.y());
+  // Get the delegate for the topmost BrowserAccessibilityManager, because
+  // that's the only one that can convert points to their origin in the screen.
+  BrowserAccessibilityManager* manager = browserAccessibility_->manager();
+  BrowserAccessibility* root = manager->GetRoot();
+  while (root->GetParent())
+    root = root->GetParent()->manager()->GetRoot();
+  manager = root->manager();
+  BrowserAccessibilityDelegate* delegate = manager->delegate();
+
+  if (delegate) {
+    gfx::Rect bounds(origin.x, origin.y, size.width, size.height);
+    gfx::Point point = delegate->AccessibilityOriginInScreen(bounds);
+    return NSMakePoint(point.x(), point.y());
+  } else {
+    return NSZeroPoint;
+  }
 }
 
 // Returns a string indicating the NSAccessibility role of this object.

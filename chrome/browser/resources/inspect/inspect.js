@@ -9,6 +9,8 @@ var MIN_VERSION_TAB_ACTIVATE = 30;
 var WEBRTC_SERIAL = 'WEBRTC';
 
 var queryParamsObject = {};
+var browserInspector;
+var browserInspectorTitle;
 
 (function() {
 var queryParams = window.location.search;
@@ -20,6 +22,13 @@ for (var i = 0; i < params.length; ++i) {
     queryParamsObject[pair[0]] = pair[1];
 }
 
+if ('trace' in queryParamsObject || 'tracing' in queryParamsObject) {
+  browserInspector = 'chrome://tracing';
+  browserInspectorTitle = 'trace';
+} else {
+  browserInspector = queryParamsObject['browser-inspector'];
+  browserInspectorTitle = 'inspect';
+}
 })();
 
 function sendCommand(command, args) {
@@ -131,6 +140,34 @@ function alreadyDisplayed(element, data) {
     return true;
   element.cachedJSON = json;
   return false;
+}
+
+function updateBrowserVisibility(browserSection) {
+  var icon = browserSection.querySelector('.used-for-port-forwarding');
+  browserSection.hidden = !browserSection.querySelector('.open') &&
+                          !browserSection.querySelector('.row') &&
+                          !browserInspector &&
+                          (!icon || icon.hidden);
+}
+
+function updateUsernameVisibility(deviceSection) {
+  var users = new Set();
+  var browsers = deviceSection.querySelectorAll('.browser');
+
+  Array.prototype.forEach.call(browsers, function(browserSection) {
+    if (!browserSection.hidden) {
+      var browserUser = browserSection.querySelector('.browser-user');
+      if (browserUser)
+        users.add(browserUser.textContent);
+    }
+  });
+  var hasSingleUser = users.size <= 1;
+
+  Array.prototype.forEach.call(browsers, function(browserSection) {
+    var browserUser = browserSection.querySelector('.browser-user');
+    if (browserUser)
+      browserUser.hidden = hasSingleUser;
+  });
 }
 
 function populateRemoteTargets(devices) {
@@ -251,6 +288,12 @@ function populateRemoteTargets(devices) {
         browserName.textContent = browser.adbBrowserName;
         if (browser.adbBrowserVersion)
           browserName.textContent += ' (' + browser.adbBrowserVersion + ')';
+        if (browser.adbBrowserUser) {
+          var browserUser = document.createElement('div');
+          browserUser.className = 'browser-user';
+          browserUser.textContent = browser.adbBrowserUser;
+          browserHeader.appendChild(browserUser);
+        }
         browserSection.appendChild(browserHeader);
 
         if (!incompatibleVersion && majorChromeVersion >= MIN_VERSION_NEW_TAB) {
@@ -296,15 +339,6 @@ function populateRemoteTargets(devices) {
           browserSection.appendChild(warningSection);
         }
 
-        var browserInspector;
-        var browserInspectorTitle;
-        if ('trace' in queryParamsObject || 'tracing' in queryParamsObject) {
-          browserInspector = 'chrome://tracing';
-          browserInspectorTitle = 'trace';
-        } else {
-          browserInspector = queryParamsObject['browser-inspector'];
-          browserInspectorTitle = 'inspect';
-        }
         if (browserInspector) {
           var link = document.createElement('span');
           link.classList.add('action');
@@ -322,35 +356,36 @@ function populateRemoteTargets(devices) {
         browserSection.appendChild(pageList);
       }
 
-      if (incompatibleVersion || alreadyDisplayed(browserSection, browser))
-        continue;
-
-      pageList.textContent = '';
-      for (var p = 0; p < browser.pages.length; p++) {
-        var page = browser.pages[p];
-        // Attached targets have no unique id until Chrome 26. For such targets
-        // it is impossible to activate existing DevTools window.
-        page.hasNoUniqueId = page.attached &&
-            (majorChromeVersion && majorChromeVersion < MIN_VERSION_TARGET_ID);
-        var row = addTargetToList(page, pageList, ['name', 'url']);
-        if (page['description'])
-          addWebViewDetails(row, page);
-        else
-          addFavicon(row, page);
-        if (majorChromeVersion >= MIN_VERSION_TAB_ACTIVATE) {
-          addActionLink(row, 'focus tab',
-              sendTargetCommand.bind(null, 'activate', page), false);
-        }
-        if (majorChromeVersion) {
-          addActionLink(row, 'reload',
-              sendTargetCommand.bind(null, 'reload', page), page.attached);
-        }
-        if (majorChromeVersion >= MIN_VERSION_TAB_CLOSE) {
-          addActionLink(row, 'close',
-              sendTargetCommand.bind(null, 'close', page), false);
+      if (!incompatibleVersion && !alreadyDisplayed(browserSection, browser)) {
+        pageList.textContent = '';
+        for (var p = 0; p < browser.pages.length; p++) {
+          var page = browser.pages[p];
+          // Attached targets have no unique id until Chrome 26. For such
+          // targets it is impossible to activate existing DevTools window.
+          page.hasNoUniqueId = page.attached &&
+              majorChromeVersion && majorChromeVersion < MIN_VERSION_TARGET_ID;
+          var row = addTargetToList(page, pageList, ['name', 'url']);
+          if (page['description'])
+            addWebViewDetails(row, page);
+          else
+            addFavicon(row, page);
+          if (majorChromeVersion >= MIN_VERSION_TAB_ACTIVATE) {
+            addActionLink(row, 'focus tab',
+                sendTargetCommand.bind(null, 'activate', page), false);
+          }
+          if (majorChromeVersion) {
+            addActionLink(row, 'reload',
+                sendTargetCommand.bind(null, 'reload', page), page.attached);
+          }
+          if (majorChromeVersion >= MIN_VERSION_TAB_CLOSE) {
+            addActionLink(row, 'close',
+                sendTargetCommand.bind(null, 'close', page), false);
+          }
         }
       }
+      updateBrowserVisibility(browserSection);
     }
+    updateUsernameVisibility(deviceSection);
   }
 }
 
@@ -910,10 +945,13 @@ function populatePortStatus(devicesStatusMap) {
       var icon = browserSection.querySelector('.used-for-port-forwarding');
       if (icon)
         icon.hidden = (browserSection.id !== deviceStatus.browserId);
+      updateBrowserVisibility(browserSection);
     }
 
     Array.prototype.forEach.call(
         deviceSection.querySelectorAll('.browser'), updatePortForwardingInfo);
+
+    updateUsernameVisibility(deviceSection);
   }
 
   function clearPorts(deviceSection) {

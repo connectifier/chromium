@@ -259,9 +259,6 @@ const char kDisableIPv6[]                   = "disable-ipv6";
 const char kDisableMinimizeOnSecondLauncherItemClick[] =
     "disable-minimize-on-second-launcher-item-click";
 
-// Disables the new bookmark app system.
-const char kDisableNewBookmarkApps[]   = "disable-new-bookmark-apps";
-
 // Disables the menu on the NTP for accessing sessions from other devices.
 const char kDisableNTPOtherSessionsMenu[]   = "disable-ntp-other-sessions-menu";
 
@@ -285,9 +282,6 @@ const char kDisablePasswordManagerReauthentication[] =
 
 // Disable the new material UI - requires out of process PDF plugin.
 const char kDisablePdfMaterialUI[]          = "disable-pdf-material-ui";
-
-// Enables searching for people from the apps list search box.
-const char kDisablePeopleSearch[]           = "disable-people-search";
 
 // Don't use bubbles for content permissions requests instead of infobars.
 const char kDisablePermissionsBubbles[]      = "disable-permissions-bubbles";
@@ -459,6 +453,9 @@ const char kEnableNaCl[]                    = "enable-nacl";
 
 // Enables the network-related benchmarking extensions.
 const char kEnableNetBenchmarking[]         = "enable-net-benchmarking";
+
+// Enables the new bookmark app system.
+const char kEnableNewBookmarkApps[] = "enable-new-bookmark-apps";
 
 // Enables NPN with HTTP. It means NPN is enabled but SPDY won't be used.
 // HTTP is still used for all requests.
@@ -713,11 +710,6 @@ const char kHomePage[]                      = "homepage";
 // connect and host resolver in a direct connection, and the CONNECT in an http
 // proxy connection, and the endpoint host in a SOCKS proxy connection).
 const char kHostRules[]                     = "host-rules";
-
-// The maximum number of concurrent host resolve requests (i.e. DNS) to allow
-// (not counting backup attempts which would also consume threads).
-// --host-resolver-retry-attempts must be set to zero for this to be exact.
-const char kHostResolverParallelism[]       = "host-resolver-parallelism";
 
 // The maximum number of retry attempts to resolve the host. Set this to zero
 // to disable host resolver retry attempts.
@@ -1369,7 +1361,7 @@ bool OutOfProcessPdfEnabled() {
     return false;
 
   // Default.
-  return false;
+  return true;
 }
 
 bool PdfMaterialUIEnabled() {
@@ -1380,7 +1372,7 @@ bool PdfMaterialUIEnabled() {
     return false;
 
   // Default.
-  return true;
+  return false;
 }
 
 bool SettingsWindowEnabled() {

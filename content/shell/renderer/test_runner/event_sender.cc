@@ -153,11 +153,12 @@ void PopulateCustomItems(const WebVector<WebMenuItemInfo>& customItems,
       strings->push_back(prefixCopy + kSeparatorIdentifier);
     } else if (customItems[i].type == blink::WebMenuItemInfo::SubMenu) {
       strings->push_back(prefixCopy + customItems[i].label.utf8() +
-          kSubMenuIdentifier);
+          customItems[i].icon.utf8() + kSubMenuIdentifier);
       PopulateCustomItems(customItems[i].subMenuItems, prefixCopy +
           kSubMenuDepthIdentifier, strings);
     } else {
-      strings->push_back(prefixCopy + customItems[i].label.utf8());
+      strings->push_back(prefixCopy + customItems[i].label.utf8() +
+          customItems[i].icon.utf8());
     }
   }
 }
@@ -1491,6 +1492,7 @@ void EventSender::SetPageScaleFactor(float scale_factor, int x, int y) {
 
 void EventSender::SetPageScaleFactorLimits(float min_scale, float max_scale) {
   view_->setPageScaleFactorLimits(min_scale, max_scale);
+  view_->setDefaultPageScaleLimits(min_scale, max_scale);
 }
 
 void EventSender::ClearTouchPoints() {

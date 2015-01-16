@@ -327,13 +327,12 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs(const GURL& url) {
 
   prefs.web_security_enabled =
       !command_line.HasSwitch(switches::kDisableWebSecurity);
-  prefs.plugins_enabled =
-      !command_line.HasSwitch(switches::kDisablePlugins);
   prefs.java_enabled =
       !command_line.HasSwitch(switches::kDisableJava);
 
   prefs.remote_fonts_enabled =
       !command_line.HasSwitch(switches::kDisableRemoteFonts);
+  prefs.application_cache_enabled = true;
 
   prefs.local_storage_enabled =
       !command_line.HasSwitch(switches::kDisableLocalStorage);
@@ -473,6 +472,9 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs(const GURL& url) {
 
   prefs.spatial_navigation_enabled = command_line.HasSwitch(
       switches::kEnableSpatialNavigation);
+
+  prefs.disable_reading_from_canvas = command_line.HasSwitch(
+      switches::kDisableReadingFromCanvas);
 
   prefs.strict_mixed_content_checking = command_line.HasSwitch(
       switches::kEnableStrictMixedContentChecking);

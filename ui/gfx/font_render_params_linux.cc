@@ -31,7 +31,7 @@ float device_scale_factor_for_internal_display = 1.0f;
 #endif
 
 // Number of recent GetFontRenderParams() results to cache.
-const size_t kCacheSize = 64;
+const size_t kCacheSize = 256;
 
 // Cached result from a call to GetFontRenderParams().
 struct QueryResult {
@@ -128,12 +128,15 @@ bool QueryFontconfig(const FontRenderParamsQuery& query,
 
   ScopedFcPattern result_pattern;
   if (query.is_empty()) {
-    // If the query was empty, call FcConfigSubstituteWithPat() to get
-    // non-family-specific configuration so it can be used as the default.
+    // If the query was empty, call FcConfigSubstituteWithPat() to get a
+    // non-family- or size-specific configuration so it can be used as the
+    // default.
     result_pattern.reset(FcPatternDuplicate(query_pattern.get()));
     if (!result_pattern)
       return false;
     FcPatternDel(result_pattern.get(), FC_FAMILY);
+    FcPatternDel(result_pattern.get(), FC_PIXEL_SIZE);
+    FcPatternDel(result_pattern.get(), FC_SIZE);
     FcConfigSubstituteWithPat(NULL, result_pattern.get(), query_pattern.get(),
                               FcMatchFont);
   } else {

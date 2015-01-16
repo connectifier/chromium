@@ -16,6 +16,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "pdf/draw_utils.h"
+#include "pdf/pdfium/pdfium_api_string_buffer_adapter.h"
 #include "pdf/pdfium/pdfium_mem_buffer_file_read.h"
 #include "pdf/pdfium/pdfium_mem_buffer_file_write.h"
 #include "ppapi/c/pp_errors.h"
@@ -1862,7 +1863,10 @@ bool PDFiumEngine::OnMouseMove(const pp::MouseInputEvent& event) {
     selection_.push_back(PDFiumRange(pages_[page_index], 0, char_index));
   } else {
     // Selecting into the previous page.
-    selection_[last].SetCharCount(-selection_[last].char_index());
+    // The selection's char_index is 0-based, so the character count is one
+    // more than the index. The character count needs to be negative to
+    // indicate a backwards selection.
+    selection_[last].SetCharCount(-(selection_[last].char_index() + 1));
 
     // First make sure that there are no gaps in selection, i.e. if mousedown on
     // page three but we only get mousemove over page one, we want page two.
@@ -2068,18 +2072,16 @@ void PDFiumEngine::SearchUsingICU(const base::string16& term,
   if (text_length <= 0)
     return;
 
+  PDFiumAPIStringBufferAdapter<base::string16> api_string_adapter(&page_text,
+                                                                  text_length,
+                                                                  false);
   unsigned short* data =
-      reinterpret_cast<unsigned short*>(WriteInto(&page_text, text_length + 1));
-  // |written| includes the trailing terminator, so get rid of the trailing
-  // NUL character by calling resize().
+      reinterpret_cast<unsigned short*>(api_string_adapter.GetData());
   int written = FPDFText_GetText(pages_[current_page]->GetTextPage(),
                                  character_to_start_searching_from,
                                  text_length,
                                  data);
-  if (written < 1)
-    page_text.resize(0);
-  else
-    page_text.resize(written - 1);
+  api_string_adapter.Close(written);
 
   std::vector<PDFEngine::Client::SearchStringResult> results;
   client_->SearchString(
@@ -2250,6 +2252,9 @@ void PDFiumEngine::InvalidateAllPages() {
 }
 
 std::string PDFiumEngine::GetSelectedText() {
+  if (!HasPermission(PDFEngine::PERMISSION_COPY))
+    return std::string();
+
   base::string16 result;
   base::string16 new_line_char = base::UTF8ToUTF16("\n");
   for (size_t i = 0; i < selection_.size(); ++i) {
@@ -3344,8 +3349,7 @@ void PDFiumEngine::GetRegion(const pp::Point& location,
 }
 
 void PDFiumEngine::OnSelectionChanged() {
-  if (HasPermission(PDFEngine::PERMISSION_COPY))
-    pp::PDF::SetSelectedText(GetPluginInstance(), GetSelectedText().c_str());
+  pp::PDF::SetSelectedText(GetPluginInstance(), GetSelectedText().c_str());
 }
 
 void PDFiumEngine::RotateInternal() {

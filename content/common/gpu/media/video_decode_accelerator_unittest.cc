@@ -57,6 +57,9 @@
 #include "base/win/windows_version.h"
 #include "content/common/gpu/media/dxva_video_decode_accelerator.h"
 #elif defined(OS_CHROMEOS)
+#if defined(ARCH_CPU_ARMEL) && defined(USE_LIBV4L2)
+#include "content/common/gpu/media/v4l2_slice_video_decode_accelerator.h"
+#endif  // defined(ARCH_CPU_ARMEL)
 #if defined(ARCH_CPU_ARMEL) || (defined(USE_OZONE) && defined(USE_V4L2_CODEC))
 #include "content/common/gpu/media/v4l2_video_decode_accelerator.h"
 #include "content/common/gpu/media/v4l2_video_device.h"
@@ -203,12 +206,16 @@ enum ClientState {
 // A helper class used to manage the lifetime of a Texture.
 class TextureRef : public base::RefCounted<TextureRef> {
  public:
-  TextureRef(const base::Closure& no_longer_needed_cb)
-      : no_longer_needed_cb_(no_longer_needed_cb) {}
+  TextureRef(uint32 texture_id, const base::Closure& no_longer_needed_cb)
+      : texture_id_(texture_id), no_longer_needed_cb_(no_longer_needed_cb) {}
+
+  int32 texture_id() const { return texture_id_; }
 
  private:
   friend class base::RefCounted<TextureRef>;
   ~TextureRef();
+
+  uint32 texture_id_;
   base::Closure no_longer_needed_cb_;
 };
 
@@ -288,6 +295,7 @@ class GLRenderingVDAClient
 
   scoped_ptr<media::VideoDecodeAccelerator> CreateDXVAVDA();
   scoped_ptr<media::VideoDecodeAccelerator> CreateV4L2VDA();
+  scoped_ptr<media::VideoDecodeAccelerator> CreateV4L2SliceVDA();
   scoped_ptr<media::VideoDecodeAccelerator> CreateVaapiVDA();
 
   void SetState(ClientState new_state);
@@ -358,6 +366,8 @@ class GLRenderingVDAClient
   // CS_RESET_State.
   TextureRefMap pending_textures_;
 
+  int32 next_picture_buffer_id_;
+
   DISALLOW_IMPLICIT_CONSTRUCTORS(GLRenderingVDAClient);
 };
 
@@ -398,7 +408,8 @@ GLRenderingVDAClient::GLRenderingVDAClient(
       suppress_rendering_(suppress_rendering),
       delay_reuse_after_frame_num_(delay_reuse_after_frame_num),
       decode_calls_per_second_(decode_calls_per_second),
-      render_as_thumbnails_(render_as_thumbnails) {
+      render_as_thumbnails_(render_as_thumbnails),
+      next_picture_buffer_id_(1) {
   CHECK_GT(num_in_flight_decodes, 0);
   CHECK_GT(num_play_throughs, 0);
   // |num_in_flight_decodes_| is unsupported if |decode_calls_per_second_| > 0.
@@ -435,7 +446,7 @@ GLRenderingVDAClient::CreateV4L2VDA() {
   scoped_ptr<media::VideoDecodeAccelerator> decoder;
 #if defined(OS_CHROMEOS) && (defined(ARCH_CPU_ARMEL) || \
     (defined(USE_OZONE) && defined(USE_V4L2_CODEC)))
-  scoped_ptr<V4L2Device> device = V4L2Device::Create(V4L2Device::kDecoder);
+  scoped_refptr<V4L2Device> device = V4L2Device::Create(V4L2Device::kDecoder);
   if (device.get()) {
     base::WeakPtr<VideoDecodeAccelerator::Client> weak_client = AsWeakPtr();
     decoder.reset(new V4L2VideoDecodeAccelerator(
@@ -443,13 +454,31 @@ GLRenderingVDAClient::CreateV4L2VDA() {
         static_cast<EGLContext>(rendering_helper_->GetGLContextHandle()),
         weak_client,
         base::Bind(&DoNothingReturnTrue),
-        device.Pass(),
+        device,
         base::MessageLoopProxy::current()));
   }
 #endif
   return decoder.Pass();
 }
 
+scoped_ptr<media::VideoDecodeAccelerator>
+GLRenderingVDAClient::CreateV4L2SliceVDA() {
+  scoped_ptr<media::VideoDecodeAccelerator> decoder;
+#if defined(OS_CHROMEOS) && defined(ARCH_CPU_ARMEL) && defined(USE_LIBV4L2)
+  scoped_refptr<V4L2Device> device = V4L2Device::Create(V4L2Device::kDecoder);
+  if (device.get()) {
+    base::WeakPtr<VideoDecodeAccelerator::Client> weak_client = AsWeakPtr();
+    decoder.reset(new V4L2SliceVideoDecodeAccelerator(
+        device,
+        static_cast<EGLDisplay>(rendering_helper_->GetGLDisplay()),
+        static_cast<EGLContext>(rendering_helper_->GetGLContextHandle()),
+        weak_client,
+        base::Bind(&DoNothingReturnTrue),
+        base::MessageLoopProxy::current()));
+  }
+#endif
+  return decoder.Pass();
+}
 scoped_ptr<media::VideoDecodeAccelerator>
 GLRenderingVDAClient::CreateVaapiVDA() {
   scoped_ptr<media::VideoDecodeAccelerator> decoder;
@@ -469,7 +498,8 @@ void GLRenderingVDAClient::CreateAndStartDecoder() {
   scoped_ptr<media::VideoDecodeAccelerator> decoders[] = {
     CreateDXVAVDA(),
     CreateV4L2VDA(),
-    CreateVaapiVDA()
+    CreateV4L2SliceVDA(),
+    CreateVaapiVDA(),
   };
 
   for (size_t i = 0; i < arraysize(decoders); ++i) {
@@ -478,8 +508,8 @@ void GLRenderingVDAClient::CreateAndStartDecoder() {
     decoder_ = decoders[i].Pass();
     weak_decoder_factory_.reset(
         new base::WeakPtrFactory<VideoDecodeAccelerator>(decoder_.get()));
-    SetState(CS_DECODER_SET);
     if (decoder_->Initialize(profile_, client)) {
+      SetState(CS_DECODER_SET);
       FinishInitialization();
       return;
     }
@@ -505,16 +535,18 @@ void GLRenderingVDAClient::ProvidePictureBuffers(
         texture_target_, &texture_id, dimensions, &done);
     done.Wait();
 
-    // Use the texture_id as the picture's id.
-    int32 id = static_cast<int32>(texture_id);
-    CHECK(
-        active_textures_.insert(std::make_pair(
-                                    id, new TextureRef(base::Bind(
-                                            &RenderingHelper::DeleteTexture,
+    int32 picture_buffer_id = next_picture_buffer_id_++;
+    CHECK(active_textures_
+              .insert(std::make_pair(
+                  picture_buffer_id,
+                  new TextureRef(texture_id,
+                                 base::Bind(&RenderingHelper::DeleteTexture,
                                             base::Unretained(rendering_helper_),
-                                            texture_id)))).second);
+                                            texture_id))))
+              .second);
 
-    buffers.push_back(media::PictureBuffer(id, dimensions, texture_id));
+    buffers.push_back(
+        media::PictureBuffer(picture_buffer_id, dimensions, texture_id));
   }
   decoder_->AssignPictureBuffers(buffers);
 }
@@ -560,8 +592,7 @@ void GLRenderingVDAClient::PictureReady(const media::Picture& picture) {
   ASSERT_NE(active_textures_.end(), texture_it);
 
   scoped_refptr<VideoFrameTexture> video_frame = new VideoFrameTexture(
-      texture_target_,
-      static_cast<uint32>(texture_it->first),  // the texture id
+      texture_target_, texture_it->second->texture_id(),
       base::Bind(&GLRenderingVDAClient::ReturnPicture, AsWeakPtr(),
                  picture.picture_buffer_id()));
   ASSERT_TRUE(pending_textures_.insert(*texture_it).second);

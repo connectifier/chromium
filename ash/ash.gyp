@@ -44,8 +44,8 @@
       'ash_touch_exploration_manager_chromeos.h',
       'cancel_mode.cc',
       'cancel_mode.h',
-      'content/display/screen_orientation_delegate_chromeos.cc',
-      'content/display/screen_orientation_delegate_chromeos.h',
+      'content/display/screen_orientation_controller_chromeos.cc',
+      'content/display/screen_orientation_controller_chromeos.h',
       'debug.cc',
       'debug.h',
       'default_accessibility_delegate.cc',
@@ -336,9 +336,6 @@
       'system/chromeos/tray_display.h',
       'system/chromeos/tray_tracing.cc',
       'system/chromeos/tray_tracing.h',
-      'system/chromeos/virtual_keyboard/tray_keyboard_lock.cc',
-      'system/chromeos/virtual_keyboard/tray_keyboard_lock.h',
-      'system/chromeos/virtual_keyboard/tray_keyboard_lock_unittest.h',
       'system/chromeos/virtual_keyboard/virtual_keyboard_tray.cc',
       'system/chromeos/virtual_keyboard/virtual_keyboard_tray.h',
       'system/chromeos/virtual_keyboard/virtual_keyboard_observer.h',
@@ -350,8 +347,8 @@
       'system/date/tray_date.cc',
       'system/date/tray_date.h',
       'system/ime/ime_observer.h',
-      'system/ime/tray_ime.cc',
-      'system/ime/tray_ime.h',
+      'system/ime/tray_ime_chromeos.cc',
+      'system/ime/tray_ime_chromeos.h',
       'system/keyboard_brightness/keyboard_brightness_control_delegate.h',
       'system/locale/locale_notification_controller.cc',
       'system/locale/locale_notification_controller.h',
@@ -531,6 +528,8 @@
       'wm/maximize_mode/maximize_mode_window_state.cc',
       'wm/maximize_mode/maximize_mode_window_state.h',
       'wm/maximize_mode/scoped_disable_internal_mouse_and_keyboard.h',
+      'wm/maximize_mode/scoped_disable_internal_mouse_and_keyboard_ozone.cc',
+      'wm/maximize_mode/scoped_disable_internal_mouse_and_keyboard_ozone.h',
       'wm/maximize_mode/scoped_disable_internal_mouse_and_keyboard_x11.cc',
       'wm/maximize_mode/scoped_disable_internal_mouse_and_keyboard_x11.h',
       'wm/maximize_mode/workspace_backdrop_delegate.cc',
@@ -757,7 +756,7 @@
       'accelerators/spoken_feedback_toggler_unittest.cc',
       'ash_touch_exploration_manager_chromeos_unittest.cc',
       'autoclick/autoclick_unittest.cc',
-      'content/display/screen_orientation_delegate_chromeos_unittest.cc',
+      'content/display/screen_orientation_controller_chromeos_unittest.cc',
       'desktop_background/desktop_background_controller_unittest.cc',
       'dip_unittest.cc',
       'display/display_change_observer_chromeos_unittest.cc',
@@ -809,7 +808,7 @@
       'system/chromeos/session/tray_session_length_limit_unittest.cc',
       'system/chromeos/supervised/tray_supervised_user_unittest.cc',
       'system/chromeos/tray_display_unittest.cc',
-      'system/chromeos/virtual_keyboard/tray_keyboard_lock_unittest.cc',
+      'system/ime/tray_ime_chromeos_unittest.cc',
       'system/date/date_view_unittest.cc',
       'system/overview/overview_button_tray_unittest.cc',
       'system/tray/media_security/multi_profile_media_tray_item_unittest.cc',
@@ -932,6 +931,11 @@
           'dependencies': [
             '../build/linux/system.gyp:xfixes',
            ],
+        }],
+        ['use_ozone==1', {
+          'dependencies': [
+            '../ui/ozone/ozone.gyp:ozone',
+          ],
         }],
         ['chromeos==1', {
           'dependencies': [
@@ -1096,7 +1100,6 @@
       'conditions': [
         ['chromeos==0', {
           'sources!': [
-            'content/display/screen_orientation_delegate_chromeos_unittest.cc',
             # TODO(zork): fix this test to build on Windows. See: crosbug.com/26906
             'focus_cycler_unittest.cc',
             # All tests for multiple displays: not supported on Windows Ash.
@@ -1107,6 +1110,7 @@
             'wm/workspace/workspace_window_resizer_unittest.cc',
             'sticky_keys/sticky_keys_overlay_unittest.cc',
             'sticky_keys/sticky_keys_unittest.cc',
+            'system/chromeos/rotation/tray_rotation_lock_unittest.cc',
             'system/tray/media_security/multi_profile_media_tray_item_unittest.cc',
             'autoclick/autoclick_unittest.cc',
             "virtual_keyboard_controller_unittest.cc"
