@@ -356,14 +356,14 @@ void DeviceStatusCollector::ClearCachedHardwareStatus() {
   cpu_usage_percent_.clear();
 }
 
-void DeviceStatusCollector::IdleStateCallback(IdleState state) {
+void DeviceStatusCollector::IdleStateCallback(ui::IdleState state) {
   // Do nothing if device activity reporting is disabled.
   if (!report_activity_times_)
     return;
 
   Time now = GetCurrentTime();
 
-  if (state == IDLE_STATE_ACTIVE) {
+  if (state == ui::IDLE_STATE_ACTIVE) {
     // If it's been too long since the last report, or if the activity is
     // negative (which can happen when the clock changes), assume a single
     // interval of activity.
@@ -653,6 +653,9 @@ void DeviceStatusCollector::GetHardwareStatus(
   for (const em::VolumeInfo& info : volume_info_) {
     *status->add_volume_info() = info;
   }
+
+  status->set_system_ram_free(base::SysInfo::AmountOfAvailablePhysicalMemory());
+  status->set_system_ram_total(base::SysInfo::AmountOfPhysicalMemory());
 
   status->clear_cpu_utilization_pct();
   for (const int cpu_usage : cpu_usage_percent_) {

@@ -23,11 +23,10 @@
 #include "media/filters/h264_parser.h"
 #include "ui/gl/scoped_binders.h"
 
-#define NOTIFY_ERROR(x)                            \
-  do {                                             \
-    SetDecoderState(kError);                       \
-    LOG(ERROR) << "calling NotifyError(): " << x;  \
-    NotifyError(x);                                \
+#define NOTIFY_ERROR(x)                        \
+  do {                                         \
+    LOG(ERROR) << "Setting error state:" << x; \
+    SetErrorState(x);                          \
   } while (0)
 
 #define IOCTL_OR_ERROR_RETURN_VALUE(type, arg, value)              \
@@ -159,14 +158,14 @@ V4L2VideoDecodeAccelerator::V4L2VideoDecodeAccelerator(
     EGLContext egl_context,
     const base::WeakPtr<Client>& io_client,
     const base::Callback<bool(void)>& make_context_current,
-    scoped_ptr<V4L2Device> device,
+    const scoped_refptr<V4L2Device>& device,
     const scoped_refptr<base::MessageLoopProxy>& io_message_loop_proxy)
     : child_message_loop_proxy_(base::MessageLoopProxy::current()),
       io_message_loop_proxy_(io_message_loop_proxy),
       io_client_(io_client),
       decoder_thread_("V4L2DecoderThread"),
       decoder_state_(kUninitialized),
-      device_(device.Pass()),
+      device_(device),
       decoder_delay_bitstream_buffer_id_(-1),
       decoder_current_input_buffer_(-1),
       decoder_decode_buffer_tasks_scheduled_(0),
@@ -239,20 +238,17 @@ bool V4L2VideoDecodeAccelerator::Initialize(media::VideoCodecProfile profile,
 
   if (egl_display_ == EGL_NO_DISPLAY) {
     LOG(ERROR) << "Initialize(): could not get EGLDisplay";
-    NOTIFY_ERROR(PLATFORM_FAILURE);
     return false;
   }
 
   // We need the context to be initialized to query extensions.
   if (!make_context_current_.Run()) {
     LOG(ERROR) << "Initialize(): could not make context current";
-    NOTIFY_ERROR(PLATFORM_FAILURE);
     return false;
   }
 
   if (!gfx::g_driver_egl.ext.b_EGL_KHR_fence_sync) {
     LOG(ERROR) << "Initialize(): context does not have EGL_KHR_fence_sync";
-    NOTIFY_ERROR(PLATFORM_FAILURE);
     return false;
   }
 
@@ -266,7 +262,6 @@ bool V4L2VideoDecodeAccelerator::Initialize(media::VideoCodecProfile profile,
   if ((caps.capabilities & kCapsRequired) != kCapsRequired) {
     LOG(ERROR) << "Initialize(): ioctl() failed: VIDIOC_QUERYCAP"
         ", caps check failed: 0x" << std::hex << caps.capabilities;
-    NOTIFY_ERROR(PLATFORM_FAILURE);
     return false;
   }
 
@@ -289,9 +284,10 @@ bool V4L2VideoDecodeAccelerator::Initialize(media::VideoCodecProfile profile,
 
   if (!decoder_thread_.Start()) {
     LOG(ERROR) << "Initialize(): decoder thread failed to start";
-    NOTIFY_ERROR(PLATFORM_FAILURE);
     return false;
   }
+
+  decoder_state_ = kInitialized;
 
   // StartDevicePoll will NOTIFY_ERROR on failure, so IgnoreResult is fine here.
   decoder_thread_.message_loop()->PostTask(
@@ -300,7 +296,6 @@ bool V4L2VideoDecodeAccelerator::Initialize(media::VideoCodecProfile profile,
           base::IgnoreResult(&V4L2VideoDecodeAccelerator::StartDevicePoll),
           base::Unretained(this)));
 
-  SetDecoderState(kInitialized);
   return true;
 }
 
@@ -436,9 +431,6 @@ void V4L2VideoDecodeAccelerator::Destroy() {
     // Otherwise, call the destroy task directly.
     DestroyTask();
   }
-
-  // Set to kError state just in case.
-  SetDecoderState(kError);
 
   delete this;
 }
@@ -1598,19 +1590,23 @@ void V4L2VideoDecodeAccelerator::NotifyError(Error error) {
   }
 }
 
-void V4L2VideoDecodeAccelerator::SetDecoderState(State state) {
-  DVLOG(3) << "SetDecoderState(): state=" << state;
-
+void V4L2VideoDecodeAccelerator::SetErrorState(Error error) {
   // We can touch decoder_state_ only if this is the decoder thread or the
   // decoder thread isn't running.
   if (decoder_thread_.message_loop() != NULL &&
       decoder_thread_.message_loop() != base::MessageLoop::current()) {
     decoder_thread_.message_loop()->PostTask(FROM_HERE, base::Bind(
-        &V4L2VideoDecodeAccelerator::SetDecoderState,
-        base::Unretained(this), state));
-  } else {
-    decoder_state_ = state;
+        &V4L2VideoDecodeAccelerator::SetErrorState,
+        base::Unretained(this), error));
+    return;
   }
+
+  // Post NotifyError only if we are already initialized, as the API does
+  // not allow doing so before that.
+  if (decoder_state_ != kError && decoder_state_ != kUninitialized)
+    NotifyError(error);
+
+  decoder_state_ = kError;
 }
 
 bool V4L2VideoDecodeAccelerator::GetFormatInfo(struct v4l2_format* format,
@@ -1707,7 +1703,7 @@ bool V4L2VideoDecodeAccelerator::SetupFormats() {
   DCHECK(!output_streamon_);
 
   __u32 input_format_fourcc =
-      V4L2Device::VideoCodecProfileToV4L2PixFmt(video_profile_);
+      V4L2Device::VideoCodecProfileToV4L2PixFmt(video_profile_, false);
   if (!input_format_fourcc) {
     NOTREACHED();
     return false;

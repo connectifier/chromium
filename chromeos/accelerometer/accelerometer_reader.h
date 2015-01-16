@@ -11,6 +11,9 @@
 #include "chromeos/chromeos_export.h"
 #include "ui/accelerometer/accelerometer_types.h"
 
+template <typename T>
+struct DefaultSingletonTraits;
+
 namespace base {
 class TaskRunner;
 }
@@ -54,8 +57,7 @@ class CHROMEOS_EXPORT AccelerometerReader {
     virtual ~Observer() {}
   };
 
-  AccelerometerReader();
-  ~AccelerometerReader();
+  static AccelerometerReader* GetInstance();
 
   void Initialize(scoped_refptr<base::TaskRunner> blocking_task_runner);
 
@@ -63,7 +65,19 @@ class CHROMEOS_EXPORT AccelerometerReader {
   void AddObserver(Observer* observer);
   void RemoveObserver(Observer* observer);
 
+  // A reading is considered stable if its deviation from gravity is small. This
+  // returns false if the deviation is too higher, or if |source| is not present
+  // in the update.
+  static bool IsReadingStable(const ui::AccelerometerUpdate& update,
+                              ui::AccelerometerSource source);
+
+ protected:
+  AccelerometerReader();
+  virtual ~AccelerometerReader();
+
  private:
+  friend struct DefaultSingletonTraits<AccelerometerReader>;
+
   // Dispatched when initialization is complete. If |success|, |configuration|
   // provides the details of the detected accelerometer.
   void OnInitialized(scoped_refptr<Configuration> configuration, bool success);

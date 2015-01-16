@@ -41,9 +41,9 @@ class EVENTS_OZONE_LAYOUT_EXPORT XkbKeyboardLayoutEngine
               KeyboardCode* key_code,
               uint32* platform_keycode) const override;
 
-  // Gets the names of the RMLO rule for libxkbcommon.
-  // Makes it protected for testing.
-  scoped_ptr<xkb_rule_names> GetXkbRuleNames(const std::string& layout_name);
+  static void ParseLayoutName(const std::string& layout_name,
+                              std::string* layout_id,
+                              std::string* layout_variant);
 
  protected:
   // Table for EventFlagsToXkbFlags().

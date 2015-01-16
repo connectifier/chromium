@@ -52,7 +52,7 @@ class VIEWS_EXPORT BridgedNativeWidget : public ui::LayerDelegate,
 
   // Creates one side of the bridge. |parent| must not be NULL.
   explicit BridgedNativeWidget(NativeWidgetMac* parent);
-  virtual ~BridgedNativeWidget();
+  ~BridgedNativeWidget() override;
 
   // Initialize the bridge, "retains" ownership of |window|.
   void Init(base::scoped_nsobject<NSWindow> window,
@@ -114,6 +114,9 @@ class VIEWS_EXPORT BridgedNativeWidget : public ui::LayerDelegate,
   // Called by the NSWindowDelegate on a scale factor or color space change.
   void OnBackingPropertiesChanged();
 
+  // Called by the NSWindowDelegate when the window becomes or resigns key.
+  void OnWindowKeyStatusChangedTo(bool is_key);
+
   // See widget.h for documentation.
   InputMethod* CreateInputMethod();
   ui::InputMethod* GetHostInputMethod();
@@ -141,7 +144,7 @@ class VIEWS_EXPORT BridgedNativeWidget : public ui::LayerDelegate,
   bool window_visible() { return window_visible_; }
 
   // Overridden from internal::InputMethodDelegate:
-  virtual void DispatchKeyEventPostIME(const ui::KeyEvent& key) override;
+  void DispatchKeyEventPostIME(const ui::KeyEvent& key) override;
 
  private:
   // Closes all child windows. BridgedNativeWidget children will be destroyed.

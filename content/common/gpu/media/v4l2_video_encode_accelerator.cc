@@ -18,11 +18,10 @@
 #include "content/public/common/content_switches.h"
 #include "media/base/bitstream_buffer.h"
 
-#define NOTIFY_ERROR(x)                            \
-  do {                                             \
-    SetEncoderState(kError);                       \
-    LOG(ERROR) << "calling NotifyError(): " << x;  \
-    NotifyError(x);                                \
+#define NOTIFY_ERROR(x)                        \
+  do {                                         \
+    LOG(ERROR) << "Setting error state:" << x; \
+    SetErrorState(x);                          \
   } while (0)
 
 #define IOCTL_OR_ERROR_RETURN_VALUE(type, arg, value)              \
@@ -70,7 +69,7 @@ V4L2VideoEncodeAccelerator::OutputRecord::~OutputRecord() {
 }
 
 V4L2VideoEncodeAccelerator::V4L2VideoEncodeAccelerator(
-    scoped_ptr<V4L2Device> device)
+    const scoped_refptr<V4L2Device>& device)
     : child_message_loop_proxy_(base::MessageLoopProxy::current()),
       output_buffer_byte_size_(0),
       device_input_format_(media::VideoFrame::UNKNOWN),
@@ -78,7 +77,7 @@ V4L2VideoEncodeAccelerator::V4L2VideoEncodeAccelerator(
       output_format_fourcc_(0),
       encoder_state_(kUninitialized),
       stream_header_size_(0),
-      device_(device.Pass()),
+      device_(device),
       input_streamon_(false),
       input_buffer_queued_count_(0),
       input_memory_type_(V4L2_MEMORY_USERPTR),
@@ -139,9 +138,9 @@ bool V4L2VideoEncodeAccelerator::Initialize(
     DVLOG(1) << "Input format not supported by the HW, will convert to "
              << media::VideoFrame::FormatToString(device_input_format_);
 
-    scoped_ptr<V4L2Device> device =
+    scoped_refptr<V4L2Device> device =
         V4L2Device::Create(V4L2Device::kImageProcessor);
-    image_processor_.reset(new V4L2ImageProcessor(device.Pass()));
+    image_processor_.reset(new V4L2ImageProcessor(device));
 
     // Convert from input_format to device_input_format_, keeping the size
     // at visible_size_ and requiring the output buffers to be of at least
@@ -172,7 +171,7 @@ bool V4L2VideoEncodeAccelerator::Initialize(
 
   RequestEncodingParametersChange(initial_bitrate, kInitialFramerate);
 
-  SetEncoderState(kInitialized);
+  encoder_state_ = kInitialized;
 
   child_message_loop_proxy_->PostTask(
       FROM_HERE,
@@ -281,7 +280,7 @@ void V4L2VideoEncodeAccelerator::Destroy() {
   }
 
   // Set to kError state just in case.
-  SetEncoderState(kError);
+  encoder_state_ = kError;
 
   delete this;
 }
@@ -783,21 +782,23 @@ void V4L2VideoEncodeAccelerator::NotifyError(Error error) {
   }
 }
 
-void V4L2VideoEncodeAccelerator::SetEncoderState(State state) {
-  DVLOG(3) << "SetEncoderState(): state=" << state;
-
+void V4L2VideoEncodeAccelerator::SetErrorState(Error error) {
   // We can touch encoder_state_ only if this is the encoder thread or the
   // encoder thread isn't running.
   if (encoder_thread_.message_loop() != NULL &&
       encoder_thread_.message_loop() != base::MessageLoop::current()) {
     encoder_thread_.message_loop()->PostTask(
-        FROM_HERE,
-        base::Bind(&V4L2VideoEncodeAccelerator::SetEncoderState,
-                   base::Unretained(this),
-                   state));
-  } else {
-    encoder_state_ = state;
+        FROM_HERE, base::Bind(&V4L2VideoEncodeAccelerator::SetErrorState,
+                              base::Unretained(this), error));
+    return;
   }
+
+  // Post NotifyError only if we are already initialized, as the API does
+  // not allow doing so before that.
+  if (encoder_state_ != kError && encoder_state_ != kUninitialized)
+    NotifyError(error);
+
+  encoder_state_ = kError;
 }
 
 void V4L2VideoEncodeAccelerator::RequestEncodingParametersChangeTask(
@@ -841,7 +842,7 @@ bool V4L2VideoEncodeAccelerator::SetOutputFormat(
   DCHECK(!output_streamon_);
 
   output_format_fourcc_ =
-      V4L2Device::VideoCodecProfileToV4L2PixFmt(output_profile);
+      V4L2Device::VideoCodecProfileToV4L2PixFmt(output_profile, false);
   if (!output_format_fourcc_) {
     LOG(ERROR) << "Initialize(): invalid output_profile=" << output_profile;
     return false;

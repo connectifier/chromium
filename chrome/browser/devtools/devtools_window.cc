@@ -11,7 +11,6 @@
 #include "base/prefs/scoped_user_pref_update.h"
 #include "base/time/time.h"
 #include "base/values.h"
-#include "chrome/browser/chrome_page_zoom.h"
 #include "chrome/browser/file_select_helper.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/prefs/pref_service_syncable.h"
@@ -31,6 +30,7 @@
 #include "chrome/common/render_messages.h"
 #include "chrome/common/url_constants.h"
 #include "components/pref_registry/pref_registry_syncable.h"
+#include "components/ui/zoom/page_zoom.h"
 #include "components/ui/zoom/zoom_controller.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/devtools_agent_host.h"
@@ -48,6 +48,7 @@
 #include "net/base/escape.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
 #include "ui/base/page_transition_types.h"
+#include "ui/events/keycodes/keyboard_code_conversion.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 
 using base::DictionaryValue;
@@ -187,7 +188,6 @@ class DevToolsEventForwarder {
   bool ForwardEvent(const content::NativeWebKeyboardEvent& event);
 
  private:
-  static int VirtualKeyCodeWithoutLocation(int key_code);
   static bool KeyWhitelistingAllowed(int key_code, int modifiers);
   static int CombineKeyCodeAndModifiers(int key_code, int modifiers);
 
@@ -238,7 +238,8 @@ bool DevToolsEventForwarder::ForwardEvent(
       return false;
   }
 
-  int key_code = VirtualKeyCodeWithoutLocation(event.windowsKeyCode);
+  int key_code = ui::LocatedToNonLocatedKeyboardCode(
+      static_cast<ui::KeyboardCode>(event.windowsKeyCode));
   int key = CombineKeyCodeAndModifiers(key_code, event.modifiers);
   if (whitelisted_keys_.find(key) == whitelisted_keys_.end())
     return false;
@@ -262,24 +263,6 @@ bool DevToolsEventForwarder::KeyWhitelistingAllowed(int key_code,
                                                     int modifiers) {
   return (ui::VKEY_F1 <= key_code && key_code <= ui::VKEY_F12) ||
       modifiers != 0;
-}
-
-// Mapping copied from Blink's KeyboardEvent.cpp.
-int DevToolsEventForwarder::VirtualKeyCodeWithoutLocation(int key_code)
-{
-  switch (key_code) {
-    case ui::VKEY_LCONTROL:
-    case ui::VKEY_RCONTROL:
-        return ui::VKEY_CONTROL;
-    case ui::VKEY_LSHIFT:
-    case ui::VKEY_RSHIFT:
-        return ui::VKEY_SHIFT;
-    case ui::VKEY_LMENU:
-    case ui::VKEY_RMENU:
-        return ui::VKEY_MENU;
-    default:
-        return key_code;
-  }
 }
 
 // DevToolsWindow::ObserverWithAccessor -------------------------------
@@ -691,7 +674,7 @@ DevToolsWindow::DevToolsWindow(Profile* profile,
 
   // Bindings take ownership over devtools as its delegate.
   bindings_->SetDelegate(this);
-  // DevTools uses chrome_page_zoom::Zoom(), so main_web_contents_ requires a
+  // DevTools uses PageZoom::Zoom(), so main_web_contents_ requires a
   // ZoomController.
   ui_zoom::ZoomController::CreateForWebContents(main_web_contents_);
   ui_zoom::ZoomController::FromWebContents(main_web_contents_)
@@ -881,8 +864,8 @@ void DevToolsWindow::CloseContents(WebContents* source) {
 
 void DevToolsWindow::ContentsZoomChange(bool zoom_in) {
   DCHECK(is_docked_);
-  chrome_page_zoom::Zoom(main_web_contents_,
-      zoom_in ? content::PAGE_ZOOM_IN : content::PAGE_ZOOM_OUT);
+  ui_zoom::PageZoom::Zoom(main_web_contents_, zoom_in ? content::PAGE_ZOOM_IN
+                                                      : content::PAGE_ZOOM_OUT);
 }
 
 void DevToolsWindow::BeforeUnloadFired(WebContents* tab,

@@ -130,6 +130,10 @@ importer.DummyImportHistory.prototype.markImportedByUrl =
 };
 
 /** @override */
+importer.DummyImportHistory.prototype.addHistoryLoadedListener =
+    function(listener) {};
+
+/** @override */
 importer.DummyImportHistory.prototype.addObserver = function(observer) {};
 
 /** @override */
@@ -159,9 +163,12 @@ importer.Urls;
  * @implements {importer.ImportHistory}
  * @struct
  *
+ * @param {function(!FileEntry): !Promise.<string>} hashGenerator
  * @param {!importer.RecordStorage} storage
  */
-importer.PersistentImportHistory = function(storage) {
+importer.PersistentImportHistory = function(hashGenerator, storage) {
+  /** @private {function(!FileEntry): !Promise.<string>} */
+  this.createKey_ = hashGenerator;
 
   /** @private {!importer.RecordStorage} */
   this.storage_ = storage;
@@ -225,7 +232,8 @@ importer.PersistentImportHistory.prototype.refresh_ = function() {
            */
           function() {
             return this;
-          }.bind(this));
+          }.bind(this))
+      .catch(importer.getLogger().catcher('import-history-refresh'));
 };
 
 /**
@@ -584,40 +592,6 @@ importer.PersistentImportHistory.prototype.getDestinations_ = function(key) {
 };
 
 /**
- * @param {!FileEntry} fileEntry
- * @return {!Promise.<string>} Resolves with a the key is available.
- * @private
- */
-importer.PersistentImportHistory.prototype.createKey_ = function(fileEntry) {
-  var entry = new importer.PromisingFileEntry(fileEntry);
-  return new Promise(
-      /**
-       * @param {function()} resolve
-       * @param {function()} reject
-       * @this {importer.PersistentImportHistory}
-       */
-      function(resolve, reject) {
-        entry.getMetadata()
-            .then(
-                /**
-                 * @param {!Object} metadata
-                 * @return {!Promise.<string>}
-                 * @this {importer.PersistentImportHistory}
-                 */
-                function(metadata) {
-                  if (!('modificationTime' in metadata)) {
-                    reject('File entry missing "modificationTime" field.');
-                  } else if (!('size' in metadata)) {
-                    reject('File entry missing "size" field.');
-                  } else {
-                    resolve(
-                      metadata['modificationTime'] + '_' + metadata['size']);
-                  }
-                }.bind(this));
-      }.bind(this));
-};
-
-/**
  * Provider of lazy loaded importer.ImportHistory. This is the main
  * access point for a fully prepared {@code importer.ImportHistory} object.
  *
@@ -638,6 +612,14 @@ importer.HistoryLoader = function() {};
 importer.HistoryLoader.prototype.getHistory;
 
 /**
+ * Adds a listener to be notified when history is fully loaded for the first
+ * time. If history is already loaded...will be called immediately.
+ *
+ * @param {function(!importer.ImportHistory)} listener
+ */
+importer.HistoryLoader.prototype.addHistoryLoadedListener;
+
+/**
  * Class responsible for lazy loading of {@code importer.ImportHistory},
  * and reloading when the underlying data is updated (via sync).
  *
@@ -652,40 +634,49 @@ importer.SynchronizedHistoryLoader = function(fileProvider) {
   /** @private {!importer.SyncFileEntryProvider} */
   this.fileProvider_ = fileProvider;
 
-  /** @private {!importer.PersistentImportHistory|undefined} */
-  this.history_;
+  /** @private {boolean} */
+  this.needsInitialization_ = true;
+
+  /** @private {!importer.Resolver} */
+  this.historyResolver_ = new importer.Resolver();
 };
 
 /** @override */
 importer.SynchronizedHistoryLoader.prototype.getHistory = function() {
-  if (this.history_) {
-    return this.history_.whenReady();
+  if (this.needsInitialization_) {
+    this.needsInitialization_ = false;
+    this.fileProvider_.addSyncListener(
+        this.onSyncedDataChanged_.bind(this));
+
+    this.fileProvider_.getSyncFileEntry()
+        .then(
+            /**
+             * @param {!FileEntry} fileEntry
+             * @return {!Promise.<!importer.ImportHistory>}
+             * @this {importer.SynchronizedHistoryLoader}
+             */
+            function(fileEntry) {
+              var storage = new importer.FileEntryRecordStorage(fileEntry);
+              var history = new importer.PersistentImportHistory(
+                  importer.createMetadataHashcode,
+                  storage);
+              new importer.DriveSyncWatcher(history);
+              history.refresh().then(
+                  /** @this {importer.SynchronizedHistoryLoader} */
+                  function() {
+                    this.historyResolver_.resolve(history);
+                  }.bind(this));
+            }.bind(this))
+        .catch(importer.getLogger().catcher('history-load-chain'));
   }
 
-  this.fileProvider_.addSyncListener(
-      this.onSyncedDataChanged_.bind(this));
+  return this.historyResolver_.promise;
+};
 
-  return this.fileProvider_.getSyncFileEntry()
-      .then(
-          /**
-           * @param {!FileEntry} fileEntry
-           * @return {!Promise.<!importer.ImportHistory>}
-           * @this {importer.SynchronizedHistoryLoader}
-           */
-          function(fileEntry) {
-            var storage = new importer.FileEntryRecordStorage(fileEntry);
-            var history = new importer.PersistentImportHistory(storage);
-            new importer.DriveSyncWatcher(history);
-            return history.refresh().then(
-                /**
-                 * @return {!importer.ImportHistory}
-                 * @this {importer.SynchronizedHistoryLoader}
-                 */
-                function() {
-                  this.history_ = history;
-                  return history;
-                }.bind(this));
-          }.bind(this));
+/** @override */
+importer.SynchronizedHistoryLoader.prototype.addHistoryLoadedListener =
+    function(listener) {
+  this.historyResolver_.promise.then(listener);
 };
 
 /**
@@ -697,198 +688,11 @@ importer.SynchronizedHistoryLoader.prototype.getHistory = function() {
  */
 importer.SynchronizedHistoryLoader.prototype.onSyncedDataChanged_ =
     function() {
-  if (this.history_) {
-    this.history_.refresh();  // Reload history entries.
-  }
-};
-
-/**
- * Factory interface for creating/accessing synced {@code FileEntry}
- * instances and listening to sync events on those files.
- *
- * @interface
- */
-importer.SyncFileEntryProvider = function() {};
-
-/**
- * Adds a listener to be notified when the the FileEntry owned/managed
- * by this class is updated via sync.
- *
- * @param {function()} syncListener
- */
-importer.SyncFileEntryProvider.prototype.addSyncListener;
-
-/**
- * Provides accsess to the sync FileEntry owned/managed by this class.
- *
- * @return {!Promise.<!FileEntry>}
- */
-importer.SyncFileEntryProvider.prototype.getSyncFileEntry;
-
-/**
- * Factory for synchronized files based on chrome.syncFileSystem.
- *
- * @constructor
- * @implements {importer.SyncFileEntryProvider}
- * @struct
- */
-importer.ChromeSyncFileEntryProvider = function() {
-
-  /** @private {!Array.<function()>} */
-  this.syncListeners_ = [];
-
-  /** @private {!Promise.<!FileEntry>|undefined} */
-  this.fileEntryPromise_;
-};
-
-/** @type {string} */
-importer.ChromeSyncFileEntryProvider.FILE_NAME_ = 'import-history.r1.log';
-
-/**
- * Wraps chrome.syncFileSystem.onFileStatusChanged
- * so that we can report to our listeners when our file has changed.
- * @private
- */
-importer.ChromeSyncFileEntryProvider.prototype.monitorSyncEvents_ =
-    function() {
-  chrome.syncFileSystem.onFileStatusChanged.addListener(
-      this.handleSyncEvent_.bind(this));
-};
-
-/** @override */
-importer.ChromeSyncFileEntryProvider.prototype.addSyncListener =
-    function(listener) {
-  if (this.syncListeners_.indexOf(listener) === -1) {
-    this.syncListeners_.push(listener);
-  }
-};
-
-/** @override */
-importer.ChromeSyncFileEntryProvider.prototype.getSyncFileEntry = function() {
-  if (this.fileEntryPromise_) {
-    return this.fileEntryPromise_;
-  };
-
-  this.fileEntryPromise_ = this.getFileSystem_()
-      .then(
-          /**
-           * @param {!FileSystem} fileSystem
-           * @return {!Promise.<!FileEntry>}
-           * @this {importer.ChromeSyncFileEntryProvider}
-           */
-          function(fileSystem) {
-            return this.getFileEntry_(fileSystem);
-          }.bind(this));
-
-  return this.fileEntryPromise_;
-};
-
-/**
- * Wraps chrome.syncFileSystem in a Promise.
- *
- * @return {!Promise.<!FileSystem>}
- * @private
- */
-importer.ChromeSyncFileEntryProvider.prototype.getFileSystem_ = function() {
-  return new Promise(
-      /**
-       * @param {function()} resolve
-       * @param {function()} reject
-       * @this {importer.ChromeSyncFileEntryProvider}
-       */
-      function(resolve, reject) {
-        chrome.syncFileSystem.requestFileSystem(
-            /**
-              * @param {FileSystem} fileSystem
-              * @this {importer.ChromeSyncFileEntryProvider}
-              */
-            function(fileSystem) {
-              if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError.message);
-              } else {
-                resolve(/** @type {!FileSystem} */ (fileSystem));
-              }
-            });
-      }.bind(this));
-};
-
-/**
- * @param {!FileSystem} fileSystem
- * @return {!Promise.<!FileEntry>}
- * @private
- */
-importer.ChromeSyncFileEntryProvider.prototype.getFileEntry_ =
-    function(fileSystem) {
-  return new Promise(
-      /**
-       * @param {function()} resolve
-       * @param {function()} reject
-       * @this {importer.ChromeSyncFileEntryProvider}
-       */
-      function(resolve, reject) {
-        fileSystem.root.getFile(
-            importer.ChromeSyncFileEntryProvider.FILE_NAME_,
-            {
-              create: true,
-              exclusive: false
-            },
-            resolve,
-            reject);
-      }.bind(this));
-};
-
-/**
- * Handles sync events. Checks to see if the event is for the file
- * we track, and sync-direction, and if so, notifies syncListeners.
- *
- * @see https://developer.chrome.com/apps/syncFileSystem
- *     #event-onFileStatusChanged
- *
- * @param {!Object} event Having a structure not unlike: {
- *     fileEntry: Entry,
- *     status: string,
- *     action: (string|undefined),
- *     direction: (string|undefined)}
- *
- * @private
- */
-importer.ChromeSyncFileEntryProvider.prototype.handleSyncEvent_ =
-    function(event) {
-  if (!this.fileEntryPromise_) {
-    return;
-  }
-
-  this.fileEntryPromise_.then(
-      /**
-       * @param {!FileEntry} fileEntry
-       * @this {importer.ChromeSyncFileEntryProvider}
-       */
-      function(fileEntry) {
-        if (event['fileEntry'].fullPath !== fileEntry.fullPath) {
-          return;
-        }
-
-        if (event.direction && event.direction !== 'remote_to_local') {
-          return;
-        }
-
-        if (event.action && event.action !== 'updated') {
-          console.error(
-            'Unexpected sync event action for history file: ' + event.action);
-          return;
-        }
-
-        this.syncListeners_.forEach(
-            /**
-             * @param {function()} listener
-             * @this {importer.ChromeSyncFileEntryProvider}
-             */
-            function(listener) {
-              // Notify by way of a promise so that it is fully asynchronous
-              // (which can rationalize testing).
-              Promise.resolve().then(listener);
-            }.bind(this));
-      }.bind(this));
+  this.historyResolver_.promise.then(
+      /** @param {!importer.ImportHistory} history */
+      function(history) {
+        history.refresh();
+      });
 };
 
 /**
@@ -982,7 +786,8 @@ importer.FileEntryRecordStorage.prototype.readAll = function() {
            */
           function(fileContents) {
             return this.parse_(fileContents);
-          }.bind(this));
+          }.bind(this))
+      .catch(importer.getLogger().catcher('record-reading'));
 };
 
 /**
@@ -1041,42 +846,6 @@ importer.FileEntryRecordStorage.prototype.parse_ = function(text) {
     var json = '[' + text.substring(0, text.length - 2) + ']';
     return /** @type {!Array.<!Array.<*>>} */ (JSON.parse(json));
   }
-};
-
-/**
- * A wrapper for FileEntry that provides Promises.
- *
- * @param {!FileEntry} fileEntry
- *
- * @constructor
- * @struct
- */
-importer.PromisingFileEntry = function(fileEntry) {
-  /** @private {!FileEntry} */
-  this.fileEntry_ = fileEntry;
-};
-
-/**
- * A "Promisary" wrapper around entry.getWriter.
- * @return {!Promise.<!FileWriter>}
- */
-importer.PromisingFileEntry.prototype.createWriter = function() {
-  return new Promise(this.fileEntry_.createWriter.bind(this.fileEntry_));
-};
-
-/**
- * A "Promisary" wrapper around entry.file.
- * @return {!Promise.<!File>}
- */
-importer.PromisingFileEntry.prototype.file = function() {
-  return new Promise(this.fileEntry_.file.bind(this.fileEntry_));
-};
-
-/**
- * @return {!Promise.<!Object>}
- */
-importer.PromisingFileEntry.prototype.getMetadata = function() {
-  return new Promise(this.fileEntry_.getMetadata.bind(this.fileEntry_));
 };
 
 /**
@@ -1153,4 +922,57 @@ importer.DriveSyncWatcher.prototype.checkSyncStatus_ =
           this.history_.markImported(entry, destination);
         }
       }.bind(this));
+};
+
+/** @const {string} */
+importer.HISTORY_FILE_NAME = 'import-history.r1.log';
+
+/**
+ * History loader that provides an ImportHistorty appropriate
+ * to user settings (if import history is enabled/disabled).
+ *
+ * TODO(smckay): Use SynchronizedHistoryLoader directly
+ *     once cloud-import feature is enabled by default.
+ *
+ * @constructor
+ * @implements {importer.HistoryLoader}
+ * @struct
+ */
+importer.RuntimeHistoryLoader = function() {
+  /** @private {boolean} */
+  this.needsInitialization_ = true;
+
+  /** @private {!importer.Resolver.<!importer.ImportHistory>} */
+  this.historyResolver_ = new importer.Resolver();
+};
+
+/** @override */
+importer.RuntimeHistoryLoader.prototype.getHistory = function() {
+  if (this.needsInitialization_) {
+    this.needsInitialization_ = false;
+    importer.importEnabled()
+        .then(
+            /**
+             * @param {boolean} enabled
+             * @return {!Promise.<!importer.ImportHistory>}
+             * @this {importer.RuntimeHistoryLoader}
+             */
+            function(enabled) {
+              var loader = enabled ?
+                  new importer.SynchronizedHistoryLoader(
+                      new importer.ChromeSyncFileEntryProvider(
+                          importer.HISTORY_FILE_NAME)) :
+                  new importer.DummyImportHistory(false);
+
+              this.historyResolver_.resolve(loader.getHistory());
+            }.bind(this));
+  }
+
+  return this.historyResolver_.promise;
+};
+
+/** @override */
+importer.RuntimeHistoryLoader.prototype.addHistoryLoadedListener =
+    function(listener) {
+  this.historyResolver_.promise.then(listener);
 };

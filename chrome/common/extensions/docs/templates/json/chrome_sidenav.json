@@ -405,6 +405,10 @@
                 "href": "/apps/cloudMessaging"
               },
               {
+                "title": "Native Messaging",
+                "href": "/apps/nativeMessaging"
+              },  
+              {
                 "title": "Rich Notifications",
                 "href": "/apps/richNotifications"
               },
@@ -528,11 +532,11 @@
       },
       {
         "title": "Extensions",
-        "href": "/extensions/overview",
+        "href": "/extensions/index",
         "items": [
           {
             "title": "Learn Basics",
-            "href": "/extensions/overview",
+            "href": "/extensions/index",
             "items": [
               {
                 "title": "Overview",
@@ -600,6 +604,10 @@
               {
                 "title": "Message Passing",
                 "href": "/extensions/messaging"
+              },
+              {
+                "title": "Native Messaging",
+                "href": "/extensions/nativeMessaging"
               },
               {
                 "title": "Migrate to Manifest 2",
@@ -697,11 +705,11 @@
       },
       {
         "title": "Native Client",
-        "href": "/native-client/overview",
+        "href": "/native-client/index",
         "items": [
           {
             "title": "Learn Basics",
-            "href": "/native-client/overview",
+            "href": "/native-client/index",
             "items": [
               {
                 "title": "Technical Overview",
@@ -830,12 +838,28 @@
             "href": "/native-client/c-api",
             "items": [
               {
-                "title": "Pepper C API",
+                "title": "Pepper C API (Stable)",
                 "href": "/native-client/c-api"
               },
               {
-                "title": "Pepper C++ API",
+                "title": "Pepper C++ API (Stable)",
                 "href": "/native-client/cpp-api"
+              },
+              {
+                "title": "Pepper C API (Beta)",
+                "href": "/native-client/c-api-beta"
+              },
+              {
+                "title": "Pepper C++ API (Beta)",
+                "href": "/native-client/cpp-api-beta"
+              },
+              {
+                "title": "Pepper C API (Dev)",
+                "href": "/native-client/c-api-dev"
+              },
+              {
+                "title": "Pepper C++ API (Dev)",
+                "href": "/native-client/cpp-api-dev"
               }
             ]
           },

@@ -87,8 +87,6 @@
       'common/pref_names_util.cc',
       'common/pref_names_util.h',
       'common/prerender_types.h',
-      'common/print_messages.cc',
-      'common/print_messages.h',
       'common/profiling.cc',
       'common/profiling.h',
       'common/ref_counted_util.h',
@@ -337,6 +335,7 @@
             '<(DEPTH)/extensions/extensions.gyp:extensions_common',
             '<(DEPTH)/extensions/extensions_resources.gyp:extensions_resources',
             '<(DEPTH)/extensions/extensions_strings.gyp:extensions_strings',
+            '<(DEPTH)/media/cast/cast.gyp:cast_net',
           ],
           'export_dependent_settings': [
             '<(DEPTH)/chrome/common/extensions/api/api.gyp:chrome_api',
@@ -365,7 +364,6 @@
             '<(DEPTH)/components/components.gyp:visitedlink_common',
             '<(DEPTH)/extensions/extensions.gyp:extensions_common_constants',
             '<(DEPTH)/ipc/ipc.gyp:ipc',
-            '<(DEPTH)/media/cast/cast.gyp:cast_net',
             '<(DEPTH)/third_party/re2/re2.gyp:re2',
             '<(DEPTH)/third_party/widevine/cdm/widevine_cdm.gyp:widevine_cdm_version_h',
           ],
@@ -415,13 +413,9 @@
             'common/pepper_permission_util.h',
           ],
         }],
-        ['enable_basic_printing==0 and enable_print_preview==0', {
-          'sources!': [
-            'common/print_messages.cc',
-            'common/print_messages.h',
-          ]
-        }, {
+        ['enable_basic_printing==1 or enable_print_preview==1', {
           'dependencies': [
+            '<(DEPTH)/components/components.gyp:printing_common',
             '<(DEPTH)/printing/printing.gyp:printing',
           ],
         }],

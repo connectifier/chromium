@@ -136,18 +136,17 @@ IPCResourceLoaderBridge::IPCResourceLoaderBridge(
   request_.fetch_frame_type = request_info.fetch_frame_type;
   request_.enable_load_timing = request_info.enable_load_timing;
   request_.enable_upload_progress = request_info.enable_upload_progress;
+  request_.do_not_prompt_for_login = request_info.do_not_prompt_for_login;
 
   if ((request_info.referrer.policy == blink::WebReferrerPolicyDefault ||
        request_info.referrer.policy ==
            blink::WebReferrerPolicyNoReferrerWhenDowngrade) &&
       request_info.referrer.url.SchemeIsSecure() &&
       !request_info.url.SchemeIsSecure()) {
-    // Debug code for crbug.com/422871
-    base::debug::DumpWithoutCrashing();
-    DLOG(FATAL) << "Trying to send secure referrer for insecure request "
-                << "without an appropriate referrer policy.\n"
-                << "URL = " << request_info.url << "\n"
-                << "Referrer = " << request_info.referrer.url;
+    LOG(FATAL) << "Trying to send secure referrer for insecure request "
+               << "without an appropriate referrer policy.\n"
+               << "URL = " << request_info.url << "\n"
+               << "Referrer = " << request_info.referrer.url;
   }
 
   const RequestExtraData kEmptyData;

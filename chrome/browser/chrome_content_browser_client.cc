@@ -36,7 +36,6 @@
 #include "chrome/browser/geolocation/chrome_access_token_store.h"
 #include "chrome/browser/geolocation/geolocation_permission_context.h"
 #include "chrome/browser/geolocation/geolocation_permission_context_factory.h"
-#include "chrome/browser/media/cast_transport_host_filter.h"
 #include "chrome/browser/media/media_capture_devices_dispatcher.h"
 #include "chrome/browser/media/midi_permission_context.h"
 #include "chrome/browser/media/midi_permission_context_factory.h"
@@ -195,10 +194,7 @@
 #include "chrome/browser/ui/views/chrome_browser_main_extra_parts_views.h"
 #endif
 
-#if defined(USE_ATHENA)
-#include "athena/content/public/web_contents_view_delegate_creator.h"
-#include "chrome/browser/ui/views/athena/chrome_browser_main_extra_parts_athena.h"
-#elif defined(USE_ASH)
+#if defined(USE_ASH)
 #include "chrome/browser/ui/views/ash/chrome_browser_main_extra_parts_ash.h"
 #endif
 
@@ -225,6 +221,7 @@
 #if defined(ENABLE_EXTENSIONS)
 #include "chrome/browser/extensions/chrome_content_browser_client_extensions_part.h"
 #include "chrome/browser/extensions/extension_util.h"
+#include "chrome/browser/media/cast_transport_host_filter.h"
 #include "chrome/browser/speech/extension_api/tts_engine_extension_api.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/guest_view/guest_view_base.h"
@@ -722,9 +719,7 @@ content::BrowserMainParts* ChromeContentBrowserClient::CreateBrowserMainParts(
 
 // TODO(oshima): Athena on chrome currently requires USE_ASH to build.
 // We should reduce the dependency as much as possible.
-#if defined(USE_ATHENA)
-  main_parts->AddParts(CreateChromeBrowserMainExtraPartsAthena());
-#elif defined(USE_ASH)
+#if defined(USE_ASH)
   main_parts->AddParts(new ChromeBrowserMainExtraPartsAsh());
 #endif
 
@@ -832,11 +827,7 @@ void ChromeContentBrowserClient::GetStoragePartitionConfigForSite(
 content::WebContentsViewDelegate*
     ChromeContentBrowserClient::GetWebContentsViewDelegate(
         content::WebContents* web_contents) {
-#if defined(USE_ATHENA)
-  return athena::CreateWebContentsViewDelegate(web_contents);
-#else
   return chrome::CreateWebContentsViewDelegate(web_contents);
-#endif
 }
 
 void ChromeContentBrowserClient::RenderProcessWillLaunch(
@@ -847,7 +838,9 @@ void ChromeContentBrowserClient::RenderProcessWillLaunch(
       profile->GetRequestContextForRenderProcess(id);
 
   host->AddFilter(new ChromeRenderMessageFilter(id, profile));
+#if defined(ENABLE_EXTENSIONS)
   host->AddFilter(new cast::CastTransportHostFilter);
+#endif
 #if defined(ENABLE_PRINTING)
   host->AddFilter(new printing::PrintingMessageFilter(id, profile));
 #endif
@@ -1404,7 +1397,6 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
       switches::kDisableBundledPpapiFlash,
       switches::kDisableCastStreamingHWEncoding,
       switches::kDisableJavaScriptHarmonyShipping,
-      switches::kDisableNewBookmarkApps,
       switches::kDisableOutOfProcessPdf,
       switches::kEnableBenchmarking,
       switches::kEnableNaCl,
@@ -1413,6 +1405,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
       switches::kEnableNaClNonSfiMode,
 #endif
       switches::kEnableNetBenchmarking,
+      switches::kEnableNewBookmarkApps,
       switches::kEnableOutOfProcessPdf,
       switches::kEnablePluginPlaceholderShadowDom,
       switches::kEnableShowModalDialog,
@@ -2291,6 +2284,7 @@ void ChromeContentBrowserClient::OverrideWebkitPrefs(
 
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnablePotentiallyAnnoyingSecurityFeatures)) {
+    web_prefs->disable_reading_from_canvas = true;
     web_prefs->strict_mixed_content_checking = true;
     web_prefs->strict_powerful_feature_restrictions = true;
   }

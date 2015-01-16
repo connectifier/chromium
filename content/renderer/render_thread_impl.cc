@@ -300,6 +300,13 @@ void NotifyTimezoneChangeOnThisThread() {
   v8::Date::DateTimeConfigurationChangeNotification(isolate);
 }
 
+void LowMemoryNotificationOnThisThread() {
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  if (!isolate)
+    return;
+  isolate->LowMemoryNotification();
+}
+
 class RenderFrameSetupImpl : public mojo::InterfaceImpl<RenderFrameSetup> {
  public:
   RenderFrameSetupImpl()
@@ -528,15 +535,7 @@ void RenderThreadImpl::Init() {
       is_impl_side_painting_enabled_);
 
   is_zero_copy_enabled_ = command_line.HasSwitch(switches::kEnableZeroCopy);
-
-#if defined(OS_MACOSX) || defined(OS_ANDROID)
-  // TODO(danakj): If changing these also update NumberOfRendererRasterThreads
-  // in compositor_util.cc. We should be using methods from compositor_util here
-  // instead of inspecting flags.
-  is_one_copy_enabled_ = command_line.HasSwitch(switches::kEnableOneCopy);
-#else
   is_one_copy_enabled_ = !command_line.HasSwitch(switches::kDisableOneCopy);
-#endif
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
   is_elastic_overscroll_enabled_ =
@@ -1491,10 +1490,13 @@ bool RenderThreadImpl::OnControlMessageReceived(const IPC::Message& msg) {
   return handled;
 }
 
-void RenderThreadImpl::OnCreateNewFrame(int routing_id,
-                                        int parent_routing_id,
-                                        int proxy_routing_id) {
-  RenderFrameImpl::CreateFrame(routing_id, parent_routing_id, proxy_routing_id);
+void RenderThreadImpl::OnCreateNewFrame(
+    int routing_id,
+    int parent_routing_id,
+    int proxy_routing_id,
+    const FrameReplicationState& replicated_state) {
+  RenderFrameImpl::CreateFrame(routing_id, parent_routing_id, proxy_routing_id,
+                               replicated_state);
 }
 
 void RenderThreadImpl::OnCreateNewFrameProxy(
@@ -1693,6 +1695,8 @@ void RenderThreadImpl::OnMemoryPressure(
   // receive a memory pressure notification, we might be about to be killed.
   if (blink_platform_impl_ && blink::mainThreadIsolate()) {
     blink::mainThreadIsolate()->LowMemoryNotification();
+    RenderThread::Get()->PostTaskToAllWebWorkers(
+        base::Bind(&LowMemoryNotificationOnThisThread));
   }
 
   if (memory_pressure_level ==

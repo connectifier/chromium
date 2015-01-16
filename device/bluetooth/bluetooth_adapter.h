@@ -14,6 +14,7 @@
 #include "base/callback.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
+#include "device/bluetooth/bluetooth_audio_sink.h"
 #include "device/bluetooth/bluetooth_device.h"
 #include "device/bluetooth/bluetooth_export.h"
 
@@ -188,12 +189,16 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapter
   static base::WeakPtr<BluetoothAdapter> CreateAdapter(
       const InitCallback& init_callback);
 
-  // Shutdown the adapter, ending reliance on other objects, and resulting in
-  // |IsPresent| returning false.
-  virtual void Shutdown();
-
   // Returns a weak pointer to an existing adapter for testing purposes only.
   base::WeakPtr<BluetoothAdapter> GetWeakPtrForTesting();
+
+#if defined(OS_CHROMEOS)
+  // Shutdown the adapter: tear down and clean up all objects owned by
+  // BluetoothAdapter. After this call, the BluetoothAdapter will behave as if
+  // no Bluetooth controller exists in the local system. |IsPresent| will return
+  // false. No futher use of DBusThreadManager will be made.
+  void OnDBusThreadManagerShutdown();
+#endif
 
   // Adds and removes observers for events on this bluetooth adapter. If
   // monitoring multiple adapters, check the |adapter| parameter of observer
@@ -338,6 +343,18 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapter
       const ServiceOptions& options,
       const CreateServiceCallback& callback,
       const CreateServiceErrorCallback& error_callback) = 0;
+
+  // Creates and registers a BluetoothAudioSink with |options|. If the fields in
+  // |options| are not specified, the default values will be used. |callback|
+  // will be called on success with a BluetoothAudioSink which is to be owned by
+  // the caller of this method. |error_callback| will be called on failure with
+  // a message indicating the cause.
+  typedef base::Callback<void(scoped_refptr<BluetoothAudioSink>)>
+      AcquiredCallback;
+  virtual void RegisterAudioSink(
+      const BluetoothAudioSink::Options& options,
+      const AcquiredCallback& callback,
+      const BluetoothAudioSink::ErrorCallback& error_callback) = 0;
 
  protected:
   friend class base::RefCountedThreadSafe<BluetoothAdapter,

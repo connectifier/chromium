@@ -14,7 +14,6 @@
     # These provide type information for jscompile.
     'remoting_webapp_js_proto_files': [
       'webapp/js_proto/chrome_proto.js',
-      'webapp/js_proto/console_proto.js',
       'webapp/js_proto/dom_proto.js',
       'webapp/js_proto/remoting_proto.js',
     ],
@@ -119,6 +118,7 @@
     ],
     # Remoting signaling files.
     'remoting_webapp_js_signaling_files': [
+      'webapp/crd/js/fallback_signal_strategy.js',
       'webapp/crd/js/signal_strategy.js',
       'webapp/crd/js/wcs_adapter.js',
       'webapp/crd/js/wcs_sandbox_container.js',
@@ -147,6 +147,7 @@
       'webapp/browser_test/bump_scroll_browser_test.js',
       'webapp/browser_test/cancel_pin_browser_test.js',
       'webapp/browser_test/invalid_pin_browser_test.js',
+      'webapp/browser_test/it2me_browser_test.js',
       'webapp/browser_test/mock_client_plugin.js',
       'webapp/browser_test/mock_host_list_api.js',
       'webapp/browser_test/mock_identity.js',
@@ -166,9 +167,10 @@
     ],
     # The unit test cases for the webapp
     'remoting_webapp_unittest_js_files': [
-      'webapp/js_proto/chrome_proto.js',
       'webapp/unittests/chrome_mocks.js',
+      'webapp/js_proto/chrome_proto.js',
       'webapp/unittests/base_unittest.js',
+      'webapp/unittests/fallback_signal_strategy_unittest.js',
       'webapp/unittests/it2me_helpee_channel_unittest.js',
       'webapp/unittests/it2me_helper_channel_unittest.js',
       'webapp/unittests/it2me_service_unittest.js',

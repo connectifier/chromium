@@ -17,14 +17,17 @@ config("password_manager_config") {
 
 static_library("browser") {
   sources = [
+    "affiliation_backend.cc",
+    "affiliation_backend.h",
     "affiliation_fetcher_delegate.h",
     "affiliation_fetcher.cc",
     "affiliation_fetcher.h",
+    "affiliation_service.cc",
+    "affiliation_service.h",
     "affiliation_utils.cc",
     "affiliation_utils.h",
     "browser_save_password_progress_logger.cc",
     "browser_save_password_progress_logger.h",
-    "credential_manager_dispatcher.h",
     "log_receiver.h",
     "log_router.cc",
     "log_router.h",

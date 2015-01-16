@@ -72,6 +72,7 @@
             'bookmarks/browser/bookmark_index_unittest.cc',
             'bookmarks/browser/bookmark_model_unittest.cc',
             'bookmarks/browser/bookmark_utils_unittest.cc',
+            'browser_watcher/endsession_watcher_window_win_unittest.cc',
             'browser_watcher/exit_funnel_win_unittest.cc',
             'browser_watcher/exit_code_watcher_win_unittest.cc',
             'browser_watcher/watcher_client_win_unittest.cc',
@@ -128,6 +129,7 @@
             'domain_reliability/test_util.h',
             'domain_reliability/uploader_unittest.cc',
             'domain_reliability/util_unittest.cc',
+            'favicon_base/select_favicon_frames_unittest.cc',
             # Note: GN tests converted to here, need to do the rest.
             'enhanced_bookmarks/enhanced_bookmark_model_unittest.cc',
             'enhanced_bookmarks/image_store_ios_unittest.mm',
@@ -195,6 +197,8 @@
             'password_manager/core/browser/affiliation_fetcher_unittest.cc',
             'password_manager/core/browser/affiliation_utils_unittest.cc',
             'password_manager/core/browser/browser_save_password_progress_logger_unittest.cc',
+            'password_manager/core/browser/export/csv_writer_unittest.cc',
+            'password_manager/core/browser/import/csv_reader_unittest.cc',
             'password_manager/core/browser/log_router_unittest.cc',
             'password_manager/core/browser/login_database_unittest.cc',
             'password_manager/core/browser/password_autofill_manager_unittest.cc',
@@ -216,6 +220,7 @@
             'rappor/byte_vector_utils_unittest.cc',
             'rappor/log_uploader_unittest.cc',
             'rappor/rappor_metric_unittest.cc',
+            'rappor/rappor_prefs_unittest.cc',
             'rappor/rappor_service_unittest.cc',
             'search/search_android_unittest.cc',
             'search/search_unittest.cc',
@@ -275,6 +280,7 @@
             'translate/ios/browser/js_translate_manager_unittest.mm',
             'translate/ios/browser/language_detection_controller_unittest.mm',
             'translate/ios/browser/translate_controller_unittest.mm',
+            'ui/zoom/page_zoom_unittests.cc',
             'update_client/update_query_params_unittest.cc',
             'url_matcher/regex_set_matcher_unittest.cc',
             'url_matcher/string_pattern_unittest.cc',
@@ -353,7 +359,7 @@
             'components.gyp:content_settings_core_browser',
             'components.gyp:content_settings_core_common',
             'components.gyp:content_settings_core_test_support',
-            
+
             # Dependencies of packed CT EV white list
             'components.gyp:packed_ct_ev_whitelist',
 
@@ -379,6 +385,9 @@
             # Dependencies of enhanced_bookmarks
             'components.gyp:enhanced_bookmarks',
             'components.gyp:enhanced_bookmarks_test_support',
+
+            # Dependencies of favicon_base
+            'components.gyp:favicon_base',
 
             # Dependencies of feedback
             'components.gyp:feedback_component',
@@ -487,6 +496,9 @@
 
             # Dependencies of wallpaper
             'components.gyp:wallpaper',
+
+            # Dependencies of ui/zoom
+            'components.gyp:ui_zoom',
 
             # Dependencies of update_client
             'components.gyp:update_client',

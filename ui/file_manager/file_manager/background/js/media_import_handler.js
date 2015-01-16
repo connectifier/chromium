@@ -102,7 +102,7 @@ importer.MediaImportHandler.prototype.onTaskProgress_ =
         strf('CLOUD_IMPORT_ITEMS_REMAINING', task.remainingFilesCount);
     item.progressMax = task.totalBytes;
     item.cancelCallback = function() {
-      // TODO(kenobi): Deal with import cancellation.
+      task.requestCancel();
     };
   }
 
@@ -113,10 +113,18 @@ importer.MediaImportHandler.prototype.onTaskProgress_ =
           strf('CLOUD_IMPORT_ITEMS_REMAINING', task.remainingFilesCount);
       break;
     case UpdateType.SUCCESS:
+      item.message = '';
+      item.progressValue = item.progressMax;
       item.state = ProgressItemState.COMPLETED;
       break;
     case UpdateType.ERROR:
+      item.message = '';
+      item.progressValue = item.progressMax;
       item.state = ProgressItemState.ERROR;
+      break;
+    case UpdateType.CANCELED:
+      item.message = '';
+      item.state = ProgressItemState.CANCELED;
       break;
   }
 
@@ -127,11 +135,6 @@ importer.MediaImportHandler.prototype.onTaskProgress_ =
  * Note that this isn't an actual FileOperationManager.Task.  It currently uses
  * the FileOperationManager (and thus *spawns* an associated
  * FileOperationManager.CopyTask) but this is a temporary state of affairs.
- *
- * TODO(kenobi): Add a proper implementation that doesn't use
- * FileOperationManager, but instead actually performs the copy using the
- * fileManagerPrivate API directly.
- * TODO(kenobi): Add task cancellation.
  *
  * @constructor
  * @extends {importer.TaskQueue.BaseTask}
@@ -173,6 +176,12 @@ importer.MediaImportHandler.ImportTask = function(
 
   /** @private {number} */
   this.remainingFilesCount_ = 0;
+
+  /** @private {?function()} */
+  this.cancelCallback_ = null;
+
+  /** @private {boolean} Indicates whether this task was canceled. */
+  this.canceled_ = false;
 };
 
 /** @struct */
@@ -200,7 +209,23 @@ importer.MediaImportHandler.ImportTask.prototype.run = function() {
   this.scanResult_.whenFinal()
       .then(this.initialize_.bind(this))
       .then(this.getDestination.bind(this))
-      .then(this.importTo_.bind(this));
+      .then(this.importTo_.bind(this))
+      .catch(importer.getLogger().catcher('import-task-chain'));
+};
+
+/**
+ * Request cancellation of this task.  An update will be sent to observers once
+ * the task is actually cancelled.
+ */
+importer.MediaImportHandler.ImportTask.prototype.requestCancel = function() {
+  this.canceled_ = true;
+  if (this.cancelCallback_) {
+    // Reset the callback before calling it, as the callback might do anything
+    // (including calling #requestCancel again).
+    var cancelCallback = this.cancelCallback_;
+    this.cancelCallback_ = null;
+    cancelCallback();
+  }
 };
 
 /** @private */
@@ -247,7 +272,10 @@ importer.MediaImportHandler.ImportTask.prototype.importTo_ =
  */
 importer.MediaImportHandler.ImportTask.prototype.importOne_ =
     function(destination, completionCallback, entry, index) {
-  // TODO(kenobi): Check for cancellation.
+  if (this.canceled_) {
+    this.notify(importer.TaskQueue.UpdateType.CANCELED);
+    return;
+  }
 
   // A count of the current number of processed bytes for this entry.
   var currentBytes = 0;
@@ -281,19 +309,26 @@ importer.MediaImportHandler.ImportTask.prototype.importOne_ =
 
   /** @this {importer.MediaImportHandler.ImportTask} */
   var onComplete = function() {
-    completionCallback();
+    this.cancelCallback_ = null;
     this.markAsCopied_(entry, destination);
     this.notify(importer.TaskQueue.UpdateType.PROGRESS);
+    completionCallback();
   };
 
-  fileOperationUtil.copyTo(
+  /** @this {importer.MediaImportHandler.ImportTask} */
+  var onError = function(error) {
+    this.cancelCallback_ = null;
+    this.onError_(error);
+  };
+
+  this.cancelCallback_ = fileOperationUtil.copyTo(
       entry,
       destination,
       entry.name,  // TODO(kenobi): account for duplicate filenames
       onEntryChanged.bind(this),
       onProgress.bind(this),
       onComplete.bind(this),
-      this.onError_.bind(this));
+      onError.bind(this));
 };
 
 /**
@@ -414,36 +449,6 @@ importer.MediaImportHandler.defaultDestination.getImportDestination =
     function() {
   var defaultDestination = importer.MediaImportHandler.defaultDestination;
   return defaultDestination.getDriveRoot_()
-      .then(defaultDestination.getOrCreateImportDestination_);
-};
-
-/**
- * Sends events for progress updates and creation of file entries.
- *
- * TODO: File entry-related events might need to be handled via callback and not
- * events - see crbug.com/358491
- *
- * @constructor
- * @extends {cr.EventTarget}
- */
-importer.MediaImportHandler.EventRouter = function() {
-};
-
-/**
- * Extends cr.EventTarget.
- */
-importer.MediaImportHandler.EventRouter.prototype.__proto__ =
-    cr.EventTarget.prototype;
-
-/**
- * @param {!importer.MediaImportHandler.ImportTask} task
- */
-importer.MediaImportHandler.EventRouter.prototype.sendUpdate = function(task) {
-};
-
-/**
- * @param {!FileEntry} entry The new entry.
- */
-importer.MediaImportHandler.EventRouter.prototype.sendEntryCreated =
-    function(entry) {
+      .then(defaultDestination.getOrCreateImportDestination_)
+      .catch(importer.getLogger().catcher('import-destination-provision'));
 };

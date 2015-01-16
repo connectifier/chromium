@@ -115,6 +115,9 @@ class PersonalDataManager : public KeyedService,
   // status can be changed.
   void UpdateServerCreditCard(const CreditCard& credit_card);
 
+  // Resets all unmasked cards to the masked state.
+  void ResetFullServerCards();
+
   // Returns the credit card with the specified |guid|, or NULL if there is
   // no credit card with the specified |guid|.
   CreditCard* GetCreditCardByGUID(const std::string& guid);
@@ -134,6 +137,9 @@ class PersonalDataManager : public KeyedService,
   // auxiliary profiles.  |web_profiles()| returns only web profiles.
   virtual const std::vector<AutofillProfile*>& GetProfiles() const;
   virtual const std::vector<AutofillProfile*>& web_profiles() const;
+  // Returns just LOCAL_CARD cards.
+  virtual const std::vector<CreditCard*>& GetLocalCreditCards() const;
+  // Returns all credit cards, server and local.
   virtual const std::vector<CreditCard*>& GetCreditCards() const;
 
   // Loads profiles that can suggest data for |type|. |field_contents| is the

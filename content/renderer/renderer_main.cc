@@ -64,11 +64,6 @@ static void HandleRendererErrorTestParameters(
 
   if (command_line.HasSwitch(switches::kRendererStartupDialog))
     ChildProcess::WaitForDebugger("Renderer");
-
-  // This parameter causes an assertion.
-  if (command_line.HasSwitch(switches::kRendererAssertTest)) {
-    DCHECK(false);
-  }
 }
 
 // This is a simplified version of the browser Jankometer, which measures
@@ -174,11 +169,9 @@ int RendererMain(const MainFunctionParams& parameters) {
   base::FieldTrialList field_trial_list(NULL);
   // Ensure any field trials in browser are reflected into renderer.
   if (parsed_command_line.HasSwitch(switches::kForceFieldTrials)) {
-    // Field trials are created in an "activated" state to ensure they get
-    // reported in crash reports.
     bool result = base::FieldTrialList::CreateTrialsFromString(
         parsed_command_line.GetSwitchValueASCII(switches::kForceFieldTrials),
-        base::FieldTrialList::ACTIVATE_TRIALS,
+        base::FieldTrialList::DONT_ACTIVATE_TRIALS,
         std::set<std::string>());
     DCHECK(result);
   }

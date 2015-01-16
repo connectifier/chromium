@@ -361,9 +361,7 @@ PDFViewer.prototype = {
         var href = 'mailto:' + message.data.to + '?cc=' + message.data.cc +
             '&bcc=' + message.data.bcc + '&subject=' + message.data.subject +
             '&body=' + message.data.body;
-        var w = window.open(href, '_blank', 'width=1,height=1');
-        if (w)
-          w.close();
+        window.location.href = href;
         break;
       case 'getAccessibilityJSONReply':
         this.sendScriptingMessage_(message.data);
@@ -376,6 +374,9 @@ PDFViewer.prototype = {
         else
           this.passwordScreen_.deny();
         break;
+      case 'getSelectedTextReply':
+        this.sendScriptingMessage_(message.data);
+        break;
       case 'goToPage':
         this.viewport_.goToPage(message.data.page);
         break;
@@ -384,7 +385,7 @@ PDFViewer.prototype = {
         break;
       case 'navigate':
         if (message.data.newTab)
-          window.open(message.data.url);
+          chrome.tabs.create({ url: message.data.url });
         else
           window.location.href = message.data.url;
         break;
@@ -525,7 +526,10 @@ PDFViewer.prototype = {
   handleScriptingMessage: function(message) {
     switch (message.data.type.toString()) {
       case 'getAccessibilityJSON':
+      case 'getSelectedText':
       case 'loadPreviewPage':
+      case 'print':
+      case 'selectAll':
         this.plugin_.postMessage(message.data);
         break;
       case 'resetPrintPreviewMode':

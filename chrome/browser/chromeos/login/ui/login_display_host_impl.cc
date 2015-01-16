@@ -147,11 +147,11 @@ class AnimationObserver : public ui::ImplicitAnimationObserver {
  public:
   explicit AnimationObserver(const base::Closure& callback)
       : callback_(callback) {}
-  virtual ~AnimationObserver() {}
+  ~AnimationObserver() override {}
 
  private:
   // ui::ImplicitAnimationObserver implementation:
-  virtual void OnImplicitAnimationsCompleted() override {
+  void OnImplicitAnimationsCompleted() override {
     callback_.Run();
     delete this;
   }
@@ -220,24 +220,14 @@ class LoginWidgetDelegate : public views::WidgetDelegate {
  public:
   explicit LoginWidgetDelegate(views::Widget* widget) : widget_(widget) {
   }
-  virtual ~LoginWidgetDelegate() {}
+  ~LoginWidgetDelegate() override {}
 
   // Overridden from WidgetDelegate:
-  virtual void DeleteDelegate() override {
-    delete this;
-  }
-  virtual views::Widget* GetWidget() override {
-    return widget_;
-  }
-  virtual const views::Widget* GetWidget() const override {
-    return widget_;
-  }
-  virtual bool CanActivate() const override {
-    return true;
-  }
-  virtual bool ShouldAdvanceFocusToTopLevelWidget() const override {
-    return true;
-  }
+  void DeleteDelegate() override { delete this; }
+  views::Widget* GetWidget() override { return widget_; }
+  const views::Widget* GetWidget() const override { return widget_; }
+  bool CanActivate() const override { return true; }
+  bool ShouldAdvanceFocusToTopLevelWidget() const override { return true; }
 
  private:
   views::Widget* widget_;
@@ -272,7 +262,6 @@ const int LoginDisplayHostImpl::kShowLoginWebUIid = 0x1111;
 
 LoginDisplayHostImpl::LoginDisplayHostImpl(const gfx::Rect& background_bounds)
     : background_bounds_(background_bounds),
-      pointer_factory_(this),
       shutting_down_(false),
       oobe_progress_bar_visible_(false),
       session_starting_(false),
@@ -288,6 +277,7 @@ LoginDisplayHostImpl::LoginDisplayHostImpl(const gfx::Rect& background_bounds)
       startup_sound_played_(false),
       startup_sound_honors_spoken_feedback_(false),
       is_observing_keyboard_(false),
+      pointer_factory_(this),
       animation_weak_ptr_factory_(this) {
   DBusThreadManager::Get()->GetSessionManagerClient()->AddObserver(this);
   CrasAudioHandler::Get()->AddAudioObserver(this);

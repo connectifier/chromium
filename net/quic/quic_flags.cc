@@ -28,9 +28,6 @@ bool FLAGS_quic_use_bbr_congestion_control = false;
 // connection options.
 bool FLAGS_quic_allow_bbr = false;
 
-// If true, truncate QUIC connection IDs if the client requests it.
-bool FLAGS_allow_truncated_connection_ids_for_quic = true;
-
 // Do not flip this flag.  jokulik plans more testing and additional monitoring
 // before the flag can go the auto-flip process.
 //
@@ -71,3 +68,15 @@ bool FLAGS_quic_use_initial_rtt_for_stats = true;
 
 // If true, uses the last sent packet for the RTO timer instead of the earliest.
 bool FLAGS_quic_rto_uses_last_sent = true;
+
+// If true, attach QuicAckNotifiers to packets rather than individual stream
+// frames.
+bool FLAGS_quic_attach_ack_notifiers_to_packets = true;
+
+// If true, the AckNotifierManager is informed about new packets as soon as they
+// are serialized.
+bool FLAGS_quic_ack_notifier_informed_on_serialized = true;
+
+// If true, QUIC will use the new RTO that waits until an ack arrives to adjust
+// the congestion window.
+bool FLAGS_quic_use_new_rto = true;

@@ -916,7 +916,7 @@ const Experiment kExperiments[] = {
   { "disable-accelerated-video-decode",
     IDS_FLAGS_DISABLE_ACCELERATED_VIDEO_DECODE_NAME,
     IDS_FLAGS_DISABLE_ACCELERATED_VIDEO_DECODE_DESCRIPTION,
-    kOsWin | kOsCrOS,
+    kOsMac | kOsWin | kOsCrOS,
     SINGLE_VALUE_TYPE(switches::kDisableAcceleratedVideoDecode),
   },
 #if defined(USE_ASH)
@@ -1514,11 +1514,11 @@ const Experiment kExperiments[] = {
   },
 #endif
   {
-    "disable-new-bookmark-apps",
-    IDS_FLAGS_DISABLE_NEW_BOOKMARK_APPS_NAME,
-    IDS_FLAGS_DISABLE_NEW_BOOKMARK_APPS_DESCRIPTION,
+    "enable-new-bookmark-apps",
+    IDS_FLAGS_ENABLE_NEW_BOOKMARK_APPS_NAME,
+    IDS_FLAGS_ENABLE_NEW_BOOKMARK_APPS_DESCRIPTION,
     kOsWin | kOsCrOS | kOsLinux | kOsMac,
-    SINGLE_VALUE_TYPE(switches::kDisableNewBookmarkApps)
+    SINGLE_VALUE_TYPE(switches::kEnableNewBookmarkApps)
   },
 #if defined(OS_MACOSX)
   {
@@ -1989,11 +1989,11 @@ const Experiment kExperiments[] = {
 #endif
 #if defined(OS_CHROMEOS)
   {
-    "use-memory-pressure-chromeos",
-    IDS_FLAGS_USE_MEMORY_PRESSURE_NAME,
-    IDS_FLAGS_USE_MEMORY_PRESSURE_DESCRIPTION,
+    "disable-memory-pressure-chromeos",
+    IDS_FLAGS_DISABLE_MEMORY_PRESSURE_NAME,
+    IDS_FLAGS_DISABLE_MEMORY_PRESSURE_DESCRIPTION,
     kOsCrOS,
-    SINGLE_VALUE_TYPE(chromeos::switches::kUseMemoryPressureSystemChromeOS)
+    SINGLE_VALUE_TYPE(chromeos::switches::kDisableMemoryPressureSystemChromeOS)
   },
   {
     "wake-on-packets",
@@ -2112,6 +2112,13 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnablePotentiallyAnnoyingSecurityFeatures)
   },
 #endif
+  {
+    "enable-delay-agnostic-aec",
+    IDS_FLAGS_ENABLE_DELAY_AGNOSTIC_AEC_NAME,
+    IDS_FLAGS_ENABLE_DELAY_AGNOSTIC_AEC_DESCRIPTION,
+    kOsDesktop,
+    SINGLE_VALUE_TYPE(switches::kEnableDelayAgnosticAec)
+  },
 
   // NOTE: Adding new command-line switches requires adding corresponding
   // entries to enum "LoginCustomFlags" in histograms.xml. See note in

@@ -146,7 +146,7 @@ class EasyUnlockService::PowerMonitor
         AddObserver(this);
   }
 
-  virtual ~PowerMonitor() {
+  ~PowerMonitor() override {
     chromeos::DBusThreadManager::Get()->GetPowerManagerClient()->
         RemoveObserver(this);
   }
@@ -167,11 +167,9 @@ class EasyUnlockService::PowerMonitor
 
  private:
   // chromeos::PowerManagerClient::Observer:
-  virtual void SuspendImminent() override {
-    service_->PrepareForSuspend();
-  }
+  void SuspendImminent() override { service_->PrepareForSuspend(); }
 
-  virtual void SuspendDone(const base::TimeDelta& sleep_duration) override {
+  void SuspendDone(const base::TimeDelta& sleep_duration) override {
     waking_up_ = true;
     wake_up_time_ = base::Time::Now();
     base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
@@ -524,8 +522,12 @@ void EasyUnlockService::LoadApp() {
 
   if (!easy_unlock_path.empty()) {
     extensions::ComponentLoader* loader = GetComponentLoader(profile_);
-    if (!loader->Exists(extension_misc::kEasyUnlockAppId))
-      loader->Add(IDR_EASY_UNLOCK_MANIFEST, easy_unlock_path);
+    if (!loader->Exists(extension_misc::kEasyUnlockAppId)) {
+      int manifest_id =
+          GetType() == TYPE_REGULAR ? IDR_EASY_UNLOCK_MANIFEST :
+                                      IDR_EASY_UNLOCK_MANIFEST_SIGNIN;
+      loader->Add(manifest_id, easy_unlock_path);
+    }
 
     ExtensionService* extension_service =
         extensions::ExtensionSystem::Get(profile_)->extension_service();

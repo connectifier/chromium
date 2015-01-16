@@ -14,7 +14,6 @@
 #include "media/base/audio_decoder_config.h"
 #include "media/base/bind_to_current_loop.h"
 #include "media/base/cdm_key_information.h"
-#include "media/base/cdm_promise.h"
 #include "media/base/channel_layout.h"
 #include "media/base/data_buffer.h"
 #include "media/base/decoder_buffer.h"
@@ -33,7 +32,6 @@
 #include "ppapi/thunk/ppb_buffer_api.h"
 #include "ui/gfx/geometry/rect.h"
 
-using media::CdmPromise;
 using media::Decryptor;
 using media::MediaKeys;
 using media::NewSessionCdmPromise;
@@ -716,34 +714,16 @@ bool ContentDecryptorDelegate::DecryptAndDecodeVideo(
 }
 
 void ContentDecryptorDelegate::OnPromiseResolved(uint32 promise_id) {
-  scoped_ptr<CdmPromise> promise = cdm_promise_adapter_.TakePromise(promise_id);
-  if (!promise ||
-      promise->GetResolveParameterType() != media::CdmPromise::VOID_TYPE) {
-    NOTREACHED();
-    return;
-  }
-
-  SimpleCdmPromise* simple_promise =
-      static_cast<SimpleCdmPromise*>(promise.get());
-  simple_promise->resolve();
+  cdm_promise_adapter_.ResolvePromise(promise_id);
 }
 
 void ContentDecryptorDelegate::OnPromiseResolvedWithSession(
     uint32 promise_id,
     PP_Var web_session_id) {
-  scoped_ptr<CdmPromise> promise = cdm_promise_adapter_.TakePromise(promise_id);
-  if (!promise ||
-      promise->GetResolveParameterType() != media::CdmPromise::STRING_TYPE) {
-    NOTREACHED();
-    return;
-  }
-
   StringVar* web_session_id_string = StringVar::FromPPVar(web_session_id);
   DCHECK(web_session_id_string);
-
-  NewSessionCdmPromise* session_promise =
-      static_cast<NewSessionCdmPromise*>(promise.get());
-  session_promise->resolve(web_session_id_string->value());
+  cdm_promise_adapter_.ResolvePromise(promise_id,
+                                      web_session_id_string->value());
 }
 
 void ContentDecryptorDelegate::OnPromiseRejected(
@@ -755,19 +735,15 @@ void ContentDecryptorDelegate::OnPromiseRejected(
 
   StringVar* error_description_string = StringVar::FromPPVar(error_description);
   DCHECK(error_description_string);
-
-  scoped_ptr<CdmPromise> promise = cdm_promise_adapter_.TakePromise(promise_id);
-  DCHECK(promise);
-  if (promise) {
-    promise->reject(PpExceptionTypeToMediaException(exception_code),
-                    system_code,
-                    error_description_string->value());
-  }
+  cdm_promise_adapter_.RejectPromise(
+      promise_id, PpExceptionTypeToMediaException(exception_code), system_code,
+      error_description_string->value());
 }
 
 void ContentDecryptorDelegate::OnSessionMessage(PP_Var web_session_id,
                                                 PP_CdmMessageType message_type,
-                                                PP_Var message) {
+                                                PP_Var message,
+                                                PP_Var legacy_destination_url) {
   if (session_message_cb_.is_null())
     return;
 
@@ -781,9 +757,23 @@ void ContentDecryptorDelegate::OnSessionMessage(PP_Var web_session_id,
     message_vector.assign(data, data + message_array_buffer->ByteLength());
   }
 
+  StringVar* destination_url_string =
+      StringVar::FromPPVar(legacy_destination_url);
+  if (!destination_url_string) {
+    NOTREACHED();
+    return;
+  }
+
+  GURL verified_gurl = GURL(destination_url_string->value());
+  if (!verified_gurl.is_valid()) {
+    DLOG(WARNING) << "SessionMessage legacy_destination_url is invalid : "
+                  << verified_gurl.possibly_invalid_spec();
+    verified_gurl = GURL::EmptyGURL();  // Replace invalid destination_url.
+  }
+
   session_message_cb_.Run(web_session_id_string->value(),
                           PpCdmMessageTypeToMediaMessageType(message_type),
-                          message_vector);
+                          message_vector, verified_gurl);
 }
 
 void ContentDecryptorDelegate::OnSessionKeysChange(

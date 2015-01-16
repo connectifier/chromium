@@ -257,9 +257,9 @@ scoped_ptr<HttpResponse> FakeSamlIdp::BuildHTMLResponse(
 class SamlTest : public InProcessBrowserTest {
  public:
   SamlTest() : gaia_frame_parent_("signin-frame"), saml_load_injected_(false) {}
-  virtual ~SamlTest() {}
+  ~SamlTest() override {}
 
-  virtual void SetUp() override {
+  void SetUp() override {
     ASSERT_TRUE(embedded_test_server()->InitializeAndWaitUntilReady());
 
     // Start the GAIA https wrapper here so that the GAIA URLs can be pointed at
@@ -281,11 +281,11 @@ class SamlTest : public InProcessBrowserTest {
     InProcessBrowserTest::SetUp();
   }
 
-  virtual void SetUpInProcessBrowserTestFixture() override {
+  void SetUpInProcessBrowserTestFixture() override {
     host_resolver()->AddRule("*", "127.0.0.1");
   }
 
-  virtual void SetUpCommandLine(base::CommandLine* command_line) override {
+  void SetUpCommandLine(base::CommandLine* command_line) override {
     command_line->AppendSwitch(switches::kLoginManager);
     command_line->AppendSwitch(switches::kForceLoginManagerInTests);
     command_line->AppendSwitch(::switches::kDisableBackgroundNetworking);
@@ -309,7 +309,7 @@ class SamlTest : public InProcessBrowserTest {
     fake_gaia_.Initialize();
   }
 
-  virtual void SetUpOnMainThread() override {
+  void SetUpOnMainThread() override {
     fake_gaia_.SetFakeMergeSessionParams(kFirstSAMLUserEmail,
                                          kTestAuthSIDCookie1,
                                          kTestAuthLSIDCookie1);
@@ -327,7 +327,7 @@ class SamlTest : public InProcessBrowserTest {
         content::NotificationService::AllSources()));
   }
 
-  virtual void TearDownOnMainThread() override {
+  void TearDownOnMainThread() override {
     // If the login display is still showing, exit gracefully.
     if (LoginDisplayHostImpl::default_host()) {
       base::MessageLoop::current()->PostTask(FROM_HERE,
@@ -509,11 +509,44 @@ IN_PROC_BROWSER_TEST_F(SamlTest, ScrapedSingle) {
   // Lands on confirm password screen.
   OobeScreenWaiter(OobeDisplay::SCREEN_CONFIRM_PASSWORD).Wait();
 
-  // Enter an unknown password should go back to confirm password screen.
+  // Entering an unknown password should go back to the confirm password screen.
   SendConfirmPassword("wrong_password");
   OobeScreenWaiter(OobeDisplay::SCREEN_CONFIRM_PASSWORD).Wait();
 
-  // Enter a known password should finish login and start session.
+  // Entering a known password should finish login and start session.
+  SendConfirmPassword("fake_password");
+  content::WindowedNotificationObserver(
+      chrome::NOTIFICATION_SESSION_STARTED,
+      content::NotificationService::AllSources()).Wait();
+}
+
+// Tests password scraping from a dynamically created password field.
+IN_PROC_BROWSER_TEST_F(SamlTest, ScrapedDynamic) {
+  fake_saml_idp()->SetLoginHTMLTemplate("saml_login.html");
+  StartSamlAndWaitForIdpPageLoad(kFirstSAMLUserEmail);
+
+  ExecuteJsInSigninFrame(
+    "(function() {"
+      "var newPassInput = document.createElement('input');"
+      "newPassInput.id = 'DynamicallyCreatedPassword';"
+      "newPassInput.type = 'password';"
+      "newPassInput.name = 'Password';"
+      "document.forms[0].appendChild(newPassInput);"
+    "})();");
+
+  // Fill-in the SAML IdP form and submit.
+  SetSignFormField("Email", "fake_user");
+  SetSignFormField("DynamicallyCreatedPassword", "fake_password");
+  ExecuteJsInSigninFrame("document.getElementById('Submit').click();");
+
+  // Lands on confirm password screen.
+  OobeScreenWaiter(OobeDisplay::SCREEN_CONFIRM_PASSWORD).Wait();
+
+  // Entering an unknown password should go back to the confirm password screen.
+  SendConfirmPassword("wrong_password");
+  OobeScreenWaiter(OobeDisplay::SCREEN_CONFIRM_PASSWORD).Wait();
+
+  // Entering a known password should finish login and start session.
   SendConfirmPassword("fake_password");
   content::WindowedNotificationObserver(
       chrome::NOTIFICATION_SESSION_STARTED,
@@ -823,11 +856,11 @@ IN_PROC_BROWSER_TEST_F(SAMLEnrollmentTest, WithCredentialsPassingAPI) {
 class SAMLPolicyTest : public SamlTest {
  public:
   SAMLPolicyTest();
-  virtual ~SAMLPolicyTest();
+  ~SAMLPolicyTest() override;
 
   // SamlTest:
-  virtual void SetUpInProcessBrowserTestFixture() override;
-  virtual void SetUpOnMainThread() override;
+  void SetUpInProcessBrowserTestFixture() override;
+  void SetUpOnMainThread() override;
 
   void SetSAMLOfflineSigninTimeLimitPolicy(int limit);
   void EnableTransferSAMLCookiesPolicy();
