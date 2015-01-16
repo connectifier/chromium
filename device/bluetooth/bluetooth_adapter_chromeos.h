@@ -43,13 +43,8 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
  public:
   static base::WeakPtr<BluetoothAdapter> CreateAdapter();
 
-  // Shutdown the adapter: tear down and clean up all objects owned by
-  // BluetoothAdapter. After this call, the BluetoothAdapter will behave as if
-  // no Bluetooth controller exists in the local system. |IsPresent| will return
-  // false. No futher use of DBusThreadManager will be made.
-  void OnDBusThreadManagerShutdown();
-
   // BluetoothAdapter:
+  void OnDBusThreadManagerShutdown();
   void DeleteOnCorrectThread() const override;
   virtual void AddObserver(
       device::BluetoothAdapter::Observer* observer) override;

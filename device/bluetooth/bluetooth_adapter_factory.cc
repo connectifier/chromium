@@ -102,8 +102,7 @@ void BluetoothAdapterFactory::GetAdapter(const AdapterCallback& callback) {
 // static
 void BluetoothAdapterFactory::OnDBusThreadManagerShutdown() {
   if (default_adapter.Get()) {
-    static_cast<chromeos::BluetoothAdapterChromeOS*>(
-        default_adapter.Get().get())->OnDBusThreadManagerShutdown();
+    default_adapter.Get().get()->OnDBusThreadManagerShutdown();
   }
 }
 #endif
