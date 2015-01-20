@@ -20,6 +20,7 @@
 #include "ppapi/cpp/dev/buffer_dev.h"
 #include "ppapi/cpp/image_data.h"
 #include "ppapi/cpp/point.h"
+#include "ppapi/cpp/var_array.h"
 #include "third_party/pdfium/fpdfsdk/include/fpdf_dataavail.h"
 #include "third_party/pdfium/fpdfsdk/include/fpdf_progressive.h"
 #include "third_party/pdfium/fpdfsdk/include/fpdfformfill.h"
@@ -28,6 +29,7 @@
 namespace pp {
 class KeyboardInputEvent;
 class MouseInputEvent;
+class VarDictionary;
 }
 
 namespace chrome_pdf {
@@ -78,7 +80,9 @@ class PDFiumEngine : public PDFEngine,
   virtual bool HasPermission(DocumentPermission permission) const;
   virtual void SelectAll();
   virtual int GetNumberOfPages();
+  virtual pp::VarArray GetBookmarks();
   virtual int GetNamedDestinationPage(const std::string& destination);
+  virtual pp::VarDictionary GetNamedDestinations();
   virtual int GetFirstVisiblePage();
   virtual int GetMostVisiblePage();
   virtual pp::Rect GetPageRect(int index);

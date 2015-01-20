@@ -8,13 +8,16 @@
 #include "base/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/values.h"
-#include "components/policy/core/common/policy_service.h"
 
 namespace base {
 class SingleThreadTaskRunner;
 class TimeDelta;
 class WaitableEvent;
 }  // namespace base
+
+namespace policy {
+class PolicyService;
+}  // namespace policy
 
 namespace remoting {
 namespace policy_hack {
@@ -28,11 +31,22 @@ class PolicyWatcher {
   typedef base::Callback<void(scoped_ptr<base::DictionaryValue>)>
       PolicyUpdatedCallback;
 
+  // TODO(lukasza): PolicyErrorCallback never gets called by
+  // PolicyServiceWatcher.  Need to either 1) remove error-handling from
+  // PolicyWatcher or 2) add error-handling around PolicyService
+  // 2a) Add policy name/type validation via policy::Schema::Normalize.
+  // 2b) Consider exposing parsing errors from policy::ConfigDirPolicyLoader.
+
   // Called after detecting malformed policies.
   typedef base::Callback<void()> PolicyErrorCallback;
 
+  // Derived classes specify which |task_runner| should be used for calling
+  // their StartWatchingInternal and StopWatchingInternal methods.
+  // Derived classes promise back to call UpdatePolicies and other instance
+  // methods on the same |task_runner|.
   explicit PolicyWatcher(
-      scoped_refptr<base::SingleThreadTaskRunner> task_runner);
+      const scoped_refptr<base::SingleThreadTaskRunner>& task_runner);
+
   virtual ~PolicyWatcher();
 
   // This guarantees that the |policy_updated_callback| is called at least once
@@ -50,6 +64,9 @@ class PolicyWatcher {
   // for policy changes and will call |policy_updated_callback| when the error
   // is recovered from and may call |policy_error_callback| when new errors are
   // found.
+  //
+  // See |Create| method's description for comments about which thread will
+  // be used to run the callbacks.
   virtual void StartWatching(
       const PolicyUpdatedCallback& policy_updated_callback,
       const PolicyErrorCallback& policy_error_callback);
@@ -58,58 +75,28 @@ class PolicyWatcher {
   // should wait for |stopped_callback| to be called before deleting it.
   virtual void StopWatching(const base::Closure& stopped_callback);
 
-  // Implemented by each platform.  |task_runner| should be an IO message loop.
-  // |policy_service| is currently only used on ChromeOS.  The caller must
-  // ensure that |policy_service| remains valid for the lifetime of
-  // PolicyWatcher.
+  // Specify a |policy_service| to borrow (on Chrome OS, from the browser
+  // process) or specify nullptr to internally construct and use a new
+  // PolicyService (on other OS-es).
+  //
+  // When |policy_service| is null, then |task_runner| is used for reading the
+  // policy from files / registry / preferences.  PolicyUpdatedCallback and
+  // PolicyErrorCallback will be called on the same |task_runner|.
+  // |task_runner| should be of TYPE_IO type.
+  //
+  // When |policy_service| is specified then |task_runner| argument is ignored
+  // and 1) BrowserThread::UI is used for PolicyUpdatedCallback and
+  // PolicyErrorCallback and 2) BrowserThread::FILE is used for reading the
+  // policy from files / registry / preferences (although (2) is just an
+  // implementation detail and should likely be ignored outside of
+  // PolicyWatcher).
   static scoped_ptr<PolicyWatcher> Create(
       policy::PolicyService* policy_service,
-      scoped_refptr<base::SingleThreadTaskRunner> task_runner);
-
-  // The name of the NAT traversal policy.
-  static const char kNatPolicyName[];
-
-  // The name of the policy for requiring 2-factor authentication.
-  static const char kHostRequireTwoFactorPolicyName[];
-
-  // The name of the host domain policy.
-  static const char kHostDomainPolicyName[];
-
-  // The name of the username policy. This policy is ignored on Windows.
-  // This policy is currently considered 'internal only' and so is not
-  // documented in policy_templates.json.
-  static const char kHostMatchUsernamePolicyName[];
-
-  // The name of the policy that controls the host talkgadget prefix.
-  static const char kHostTalkGadgetPrefixPolicyName[];
-
-  // The name of the policy for requiring curtain-mode.
-  static const char kHostRequireCurtainPolicyName[];
-
-  // The names of the policies for token authentication URLs.
-  static const char kHostTokenUrlPolicyName[];
-  static const char kHostTokenValidationUrlPolicyName[];
-  static const char kHostTokenValidationCertIssuerPolicyName[];
-
-  // The name of the policy for disabling PIN-less authentication.
-  static const char kHostAllowClientPairing[];
-
-  // The name of the policy for disabling gnubbyd forwarding.
-  static const char kHostAllowGnubbyAuthPolicyName[];
-
-  // The name of the policy for allowing use of relay servers.
-  static const char kRelayPolicyName[];
-
-  // The name of the policy that restricts the range of host UDP ports.
-  static const char kUdpPortRangePolicyName[];
-
-  // The name of the policy for overriding policies, for use in testing.
-  static const char kHostDebugOverridePoliciesName[];
+      const scoped_refptr<base::SingleThreadTaskRunner>& task_runner);
 
  protected:
   virtual void StartWatchingInternal() = 0;
   virtual void StopWatchingInternal() = 0;
-  virtual void Reload() = 0;
 
   // Used to check if the class is on the right thread.
   bool OnPolicyWatcherThread() const;
@@ -126,11 +113,6 @@ class PolicyWatcher {
   // SignalPolicyError() only after a threshold count is reached.
   // The counter is reset whenever policy has been successfully read.
   void SignalTransientPolicyError();
-
-  // Used for time-based reloads in case something goes wrong with the
-  // notification system.
-  void ScheduleFallbackReloadTask();
-  void ScheduleReloadTask(const base::TimeDelta& delay);
 
   // Returns a DictionaryValue containing the default values for each policy.
   const base::DictionaryValue& Defaults() const;

@@ -12,8 +12,8 @@
 #include "base/location.h"
 #include "base/memory/weak_ptr.h"
 #include "base/single_thread_task_runner.h"
-#include "base/time/time.h"
 #include "base/values.h"
+#include "policy/policy_constants.h"
 #include "remoting/host/dns_blackhole_checker.h"
 
 #if !defined(NDEBUG)
@@ -24,10 +24,6 @@ namespace remoting {
 namespace policy_hack {
 
 namespace {
-
-// The time interval for rechecking policy. This is our fallback in case the
-// delegate never reports a change to the ReloadObserver.
-const int kFallbackReloadDelayMinutes = 15;
 
 // Copies all policy values from one dictionary to another, using values from
 // |default| if they are not set in |from|, or values from |bad_type_values| if
@@ -58,7 +54,7 @@ scoped_ptr<base::DictionaryValue> CopyGoodValuesAndAddDefaults(
 #if !defined(NDEBUG)
   // Replace values with those specified in DebugOverridePolicies, if present.
   std::string policy_overrides;
-  if (from->GetString(PolicyWatcher::kHostDebugOverridePoliciesName,
+  if (from->GetString(policy::key::kRemoteAccessHostDebugOverridePolicies,
                       &policy_overrides)) {
     scoped_ptr<base::Value> value(base::JSONReader::Read(policy_overrides));
     const base::DictionaryValue* override_values;
@@ -73,80 +69,52 @@ scoped_ptr<base::DictionaryValue> CopyGoodValuesAndAddDefaults(
 
 }  // namespace
 
-const char PolicyWatcher::kNatPolicyName[] =
-    "RemoteAccessHostFirewallTraversal";
-
-const char PolicyWatcher::kHostRequireTwoFactorPolicyName[] =
-    "RemoteAccessHostRequireTwoFactor";
-
-const char PolicyWatcher::kHostDomainPolicyName[] =
-    "RemoteAccessHostDomain";
-
-const char PolicyWatcher::kHostMatchUsernamePolicyName[] =
-    "RemoteAccessHostMatchUsername";
-
-const char PolicyWatcher::kHostTalkGadgetPrefixPolicyName[] =
-    "RemoteAccessHostTalkGadgetPrefix";
-
-const char PolicyWatcher::kHostRequireCurtainPolicyName[] =
-    "RemoteAccessHostRequireCurtain";
-
-const char PolicyWatcher::kHostTokenUrlPolicyName[] =
-    "RemoteAccessHostTokenUrl";
-
-const char PolicyWatcher::kHostTokenValidationUrlPolicyName[] =
-    "RemoteAccessHostTokenValidationUrl";
-
-const char PolicyWatcher::kHostTokenValidationCertIssuerPolicyName[] =
-    "RemoteAccessHostTokenValidationCertificateIssuer";
-
-const char PolicyWatcher::kHostAllowClientPairing[] =
-    "RemoteAccessHostAllowClientPairing";
-
-const char PolicyWatcher::kHostAllowGnubbyAuthPolicyName[] =
-    "RemoteAccessHostAllowGnubbyAuth";
-
-const char PolicyWatcher::kRelayPolicyName[] =
-    "RemoteAccessHostAllowRelayedConnection";
-
-const char PolicyWatcher::kUdpPortRangePolicyName[] =
-    "RemoteAccessHostUdpPortRange";
-
-const char PolicyWatcher::kHostDebugOverridePoliciesName[] =
-    "RemoteAccessHostDebugOverridePolicies";
-
 PolicyWatcher::PolicyWatcher(
-    scoped_refptr<base::SingleThreadTaskRunner> task_runner)
+    const scoped_refptr<base::SingleThreadTaskRunner>& task_runner)
     : task_runner_(task_runner),
       transient_policy_error_retry_counter_(0),
       old_policies_(new base::DictionaryValue()),
       default_values_(new base::DictionaryValue()),
       weak_factory_(this) {
   // Initialize the default values for each policy.
-  default_values_->SetBoolean(kNatPolicyName, true);
-  default_values_->SetBoolean(kHostRequireTwoFactorPolicyName, false);
-  default_values_->SetBoolean(kHostRequireCurtainPolicyName, false);
-  default_values_->SetBoolean(kHostMatchUsernamePolicyName, false);
-  default_values_->SetString(kHostDomainPolicyName, std::string());
-  default_values_->SetString(kHostTalkGadgetPrefixPolicyName,
-                               kDefaultHostTalkGadgetPrefix);
-  default_values_->SetString(kHostTokenUrlPolicyName, std::string());
-  default_values_->SetString(kHostTokenValidationUrlPolicyName, std::string());
-  default_values_->SetString(kHostTokenValidationCertIssuerPolicyName,
+  default_values_->SetBoolean(policy::key::kRemoteAccessHostFirewallTraversal,
+                              true);
+  default_values_->SetBoolean(policy::key::kRemoteAccessHostRequireTwoFactor,
+                              false);
+  default_values_->SetBoolean(policy::key::kRemoteAccessHostRequireCurtain,
+                              false);
+  default_values_->SetBoolean(policy::key::kRemoteAccessHostMatchUsername,
+                              false);
+  default_values_->SetString(policy::key::kRemoteAccessHostDomain,
                              std::string());
-  default_values_->SetBoolean(kHostAllowClientPairing, true);
-  default_values_->SetBoolean(kHostAllowGnubbyAuthPolicyName, true);
-  default_values_->SetBoolean(kRelayPolicyName, true);
-  default_values_->SetString(kUdpPortRangePolicyName, "");
+  default_values_->SetString(policy::key::kRemoteAccessHostTalkGadgetPrefix,
+                             kDefaultHostTalkGadgetPrefix);
+  default_values_->SetString(policy::key::kRemoteAccessHostTokenUrl,
+                             std::string());
+  default_values_->SetString(policy::key::kRemoteAccessHostTokenValidationUrl,
+                             std::string());
+  default_values_->SetString(
+      policy::key::kRemoteAccessHostTokenValidationCertificateIssuer,
+      std::string());
+  default_values_->SetBoolean(policy::key::kRemoteAccessHostAllowClientPairing,
+                              true);
+  default_values_->SetBoolean(policy::key::kRemoteAccessHostAllowGnubbyAuth,
+                              true);
+  default_values_->SetBoolean(
+      policy::key::kRemoteAccessHostAllowRelayedConnection, true);
+  default_values_->SetString(policy::key::kRemoteAccessHostUdpPortRange, "");
 #if !defined(NDEBUG)
-  default_values_->SetString(kHostDebugOverridePoliciesName, std::string());
+  default_values_->SetString(
+      policy::key::kRemoteAccessHostDebugOverridePolicies, std::string());
 #endif
 
   // Initialize the fall-back values to use for unreadable policies.
   // For most policies these match the defaults.
   bad_type_values_.reset(default_values_->DeepCopy());
-  bad_type_values_->SetBoolean(kNatPolicyName, false);
-  bad_type_values_->SetBoolean(kRelayPolicyName, false);
+  bad_type_values_->SetBoolean(policy::key::kRemoteAccessHostFirewallTraversal,
+                               false);
+  bad_type_values_->SetBoolean(
+      policy::key::kRemoteAccessHostAllowRelayedConnection, false);
 }
 
 PolicyWatcher::~PolicyWatcher() {
@@ -181,20 +149,6 @@ void PolicyWatcher::StopWatchingOnPolicyWatcherThread() {
   weak_factory_.InvalidateWeakPtrs();
   policy_updated_callback_.Reset();
   policy_error_callback_.Reset();
-}
-
-void PolicyWatcher::ScheduleFallbackReloadTask() {
-  DCHECK(OnPolicyWatcherThread());
-  ScheduleReloadTask(
-      base::TimeDelta::FromMinutes(kFallbackReloadDelayMinutes));
-}
-
-void PolicyWatcher::ScheduleReloadTask(const base::TimeDelta& delay) {
-  DCHECK(OnPolicyWatcherThread());
-  task_runner_->PostDelayedTask(
-      FROM_HERE,
-      base::Bind(&PolicyWatcher::Reload, weak_factory_.GetWeakPtr()),
-      delay);
 }
 
 const base::DictionaryValue& PolicyWatcher::Defaults() const {

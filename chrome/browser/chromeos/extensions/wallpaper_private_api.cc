@@ -4,6 +4,9 @@
 
 #include "chrome/browser/chromeos/extensions/wallpaper_private_api.h"
 
+#include <map>
+#include <set>
+#include <string>
 #include <vector>
 
 #include "ash/desktop_background/desktop_background_controller.h"
@@ -17,6 +20,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/path_service.h"
 #include "base/prefs/pref_service.h"
+#include "base/stl_util.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/threading/worker_pool.h"
@@ -68,7 +72,9 @@ bool IsOEMDefaultWallpaper() {
 
 // Saves |data| as |file_name| to directory with |key|. Return false if the
 // directory can not be found/created or failed to write file.
-bool SaveData(int key, const std::string& file_name, const std::string& data) {
+bool SaveData(int key,
+              const std::string& file_name,
+              const std::vector<char>& data) {
   base::FilePath data_dir;
   CHECK(PathService::Get(key, &data_dir));
   if (!base::DirectoryExists(data_dir) &&
@@ -78,7 +84,7 @@ bool SaveData(int key, const std::string& file_name, const std::string& data) {
   base::FilePath file_path = data_dir.Append(file_name);
 
   return base::PathExists(file_path) ||
-         (base::WriteFile(file_path, data.c_str(), data.size()) != -1);
+         base::WriteFile(file_path, vector_as_array(&data), data.size()) != -1;
 }
 
 // Gets |file_name| from directory with |key|. Return false if the directory can
@@ -313,8 +319,6 @@ WallpaperPrivateSetWallpaperIfExistsFunction::
     ~WallpaperPrivateSetWallpaperIfExistsFunction() {}
 
 bool WallpaperPrivateSetWallpaperIfExistsFunction::RunAsync() {
-#if !defined(USE_ATHENA)
-  // TODO(bshe): Support wallpaper manager in Athena, crbug.com/408734.
   params = set_wallpaper_if_exists::Params::Create(*args_);
   EXTENSION_FUNCTION_VALIDATE(params);
 
@@ -349,7 +353,6 @@ bool WallpaperPrivateSetWallpaperIfExistsFunction::RunAsync() {
           &WallpaperPrivateSetWallpaperIfExistsFunction::
               ReadFileAndInitiateStartDecode,
           this, wallpaper_path, fallback_path));
-#endif
   return true;
 }
 
@@ -358,17 +361,18 @@ void WallpaperPrivateSetWallpaperIfExistsFunction::
                                    const base::FilePath& fallback_path) {
   DCHECK(BrowserThread::GetBlockingPool()->IsRunningSequenceOnCurrentThread(
       sequence_token_));
-  std::string data;
   base::FilePath path = file_path;
 
   if (!base::PathExists(file_path))
     path = fallback_path;
 
+  std::string data;
   if (base::PathExists(path) &&
       base::ReadFileToString(path, &data)) {
-    BrowserThread::PostTask(BrowserThread::UI, FROM_HERE,
+    BrowserThread::PostTask(
+        BrowserThread::UI, FROM_HERE,
         base::Bind(&WallpaperPrivateSetWallpaperIfExistsFunction::StartDecode,
-                   this, data));
+                   this, std::vector<char>(data.begin(), data.end())));
     return;
   }
   std::string error = base::StringPrintf(
@@ -834,8 +838,8 @@ void WallpaperPrivateSaveThumbnailFunction::Success() {
   SendResponse(true);
 }
 
-void WallpaperPrivateSaveThumbnailFunction::Save(const std::string& data,
-                                          const std::string& file_name) {
+void WallpaperPrivateSaveThumbnailFunction::Save(const std::vector<char>& data,
+                                                 const std::string& file_name) {
   DCHECK(BrowserThread::GetBlockingPool()->IsRunningSequenceOnCurrentThread(
       sequence_token_));
   if (SaveData(chrome::DIR_CHROMEOS_WALLPAPER_THUMBNAILS, file_name, data)) {

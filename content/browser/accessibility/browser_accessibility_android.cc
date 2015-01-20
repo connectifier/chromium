@@ -206,8 +206,8 @@ bool BrowserAccessibilityAndroid::IsHierarchical() const {
 }
 
 bool BrowserAccessibilityAndroid::IsLink() const {
-  return GetRole() == ui::AX_ROLE_LINK ||
-         GetRole() == ui::AX_ROLE_IMAGE_MAP_LINK;
+  return (GetRole() == ui::AX_ROLE_LINK ||
+         GetRole() == ui::AX_ROLE_IMAGE_MAP_LINK);
 }
 
 bool BrowserAccessibilityAndroid::IsMultiLine() const {
@@ -220,6 +220,7 @@ bool BrowserAccessibilityAndroid::IsPassword() const {
 
 bool BrowserAccessibilityAndroid::IsRangeType() const {
   return (GetRole() == ui::AX_ROLE_PROGRESS_INDICATOR ||
+          GetRole() == ui::AX_ROLE_METER ||
           GetRole() == ui::AX_ROLE_SCROLL_BAR ||
           GetRole() == ui::AX_ROLE_SLIDER);
 }

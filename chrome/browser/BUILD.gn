@@ -242,10 +242,7 @@ static_library("browser") {
       "//content/app/resources",
       "//media",
       "//mojo/common",
-      "//mojo/edk/system",
       "//mojo/environment:chromium",
-      "//mojo/public/cpp/bindings",
-      "//mojo/public/js",
       "//net:extras",
       "//net:net_with_v8",
       "//storage/browser",
@@ -255,6 +252,9 @@ static_library("browser") {
       "//third_party/leveldatabase",
       "//third_party/libaddressinput",
       "//third_party/libyuv",
+      "//third_party/mojo/src/mojo/edk/system",
+      "//third_party/mojo/src/mojo/public/cpp/bindings",
+      "//third_party/mojo/src/mojo/public/js",
       "//third_party/npapi",
       "//third_party/re2",
       "//third_party/smhasher:cityhash",
@@ -581,7 +581,6 @@ static_library("browser") {
       ":jni_headers",
       "//components/cdm/browser",
       "//components/enhanced_bookmarks",
-      "//components/history/core/android",
       "//components/resources:components_resources",
       "//components/web_contents_delegate_android",
       "//third_party/android_opengl/etc1",
@@ -650,8 +649,8 @@ static_library("browser") {
       #"../chrome_elf/chrome_elf.gyp:chrome_elf_constants",  TODO(GYP)
       #"../chrome_elf/chrome_elf.gyp:dll_hash",  TODO(GYP)
       #"../google_update/google_update.gyp:google_update",  TODO(GYP)
-      #"../ui/metro_viewer/metro_viewer.gyp:metro_viewer_messages",  TODO(GYP)
-      #"../win8/win8.gyp:metro_viewer",  TODO(GYP)
+      "//ui/metro_viewer",
+      "//win8:metro_viewer",
     ]
   } else {
     # Non-Windows.

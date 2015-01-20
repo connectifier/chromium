@@ -39,6 +39,7 @@ PDFViewer.MIN_TOOLBAR_OFFSET = 15;
 /**
  * Creates a new PDFViewer. There should only be one of these objects per
  * document.
+ * @constructor
  * @param {Object} streamDetails The stream object which points to the data
  *     contained in the PDF.
  */
@@ -46,6 +47,9 @@ function PDFViewer(streamDetails) {
   this.streamDetails_ = streamDetails;
   this.loaded_ = false;
   this.parentWindow_ = null;
+
+  this.isPrintPreview_ =
+      this.streamDetails_.originalUrl.indexOf('chrome://print') == 0;
 
   // The sizer element is placed behind the plugin element to cause scrollbars
   // to be displayed in the window. It is sized according to the document size
@@ -136,8 +140,7 @@ function PDFViewer(streamDetails) {
   }
 
   // Parse open pdf parameters.
-  var paramsParser = new OpenPDFParamsParser(this.streamDetails_.originalUrl);
-  this.urlParams_ = paramsParser.urlParams;
+  this.paramsParser_ = new OpenPDFParamsParser();
 }
 
 PDFViewer.prototype = {
@@ -229,7 +232,7 @@ PDFViewer.prototype = {
       case 65:  // a key.
         if (e.ctrlKey || e.metaKey) {
           this.plugin_.postMessage({
-            type: 'selectAll',
+            type: 'selectAll'
           });
         }
         return;
@@ -243,14 +246,14 @@ PDFViewer.prototype = {
       case 219:  // left bracket.
         if (e.ctrlKey) {
           this.plugin_.postMessage({
-            type: 'rotateCounterclockwise',
+            type: 'rotateCounterclockwise'
           });
         }
         return;
       case 221:  // right bracket.
         if (e.ctrlKey) {
           this.plugin_.postMessage({
-            type: 'rotateClockwise',
+            type: 'rotateClockwise'
           });
         }
         return;
@@ -263,7 +266,7 @@ PDFViewer.prototype = {
    */
   print_: function() {
     this.plugin_.postMessage({
-      type: 'print',
+      type: 'print'
     });
   },
 
@@ -273,7 +276,7 @@ PDFViewer.prototype = {
    */
   save_: function() {
     this.plugin_.postMessage({
-      type: 'save',
+      type: 'save'
     });
   },
 
@@ -284,17 +287,20 @@ PDFViewer.prototype = {
    * important as later actions can override the effects of previous actions.
    */
   handleURLParams_: function() {
-    if (this.urlParams_.page)
-      this.viewport_.goToPage(this.urlParams_.page);
-    if (this.urlParams_.position) {
+    var urlParams =
+        this.paramsParser_.getViewportFromUrlParams(
+            this.streamDetails_.originalUrl);
+    if (urlParams.page)
+      this.viewport_.goToPage(urlParams.page);
+    if (urlParams.position) {
       // Make sure we don't cancel effect of page parameter.
       this.viewport_.position = {
-        x: this.viewport_.position.x + this.urlParams_.position.x,
-        y: this.viewport_.position.y + this.urlParams_.position.y
+        x: this.viewport_.position.x + urlParams.position.x,
+        y: this.viewport_.position.y + urlParams.position.y
       };
     }
-    if (this.urlParams_.zoom)
-      this.viewport_.setZoom(this.urlParams_.zoom);
+    if (urlParams.zoom)
+      this.viewport_.setZoom(urlParams.zoom);
   },
 
   /**
@@ -337,6 +343,68 @@ PDFViewer.prototype = {
       type: 'getPasswordComplete',
       password: event.detail.password
     });
+  },
+
+  /**
+   * @private
+   * Helper function to navigate to given URL. This might involve navigating
+   * within the PDF page or opening a new url (in the same tab or a new tab).
+   * @param {string} url The URL to navigate to.
+   * @param {boolean} newTab Whether to perform the navigation in a new tab or
+   * in the current tab.
+   */
+  navigate_: function(url, newTab) {
+    if (url.length == 0)
+      return;
+    var originalUrl = this.streamDetails_.originalUrl;
+    // If |urlFragment| starts with '#', then it's for the same URL with a
+    // different URL fragment.
+    if (url.charAt(0) == '#') {
+      // if '#' is already present in |originalUrl| then remove old fragment
+      // and add new url fragment.
+      var hashIndex = originalUrl.search('#');
+      if (hashIndex != -1)
+        url = originalUrl.substring(0, hashIndex) + url;
+      else
+        url = originalUrl + url;
+    }
+
+    // If there's no scheme, add http.
+    if (url.indexOf('://') == -1 && url.indexOf('mailto:') == -1)
+      url = 'http://' + url;
+
+    // Make sure url starts with a valid scheme.
+    if (url.indexOf('http://') != 0 &&
+        url.indexOf('https://') != 0 &&
+        url.indexOf('ftp://') != 0 &&
+        url.indexOf('file://') != 0 &&
+        url.indexOf('mailto:') != 0) {
+      return;
+    }
+    // Make sure url is not only a scheme.
+    if (url == 'http://' ||
+        url == 'https://' ||
+        url == 'ftp://' ||
+        url == 'file://' ||
+        url == 'mailto:') {
+      return;
+    }
+
+    if (newTab) {
+      // Prefer the tabs API because it guarantees we can just open a new tab.
+      // window.open doesn't have this guarantee.
+      if (chrome.tabs)
+        chrome.tabs.create({ url: url });
+      else
+        window.open(url);
+    } else {
+      var pageNumber =
+          this.paramsParser_.getViewportFromUrlParams(url).page;
+      if (pageNumber != undefined)
+        this.viewport_.goToPage(pageNumber);
+      else
+        window.location.href = url;
+    }
   },
 
   /**
@@ -384,27 +452,35 @@ PDFViewer.prototype = {
         this.updateProgress_(message.data.progress);
         break;
       case 'navigate':
-        if (message.data.newTab)
-          chrome.tabs.create({ url: message.data.url });
+        // If in print preview, always open a new tab.
+        if (this.isPrintPreview_)
+          this.navigate_(message.data.url, true);
         else
-          window.location.href = message.data.url;
+          this.navigate_(message.data.url, message.data.newTab);
+        break;
+      case 'setNamedDestinations':
+        this.paramsParser_.namedDestinations = message.data.namedDestinations;
         break;
       case 'setScrollPosition':
         var position = this.viewport_.position;
-        if (message.data.x != undefined)
+        if (message.data.x !== undefined)
           position.x = message.data.x;
-        if (message.data.y != undefined)
+        if (message.data.y !== undefined)
           position.y = message.data.y;
         this.viewport_.position = position;
         break;
       case 'setTranslatedStrings':
         this.passwordScreen_.text = message.data.getPasswordString;
         this.progressBar_.text = message.data.loadingString;
-        this.progressBar_.style.visibility = 'visible';
+        if (!this.isPrintPreview_)
+          this.progressBar_.style.visibility = 'visible';
         this.errorScreen_.text = message.data.loadFailedString;
         break;
       case 'cancelStreamUrl':
         chrome.streamsPrivate.abort(this.streamDetails_.streamUrl);
+        break;
+      case 'bookmarks':
+        this.bookmarks_ = message.data.bookmarks;
         break;
     }
   },
@@ -451,7 +527,7 @@ PDFViewer.prototype = {
    */
   setZoomComplete_: function(lastZoom) {
     var zoom = this.viewport_.zoom;
-    if (zoom != lastZoom) {
+    if (zoom !== lastZoom) {
       chrome.tabs.setZoom(this.streamDetails_.tabId, zoom,
                           this.setZoomComplete_.bind(this, zoom));
     } else {
@@ -512,7 +588,7 @@ PDFViewer.prototype = {
       pageY: visiblePageDimensions.y,
       pageWidth: visiblePageDimensions.width,
       viewportWidth: size.width,
-      viewportHeight: size.height,
+      viewportHeight: size.height
     });
   },
 
@@ -533,6 +609,9 @@ PDFViewer.prototype = {
         this.plugin_.postMessage(message.data);
         break;
       case 'resetPrintPreviewMode':
+        if (!this.isPrintPreview_)
+          break;
+
         if (!this.inPrintPreviewMode_) {
           this.inPrintPreviewMode_ = true;
           this.viewport_.fitToPage();

@@ -335,6 +335,7 @@ bool RenderFrameHostImpl::OnMessageReceived(const IPC::Message &msg) {
                         OnAccessibilityLocationChanges)
     IPC_MESSAGE_HANDLER(AccessibilityHostMsg_FindInPageResult,
                         OnAccessibilityFindInPageResult)
+    IPC_MESSAGE_HANDLER(FrameHostMsg_ToggleFullscreen, OnToggleFullscreen)
 #if defined(OS_MACOSX) || defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(FrameHostMsg_ShowPopup, OnShowPopup)
     IPC_MESSAGE_HANDLER(FrameHostMsg_HidePopup, OnHidePopup)
@@ -452,23 +453,27 @@ BrowserAccessibilityManager* RenderFrameHostImpl::AccessibilityGetChildFrame(
     int accessibility_node_id) {
   RenderFrameHostImpl* child_frame =
       FrameAccessibility::GetInstance()->GetChild(this, accessibility_node_id);
-  if (!child_frame)
-    return NULL;
-
-  // Return NULL if this isn't an out-of-process iframe. Same-process iframes
-  // are already part of the accessibility tree.
-  if (child_frame->GetProcess()->GetID() == GetProcess()->GetID())
-    return NULL;
-
-  // As a sanity check, make sure the frame we're going to return belongs
-  // to the same BrowserContext.
-  if (GetSiteInstance()->GetBrowserContext() !=
-      child_frame->GetSiteInstance()->GetBrowserContext()) {
-    NOTREACHED();
-    return NULL;
-  }
+  if (!child_frame || IsSameSiteInstance(child_frame))
+    return nullptr;
 
   return child_frame->GetOrCreateBrowserAccessibilityManager();
+}
+
+void RenderFrameHostImpl::AccessibilityGetAllChildFrames(
+    std::vector<BrowserAccessibilityManager*>* child_frames) {
+  std::vector<RenderFrameHostImpl*> child_frame_hosts;
+  FrameAccessibility::GetInstance()->GetAllChildFrames(
+      this, &child_frame_hosts);
+  for (size_t i = 0; i < child_frame_hosts.size(); ++i) {
+    RenderFrameHostImpl* child_frame_host = child_frame_hosts[i];
+    if (!child_frame_host || IsSameSiteInstance(child_frame_host))
+      continue;
+
+    BrowserAccessibilityManager* manager =
+        child_frame_host->GetOrCreateBrowserAccessibilityManager();
+    if (manager)
+      child_frames->push_back(manager);
+  }
 }
 
 BrowserAccessibility* RenderFrameHostImpl::AccessibilityGetParentFrame() {
@@ -1136,6 +1141,17 @@ void RenderFrameHostImpl::OnAccessibilityFindInPageResult(
   }
 }
 
+void RenderFrameHostImpl::OnToggleFullscreen(bool enter_fullscreen) {
+  if (enter_fullscreen)
+    delegate_->EnterFullscreenMode(GetLastCommittedURL().GetOrigin());
+  else
+    delegate_->ExitFullscreenMode();
+
+  // The previous call might change the fullscreen state. We need to make sure
+  // the renderer is aware of that, which is done via the resize message.
+  render_view_host_->WasResized();
+}
+
 #if defined(OS_MACOSX) || defined(OS_ANDROID)
 void RenderFrameHostImpl::OnShowPopup(
     const FrameHostMsg_ShowPopup_Params& params) {
@@ -1483,6 +1499,14 @@ void RenderFrameHostImpl::UpdateGuestFrameAccessibility(
     FrameAccessibility::GetInstance()->AddGuestWebContents(
         this, node_id, browser_plugin_instance_id);
   }
+}
+
+bool RenderFrameHostImpl::IsSameSiteInstance(
+    RenderFrameHostImpl* other_render_frame_host) {
+  // As a sanity check, make sure the frame belongs to the same BrowserContext.
+  CHECK_EQ(GetSiteInstance()->GetBrowserContext(),
+           other_render_frame_host->GetSiteInstance()->GetBrowserContext());
+  return GetSiteInstance() == other_render_frame_host->GetSiteInstance();
 }
 
 void RenderFrameHostImpl::SetAccessibilityMode(AccessibilityMode mode) {

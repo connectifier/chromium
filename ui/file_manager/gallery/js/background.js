@@ -170,7 +170,8 @@ function launch(selectedEntriesPromise) {
               // TODO(hirono): This is workaround for crbug.com/442217. Remove
               // this after fixing it.
               setTimeout(function() {
-                launch(reopenEntriesPromsie);
+                if (reopenEntriesPromsie)
+                  launch(reopenEntriesPromsie);
               }, 500);
             }
           });
@@ -239,7 +240,7 @@ if (chrome.test) {
     var script = document.createElement('script');
     script.src =
         'chrome-extension://' + window.testExtensionId +
-        '/common/test_loader.js';
+        '/gallery/test_loader.js';
     document.documentElement.appendChild(script);
   });
 }

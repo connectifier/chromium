@@ -386,6 +386,12 @@ are declared in build/common.gypi.
       <message name="IDS_WEBSITE_SETTINGS_TYPE_MEDIASTREAM" desc="The label used for media stream permission controls in the Website Settings popup.">
         Media
       </message>
+      <message name="IDS_WEBSITE_SETTINGS_TYPE_MIC" desc="The label used for the microphone permission controls in the Website Settings popup.">
+        Microphone
+      </message>
+      <message name="IDS_WEBSITE_SETTINGS_TYPE_CAMERA" desc="The label used for the camera permission controls in the Website Settings popup.">
+        Camera
+      </message>
       <message name="IDS_WEBSITE_SETTINGS_TYPE_MIDI_SYSEX" desc="The label used for MIDI system exclusive message permission controls in the Website Settings popup.">
         MIDI full control
       </message>
@@ -6286,7 +6292,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_PASSWORD_MANAGER_LINK_DESCRIPTION" desc="Description of the flag to enable showing a link to account central on password settings page">
         Show a link in the password manager settings page to manage your synced passwords online.
-      </message>      
+      </message>
       <message name="IDS_FLAGS_ENABLE_SAVE_PASSOWRD_ON_IN_PAGE_NAVIGATION_NAME" desc="Name of the flag to enable showing of the password save prompt on in-page navigations">
         Enable showing of password prompt on in-page navigations.
       </message>
@@ -14154,11 +14160,11 @@ Do you accept?
       </message>
 
       <if expr="chromeos">
-        <message name="IDS_FLAGS_ENABLE_AUTO_VIRTUAL_KEYBOARD_NAME" desc="Name of about:flags option to turn on automatic deployment of the virtual keyboard.">
-          Auto Virtual Keyboard
+        <message name="IDS_FLAGS_DISABLE_SMART_VIRTUAL_KEYBOARD_NAME" desc="Name of about:flags option to turn off smart deployment of the virtual keyboard.">
+          Disable Smart Virtual Keyboard
         </message>
-        <message name="IDS_FLAGS_ENABLE_AUTO_VIRTUAL_KEYBOARD_DESCRIPTION" desc="Description of about:flags option to turn on automatic deployment of the virtual keyboard">
-          Enable automatic deployment of the virtual keyboard.
+        <message name="IDS_FLAGS_DISABLE_SMART_VIRTUAL_KEYBOARD_DESCRIPTION" desc="Description of about:flags option to turn off smart deployment of the virtual keyboard">
+          Disable smart deployment of the virtual keyboard.
         </message>
 
         <message name="IDS_FLAGS_ENABLE_VIRTUAL_KEYBOARD_NAME" desc="Name of about:flags option to turn on the virtual keyboard">
@@ -14203,11 +14209,18 @@ Do you accept?
           Enable new Korean IME, which is based on Google Input Tools' HMM engine.
         </message>
 
-        <message name="IDS_FLAGS_ENABLE_PHYSICAL_KEYBOARD_AUTOCORRECT_NAME" desc="Name of about::flags option to enable physical keyboard autocorrect for US keyboard">
-          Enable physical keyboard autocorrect.
+        <message name="IDS_FLAGS_DISABLE_PHYSICAL_KEYBOARD_AUTOCORRECT_NAME" desc="Name of about::flags option to disable physical keyboard autocorrect for US keyboard">
+          Disable physical keyboard autocorrect.
         </message>
-        <message name="IDS_FLAGS_ENABLE_PHYSICAL_KEYBOARD_AUTOCORRECT_DESCRIPTION" desc="Description of about::flags option to enable physical keyboard autocorrect for US keyboard">
-          Enable physical keyboard autocorrect for US keyboard, which can provide suggestions as typing on physical keyboard.
+        <message name="IDS_FLAGS_DISABLE_PHYSICAL_KEYBOARD_AUTOCORRECT_DESCRIPTION" desc="Description of about::flags option to disable physical keyboard autocorrect for US keyboard">
+          Disable physical keyboard autocorrect for US keyboard, which can provide suggestions as typing on physical keyboard.
+        </message>
+
+        <message name="IDS_FLAGS_DISABLE_VOICE_INPUT_NAME" desc="Name of about::flags option to disable voice input on virtual keyboard">
+          Disable voice input on virtual keyboard.
+        </message>
+        <message name="IDS_FLAGS_DISABLE_VOICE_INPUT_DESCRIPTION" desc="Description of about::flags option to disable voice input on virtual keyboard">
+          Disable voice input on virtual keyboard.
         </message>
 
         <message name="IDS_FLAGS_ENABLE_EXPERIMENTAL_INPUT_VIEW_FEATURES_NAME" desc="Name of about::flags option to enable experimental features for IME input-views">

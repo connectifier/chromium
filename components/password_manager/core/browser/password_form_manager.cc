@@ -100,8 +100,9 @@ PasswordFormManager::~PasswordFormManager() {
 }
 
 int PasswordFormManager::GetActionsTaken() const {
-  return user_action_ + kUserActionMax * (manager_action_ +
-         kManagerActionMax * submit_result_);
+  return user_action_ +
+         kUserActionMax *
+             (manager_action_ + kManagerActionMax * submit_result_);
 }
 
 // TODO(timsteele): use a hash of some sort in the future?
@@ -402,6 +403,13 @@ bool PasswordFormManager::HasCompletedMatching() const {
   return state_ == POST_MATCHING_PHASE;
 }
 
+bool PasswordFormManager::IsIgnorableChangePasswordForm() const {
+  bool is_change_password_form = !observed_form_.new_password_element.empty() &&
+                                 !observed_form_.password_element.empty();
+  bool is_username_certainly_correct = observed_form_.username_marked_by_site;
+  return is_change_password_form && !is_username_certainly_correct;
+}
+
 void PasswordFormManager::OnRequestDone(
     const std::vector<PasswordForm*>& logins_result) {
   // Note that the result gets deleted after this call completes, but we own
@@ -472,8 +480,8 @@ void PasswordFormManager::OnRequestDone(
       preferred_match_ = NULL;  // Don't delete, its owned by best_matches_.
       best_matches_[logins_result[i]->username_value] = logins_result[i];
     }
-    preferred_match_ = logins_result[i]->preferred ? logins_result[i]
-                                                   : preferred_match_;
+    preferred_match_ =
+        logins_result[i]->preferred ? logins_result[i] : preferred_match_;
   }
 
   client_->AutofillResultsComputed();
@@ -548,7 +556,7 @@ void PasswordFormManager::ProcessFrame(
 }
 
 void PasswordFormManager::OnGetPasswordStoreResults(
-      const std::vector<autofill::PasswordForm*>& results) {
+    const std::vector<autofill::PasswordForm*>& results) {
   DCHECK_EQ(state_, MATCHING_PHASE);
 
   scoped_ptr<BrowserSavePasswordProgressLogger> logger;
@@ -756,7 +764,8 @@ bool PasswordFormManager::UpdatePendingCredentialsIfOtherPossibleUsername(
 }
 
 void PasswordFormManager::CheckForAccountCreationForm(
-    const PasswordForm& pending, const PasswordForm& observed) {
+    const PasswordForm& pending,
+    const PasswordForm& observed) {
   // We check to see if the saved form_data is the same as the observed
   // form_data, which should never be true for passwords saved on account
   // creation forms. This check is only made the first time a password is used
@@ -789,8 +798,7 @@ void PasswordFormManager::UploadPasswordForm(
 
   // Note that this doesn't guarantee that the upload succeeded, only that
   // |form_data| is considered uploadable.
-  bool success =
-      autofill_manager->UploadPasswordForm(form_data, password_type);
+  bool success = autofill_manager->UploadPasswordForm(form_data, password_type);
   UMA_HISTOGRAM_BOOLEAN("PasswordGeneration.UploadStarted", success);
 }
 
@@ -824,10 +832,10 @@ int PasswordFormManager::ScoreResult(const PasswordForm& candidate) const {
     std::vector<std::string> candidate_path_tokens;
     base::SplitString(candidate.origin.path(), '/', &candidate_path_tokens);
     size_t depth = 0;
-    size_t max_dirs = std::min(form_path_tokens_.size(),
-                               candidate_path_tokens.size());
-    while ((depth < max_dirs) && (form_path_tokens_[depth] ==
-                                  candidate_path_tokens[depth])) {
+    size_t max_dirs =
+        std::min(form_path_tokens_.size(), candidate_path_tokens.size());
+    while ((depth < max_dirs) &&
+           (form_path_tokens_[depth] == candidate_path_tokens[depth])) {
       depth++;
       score++;
     }

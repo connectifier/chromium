@@ -70,7 +70,7 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
 
   static GuestViewBase* FromWebContents(content::WebContents* web_contents);
 
-  static GuestViewBase* From(int embedder_process_id, int instance_id);
+  static GuestViewBase* From(int owner_process_id, int instance_id);
 
   static bool IsGuest(content::WebContents* web_contents);
 
@@ -309,6 +309,9 @@ class GuestViewBase : public content::BrowserPluginGuestDelegate,
   void ActivateContents(content::WebContents* contents) final;
   void DeactivateContents(content::WebContents* contents) final;
   void ContentsZoomChange(bool zoom_in) override;
+  void HandleKeyboardEvent(
+      content::WebContents* source,
+      const content::NativeWebKeyboardEvent& event) override;
   void RunFileChooser(content::WebContents* web_contents,
                       const content::FileChooserParams& params) override;
   bool ShouldFocusPageAfterCrash() final;

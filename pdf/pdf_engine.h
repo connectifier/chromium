@@ -24,9 +24,11 @@
 #include "ppapi/cpp/rect.h"
 #include "ppapi/cpp/size.h"
 #include "ppapi/cpp/url_loader.h"
+#include "ppapi/cpp/var_array.h"
 
 namespace pp {
 class InputEvent;
+class VarDictionary;
 }
 
 const uint32 kBackgroundColor = 0xFFCCCCCC;
@@ -246,6 +248,14 @@ class PDFEngine {
   // Returns number of copies to be printed.
   virtual int GetCopiesToPrint() = 0;
 
+  // Returns a VarArray of Bookmarks, each a VarDictionary containing the
+  // following key/values:
+  // - "title" - a string Var.
+  // - "page" - an int Var.
+  // - "children" - a VarArray(), with each entry containing a VarDictionary of
+  //   the same structure.
+  virtual pp::VarArray GetBookmarks() = 0;
+
   // Append blank pages to make a 1-page document to a |num_pages| document.
   // Always retain the first page data.
   virtual void AppendBlankPages(int num_pages) = 0;
@@ -260,6 +270,7 @@ class PDFEngine {
   virtual void SetScrollPosition(const pp::Point& position) = 0;
 
   virtual bool IsProgressiveLoad() = 0;
+  virtual pp::VarDictionary GetNamedDestinations() = 0;
 };
 
 // Interface for exports that wrap the PDF engine.

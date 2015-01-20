@@ -759,6 +759,7 @@
                 '../build/linux/system.gyp:xext',
                 '../build/linux/system.gyp:xfixes',
                 '../build/linux/system.gyp:xtst',
+                '../ui/gfx/x/gfx_x11.gyp:gfx_x11',
               ],
             }, {  # else: use_x11==0
               'sources!': [
@@ -1907,7 +1908,7 @@
         },
       ],
     }],
-    ['test_isolation_mode != "noop" and archive_gpu_tests==1', {
+    ['test_isolation_mode != "noop"', {
       'targets': [
         {
           'target_name': 'media_unittests_run',

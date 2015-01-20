@@ -3312,8 +3312,8 @@ TEST_F(BluetoothChromeOSTest, GetConnectionInfoForConnectedDevice) {
   EXPECT_EQ(4, conn_info.max_transmit_power);
 }
 
-// Verifies OnDBusThreadManagerShutdown shuts down the adapter as expected.
-TEST_F(BluetoothChromeOSTest, OnDBusThreadManagerShutdown) {
+// Verifies Shutdown shuts down the adapter as expected.
+TEST_F(BluetoothChromeOSTest, Shutdown) {
   // Set up and adapter, power, discoverable, start discovery.
   GetAdapter();
   adapter_->SetPowered(true, base::Bind(&BluetoothChromeOSTest::Callback,
@@ -3329,6 +3329,10 @@ TEST_F(BluetoothChromeOSTest, OnDBusThreadManagerShutdown) {
                  base::Unretained(this)),
       base::Bind(&BluetoothChromeOSTest::ErrorCallback,
                  base::Unretained(this)));
+  base::MessageLoop::current()->Run();
+  ASSERT_EQ(3, callback_count_);
+  ASSERT_EQ(0, error_callback_count_);
+  callback_count_ = 0;
 
   // Validate running adapter state.
   EXPECT_NE("", adapter_->GetAddress());
@@ -3338,12 +3342,14 @@ TEST_F(BluetoothChromeOSTest, OnDBusThreadManagerShutdown) {
   EXPECT_TRUE(adapter_->IsPowered());
   EXPECT_TRUE(adapter_->IsDiscoverable());
   EXPECT_TRUE(adapter_->IsDiscovering());
+  EXPECT_EQ(1U, adapter_->GetDevices().size());
+  EXPECT_NE(nullptr, adapter_->GetDevice(
+                         FakeBluetoothDeviceClient::kPairedDeviceAddress));
   EXPECT_NE(dbus::ObjectPath(""), static_cast<BluetoothAdapterChromeOS*>(
                                       adapter_.get())->object_path());
 
-  // OnDBusThreadManagerShutdown
-  static_cast<BluetoothAdapterChromeOS*>(adapter_.get())
-      ->OnDBusThreadManagerShutdown();
+  // Shutdown
+  static_cast<BluetoothAdapterChromeOS*>(adapter_.get())->Shutdown();
 
   // Validate post shutdown state.
   EXPECT_EQ("", adapter_->GetAddress());
@@ -3353,8 +3359,27 @@ TEST_F(BluetoothChromeOSTest, OnDBusThreadManagerShutdown) {
   EXPECT_FALSE(adapter_->IsPowered());
   EXPECT_FALSE(adapter_->IsDiscoverable());
   EXPECT_FALSE(adapter_->IsDiscovering());
+  EXPECT_EQ(0U, adapter_->GetDevices().size());
+  EXPECT_EQ(nullptr, adapter_->GetDevice(
+                         FakeBluetoothDeviceClient::kPairedDeviceAddress));
   EXPECT_EQ(dbus::ObjectPath(""), static_cast<BluetoothAdapterChromeOS*>(
                                       adapter_.get())->object_path());
+
+  adapter_->SetPowered(true, base::Bind(&BluetoothChromeOSTest::Callback,
+                                        base::Unretained(this)),
+                       base::Bind(&BluetoothChromeOSTest::ErrorCallback,
+                                  base::Unretained(this)));
+  adapter_->SetDiscoverable(true, base::Bind(&BluetoothChromeOSTest::Callback,
+                                             base::Unretained(this)),
+                            base::Bind(&BluetoothChromeOSTest::ErrorCallback,
+                                       base::Unretained(this)));
+  adapter_->StartDiscoverySession(
+      base::Bind(&BluetoothChromeOSTest::DiscoverySessionCallback,
+                 base::Unretained(this)),
+      base::Bind(&BluetoothChromeOSTest::ErrorCallback,
+                 base::Unretained(this)));
+  ASSERT_EQ(0, callback_count_);
+  ASSERT_EQ(3, error_callback_count_);
 }
 
 }  // namespace chromeos

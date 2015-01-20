@@ -334,8 +334,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual void didBlur();
   virtual void show(blink::WebNavigationPolicy policy);
   virtual void runModal();
-  virtual bool enterFullScreen();
-  virtual void exitFullScreen();
   virtual bool requestPointerLock();
   virtual void requestPointerUnlock();
   virtual bool isPointerLocked();
@@ -728,10 +726,6 @@ class CONTENT_EXPORT RenderViewImpl
   // Returns a new NavigationState populated with the navigation information
   // saved in OnNavigate().
   NavigationState* CreateNavigationStateFromPending();
-
-  // Processes the command-line flags --enable-viewport,
-  // --enable-fixed-layout[=w,h] and --enable-pinch.
-  void ProcessViewLayoutFlags(const base::CommandLine& command_line);
 
 #if defined(OS_ANDROID)
   // Launch an Android content intent with the given URL.

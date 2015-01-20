@@ -11,6 +11,7 @@
 
 using device::BluetoothAdapter;
 using device::BluetoothAdapterFactory;
+using device::BluetoothDevice;
 
 namespace content {
 

@@ -34,7 +34,7 @@ vars = {
   'llvm_url': 'http://src.chromium.org/llvm-project',
   'llvm_git': 'https://llvm.googlesource.com',
   'webkit_trunk': 'http://src.chromium.org/blink/trunk',
-  'webkit_revision': '7a4bf5ae27947a72b8465a820b58f25b062ab288', # from svn revision 188521
+  'webkit_revision': 'c4e2af3d859a353fb96ba40539d703f747e9d39f', # from svn revision 188690
   'chromium_git': 'https://chromium.googlesource.com',
   'chromiumos_git': 'https://chromium.googlesource.com/chromiumos',
   'pdfium_git': 'https://pdfium.googlesource.com',
@@ -42,19 +42,19 @@ vars = {
   'boringssl_git': 'https://boringssl.googlesource.com',
   'libvpx_revision': '4f9bd1b106e9e87a02ac2a0d5f9f92a6389b467d',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': 'afe3005be3392e43bc51eb7eb2017eefaed85ad1',
+  'skia_revision': '87f3ba4847aa575016eb3a21e944197d757df8c0',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   'v8_branch': 'trunk',
-  'v8_revision': 'bf5996028389844f4078aa2bff403207cea47a17',
+  'v8_revision': '1669c95a799da50b44f7efcb518473b81a0bf669',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
-  'swarming_revision': 'c44f5725d2243ada2d8b63adf85ca76acb50fee6',
+  'swarming_revision': '0a795bd52b2e58a2b73002e7f9ce5cad936e53c4',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
@@ -66,7 +66,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
-  'pdfium_revision': 'f061e44695fc438f3fc9877f5bf8f0f8397ed186',
+  'pdfium_revision': 'aa7b4ede03764a5701a477b601720a32c88d8e42',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openmax_dl
   # and whatever else without interference from each other.
@@ -209,10 +209,10 @@ deps = {
    Var('chromium_git') + '/chromium/deps/libvpx.git' + '@' +  Var('libvpx_revision'),
 
   'src/third_party/ffmpeg':
-   Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + 'e74760aa626e18175dea1b089c7ed719263adb8b',
+   Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + 'ff47c53afa6bc5a2d705c569dbca324d71447f6f',
 
   'src/third_party/libjingle/source/talk':
-    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + 'e731f3fc397ccd52b4dff609a9c3d25c311a2a25', # from svn revision 8064
+    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + 'df4bf5ac2968fce7df9d4b8ac8062106b6c72f2e', # from svn revision 8102
 
   'src/third_party/usrsctp/usrsctplib':
     Var('chromium_git') + '/external/usrsctplib.git' + '@' + '190c8cbfcf8fd810aa09e0fab4ca62a8ce724e14',
@@ -236,7 +236,7 @@ deps = {
    Var('chromium_git') + '/native_client/src/third_party/scons-2.0.1.git' + '@' + '1c1550e17fc26355d08627fbdec13d8291227067',
 
   'src/third_party/webrtc':
-    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + 'a10b9b472673f1fabd4f7acc331cfb16db02914a', # from svn revision 8064
+    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + '54c8130108f395419e64dac24e1b452979c380f7', # from svn revision 8102
 
   'src/third_party/openmax_dl':
     Var('chromium_git') + '/external/webrtc/deps/third_party/openmax.git' + '@' +  Var('openmax_dl_revision'),
@@ -737,7 +737,10 @@ hooks = [
   {
     'name': 'download_mojo_shell',
     'pattern': '',
-    'action': [ 'python', 'src/mojo/public/tools/download_shell_binary.py' ],
+    'action': [ 'python',
+                'src/third_party/mojo/src/mojo/public/tools/download_shell_binary.py',
+                '--tools-directory=../../../../../../tools',
+              ],
   },
   {
     # A change to a .gyp, .gypi, or to GYP itself should run the generator.

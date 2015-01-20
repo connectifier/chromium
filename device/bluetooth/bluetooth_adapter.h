@@ -196,8 +196,8 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapter
   // Shutdown the adapter: tear down and clean up all objects owned by
   // BluetoothAdapter. After this call, the BluetoothAdapter will behave as if
   // no Bluetooth controller exists in the local system. |IsPresent| will return
-  // false. No futher use of DBusThreadManager will be made.
-  void OnDBusThreadManagerShutdown();
+  // false.
+  virtual void Shutdown();
 #endif
 
   // Adds and removes observers for events on this bluetooth adapter. If

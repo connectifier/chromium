@@ -302,9 +302,13 @@ class FakeFullscreenDelegate : public WebContentsDelegate {
   FakeFullscreenDelegate() : fullscreened_contents_(NULL) {}
   ~FakeFullscreenDelegate() override {}
 
-  void ToggleFullscreenModeForTab(WebContents* web_contents,
-                                  bool enter_fullscreen) override {
-    fullscreened_contents_ = enter_fullscreen ? web_contents : NULL;
+  void EnterFullscreenModeForTab(WebContents* web_contents,
+                                 const GURL& origin) override {
+    fullscreened_contents_ = web_contents;
+  }
+
+  void ExitFullscreenModeForTab(WebContents* web_contents) override {
+    fullscreened_contents_ = NULL;
   }
 
   bool IsFullscreenForTabOrPending(
@@ -1302,8 +1306,8 @@ TEST_F(WebContentsImplTest, NavigationExitsFullscreen) {
   EXPECT_FALSE(orig_rvh->IsFullscreen());
   EXPECT_FALSE(contents()->IsFullscreenForCurrentTab());
   EXPECT_FALSE(fake_delegate.IsFullscreenForTabOrPending(contents()));
-  orig_rvh->OnMessageReceived(
-      ViewHostMsg_ToggleFullscreen(orig_rvh->GetRoutingID(), true));
+  orig_rfh->OnMessageReceived(
+      FrameHostMsg_ToggleFullscreen(orig_rfh->GetRoutingID(), true));
   EXPECT_TRUE(orig_rvh->IsFullscreen());
   EXPECT_TRUE(contents()->IsFullscreenForCurrentTab());
   EXPECT_TRUE(fake_delegate.IsFullscreenForTabOrPending(contents()));
@@ -1354,8 +1358,8 @@ TEST_F(WebContentsImplTest, HistoryNavigationExitsFullscreen) {
 
   for (int i = 0; i < 2; ++i) {
     // Toggle fullscreen mode on (as if initiated via IPC from renderer).
-    orig_rvh->OnMessageReceived(
-        ViewHostMsg_ToggleFullscreen(orig_rvh->GetRoutingID(), true));
+    orig_rfh->OnMessageReceived(
+        FrameHostMsg_ToggleFullscreen(orig_rfh->GetRoutingID(), true));
     EXPECT_TRUE(orig_rvh->IsFullscreen());
     EXPECT_TRUE(contents()->IsFullscreenForCurrentTab());
     EXPECT_TRUE(fake_delegate.IsFullscreenForTabOrPending(contents()));
@@ -1412,8 +1416,8 @@ TEST_F(WebContentsImplTest, CrashExitsFullscreen) {
   EXPECT_FALSE(test_rvh()->IsFullscreen());
   EXPECT_FALSE(contents()->IsFullscreenForCurrentTab());
   EXPECT_FALSE(fake_delegate.IsFullscreenForTabOrPending(contents()));
-  test_rvh()->OnMessageReceived(
-      ViewHostMsg_ToggleFullscreen(test_rvh()->GetRoutingID(), true));
+  contents()->GetMainFrame()->OnMessageReceived(FrameHostMsg_ToggleFullscreen(
+      contents()->GetMainFrame()->GetRoutingID(), true));
   EXPECT_TRUE(test_rvh()->IsFullscreen());
   EXPECT_TRUE(contents()->IsFullscreenForCurrentTab());
   EXPECT_TRUE(fake_delegate.IsFullscreenForTabOrPending(contents()));
@@ -2417,6 +2421,66 @@ TEST_F(WebContentsImplTest, CapturerOverridesPreferredSize) {
   contents()->DecrementCapturerCount();
   EXPECT_EQ(0, contents()->GetCapturerCount());
   EXPECT_EQ(original_preferred_size, contents()->GetPreferredSize());
+}
+
+TEST_F(WebContentsImplTest, CapturerPreventsHiding) {
+  const gfx::Size original_preferred_size(1024, 768);
+  contents()->UpdatePreferredSize(original_preferred_size);
+
+  TestRenderWidgetHostView* view = static_cast<TestRenderWidgetHostView*>(
+      contents()->GetMainFrame()->GetRenderViewHost()->GetView());
+
+  // With no capturers, setting and un-setting occlusion should change the
+  // view's occlusion state.
+  EXPECT_FALSE(view->is_showing());
+  contents()->WasShown();
+  EXPECT_TRUE(view->is_showing());
+  contents()->WasHidden();
+  EXPECT_FALSE(view->is_showing());
+  contents()->WasShown();
+  EXPECT_TRUE(view->is_showing());
+
+  // Add a capturer and try to hide the contents. The view will remain visible.
+  contents()->IncrementCapturerCount(gfx::Size());
+  contents()->WasHidden();
+  EXPECT_TRUE(view->is_showing());
+
+  // Remove the capturer, and the WasHidden should take effect.
+  contents()->DecrementCapturerCount();
+  EXPECT_FALSE(view->is_showing());
+}
+
+TEST_F(WebContentsImplTest, CapturerPreventsOcclusion) {
+  const gfx::Size original_preferred_size(1024, 768);
+  contents()->UpdatePreferredSize(original_preferred_size);
+
+  TestRenderWidgetHostView* view = static_cast<TestRenderWidgetHostView*>(
+      contents()->GetMainFrame()->GetRenderViewHost()->GetView());
+
+  // With no capturers, setting and un-setting occlusion should change the
+  // view's occlusion state.
+  EXPECT_FALSE(view->is_occluded());
+  contents()->WasOccluded();
+  EXPECT_TRUE(view->is_occluded());
+  contents()->WasUnOccluded();
+  EXPECT_FALSE(view->is_occluded());
+  contents()->WasOccluded();
+  EXPECT_TRUE(view->is_occluded());
+
+  // Add a capturer. This should cause the view to be un-occluded.
+  contents()->IncrementCapturerCount(gfx::Size());
+  EXPECT_FALSE(view->is_occluded());
+
+  // Try to occlude the view. This will fail to propagate because of the
+  // active capturer.
+  contents()->WasOccluded();
+  EXPECT_FALSE(view->is_occluded());
+
+  // Remove the capturer and try again.
+  contents()->DecrementCapturerCount();
+  EXPECT_FALSE(view->is_occluded());
+  contents()->WasOccluded();
+  EXPECT_TRUE(view->is_occluded());
 }
 
 // Tests that GetLastActiveTime starts with a real, non-zero time and updates

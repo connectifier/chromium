@@ -20,10 +20,20 @@
       },
       "cacheinvalidation_unittests",
       "cast_unittests",
-      "cc_unittests",
+      {
+        "test": "cc_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "chromedriver_unittests",
       "chrome_elf_unittests",
-      "components_unittests",
+      {
+        "test": "components_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "compositor_unittests",
       {
         "test": "content_browsertests",
@@ -44,7 +54,12 @@
       "gcm_unit_tests",
       "gfx_unittests",
       "google_apis_unittests",
-      "gpu_unittests",
+      {
+        "test": "gpu_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "installer_util_unittests",
       {
         "test": "interactive_ui_tests",
@@ -55,7 +70,12 @@
       },
       "ipc_tests",
       "jingle_unittests",
-      "media_unittests",
+      {
+        "test": "media_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       {
         "test": "net_unittests",
         "swarming": {
@@ -125,10 +145,20 @@
       },
       "cacheinvalidation_unittests",
       "cast_unittests",
-      "cc_unittests",
+      {
+        "test": "cc_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "chromedriver_unittests",
       "chrome_elf_unittests",
-      "components_unittests",
+      {
+        "test": "components_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "compositor_unittests",
       {
         "test": "content_browsertests",
@@ -149,7 +179,12 @@
       "gcm_unit_tests",
       "gfx_unittests",
       "google_apis_unittests",
-      "gpu_unittests",
+      {
+        "test": "gpu_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "installer_util_unittests",
       {
         "test": "interactive_ui_tests",
@@ -160,7 +195,12 @@
       },
       "ipc_tests",
       "jingle_unittests",
-      "media_unittests",
+      {
+        "test": "media_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "mojo_common_unittests",
       "mojo_public_bindings_unittests",
       "mojo_public_environment_unittests",
@@ -240,11 +280,21 @@
       },
       "cacheinvalidation_unittests",
       "cast_unittests",
-      "cc_unittests",
+      {
+        "test": "cc_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "chromedriver_unittests",
       "chrome_elf_unittests",
       "components_browsertests",
-      "components_unittests",
+      {
+        "test": "components_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "compositor_unittests",
       {
         "test": "content_browsertests",
@@ -266,7 +316,12 @@
       "gcm_unit_tests",
       "gfx_unittests",
       "google_apis_unittests",
-      "gpu_unittests",
+      {
+        "test": "gpu_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "installer_util_unittests",
       {
         "test": "interactive_ui_tests",
@@ -278,7 +333,12 @@
       "ipc_tests",
       "jingle_unittests",
       "keyboard_unittests",
-      "media_unittests",
+      {
+        "test": "media_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "message_center_unittests",
       "mojo_common_unittests",
       "mojo_public_bindings_unittests",
@@ -363,11 +423,21 @@
       "aura_unittests",
       "cacheinvalidation_unittests",
       "cast_unittests",
-      "cc_unittests",
+      {
+        "test": "cc_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "chromedriver_unittests",
       "chrome_elf_unittests",
       "components_browsertests",
-      "components_unittests",
+      {
+        "test": "components_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "compositor_unittests",
       {
         "test": "content_browsertests",
@@ -389,7 +459,12 @@
       "gcm_unit_tests",
       "gfx_unittests",
       "google_apis_unittests",
-      "gpu_unittests",
+      {
+        "test": "gpu_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "installer_util_unittests",
       {
         "test": "interactive_ui_tests",
@@ -401,7 +476,12 @@
       "ipc_tests",
       "jingle_unittests",
       "keyboard_unittests",
-      "media_unittests",
+      {
+        "test": "media_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "message_center_unittests",
       "mojo_common_unittests",
       "mojo_public_bindings_unittests",
@@ -484,10 +564,20 @@
       },
       "cacheinvalidation_unittests",
       "cast_unittests",
-      "cc_unittests",
+      {
+        "test": "cc_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "chromedriver_unittests",
       "chrome_elf_unittests",
-      "components_unittests",
+      {
+        "test": "components_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "compositor_unittests",
       {
         "test": "content_browsertests",
@@ -507,7 +597,12 @@
       "events_unittests",
       "extensions_unittests",
       "gcm_unit_tests",
-      "gpu_unittests",
+      {
+        "test": "gpu_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "installer_util_unittests",
       {
         "test": "interactive_ui_tests",
@@ -518,7 +613,12 @@
       },
       "ipc_tests",
       "jingle_unittests",
-      "media_unittests",
+      {
+        "test": "media_unittests",
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        }
+      },
       "mojo_common_unittests",
       "mojo_public_bindings_unittests",
       "mojo_public_environment_unittests",

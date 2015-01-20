@@ -72,11 +72,11 @@ base::WeakPtr<BluetoothAdapter> BluetoothAdapterChromeOS::CreateAdapter() {
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }
 
-void BluetoothAdapterChromeOS::OnDBusThreadManagerShutdown() {
+void BluetoothAdapterChromeOS::Shutdown() {
   if (dbus_is_shutdown_)
     return;
   DCHECK(DBusThreadManager::IsInitialized())
-      << "Call BluetoothAdapterFactory::OnDBusThreadManagerShutdown() before "
+      << "Call BluetoothAdapterFactory::Shutdown() before "
          "DBusThreadManager::Shutdown().";
 
   if (IsPresent())
@@ -124,7 +124,7 @@ BluetoothAdapterChromeOS::BluetoothAdapterChromeOS()
 }
 
 BluetoothAdapterChromeOS::~BluetoothAdapterChromeOS() {
-  OnDBusThreadManagerShutdown();
+  Shutdown();
 }
 
 void BluetoothAdapterChromeOS::DeleteOnCorrectThread() const {
@@ -959,7 +959,10 @@ void BluetoothAdapterChromeOS::OnPropertyChangeCompleted(
 void BluetoothAdapterChromeOS::AddDiscoverySession(
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
-  DCHECK(IsPresent());
+  if (!IsPresent()) {
+    error_callback.Run();
+    return;
+  }
   VLOG(1) << __func__;
   if (discovery_request_pending_) {
     // The pending request is either to stop a previous session or to start a

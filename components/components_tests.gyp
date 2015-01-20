@@ -146,7 +146,7 @@
             'gcm_driver/gcm_stats_recorder_impl_unittest.cc',
             'google/core/browser/google_url_tracker_unittest.cc',
             'google/core/browser/google_util_unittest.cc',
-            'history/core/android/android_history_types_unittest.cc',
+            'history/core/browser/android/android_history_types_unittest.cc',
             'history/core/browser/history_types_unittest.cc',
             'history/core/browser/in_memory_url_index_types_unittest.cc',
             'history/core/browser/top_sites_cache_unittest.cc',
@@ -756,7 +756,6 @@
               ],
               'dependencies': [
                 '../testing/android/native_test.gyp:native_test_native_code',
-                'components.gyp:history_core_android',
               ],
               'dependencies!': [
                 'components.gyp:feedback_component',
@@ -826,6 +825,7 @@
               'sources': [
                 'pairing/message_buffer_unittest.cc',
                 'timers/alarm_timer_unittest.cc',
+                'wifi_sync/wifi_config_delegate_chromeos_unittest.cc',
                 'wifi_sync/wifi_credential_unittest.cc',
                 'wifi_sync/wifi_security_class_chromeos_unittest.cc',
                 'wifi_sync/wifi_security_class_unittest.cc',
@@ -866,12 +866,12 @@
               ],
             }],
             ['OS=="linux" and component=="shared_library" and use_allocator!="none"', {
-            'dependencies': [
+              'dependencies': [
                 '<(DEPTH)/base/allocator/allocator.gyp:allocator',
-            ],
-            'link_settings': {
+              ],
+              'link_settings': {
                 'ldflags': ['-rdynamic'],
-            },
+              },
             }],
             ['configuration_policy==1', {
               'dependencies': [
@@ -1128,6 +1128,23 @@
                 '../base/allocator/allocator.gyp:allocator',
               ],
             }],
+          ],
+        },
+      ],
+    }],
+    ['test_isolation_mode != "noop"', {
+      'targets': [
+        {
+          'target_name': 'components_unittests_run',
+          'type': 'none',
+          'dependencies': [
+            'components_unittests',
+          ],
+          'includes': [
+            '../build/isolate.gypi',
+          ],
+          'sources': [
+            'components_unittests.isolate',
           ],
         },
       ],

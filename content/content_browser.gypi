@@ -503,6 +503,8 @@
       'browser/device_monitor_mac.mm',
       'browser/device_monitor_udev.cc',
       'browser/device_monitor_udev.h',
+      'browser/device_sensors/ambient_light_mac.cc',
+      'browser/device_sensors/ambient_light_mac.h',
       'browser/device_sensors/data_fetcher_shared_memory.h',
       'browser/device_sensors/data_fetcher_shared_memory_android.cc',
       'browser/device_sensors/data_fetcher_shared_memory_base.cc',
@@ -1677,18 +1679,18 @@
         '../cc/cc.gyp:cc',
         '../cc/cc.gyp:cc_surfaces',
         '../device/bluetooth/bluetooth.gyp:device_bluetooth',
-        '../mojo/mojo_public.gyp:mojo_cpp_bindings',
-        '../mojo/mojo_public.gyp:mojo_js_bindings',
         '../net/net.gyp:http_server',
         '../storage/storage_browser.gyp:storage',
         '../storage/storage_common.gyp:storage_common',
         '../third_party/angle/src/angle.gyp:commit_id',
         '../third_party/leveldatabase/leveldatabase.gyp:leveldatabase',
+        '../third_party/mojo/mojo_public.gyp:mojo_cpp_bindings',
+        '../third_party/mojo/mojo_public.gyp:mojo_js_bindings',
         '../ui/surface/surface.gyp:surface',
         '../ui/touch_selection/ui_touch_selection.gyp:ui_touch_selection',
       ],
       'export_dependent_settings': [
-        '../mojo/mojo_public.gyp:mojo_cpp_bindings',
+        '../third_party/mojo/mojo_public.gyp:mojo_cpp_bindings',
       ],
     }],
     ['enable_basic_printing==1 or enable_print_preview==1', {
@@ -1814,6 +1816,8 @@
     ['use_x11==1', {
       'dependencies': [
         '../build/linux/system.gyp:x11',
+        '../ui/events/platform/x11/x11_events_platform.gyp:x11_events_platform',
+        '../ui/gfx/x/gfx_x11.gyp:gfx_x11',
       ],
     }],
     ['use_pango==1', {

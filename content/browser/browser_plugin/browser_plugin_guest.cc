@@ -132,11 +132,18 @@ base::WeakPtr<BrowserPluginGuest> BrowserPluginGuest::AsWeakPtr() {
   return weak_ptr_factory_.GetWeakPtr();
 }
 
-void BrowserPluginGuest::SetFocus(RenderWidgetHost* rwh, bool focused) {
+void BrowserPluginGuest::SetFocus(RenderWidgetHost* rwh,
+                                  bool focused,
+                                  blink::WebFocusType focus_type) {
   focused_ = focused;
   if (!rwh)
     return;
 
+  if ((focus_type == blink::WebFocusTypeForward) ||
+      (focus_type == blink::WebFocusTypeBackward)) {
+    static_cast<RenderViewHostImpl*>(RenderViewHost::From(rwh))->
+        SetInitialFocus(focus_type == blink::WebFocusTypeBackward);
+  }
   rwh->Send(new InputMsg_SetFocus(rwh->GetRoutingID(), focused));
   if (!focused && mouse_locked_)
     OnUnlockMouse();
@@ -220,7 +227,9 @@ void BrowserPluginGuest::InitInternal(
     const BrowserPluginHostMsg_Attach_Params& params,
     WebContentsImpl* owner_web_contents) {
   focused_ = params.focused;
-  OnSetFocus(browser_plugin::kInstanceIDNone, focused_);
+  OnSetFocus(browser_plugin::kInstanceIDNone,
+             focused_,
+             blink::WebFocusTypeNone);
 
   guest_visible_ = params.visible;
   UpdateVisibility();
@@ -731,7 +740,7 @@ void BrowserPluginGuest::OnResizeGuest(
   // BrowserPluginGuest does not yet have a RenderViewHost.
   if (guest_device_scale_factor_ != params.scale_factor &&
       GetWebContents()->GetRenderViewHost()) {
-    RenderWidgetHostImpl* render_widget_host =
+    auto render_widget_host =
         RenderWidgetHostImpl::From(GetWebContents()->GetRenderViewHost());
     guest_device_scale_factor_ = params.scale_factor;
     render_widget_host->NotifyScreenInfoChanged();
@@ -748,10 +757,11 @@ void BrowserPluginGuest::OnResizeGuest(
 }
 
 void BrowserPluginGuest::OnSetFocus(int browser_plugin_instance_id,
-                                    bool focused) {
+                                    bool focused,
+                                    blink::WebFocusType focus_type) {
   RenderWidgetHostView* rwhv = web_contents()->GetRenderWidgetHostView();
   RenderWidgetHost* rwh = rwhv ? rwhv->GetRenderWidgetHost() : NULL;
-  SetFocus(rwh, focused);
+  SetFocus(rwh, focused, focus_type);
 }
 
 void BrowserPluginGuest::OnSetEditCommandsForNextKeyEvent(

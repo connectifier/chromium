@@ -84,6 +84,16 @@ class PasswordFormManager : public PasswordStoreConsumer {
   // the same thread!
   bool HasCompletedMatching() const;
 
+  // Returns true if the observed form has both the current and new password
+  // fields, and the username field was not explicitly marked with
+  // autocomplete=username. In these cases it is not clear whether the username
+  // field is the right guess (often such change password forms do not contain
+  // the username at all), and the user should not be bothered with saving a
+  // potentially malformed credential. Once we handle change password forms
+  // correctly, or http://crbug.com/448351 gets implemented, this method should
+  // be replaced accordingly.
+  bool IsIgnorableChangePasswordForm() const;
+
   // Determines if the user opted to 'never remember' passwords for this form.
   bool IsBlacklisted() const;
 
@@ -161,9 +171,7 @@ class PasswordFormManager : public PasswordStoreConsumer {
   }
 
   // Returns the realm URL for the form managed my this manager.
-  const std::string& realm() const {
-    return pending_credentials_.signon_realm;
-  }
+  const std::string& realm() const { return pending_credentials_.signon_realm; }
 
  protected:
   const autofill::PasswordForm& observed_form() const { return observed_form_; }
@@ -212,8 +220,8 @@ class PasswordFormManager : public PasswordStoreConsumer {
 
   // The maximum number of combinations of the three preceding enums.
   // This is used when recording the actions taken by the form in UMA.
-  static const int kMaxNumActionsTaken = kManagerActionMax * kUserActionMax *
-                                         kSubmitResultMax;
+  static const int kMaxNumActionsTaken =
+      kManagerActionMax * kUserActionMax * kSubmitResultMax;
 
   // Determines if we need to autofill given the results of the query.
   // Takes ownership of the elements in |result|.
@@ -314,12 +322,12 @@ class PasswordFormManager : public PasswordStoreConsumer {
   const autofill::PasswordForm* preferred_match_;
 
   typedef enum {
-    PRE_MATCHING_PHASE,      // Have not yet invoked a GetLogins query to find
-                             // matching login information from password store.
-    MATCHING_PHASE,          // We've made a GetLogins request, but
-                             // haven't received or finished processing result.
-    POST_MATCHING_PHASE      // We've queried the DB and processed matching
-                             // login results.
+    PRE_MATCHING_PHASE,  // Have not yet invoked a GetLogins query to find
+                         // matching login information from password store.
+    MATCHING_PHASE,      // We've made a GetLogins request, but
+                         // haven't received or finished processing result.
+    POST_MATCHING_PHASE  // We've queried the DB and processed matching
+                         // login results.
   } PasswordFormManagerState;
 
   // State of matching process, used to verify that we don't call methods

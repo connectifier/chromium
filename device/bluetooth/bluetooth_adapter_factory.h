@@ -30,9 +30,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterFactory {
   static void GetAdapter(const AdapterCallback& callback);
 
 #if defined(OS_CHROMEOS)
-  // Calls |BluetoothAdapter::OnDBusThreadManagerShutdown| on the adapter if
+  // Calls |BluetoothAdapter::Shutdown| on the adapter if
   // present.
-  static void OnDBusThreadManagerShutdown();
+  static void Shutdown();
 #endif
 
   // Sets the shared instance of the default adapter for testing purposes only,

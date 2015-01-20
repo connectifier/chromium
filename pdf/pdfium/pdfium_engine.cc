@@ -31,6 +31,7 @@
 #include "ppapi/cpp/trusted/browser_font_trusted.h"
 #include "ppapi/cpp/url_response_info.h"
 #include "ppapi/cpp/var.h"
+#include "ppapi/cpp/var_dictionary.h"
 #include "third_party/pdfium/fpdfsdk/include/fpdf_ext.h"
 #include "third_party/pdfium/fpdfsdk/include/fpdf_flatten.h"
 #include "third_party/pdfium/fpdfsdk/include/fpdf_searchex.h"
@@ -512,6 +513,44 @@ void FormatStringForOS(base::string16* text) {
 #else
   NOTIMPLEMENTED();
 #endif
+}
+
+// Returns a VarDictionary (representing a bookmark), which in turn contains
+// child VarDictionaries (representing the child bookmarks).
+// If NULL is passed in as the bookmark then we traverse from the "root".
+// Note that the "root" bookmark contains no useful information.
+pp::VarDictionary TraverseBookmarks(FPDF_DOCUMENT doc, FPDF_BOOKMARK bookmark) {
+  pp::VarDictionary dict;
+  base::string16 title;
+  unsigned long buffer_size = FPDFBookmark_GetTitle(bookmark, NULL, 0);
+  size_t title_length = buffer_size / sizeof(base::string16::value_type);
+
+  if (title_length > 0) {
+    PDFiumAPIStringBufferAdapter<base::string16> api_string_adapter(
+        &title, title_length, true);
+    void* data = api_string_adapter.GetData();
+    FPDFBookmark_GetTitle(bookmark, data, buffer_size);
+    api_string_adapter.Close(title_length);
+  }
+  dict.Set(pp::Var("title"), pp::Var(base::UTF16ToUTF8(title)));
+
+  FPDF_DEST dest = FPDFBookmark_GetDest(doc, bookmark);
+  // Some bookmarks don't have a page to select.
+  if (dest) {
+    int page_index = FPDFDest_GetPageIndex(doc, dest);
+    dict.Set(pp::Var("page"), pp::Var(page_index));
+  }
+
+  pp::VarArray children;
+  int child_index = 0;
+  for (FPDF_BOOKMARK child_bookmark = FPDFBookmark_GetFirstChild(doc, bookmark);
+      child_bookmark != NULL;
+      child_bookmark = FPDFBookmark_GetNextSibling(doc, child_bookmark)) {
+    children.Set(child_index, TraverseBookmarks(doc, child_bookmark));
+    child_index++;
+  }
+  dict.Set(pp::Var("children"), children);
+  return dict;
 }
 
 }  // namespace
@@ -2320,6 +2359,13 @@ int PDFiumEngine::GetNumberOfPages() {
   return pages_.size();
 }
 
+
+pp::VarArray PDFiumEngine::GetBookmarks() {
+  pp::VarDictionary dict = TraverseBookmarks(doc_, NULL);
+  // The root bookmark contains no useful information.
+  return pp::VarArray(dict.Get(pp::Var("children")));
+}
+
 int PDFiumEngine::GetNamedDestinationPage(const std::string& destination) {
   // Look for the destination.
   FPDF_DEST dest = FPDF_GetNamedDestByName(doc_, destination.c_str());
@@ -2334,6 +2380,32 @@ int PDFiumEngine::GetNamedDestinationPage(const std::string& destination) {
     dest = FPDFBookmark_GetDest(doc_, bookmark);
   }
   return dest ? FPDFDest_GetPageIndex(doc_, dest) : -1;
+}
+
+pp::VarDictionary PDFiumEngine::GetNamedDestinations() {
+  pp::VarDictionary named_destinations;
+  for (unsigned long i = 0; i < FPDF_CountNamedDests(doc_); i++) {
+    base::string16 name;
+    unsigned long buffer_bytes;
+    FPDF_GetNamedDest(doc_, i, NULL, buffer_bytes);
+    size_t name_length = buffer_bytes / sizeof(base::string16::value_type);
+    if (name_length > 0) {
+      PDFiumAPIStringBufferAdapter<base::string16> api_string_adapter(
+          &name, name_length, true);
+      FPDF_DEST dest = FPDF_GetNamedDest(doc_, i, api_string_adapter.GetData(),
+                                         buffer_bytes);
+      api_string_adapter.Close(name_length);
+      if (dest) {
+        std::string named_dest = base::UTF16ToUTF8(name);
+        int page_number = GetNamedDestinationPage(named_dest);
+        if (page_number >= 0) {
+          named_destinations.Set(pp::Var(named_dest.c_str()),
+                                 pp::Var(page_number));
+        }
+      }
+    }
+  }
+  return named_destinations;
 }
 
 int PDFiumEngine::GetFirstVisiblePage() {
@@ -3618,7 +3690,8 @@ void PDFiumEngine::Form_Mail(IPDF_JSPLATFORM* param,
                              FPDF_WIDESTRING cc,
                              FPDF_WIDESTRING bcc,
                              FPDF_WIDESTRING message) {
-  DCHECK(length == 0);  // Don't handle attachments; no way with mailto.
+  // Note: |mail_data| and |length| are ignored. We don't handle attachments;
+  // there is no way with mailto.
   std::string to_str =
       base::UTF16ToUTF8(reinterpret_cast<const base::char16*>(to));
   std::string cc_str =
