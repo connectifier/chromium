@@ -95,6 +95,7 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
         // TODO(scheib): "Empty Mock Device instanceId"
         device_ipc.instance_id = "Empty Mock deviceId";
         // TODO(scheib): device_ipc.name; --- how to construct string16?
+        device_ipc.device_class = 0x1F00;  // Unspecified.
       Send(new BluetoothMsg_RequestDeviceSuccess(thread_id, request_id,
                                                  device_ipc));
       return;
