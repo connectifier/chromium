@@ -109,7 +109,7 @@ void BluetoothDispatcher::OnRequestDeviceSuccess(int thread_id,
       ->onSuccess(
           new WebBluetoothDevice(WebString::fromUTF8(device.instance_id),
                                  WebString(device.name),
-                                 device.class));
+                                 device.device_class));
   pending_requests_.Remove(request_id);
 }
 
