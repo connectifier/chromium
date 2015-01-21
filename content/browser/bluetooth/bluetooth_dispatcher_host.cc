@@ -4,6 +4,7 @@
 
 #include "content/browser/bluetooth/bluetooth_dispatcher_host.h"
 
+#include "base/strings/utf_string_conversions.h"
 #include "content/common/bluetooth/bluetooth_messages.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_adapter_factory.h"
@@ -94,7 +95,7 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
         content::BluetoothDevice device_ipc;
         // TODO(scheib): "Empty Mock Device instanceId"
         device_ipc.instance_id = "Empty Mock deviceId";
-        // TODO(scheib): device_ipc.name; --- how to construct string16?
+        device_ipc.name = base::UTF8ToUTF16("Empty Mock Device Name");
         device_ipc.device_class = 0x1F00;  // Unspecified.
       Send(new BluetoothMsg_RequestDeviceSuccess(thread_id, request_id,
                                                  device_ipc));
