@@ -63,7 +63,6 @@ void BluetoothDispatcherHost::set_adapter(
 }
 
 void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
-  fprintf(stderr, "%s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   // TODO(scheib) Extend this very simple mock implementation by using
   // device/bluetooth/test mock adapter and related classes.

@@ -89,7 +89,6 @@ void BluetoothDispatcher::OnMessageReceived(const IPC::Message& msg) {
 void BluetoothDispatcher::requestDevice(
     blink::WebBluetoothRequestDeviceCallbacks* callbacks) {
   int request_id = pending_requests_.Add(callbacks);
-  fprintf(stderr, "%s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
   Send(new BluetoothHostMsg_RequestDevice(CurrentWorkerId(), request_id));
 }
 
