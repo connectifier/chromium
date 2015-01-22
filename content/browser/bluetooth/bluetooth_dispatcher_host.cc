@@ -76,8 +76,6 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
         Send(new BluetoothMsg_RequestDeviceError(thread_id, request_id,
                                                  BluetoothError::NOT_FOUND));
       } else {
-        fprintf(stderr, "%s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
         device::BluetoothDevice* device = *devices.begin();
         content::BluetoothDevice device_ipc;
         device_ipc.instance_id = device->GetAddress();
@@ -87,7 +85,6 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
         device_ipc.product_id = device->GetProductID();
         device_ipc.paired = device->IsPaired();
         device_ipc.connected = device->IsConnected();
-        fprintf(stderr, "%s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
         Send(new BluetoothMsg_RequestDeviceSuccess(thread_id, request_id,
                                                    device_ipc));
       }
