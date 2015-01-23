@@ -83,6 +83,7 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
         device_ipc.device_class = device->GetBluetoothClass();
         device_ipc.vendor_id = device->GetVendorID();
         device_ipc.product_id = device->GetProductID();
+        device_ipc.product_version = device->GetDeviceID();
         device_ipc.paired = device->IsPaired();
         device_ipc.connected = device->IsConnected();
         Send(new BluetoothMsg_RequestDeviceSuccess(thread_id, request_id,

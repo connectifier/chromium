@@ -112,6 +112,7 @@ void BluetoothDispatcher::OnRequestDeviceSuccess(int thread_id,
                                  device.device_class,
                                  device.vendor_id,
                                  device.product_id,
+                                 device.product_version,
                                  device.paired,
                                  device.connected));
   pending_requests_.Remove(request_id);

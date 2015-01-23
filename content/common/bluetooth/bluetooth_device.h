@@ -22,6 +22,7 @@ struct CONTENT_EXPORT BluetoothDevice {
     uint32 device_class;
     uint16 vendor_id;
     uint16 product_id;
+    uint16 product_version;
     bool paired;
     bool connected;
 };
