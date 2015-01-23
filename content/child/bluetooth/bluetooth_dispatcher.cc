@@ -45,6 +45,20 @@ WebBluetoothError::ErrorType WebBluetoothErrorFromBluetoothError(
   return WebBluetoothError::NotFoundError;
 }
 
+WebBluetoothDevice::VendorIDSource GetWebVendorIdSource(
+    device::BluetoothDevice::VendorIDSource vendor_id_source) {
+  switch (vendor_id_source) {
+    case device::BluetoothDevice::VENDOR_ID_UNKNOWN:
+      return WebBluetoothDevice::VendorIDSource::Unknown;
+    case device::BluetoothDevice::VENDOR_ID_BLUETOOTH:
+      return WebBluetoothDevice::VendorIDSource::Bluetooth;
+    case device::BluetoothDevice::VENDOR_ID_USB:
+      return WebBluetoothDevice::VendorIDSource::USB;
+  }
+  NOTREACHED();
+  return WebBluetoothDevice::VendorIDSource::Unknown;
+}
+
 }  // namespace
 
 BluetoothDispatcher::BluetoothDispatcher(ThreadSafeSender* sender)
@@ -106,15 +120,11 @@ void BluetoothDispatcher::OnRequestDeviceSuccess(int thread_id,
                                                  BluetoothDevice device) {
   DCHECK(pending_requests_.Lookup(request_id)) << request_id;
   pending_requests_.Lookup(request_id)
-      ->onSuccess(
-          new WebBluetoothDevice(WebString::fromUTF8(device.instance_id),
-                                 WebString(device.name),
-                                 device.device_class,
-                                 device.vendor_id,
-                                 device.product_id,
-                                 device.product_version,
-                                 device.paired,
-                                 device.connected));
+      ->onSuccess(new WebBluetoothDevice(
+          WebString::fromUTF8(device.instance_id), WebString(device.name),
+          device.device_class, GetWebVendorIdSource(device.vendor_id_source),
+          device.vendor_id, device.product_id, device.product_version,
+          device.paired, device.connected));
   pending_requests_.Remove(request_id);
 }
 

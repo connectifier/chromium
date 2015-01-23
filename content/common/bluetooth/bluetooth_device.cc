@@ -6,8 +6,8 @@
 
 namespace content {
 
-BluetoothDevice::BluetoothDevice() {
-  // TODO
+BluetoothDevice::BluetoothDevice(){
+    // TODO
 };
 
 }  // namespace content

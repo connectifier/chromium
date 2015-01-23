@@ -85,18 +85,23 @@
 #define IPC_MESSAGE_START BluetoothMsgStart
 
 IPC_STRUCT_TRAITS_BEGIN(content::BluetoothDevice)
-  IPC_STRUCT_TRAITS_MEMBER(instance_id)
-  IPC_STRUCT_TRAITS_MEMBER(name)
-  IPC_STRUCT_TRAITS_MEMBER(device_class)
-  IPC_STRUCT_TRAITS_MEMBER(vendor_id)
-  IPC_STRUCT_TRAITS_MEMBER(product_id)
-  IPC_STRUCT_TRAITS_MEMBER(product_version)
-  IPC_STRUCT_TRAITS_MEMBER(paired)
-  IPC_STRUCT_TRAITS_MEMBER(connected)
+IPC_STRUCT_TRAITS_MEMBER(instance_id)
+IPC_STRUCT_TRAITS_MEMBER(name)
+IPC_STRUCT_TRAITS_MEMBER(device_class)
+IPC_STRUCT_TRAITS_MEMBER(vendor_id_source)
+IPC_STRUCT_TRAITS_MEMBER(vendor_id)
+IPC_STRUCT_TRAITS_MEMBER(product_id)
+IPC_STRUCT_TRAITS_MEMBER(product_version)
+IPC_STRUCT_TRAITS_MEMBER(paired)
+IPC_STRUCT_TRAITS_MEMBER(connected)
 IPC_STRUCT_TRAITS_END()
 
 IPC_ENUM_TRAITS_MAX_VALUE(content::BluetoothError,
                           content::BluetoothError::ENUM_MAX_VALUE)
+
+IPC_ENUM_TRAITS_MAX_VALUE(
+    device::BluetoothDevice::VendorIDSource,
+    device::BluetoothDevice::VendorIDSource::VENDOR_ID_MAX_VALUE)
 
 // Messages sent from the browser to the renderer.
 

@@ -81,6 +81,7 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
         device_ipc.instance_id = device->GetAddress();
         device_ipc.name = device->GetName();
         device_ipc.device_class = device->GetBluetoothClass();
+        device_ipc.vendor_id_source = device->GetVendorIDSource();
         device_ipc.vendor_id = device->GetVendorID();
         device_ipc.product_id = device->GetProductID();
         device_ipc.product_version = device->GetDeviceID();
@@ -97,11 +98,13 @@ void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
       return;
     }
     case MockData::RESOLVE: {
-        content::BluetoothDevice device_ipc;
-        // TODO(scheib): "Empty Mock Device instanceId"
-        device_ipc.instance_id = "Empty Mock deviceId";
-        device_ipc.name = base::UTF8ToUTF16("Empty Mock Device Name");
-        device_ipc.device_class = 0x1F00;  // Unspecified.
+      content::BluetoothDevice device_ipc;
+      // TODO(scheib): "Empty Mock Device instanceId"
+      device_ipc.instance_id = "Empty Mock deviceId";
+      device_ipc.name = base::UTF8ToUTF16("Empty Mock Device Name");
+      device_ipc.device_class = 0x1F00;  // Unspecified.
+      device_ipc.vendor_id_source =
+          device::BluetoothDevice::VENDOR_ID_BLUETOOTH;
       Send(new BluetoothMsg_RequestDeviceSuccess(thread_id, request_id,
                                                  device_ipc));
       return;
